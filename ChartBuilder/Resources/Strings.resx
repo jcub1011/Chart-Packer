@@ -321,7 +321,7 @@
     <comment>A Properties field: a vocal note's lyric.</comment>
   </data>
   <data name="PropertiesLyricToolTip" xml:space="preserve">
-    <value>The syllable as the chart has it. A hyphen at the end joins it to the next; # marks it spoken; + is a slide from the note before.</value>
+    <value>The syllable as written. A trailing hyphen joins it to the next; # marks it spoken; + is a slide from the previous note.</value>
     <comment>The tooltip of Properties' lyric field.</comment>
   </data>
   <data name="PropertiesSungLabel" xml:space="preserve">
@@ -333,7 +333,7 @@
     <comment>A Properties check box: the vocal note slides on from the one before (its lyric is +).</comment>
   </data>
   <data name="PropertiesSlideToolTip" xml:space="preserve">
-    <value>The note carries the one before it on to its pitch, with no syllable of its own.</value>
+    <value>The note carries the previous note on to its pitch, with no syllable of its own.</value>
     <comment>The tooltip of Properties' Slide check box.</comment>
   </data>
   <data name="PropertiesSpoken" xml:space="preserve">
@@ -353,7 +353,7 @@
     <comment>The tooltip of the Type lyrics button.</comment>
   </data>
   <data name="PropertiesTypeLyricsHint" xml:space="preserve">
-    <value>One syllable a note, from the first selected; a slide is skipped. Spaces split words, and a hyphen splits a word into syllables: Hel-lo world.</value>
+    <value>One syllable per note, from the first selected; slides are skipped. Spaces split words, hyphens split syllables: Hel-lo world.</value>
     <comment>Type lyrics' explanation, above its box.</comment>
   </data>
   <data name="PropertiesTypeLyricsPlaceholder" xml:space="preserve">
@@ -420,7 +420,7 @@
     <value>What opens on startup</value>
   </data>
   <data name="StartupActionDescription" xml:space="preserve">
-    <value>What Chart Builder opens with when it starts with nothing on its command line.</value>
+    <value>What Chart Builder opens with when started with no command line.</value>
   </data>
   <data name="StartupActionKeywords" xml:space="preserve">
     <value>startup open blank new chart recent start launch</value>
@@ -456,7 +456,7 @@
     <comment>{0} is the song's path.</comment>
   </data>
   <data name="OpenSongLockedElsewhereFormat" xml:space="preserve">
-    <value>{0} is being edited in another window of Chart Builder or Chart Packer.</value>
+    <value>{0} is being edited in another Chart Builder or Chart Packer window.</value>
     <comment>{0} is the song's path.</comment>
   </data>
   <data name="OpenSongLockedFormat" xml:space="preserve">
@@ -479,7 +479,7 @@
     <value>Import notes.chart</value>
   </data>
   <data name="ImportMessageFormat" xml:space="preserve">
-    <value>{0} has only a notes.chart, which is converted to MIDI to be edited. These don't come out exactly as the .chart has them:
+    <value>{0} has only a notes.chart, converted to MIDI for editing. These don't convert exactly as written:
 
 {1}
 
@@ -490,11 +490,11 @@ Open it anyway?</value>
     <value>Open</value>
   </data>
   <data name="ImportIssueSustainsFormat" xml:space="preserve">
-    <value>{0} ({1}): some sustains became plain notes, or the other way round</value>
+    <value>{0} ({1}): some sustains became plain notes, or vice versa</value>
     <comment>{0} is the part, {1} the difficulty.</comment>
   </data>
   <data name="ImportIssueMarkingsFormat" xml:space="preserve">
-    <value>{0} ({1}): some notes changed what they are (HOPO, tap, cymbal, star power)</value>
+    <value>{0} ({1}): some notes changed type (HOPO, tap, cymbal, star power)</value>
     <comment>{0} is the part, {1} the difficulty.</comment>
   </data>
   <data name="ImportIssueNotesChangedFormat" xml:space="preserve">
@@ -514,10 +514,10 @@ Open it anyway?</value>
     <comment>{0} is the first few times, {1} how many more there are.</comment>
   </data>
   <data name="LoadIssueNotice" xml:space="preserve">
-    <value>One thing in the chart couldn't be read as written, and was left out, as the games leave it out. It's listed under Findings (CHR086).</value>
+    <value>One chart item couldn't be read as written and was left out, as the games leave it out. Listed under Findings (CHR086).</value>
   </data>
   <data name="LoadIssuesNoticeFormat" xml:space="preserve">
-    <value>{0} things in the chart couldn't be read as written, and were left out, as the games leave them out. They're listed under Findings (CHR086).</value>
+    <value>{0} chart items couldn't be read as written and were left out, as the games leave them out. Listed under Findings (CHR086).</value>
     <comment>{0} is how many.</comment>
   </data>
   <data name="PlayToolTip" xml:space="preserve">
@@ -546,7 +546,7 @@ Open it anyway?</value>
     <value>Metronome</value>
   </data>
   <data name="MetronomeToolTip" xml:space="preserve">
-    <value>Click on each beat of the chart's tempo map, and louder on each measure.</value>
+    <value>Clicks on each beat of the tempo map, louder on each measure.</value>
   </data>
   <data name="AudioNoStems" xml:space="preserve">
     <value>The song has no audio to play.</value>
@@ -563,7 +563,7 @@ Open it anyway?</value>
     <value>Calibrate Audio Latency</value>
   </data>
   <data name="CalibrationPromptFormat" xml:space="preserve">
-    <value>{0} hasn't been calibrated. Calibrating lines up what you see with what you hear, which timing notes depends on. It takes about a minute.</value>
+    <value>{0} is not calibrated. Calibration lines up what you see with what you hear, which note timing depends on. Takes about a minute.</value>
     <comment>{0} is the audio output device's name.</comment>
   </data>
   <data name="CalibrationPromptConfirm" xml:space="preserve">
@@ -576,7 +576,7 @@ Open it anyway?</value>
     <value>Audio/visual latency</value>
   </data>
   <data name="AudioLatencyDescription" xml:space="preserve">
-    <value>How much later the audio is heard than the screen shows it, measured for each output device. What's drawn against the audio is moved by it. It's what the latency is beyond what's detected from the device, which is added to it.</value>
+    <value>How much later audio is heard than the screen shows it, per output device. Drawn audio shifts by it. This adds to the latency detected from the device.</value>
   </data>
   <data name="AudioLatencyKeywords" xml:space="preserve">
     <value>latency delay offset sync calibrate calibration audio video lag bluetooth</value>
@@ -586,7 +586,7 @@ Open it anyway?</value>
     <comment>A switch: whether the latency read from the output device's buffers is added to its calibrated latency.</comment>
   </data>
   <data name="DetectLatencyDescription" xml:space="preserve">
-    <value>Read the latency of the output device's buffers from the system, and add it to the device's calibrated latency. It can't include a Bluetooth link's delay, or the display's, so calibrate to cover those. Shared with Chart Packer.</value>
+    <value>Adds the output buffer latency reported by the system. Excludes Bluetooth and display delay; calibrate for those. (Shared with Chart Packer.)</value>
   </data>
   <data name="DetectLatencyKeywords" xml:space="preserve">
     <value>detect automatic auto latency delay buffer hardware device sync calibration audio lag</value>
@@ -598,7 +598,7 @@ Open it anyway?</value>
     <value>Offer to calibrate a new output device</value>
   </data>
   <data name="PromptForCalibrationDescription" xml:space="preserve">
-    <value>The first time a song plays on a device that hasn't been calibrated, ask whether to calibrate it.</value>
+    <value>When a song first plays on an uncalibrated device, ask whether to calibrate it.</value>
   </data>
   <data name="PromptForCalibrationKeywords" xml:space="preserve">
     <value>latency calibrate calibration prompt ask device first</value>
@@ -610,7 +610,7 @@ Open it anyway?</value>
     <value>When a tempo changes</value>
   </data>
   <data name="TempoEditsDescription" xml:space="preserve">
-    <value>Whether notes keep their ticks, so they move in time with the grid, or keep their times, so they stay where they are in the audio. Keeping ticks is right while the tempo map is still being built.</value>
+    <value>Whether notes keep their ticks and move with the grid, or keep their times and stay put in the audio. Keep ticks while building the tempo map.</value>
   </data>
   <data name="TempoEditsKeywords" xml:space="preserve">
     <value>tempo bpm keep ticks times retick grid</value>
@@ -649,7 +649,7 @@ Open it anyway?</value>
     <value>Drums</value>
   </data>
   <data name="ChartSettingsDrumsToolTip" xml:space="preserve">
-    <value>Switching between 4-lane and Pro keeps the notes as they are. Switching to or from 5-lane converts them, and lists any it couldn't place. Undo brings them back.</value>
+    <value>Switching between 4-lane and Pro keeps notes as they are. To or from 5-lane converts them and lists any unplaced. Undo brings them back.</value>
   </data>
   <data name="DrumsFourLane" xml:space="preserve">
     <value>4-lane</value>
@@ -665,11 +665,11 @@ Open it anyway?</value>
     <comment>{0} is the drum variant: 4-lane, Pro or 5-lane.</comment>
   </data>
   <data name="DrumConversionReportFormat" xml:space="preserve">
-    <value>Converted the drums to {0}. Notes the mapping couldn't place as it says: {1}. Undo brings them back.</value>
+    <value>Converted the drums to {0}. Unplaced notes: {1}. Undo brings them back.</value>
     <comment>{0} is the drum variant; {1} how many notes are listed below.</comment>
   </data>
   <data name="DrumConversionFromFourLane" xml:space="preserve">
-    <value>The drums were 4-lane, so their cymbals and toms, which the player never saw, were taken from the tom markers as they stood.</value>
+    <value>The drums were 4-lane, so cymbals and toms the player never saw came from the tom markers as they stood.</value>
   </data>
   <data name="DrumConversionLineFormat" xml:space="preserve">
     <value>{0}, {1}: {2}, {3}</value>
@@ -677,11 +677,11 @@ Open it anyway?</value>
   </data>
   <data name="DrumConversionCymbalFormat" xml:space="preserve">
     <value>{0} cymbal</value>
-    <comment>{0} is a pad's colour, such as Blue.</comment>
+    <comment>{0} is a pad's color, such as Blue.</comment>
   </data>
   <data name="DrumConversionTomFormat" xml:space="preserve">
     <value>{0} tom</value>
-    <comment>{0} is a pad's colour, such as Blue.</comment>
+    <comment>{0} is a pad's color, such as Blue.</comment>
   </data>
   <data name="DrumConversionLeftOut" xml:space="preserve">
     <value>left out (another note landed on its pad)</value>
@@ -738,13 +738,13 @@ Open it anyway?</value>
     <value>Change Resolution</value>
   </data>
   <data name="ResolutionWarningMovesFormat" xml:space="preserve">
-    <value>Changing the resolution from {0} to {1} would move {2} items in time, as their ticks don't scale to whole ticks, by up to {3:0.###} ms:</value>
+    <value>Changing resolution from {0} to {1} would move {2} items in time, as their ticks don't scale to whole ticks, by up to {3:0.###} ms:</value>
   </data>
   <data name="ResolutionWarningGroupFormat" xml:space="preserve">
     <value>• {0}: {1}</value>
   </data>
   <data name="ResolutionWarningLeftOut" xml:space="preserve">
-    <value>These would be left out, as another item lands on their place:</value>
+    <value>These would be left out, as another item lands in their place:</value>
   </data>
   <data name="ResolutionWarningConfirm" xml:space="preserve">
     <value>Change anyway</value>
@@ -762,7 +762,7 @@ Open it anyway?</value>
     <value>The resolution can't be changed: {0}</value>
   </data>
   <data name="ChartSettingsNotAppliedFormat" xml:space="preserve">
-    <value>Chart Settings couldn't be applied, so nothing was changed: {0}</value>
+    <value>Chart Settings couldn't apply, so nothing changed: {0}</value>
   </data>
   <data name="PendingChangesHeading" xml:space="preserve">
     <value>Pending song.ini Changes</value>
@@ -771,7 +771,7 @@ Open it anyway?</value>
     <value>None.</value>
   </data>
   <data name="PendingChangesHint" xml:space="preserve">
-    <value>Save writes them with the chart. Revert leaves one out until it is restored.</value>
+    <value>Save writes them with the chart. Revert leaves one out until restored.</value>
   </data>
   <data name="PendingChangeFormat" xml:space="preserve">
     <value>{0} = {1}</value>
@@ -797,7 +797,7 @@ Open it anyway?</value>
     <comment>A setting: the grid notes snap to when the editor opens.</comment>
   </data>
   <data name="DefaultSnapDescription" xml:space="preserve">
-    <value>The grid notes snap to when a chart is opened. [ and ] change it while editing.</value>
+    <value>The grid notes snap to on open. [ and ] change it while editing.</value>
     <comment>The default snap setting's description.</comment>
   </data>
   <data name="DefaultSnapKeywords" xml:space="preserve">
@@ -813,7 +813,7 @@ Open it anyway?</value>
     <comment>A setting: how a lane shows the chart when it's opened.</comment>
   </data>
   <data name="DefaultEditorViewDescription" xml:space="preserve">
-    <value>How a lane shows the chart when it's opened: a vertical highway, as in the games, or a horizontal timeline. V switches the lane in focus.</value>
+    <value>How a lane shows a newly opened chart: a vertical highway, as in the games, or a horizontal timeline. V switches the focused lane.</value>
     <comment>The default view setting's description.</comment>
   </data>
   <data name="DefaultEditorViewKeywords" xml:space="preserve">
@@ -833,7 +833,7 @@ Open it anyway?</value>
     <comment>A setting: how fast notes go by in the editor.</comment>
   </data>
   <data name="EditorHighwaySpeedDescription" xml:space="preserve">
-    <value>How fast notes go by in a lane whose look-ahead you haven't set. Set a lane's own from its header, or with Ctrl+wheel, + and −.</value>
+    <value>How fast notes pass in a lane with no look-ahead set. Set a lane's own from its header, or with Ctrl+wheel, + and −.</value>
     <comment>The highway speed setting's description.</comment>
   </data>
   <data name="EditorHighwaySpeedKeywords" xml:space="preserve">
@@ -845,7 +845,7 @@ Open it anyway?</value>
     <comment>A setting: which way the mouse wheel moves through the song in the editor.</comment>
   </data>
   <data name="WheelDirectionDescription" xml:space="preserve">
-    <value>Which way the mouse wheel moves the cursor through the song: the same on the highway, in the timeline view and on the timeline along the bottom. Shift+wheel moves four times as far.</value>
+    <value>Which way the mouse wheel moves the cursor: same on the highway, in the timeline view and on the bottom timeline. Shift+wheel moves four times as far.</value>
     <comment>The wheel scroll direction setting's description.</comment>
   </data>
   <data name="WheelDirectionKeywords" xml:space="preserve">
@@ -877,7 +877,7 @@ Open it anyway?</value>
     <comment>A setting: how loud the hit sounds are.</comment>
   </data>
   <data name="HitSoundVolumeDescription" xml:space="preserve">
-    <value>How loud the sound on each note is, as it reaches the strike line.</value>
+    <value>How loud the sound on each note is at the strike line.</value>
     <comment>The hit sound volume setting's description.</comment>
   </data>
   <data name="HitSoundVolumeKeywords" xml:space="preserve">
@@ -973,7 +973,7 @@ Open it anyway?</value>
     <comment>The ghost difficulty menu's item for showing no ghost.</comment>
   </data>
   <data name="LaneGhostToolTip" xml:space="preserve">
-    <value>Ghost difficulty: another difficulty drawn faintly behind this one, to check a reduction against it</value>
+    <value>Ghost difficulty: another difficulty drawn faintly behind this one, for checking a reduction</value>
     <comment>The ghost difficulty button's tooltip.</comment>
   </data>
   <data name="LaneDifficultyToolTipFormat" xml:space="preserve">
@@ -1093,7 +1093,7 @@ Open it anyway?</value>
     <comment>A button: work out the tempo from the span's length and its beats.</comment>
   </data>
   <data name="PropertiesSetBpmToolTip" xml:space="preserve">
-    <value>Sets the tempo from the span's start so that its beats fit the span exactly.</value>
+    <value>Sets the tempo from the span start so its beats fit the span exactly.</value>
     <comment>The Set BPM from span button's tooltip.</comment>
   </data>
   <data name="LaneNameGreen" xml:space="preserve">
@@ -1137,27 +1137,27 @@ Open it anyway?</value>
     <comment>A six-fret note's lane, with its column.</comment>
   </data>
   <data name="ToolSelectToolTip" xml:space="preserve">
-    <value>Select notes and drag them in time or across lanes; drag a tail to set a sustain; drag in an empty place to select a span. Click an empty place to clear the selection. On a selected note, Ctrl-drag lengthens or shortens each sustain and Alt-drag lays a run of each note. Right-drag sets the selected sustains (Ctrl: to end at the pointer; Alt: runs up to the pointer). Hold Shift with any tool to select.</value>
+    <value>Drag notes in time or across lanes; drag a tail to set a sustain; drag empty space to select a span. Click empty space to clear. On a selected note, Ctrl-drag resizes each sustain, Alt-drag lays a run of each note. Right-drag sets the selected sustains (Ctrl: end at the pointer; Alt: runs up to the pointer). Shift selects with any tool.</value>
     <comment>The Select tool's tooltip.</comment>
   </data>
   <data name="ToolPlaceToolTip" xml:space="preserve">
-    <value>Click to place a note on the grid, made as the options beside the tools have it, and drag to lay a run of notes; Ctrl-drag draws out a sustain instead (or a run, with Sustain picked). Hold Alt to place an open note, the kick on drums (or a fret, with Open picked). Hold Shift to select instead.</value>
+    <value>Click to place a note on the grid, as set by the options beside the tools; drag to lay a run. Ctrl-drag draws a sustain instead (or a run, with Sustain picked). Alt places an open note, the kick on drums (a fret, with Open picked). Shift selects instead.</value>
     <comment>The Place tool's tooltip.</comment>
   </data>
   <data name="ToolEraseToolTip" xml:space="preserve">
-    <value>Click or drag over notes to remove them, and over phrases in the rail beside the lanes. What a click removes is shown in red. Hold Shift to select instead.</value>
+    <value>Click or drag over notes to remove them, and phrases in the side rail. Removals preview in red. Shift selects instead.</value>
     <comment>The Erase tool's tooltip.</comment>
   </data>
   <data name="ToolTempoToolTip" xml:space="preserve">
-    <value>Click to add a tempo marker; drag one to move it, or, when it's anchored, to fit the tempo to the audio. Middle-click a marker to remove it. Edit its tempo in Properties.</value>
+    <value>Click to add a tempo marker; drag to move it, or to fit the tempo to the audio when anchored. Middle-click removes it. Edit tempo in Properties.</value>
     <comment>The Tempo tool's tooltip.</comment>
   </data>
   <data name="ToolSyncToolTip" xml:space="preserve">
-    <value>Drag over two or more chords of a lane to synchronize them: every passage of the lane matching them exactly is highlighted, and edits in the region are made in each of them too. Click again to clear the region.</value>
+    <value>Drag over two or more chords of a lane to sync them: every exactly matching passage highlights, and edits in the region apply to each. Click again to clear.</value>
     <comment>The Sync tool's tooltip.</comment>
   </data>
   <data name="ToolPhraseToolTip" xml:space="preserve">
-    <value>Drag along the lanes to add a phrase of the kind picked beside this. With any tool, click a phrase in the rail beside the lanes to select it, drag it to move it, or drag either end to resize it. S puts star power over the selection.</value>
+    <value>Drag along the lanes to add a phrase of the picked kind. With any tool, click a phrase in the side rail to select it, drag to move it, or drag either end to resize it. S puts star power over the selection.</value>
     <comment>The Phrase tool's tooltip.</comment>
   </data>
   <data name="ToolPhraseKindToolTip" xml:space="preserve">
@@ -1173,7 +1173,7 @@ Open it anyway?</value>
     <comment>A place option on 5-fret and GHL lanes: a chord a note joins keeps its marking, and a new one is natural.</comment>
   </data>
   <data name="PlaceNaturalToolTip" xml:space="preserve">
-    <value>Place notes as they come: a new chord is natural, and a note added to a chord leaves its marking as it is.</value>
+    <value>Place notes as they come: a new chord is natural, and a note added to a chord keeps its marking.</value>
   </data>
   <data name="PlaceHopo" xml:space="preserve">
     <value>HOPO</value>
@@ -1222,14 +1222,14 @@ Open it anyway?</value>
     <comment>A place option on Pro drums lanes: yellow, blue and green pads stay cymbals.</comment>
   </data>
   <data name="PlaceCymbalToolTip" xml:space="preserve">
-    <value>Place yellow, blue and green pads as they are marked: cymbals, unless a tom marker covers them.</value>
+    <value>Place yellow, blue and green pads as marked: cymbals, unless a tom marker covers them.</value>
   </data>
   <data name="PlaceTom" xml:space="preserve">
     <value>Tom</value>
     <comment>A place option on Pro drums lanes: yellow, blue and green pads are made toms.</comment>
   </data>
   <data name="PlaceTomToolTip" xml:space="preserve">
-    <value>Make each yellow, blue or green pad placed a tom (C). Toms are marked for every difficulty.</value>
+    <value>Make each placed yellow, blue or green pad a tom (C). Toms are marked for every difficulty.</value>
   </data>
   <data name="PlaceNormal" xml:space="preserve">
     <value>Normal</value>
@@ -1364,7 +1364,7 @@ Open it anyway?</value>
     <comment>The snap controls' tooltip.</comment>
   </data>
   <data name="SnapButtonToolTip" xml:space="preserve">
-    <value>Notes placed and moved snap to the grid picked beside this. Off, they go where the pointer is.</value>
+    <value>Placed and moved notes snap to the grid picked beside this. Off, they go where the pointer is.</value>
     <comment>The snap button's tooltip, under its name.</comment>
   </data>
   <data name="LoopLabel" xml:space="preserve">
@@ -1376,7 +1376,7 @@ Open it anyway?</value>
     <comment>The transport bar's checkbox: a sound on each note.</comment>
   </data>
   <data name="HitSoundsToolTip" xml:space="preserve">
-    <value>Play a sound on each note of the lanes shown as it reaches the strike line.</value>
+    <value>Play a sound for each note of the shown lanes as it reaches the strike line.</value>
     <comment>The hit sounds checkbox's tooltip.</comment>
   </data>
   <data name="LatencyLabel" xml:space="preserve">
@@ -1419,7 +1419,7 @@ Open it anyway?</value>
     <comment>Save and pack's tooltip when the song open is a .sng.</comment>
   </data>
   <data name="ExportCopyToolTip" xml:space="preserve">
-    <value>Write a copy of the song, with the chart and its song.ini changes, to another folder</value>
+    <value>Write a copy of the song, with the chart and song.ini changes, to another folder</value>
   </data>
   <data name="ExportCopyNewChartToolTip" xml:space="preserve">
     <value>Save the new chart first; its copy is made from its song folder</value>
@@ -1441,11 +1441,11 @@ Open it anyway?</value>
     <comment>{0} is the .sng written.</comment>
   </data>
   <data name="PackSkippedInUseFormat" xml:space="preserve">
-    <value>Saved, but not packed: {0} is being edited in another window of Chart Builder or Chart Packer.</value>
+    <value>Saved, but not packed: {0} is being edited in another Chart Builder or Chart Packer window.</value>
     <comment>{0} is the .sng that's open.</comment>
   </data>
   <data name="PackSkippedExistsFormat" xml:space="preserve">
-    <value>Saved, but not packed: {0} is already there, and Chart Packer's overwrite setting is to skip it.</value>
+    <value>Saved, but not packed: {0} is already there, and Chart Packer's overwrite setting skips it.</value>
     <comment>{0} is the .sng that exists.</comment>
   </data>
   <data name="PackFailedFormat" xml:space="preserve">
@@ -1458,7 +1458,7 @@ Open it anyway?</value>
     <value>Unsaved Changes</value>
   </data>
   <data name="CloseUnsavedMessageFormat" xml:space="preserve">
-    <value>"{0}" has changes that aren't saved. Save them before closing?</value>
+    <value>"{0}" has unsaved changes. Save them before closing?</value>
     <comment>{0} is the song's title, or Untitled chart.</comment>
   </data>
   <data name="SaveConfirmTitle" xml:space="preserve">
@@ -1475,9 +1475,9 @@ Open it anyway?</value>
     <value>Save as notes.mid</value>
   </data>
   <data name="SaveImportMessageFormat" xml:space="preserve">
-    <value>The chart is saved as notes.mid. {0} can be removed, so the games don't choose between two charts; no copy of it is kept.
+    <value>The chart saves as notes.mid. {0} can be removed so the games don't pick between two charts; no copy is kept.
 
-Saving also makes these changes to song.ini:
+Saving also changes song.ini:
 
 {1}</value>
     <comment>{0} is the imported chart's file name (notes.chart); {1} is the song.ini changes, one per line.</comment>
@@ -1492,7 +1492,7 @@ Saving also makes these changes to song.ini:
     <value>The chart wasn't saved: {0}</value>
   </data>
   <data name="SaveReadBackFailedFormat" xml:space="preserve">
-    <value>The chart wasn't saved: it didn't read back as it was written ({0}). Nothing on disk was changed; this is a bug, which the log has the details of.</value>
+    <value>The chart wasn't saved: it didn't read back as written ({0}). Nothing on disk changed. This is a bug; the log has details.</value>
     <comment>{0} is where the written chart differs from the one in the editor.</comment>
   </data>
   <data name="SavedStatus" xml:space="preserve">
@@ -1510,7 +1510,7 @@ Saving also makes these changes to song.ini:
     <value>Save New Chart</value>
   </data>
   <data name="FirstSaveIntro" xml:space="preserve">
-    <value>A new chart is saved as a song folder, holding notes.mid, song.ini and its audio. Its folder can't be one that's already there.</value>
+    <value>A new chart saves as a song folder holding notes.mid, song.ini and its audio. Its folder must not already exist.</value>
   </data>
   <data name="FirstSaveParentLabel" xml:space="preserve">
     <value>Save In</value>
@@ -1541,7 +1541,7 @@ Saving also makes these changes to song.ini:
     <value>{0} has unsaved changes in Chart Packer.</value>
   </data>
   <data name="FirstSaveLockedElsewhereFormat" xml:space="preserve">
-    <value>{0} is being edited in another window of Chart Builder or Chart Packer.</value>
+    <value>{0} is being edited in another Chart Builder or Chart Packer window.</value>
   </data>
   <data name="FirstSaveLockedFormat" xml:space="preserve">
     <value>{0} is open in another Chart Builder.</value>
@@ -1556,7 +1556,7 @@ Saving also makes these changes to song.ini:
     <value>New Chart in This Song</value>
   </data>
   <data name="NewChartInSongMessageFormat" xml:space="preserve">
-    <value>"{0}" has neither notes.mid nor notes.chart. Start a new chart in it? Its first save adds notes.mid and the song.ini keys.</value>
+    <value>"{0}" has neither notes.mid nor notes.chart. Start a new chart in it? Its first save adds notes.mid and song.ini keys.</value>
     <comment>{0} is the song's name.</comment>
   </data>
   <data name="NewChartInSongButton" xml:space="preserve">
@@ -1577,13 +1577,13 @@ Saving also makes these changes to song.ini:
     <value>Restore</value>
   </data>
   <data name="PendingChangeNotRevertableToolTip" xml:space="preserve">
-    <value>The chart is read by this setting, so leaving it out would save a chart that plays differently. Change the drums in Chart Settings instead.</value>
+    <value>The chart reads this setting, so leaving it out would save a chart that plays differently. Change drums in Chart Settings instead.</value>
   </data>
   <data name="PendingReasonImportedValue" xml:space="preserve">
-    <value>From the imported chart or the new chart's details, as song.ini has no value for it.</value>
+    <value>From the imported chart or new chart details; song.ini has no value.</value>
   </data>
   <data name="PendingReasonCharter" xml:space="preserve">
-    <value>song.ini has no charter, so it's taken from the Default charter name setting.</value>
+    <value>song.ini has no charter, so the Default charter name setting is used.</value>
   </data>
   <data name="PendingReasonDelay" xml:space="preserve">
     <value>The imported .chart's Offset, which notes.mid can't hold.</value>
@@ -1592,13 +1592,13 @@ Saving also makes these changes to song.ini:
     <value>song_length doesn't match the audio's length.</value>
   </data>
   <data name="PendingReasonPartRating" xml:space="preserve">
-    <value>A part added since the song was opened, which isn't rated yet.</value>
+    <value>A part added since the song opened, not yet rated.</value>
   </data>
   <data name="PendingReasonDrumLayout" xml:space="preserve">
     <value>How the drums are read: the drum variant the chart has.</value>
   </data>
   <data name="PendingReasonImportSettings" xml:space="preserve">
-    <value>The sustain cutoff the imported .chart's sustains need to stay sustains once it's notes.mid.</value>
+    <value>The sustain cutoff imported .chart sustains need to stay sustains as notes.mid.</value>
   </data>
   <data name="PendingReasonMultiplierNote" xml:space="preserve">
     <value>The chart's star power is saved on note 116, so multiplier_note no longer applies.</value>
@@ -1608,7 +1608,7 @@ Saving also makes these changes to song.ini:
     <comment>The Settings row for how often the chart is autosaved.</comment>
   </data>
   <data name="AutosaveMinutesDescription" xml:space="preserve">
-    <value>Minutes between autosaves of the chart open, for recovery after a crash. It's also autosaved when playback stops. Autosaves are kept in Chart Builder's settings folder, never in the song.</value>
+    <value>Minutes between autosaves of the open chart, for crash recovery. Also autosaves when playback stops. Autosaves live in Chart Builder's settings folder, never in the song.</value>
   </data>
   <data name="AutosaveMinutesKeywords" xml:space="preserve">
     <value>autosave recovery crash backup minutes interval</value>
@@ -1617,7 +1617,7 @@ Saving also makes these changes to song.ini:
     <value>Pack folder</value>
   </data>
   <data name="PackFolderDescription" xml:space="preserve">
-    <value>The export dialog's default location for the .sng. When empty, it starts at the song's parent folder. The dialog always asks before writing anything.</value>
+    <value>The export dialog's default .sng location. When empty, it starts at the song's parent folder. The dialog always asks before writing.</value>
   </data>
   <data name="PackFolderKeywords" xml:space="preserve">
     <value>pack export output sng folder destination save</value>
@@ -1683,7 +1683,7 @@ Saving also makes these changes to song.ini:
     <value>Convert non-Opus audio to Opus</value>
   </data>
   <data name="ExportSngTranscodeUnavailable" xml:space="preserve">
-    <value>Transcoding to Opus isn't available in this build, so Export stays disabled while this is checked with non-Opus stems. Convert the stems to .opus first, or uncheck it to pack as-is.</value>
+    <value>Opus transcoding isn't in this build, so Export stays disabled while this is checked with non-Opus stems. Convert the stems to .opus first, or uncheck to pack as-is.</value>
   </data>
   <data name="ExportSngTranscodeBlockedProblem" xml:space="preserve">
     <value>Opus transcoding isn't available in this build.</value>
@@ -1754,11 +1754,11 @@ Saving also makes these changes to song.ini:
     <comment>{0} is the .sng written.</comment>
   </data>
   <data name="ExportSngSkippedInUseFormat" xml:space="preserve">
-    <value>Saved, but nothing was written: {0} is being edited in another window of Chart Builder or Chart Packer.</value>
+    <value>Saved, but nothing written: {0} is being edited in another Chart Builder or Chart Packer window.</value>
     <comment>{0} is the .sng that's open.</comment>
   </data>
   <data name="ExportSngSkippedExistsFormat" xml:space="preserve">
-    <value>Saved, but nothing was written: {0} is already there, and the choice is to skip it.</value>
+    <value>Saved, but nothing written: {0} is already there, and the choice is to skip it.</value>
     <comment>{0} is the .sng that exists.</comment>
   </data>
   <data name="ExportSngAudioHeading" xml:space="preserve">
@@ -1788,18 +1788,18 @@ Saving also makes these changes to song.ini:
     <value>Length</value>
   </data>
   <data name="RecoveredNotice" xml:space="preserve">
-    <value>Recovered from an autosave. It isn't saved yet: save it to keep it.</value>
+    <value>Recovered from an autosave. Not saved yet: save to keep it.</value>
     <comment>The Editor's notice when it opens a chart recovered from an autosave.</comment>
   </data>
   <data name="RecoverTitle" xml:space="preserve">
     <value>Recover Unsaved Changes</value>
   </data>
   <data name="RecoverMessageFormat" xml:space="preserve">
-    <value>"{0}" has changes that weren't saved, autosaved at {1}. Recover them, or discard them and open the song as it is on disk?</value>
+    <value>"{0}" has unsaved changes, autosaved at {1}. Recover them, or discard them and open the song as on disk?</value>
     <comment>{0} is the song's name; {1} is when it was autosaved.</comment>
   </data>
   <data name="RecoverChangedWarning" xml:space="preserve">
-    <value>The song's chart has changed on disk since then. Recovering puts the autosaved chart in its place once you save.</value>
+    <value>The song chart changed on disk since then. Recovering puts the autosaved chart in its place once you save.</value>
   </data>
   <data name="RecoverButton" xml:space="preserve">
     <value>Recover</value>
@@ -1822,7 +1822,7 @@ Saving also makes these changes to song.ini:
     <value>Discard unsaved chart</value>
   </data>
   <data name="DiscardUnsavedMessageFormat" xml:space="preserve">
-    <value>Delete the autosave of "{0}"? It can't be recovered afterwards.</value>
+    <value>Delete the autosave of "{0}"? It can't be recovered.</value>
   </data>
   <data name="DiscardUnsavedButton" xml:space="preserve">
     <value>Delete</value>
@@ -1843,7 +1843,7 @@ Saving also makes these changes to song.ini:
     <comment>After Fix All. {0} is how many were fixed, {1} the rule ID (CHR023).</comment>
   </data>
   <data name="SaveAndPackErrorsToolTipFormat" xml:space="preserve">
-    <value>The chart has {0} errors, things the games read differently from what's written. Fix them before packing; Save still works.</value>
+    <value>The chart has {0} errors the games read differently than written. Fix them before packing; Save still works.</value>
   </data>
   <data name="SaveAndPackErrorsFormat" xml:space="preserve">
     <value>Saved, but not packed: the chart has {0} errors. See Findings.</value>
@@ -1923,17 +1923,17 @@ Saving also makes these changes to song.ini:
     <comment>The tick field's tooltip on [music_start], [music_end] or [end], which the editor places.</comment>
   </data>
   <data name="SectionsPlacedToolTipFormat" xml:space="preserve">
-    <value>Written as {0}. Placed automatically from the audio and the notes, and kept up to date as they change.</value>
+    <value>Written as {0}. Placed automatically from the audio and notes, and kept up to date as they change.</value>
     <comment>The label's tooltip on [music_start], [music_end] or [end], which the editor places. {0} is its text, e.g. [music_end].</comment>
   </data>
   <data name="SectionsNameToolTip" xml:space="preserve">
     <value>The section's name. Type a new one and press Enter to rename it.</value>
   </data>
   <data name="SectionsTextToolTip" xml:space="preserve">
-    <value>The event's text, brackets included, as it's written. Type new text and press Enter to change it.</value>
+    <value>The event text, brackets included, as written. Type new text and press Enter to change it.</value>
   </data>
   <data name="SectionsSongEventToolTipFormat" xml:space="preserve">
-    <value>Written as {0}. Its tick can be changed here, or it can be deleted.</value>
+    <value>Written as {0}. Its tick can change here, or it can be deleted.</value>
     <comment>A song event's label's tooltip. {0} is its text, e.g. [music_start].</comment>
   </data>
   <data name="SectionsGoToToolTip" xml:space="preserve">
@@ -1943,7 +1943,7 @@ Saving also makes these changes to song.ini:
     <value>Delete it, as one step to undo</value>
   </data>
   <data name="SectionsKeysHint" xml:space="preserve">
-    <value>Ctrl+↑ and Ctrl+↓ move the cursor to the next section and the previous one.</value>
+    <value>Ctrl+↑ / Ctrl+↓ move the cursor to the next/previous section.</value>
   </data>
   <data name="TempoMapTab" xml:space="preserve">
     <value>Tempo Map</value>
@@ -1963,7 +1963,7 @@ Saving also makes these changes to song.ini:
     <value>Time Signature</value>
   </data>
   <data name="TempoMapAddSignatureToolTip" xml:space="preserve">
-    <value>Add a time signature change at the start of the measure the cursor is in</value>
+    <value>Add a time signature change at the start of the cursor's measure</value>
   </data>
   <data name="TempoMapCustomSignature" xml:space="preserve">
     <value>Custom…</value>
@@ -1982,16 +1982,16 @@ Saving also makes these changes to song.ini:
     <comment>Beside a tempo change's BPM field.</comment>
   </data>
   <data name="TempoMapBpmToolTip" xml:space="preserve">
-    <value>The tempo from here on. Type a BPM and press Enter; empty it to remove the tempo change. Greyed, it's the tempo carried on from before.</value>
+    <value>Tempo from here on. Type a BPM and press Enter; empty to remove the change. Greyed means carried over.</value>
   </data>
   <data name="TempoMapNumeratorToolTip" xml:space="preserve">
-    <value>Beats in a measure from here on. Type a number and press Enter; empty it to remove the time signature change. Greyed, it's carried on from before.</value>
+    <value>Beats per measure from here on. Type a number and press Enter; empty to remove the change. Greyed means carried over.</value>
   </data>
   <data name="TempoMapDenominatorToolTip" xml:space="preserve">
     <value>The note value of a beat from here on</value>
   </data>
   <data name="TempoMapAnchorToolTip" xml:space="preserve">
-    <value>Anchored: the marker stays at its time in the audio when tempos before it change</value>
+    <value>Anchored: the marker keeps its time in the audio when earlier tempos change</value>
   </data>
   <data name="TempoMapRemoveToolTip" xml:space="preserve">
     <value>Remove this change, as one step to undo</value>
@@ -2013,7 +2013,7 @@ Saving also makes these changes to song.ini:
     <comment>Said when a time signature's beats typed in the Tempo map tab aren't a whole number.</comment>
   </data>
   <data name="TempoMapKeysHint" xml:space="preserve">
-    <value>Ctrl+Shift+↑ and Ctrl+Shift+↓ move the cursor to the next tempo or time signature change and the previous one. The Tempo tool adds and drags tempo markers on the lanes.</value>
+    <value>Ctrl+Shift+↑ / Ctrl+Shift+↓ move the cursor to the next/previous tempo or time signature change. The Tempo tool adds and drags tempo markers on the lanes.</value>
   </data>
   <data name="GenerateFillsHeading" xml:space="preserve">
     <value>Generate Fills</value>
@@ -2027,7 +2027,7 @@ Saving also makes these changes to song.ini:
     <comment>How many measures apart generated fills start, at the least.</comment>
   </data>
   <data name="GenerateFillsSpacingToolTip" xml:space="preserve">
-    <value>Fills start at least this many measures apart, counting the fills already there.</value>
+    <value>Fills start at least this many measures apart, counting existing fills.</value>
   </data>
   <data name="GenerateFillsLengthLabel" xml:space="preserve">
     <value>Fill length (measures)</value>
@@ -2040,7 +2040,7 @@ Saving also makes these changes to song.ini:
     <comment>What a generated fill must end on: a crash or any note.</comment>
   </data>
   <data name="GenerateFillsEndToolTip" xml:space="preserve">
-    <value>The note star power is activated on, on a measure's first beat. A crash is a green cymbal on Pro drums, orange on 5-lane and green on 4-lane.</value>
+    <value>The note star power activates on, on a measure's first beat. A crash is a green cymbal on Pro drums, orange on 5-lane, green on 4-lane.</value>
   </data>
   <data name="GenerateFillsEndCrash" xml:space="preserve">
     <value>Crash</value>
@@ -2080,14 +2080,14 @@ Saving also makes these changes to song.ini:
     <comment>About how many seconds apart generated star power phrases are.</comment>
   </data>
   <data name="GenerateStarPowerSpacingToolTip" xml:space="preserve">
-    <value>About how far apart phrases are, in seconds of the part's playing: its long rests don't count. A whole part gets at least four.</value>
+    <value>Roughly how far apart phrases are, in seconds of the part's playing; long rests do not count. A whole part gets at least four.</value>
   </data>
   <data name="GenerateStarPowerSpikesLabel" xml:space="preserve">
     <value>Charge for hard passages</value>
     <comment>A check box: place phrases so a player has enough star power to activate going into each hard passage.</comment>
   </data>
   <data name="GenerateStarPowerSpikesToolTip" xml:space="preserve">
-    <value>Place phrases so a player has half a meter, enough to activate, just before each of the hardest passages the difficulty graph finds. Off, they're only spread evenly.</value>
+    <value>Place phrases to give half a meter, enough to activate, before each hardest passage the difficulty graph finds. Off, they're only spread evenly.</value>
   </data>
   <data name="StarPowerRunFormat" xml:space="preserve">
     <value>{0} of {1} proposed star power phrases kept</value>
@@ -2158,7 +2158,7 @@ Saving also makes these changes to song.ini:
     <value>Lanes show</value>
   </data>
   <data name="LaneBackdropDescription" xml:space="preserve">
-    <value>Whether a lane draws its audio as a waveform or a spectrogram until it's switched, from the lane's audio button or with W.</value>
+    <value>Whether a lane draws audio as a waveform or spectrogram until switched, from the lane's audio button or with W.</value>
   </data>
   <data name="LaneBackdropKeywords" xml:space="preserve">
     <value>waveform spectrogram audio lane behind beside</value>
@@ -2167,7 +2167,7 @@ Saving also makes these changes to song.ini:
     <value>Spectrogram memory budget (MB)</value>
   </data>
   <data name="SpectrogramBudgetDescription" xml:space="preserve">
-    <value>How much memory every stem's spectrogram may take together. The stems used least recently are let go first. Spectrograms are never written to disk.</value>
+    <value>How much memory all stems' spectrograms may take together. Least recently used stems release first. Spectrograms are never written to disk.</value>
   </data>
   <data name="SpectrogramBudgetKeywords" xml:space="preserve">
     <value>spectrogram memory budget ram megabytes</value>
@@ -2260,7 +2260,7 @@ Saving also makes these changes to song.ini:
     <value>The song has no audio to show.</value>
   </data>
   <data name="SpectrogramOverBudgetFormat" xml:space="preserve">
-    <value>The spectrogram of {0} needs {1:0} MB, more than the whole spectrogram memory budget. Raise the budget in Settings to see it.</value>
+    <value>The spectrogram of {0} needs {1:0} MB, more than the whole memory budget. Raise the budget in Settings to see it.</value>
   </data>
   <data name="OnsetsFindingFormat" xml:space="preserve">
     <value>Finding onsets in {0}…</value>
@@ -2275,7 +2275,7 @@ Saving also makes these changes to song.ini:
     <value>Snap to onset</value>
   </data>
   <data name="SnapToOnsetToolTip" xml:space="preserve">
-    <value>Snap to onset (O): notes placed and moved go to the nearest onset within half a grid step</value>
+    <value>Snap to onset (O): placed and moved notes go to the nearest onset within half a grid step</value>
   </data>
   <data name="SnapToOnsetOnStatus" xml:space="preserve">
     <value>Snap to onset is on: notes go to the nearest onset within half a grid step.</value>
@@ -2287,19 +2287,19 @@ Saving also makes these changes to song.ini:
     <value>Nudge</value>
   </data>
   <data name="NudgeToOnsetsToolTip" xml:space="preserve">
-    <value>Nudge to onsets (Shift+O): move the selected notes to their nearest onsets</value>
+    <value>Nudge to onsets (Shift+O): move selected notes to their nearest onsets</value>
   </data>
   <data name="NudgeNothingSelected" xml:space="preserve">
     <value>Select the notes to nudge to their onsets first.</value>
   </data>
   <data name="NudgeNoOnsets" xml:space="preserve">
-    <value>There are no onsets to nudge to yet: they're still being found, or the lane has no audio.</value>
+    <value>No onsets to nudge to yet: they're still being found, or the lane has no audio.</value>
   </data>
   <data name="NudgeNothingMovedFormat" xml:space="preserve">
-    <value>Nothing was nudged: none of the {0} chords has an onset of its own within half a grid step.</value>
+    <value>Nothing nudged: none of the {0} chords has an onset of its own within half a grid step.</value>
   </data>
   <data name="NudgeReportFormat" xml:space="preserve">
-    <value>Nudged {0} chords to their onsets; the largest move was {1:0.0} ms. {2} stayed where they were.</value>
+    <value>Nudged {0} chords to their onsets; largest move {1:0.0} ms. {2} stayed put.</value>
   </data>
   <data name="NudgeLineFormat" xml:space="preserve">
     <value>{0}: {1:+0.0;-0.0;0.0} ms</value>
@@ -2308,7 +2308,7 @@ Saving also makes these changes to song.ini:
     <value>{0}: no onset within half a grid step, so it stayed</value>
   </data>
   <data name="NudgeBlockedLineFormat" xml:space="preserve">
-    <value>{0}: another note was nearer the onset, or in the way, so it stayed</value>
+    <value>{0}: another note was nearer the onset or in the way, so it stayed</value>
   </data>
   <data name="AudioAssistGroupLabel" xml:space="preserve">
     <value>Audio assist</value>
@@ -2320,7 +2320,7 @@ Saving also makes these changes to song.ini:
     <value>Propose tempo map…</value>
   </data>
   <data name="ProposeTempoMapToolTip" xml:space="preserve">
-    <value>Propose a tempo map from the audio, to review over the real one</value>
+    <value>Propose a tempo map from the audio, to review over the current one</value>
   </data>
   <data name="ProposeTempoMapHeading" xml:space="preserve">
     <value>Propose a Tempo Map</value>
@@ -2338,7 +2338,7 @@ Saving also makes these changes to song.ini:
     <value>Anchor every (measures)</value>
   </data>
   <data name="ProposalAnchorEveryToolTip" xml:space="preserve">
-    <value>When it's accepted, anchor a tempo marker every this many measures; 0 for none</value>
+    <value>When accepted, anchor a tempo marker every this many measures; 0 for none</value>
   </data>
   <data name="ProposalMergeLabel" xml:space="preserve">
     <value>Merge within (ms)</value>
@@ -2398,7 +2398,7 @@ Saving also makes these changes to song.ini:
     <value>Discard</value>
   </data>
   <data name="ProposalAcceptedFormat" xml:space="preserve">
-    <value>The proposed tempo map is written: {0} tempo markers, {1} anchors.</value>
+    <value>Proposed tempo map written: {0} tempo markers, {1} anchors.</value>
   </data>
   <data name="ProposalUnsureLabel" xml:space="preserve">
     <value>Unsure: map by hand</value>
@@ -2413,7 +2413,7 @@ Saving also makes these changes to song.ini:
     <value>Measure 1 most likely starts at {0}.</value>
   </data>
   <data name="DownbeatNotFound" xml:space="preserve">
-    <value>No downbeat was found: the song has no steady beat to count from.</value>
+    <value>No downbeat found: the song has no steady beat to count from.</value>
   </data>
   <data name="DownbeatLeadIn" xml:space="preserve">
     <value>Lead-in</value>
@@ -2434,13 +2434,13 @@ Saving also makes these changes to song.ini:
     <value>Downbeat?</value>
   </data>
   <data name="DownbeatDelaySetFormat" xml:space="preserve">
-    <value>The delay is set to {0} ms, so the chart starts on the downbeat. Revert it in Pending Changes to take it back.</value>
+    <value>Delay set to {0} ms so the chart starts on the downbeat. Revert it in Pending Changes to take it back.</value>
   </data>
   <data name="DetectFromAudioButton" xml:space="preserve">
     <value>Detect from audio</value>
   </data>
   <data name="DetectFromAudioToolTip" xml:space="preserve">
-    <value>Find the tempo in the song's audio, set the starting BPM, and propose a tempo map to review</value>
+    <value>Find the tempo in the song audio, set the starting BPM, and propose a tempo map</value>
   </data>
   <data name="DetectFromAudioNoAudioToolTip" xml:space="preserve">
     <value>The song has no audio to detect the tempo from.</value>
@@ -2449,7 +2449,7 @@ Saving also makes these changes to song.ini:
     <value>No steady beat was found in the audio.</value>
   </data>
   <data name="SpectrogramBudgetFullFormat" xml:space="preserve">
-    <value>The spectrogram of {0} ({1:0} MB) doesn't fit in the spectrogram memory budget beside the ones shown. Raise the budget in Settings, or show fewer spectrograms.</value>
+    <value>The spectrogram of {0} ({1:0} MB) doesn't fit the memory budget with those shown. Raise the budget in Settings, or show fewer spectrograms.</value>
   </data>
   <data name="LaneEditToolTip" xml:space="preserve">
     <value>Edit: copy, reduce, generate and transform this lane</value>
@@ -2506,10 +2506,10 @@ Saving also makes these changes to song.ini:
     <value>Default Reduction Rules</value>
   </data>
   <data name="ReduceIntro" xml:space="preserve">
-    <value>Makes a draft of a lower difficulty from a higher one, drawn over the target as you change the rules. The changes here are for this run only.</value>
+    <value>Drafts a lower difficulty from a higher one, drawn over the target as you change rules. Changes here apply to this run only.</value>
   </data>
   <data name="ReduceDefaultsIntro" xml:space="preserve">
-    <value>The rules Reduce starts from for each family and difficulty. Each run can change them for itself.</value>
+    <value>The rules Reduce starts from for each family and difficulty. Each run can change them.</value>
   </data>
   <data name="ReduceFamilyLabel" xml:space="preserve">
     <value>Part</value>
@@ -2548,7 +2548,7 @@ Saving also makes these changes to song.ini:
     <value>Hard, Medium and Easy</value>
   </data>
   <data name="ReduceAllIntro" xml:space="preserve">
-    <value>Each difficulty ticked is made from the one above it, as it will be. Those with notes are left alone unless you tick them.</value>
+    <value>Each ticked difficulty is made from the one above it. Difficulties with notes are left alone unless ticked.</value>
   </data>
   <data name="ReduceChartedFormat" xml:space="preserve">
     <value>{0} (has notes)</value>
@@ -2617,7 +2617,7 @@ Saving also makes these changes to song.ini:
     <value>Default reduction rules</value>
   </data>
   <data name="ReductionRulesDescription" xml:space="preserve">
-    <value>The rules Reduce starts from: chord size, frets used, thinning by grid and by time, forcing and sustains, and the drums' pads and kick. Each run can change them for itself.</value>
+    <value>The rules Reduce starts from: chord size, frets, thinning by grid and time, forcing, sustains, and drum pads and kick. Each run can change them.</value>
   </data>
   <data name="ReductionRulesKeywords" xml:space="preserve">
     <value>reduce reduction difficulty easy medium hard thinning chords</value>
@@ -2710,22 +2710,22 @@ Saving also makes these changes to song.ini:
     <value>Record</value>
   </data>
   <data name="RecordStartToolTip" xml:space="preserve">
-    <value>Record mode (R): playing the song records the keys and devices you play into the focused lane, and pausing adds the pass as one step</value>
+    <value>Record mode (R): playing records your keys and devices into the focused lane; pausing adds the pass as one step</value>
   </data>
   <data name="RecordStopToolTip" xml:space="preserve">
     <value>Record mode is on (R): playing the song records into the focused lane. Click to turn it off.</value>
   </data>
   <data name="RecordModeToolTip" xml:space="preserve">
-    <value>How a recorded pass goes in: merged with what's there, or over the selected range or the stretch played</value>
+    <value>How a recorded pass goes in: merged with what's there, or over the selected range or the played stretch</value>
   </data>
   <data name="QuantizeLabel" xml:space="preserve">
     <value>Quantize</value>
   </data>
   <data name="QuantizeToolTip" xml:space="preserve">
-    <value>Quantize while recording: on, what's played goes on the quantize grid; off, it's kept as played</value>
+    <value>Quantize while recording: on, playing snaps to the quantize grid; off, it's kept as played</value>
   </data>
   <data name="QuantizeResolutionToolTip" xml:space="preserve">
-    <value>The quantize grid: what record mode quantizes to, and what Quantize in the note menu puts the selected notes on</value>
+    <value>The quantize grid: what record mode quantizes to, and what Quantize in the note menu moves selected notes to</value>
   </data>
   <data name="NoteMenuQuantizeFormat" xml:space="preserve">
     <value>Quantize to {0}</value>
@@ -2735,7 +2735,7 @@ Saving also makes these changes to song.ini:
     <value>Quantized {0} chords to {1}.</value>
   </data>
   <data name="QuantizedBlockedFormat" xml:space="preserve">
-    <value>Quantized {0} chords to {1}. {2} stayed where they were: they'd land on notes that aren't selected.</value>
+    <value>Quantized {0} chords to {1}. {2} stayed put: they'd land on unselected notes.</value>
   </data>
   <data name="QuantizeNothingFormat" xml:space="preserve">
     <value>The selected notes are on the {0} grid already.</value>
@@ -2774,7 +2774,7 @@ Saving also makes these changes to song.ini:
     <value>The lane in focus</value>
   </data>
   <data name="PreviewTrackToolTip" xml:space="preserve">
-    <value>What the preview shows: the lane in focus, or a part and difficulty</value>
+    <value>What the preview shows: the focused lane, or a part and difficulty</value>
   </data>
   <data name="PreviewOpenWindow" xml:space="preserve">
     <value>Window</value>
@@ -2846,7 +2846,7 @@ Saving also makes these changes to song.ini:
     <value>Pro drums, with the cymbals: {0}, rank {1:0.00}</value>
   </data>
   <data name="SuggestedRatingModelSuggestion" xml:space="preserve">
-    <value>Only a suggestion, from a difficulty model tuned against the ratings of official charts.</value>
+    <value>Only a suggestion, from a difficulty model tuned on official chart ratings.</value>
   </data>
   <data name="DifficultyTab" xml:space="preserve">
     <value>Difficulty</value>
@@ -2855,7 +2855,7 @@ Saving also makes these changes to song.ini:
     <value>Difficulty</value>
   </data>
   <data name="DifficultyTrackToolTip" xml:space="preserve">
-    <value>The part and difficulty analyzed: the lane in focus, or one picked</value>
+    <value>The part and difficulty analyzed: the focused lane, or one picked</value>
   </data>
   <data name="DifficultyOpenWindowToolTip" xml:space="preserve">
     <value>Show the analysis in a window of its own, with room for the graph</value>
@@ -2873,7 +2873,7 @@ Saving also makes these changes to song.ini:
     <value>Rank {0:0.0} · overchart</value>
   </data>
   <data name="DifficultyRankToolTipFormat" xml:space="preserve">
-    <value>The chart's rank: 0 to 6 for charts written to be played, 7 and up for overcharts. From its score, {0:0.0}, which weighs its hardest stretches the most.</value>
+    <value>The chart's rank: 0 to 6 for playable charts, 7 and up for overcharts. From its score, {0:0.0}, weighing its hardest stretches most.</value>
   </data>
   <data name="DifficultyScopeChart" xml:space="preserve">
     <value>Whole chart</value>
@@ -2891,7 +2891,7 @@ Saving also makes these changes to song.ini:
     <value>Alone</value>
   </data>
   <data name="DifficultyIsolatedToolTip" xml:space="preserve">
-    <value>Rate the selection as if practised on its own, with nothing built up before it; off, as it's played in the song</value>
+    <value>Rate the selection as practised alone, with no buildup; off, as played in the song</value>
   </data>
   <data name="DifficultyNoSelection" xml:space="preserve">
     <value>Select a range in the lanes to rate it.</value>
@@ -2924,7 +2924,7 @@ Saving also makes these changes to song.ini:
     <value>Pro drums</value>
   </data>
   <data name="DifficultyProViewToolTip" xml:space="preserve">
-    <value>Rate the drums as Pro drums, each cymbal a pad of its own, as diff_drums_real does; otherwise as 4-lane drums, as diff_drums does</value>
+    <value>Rate drums as Pro drums, each cymbal its own pad, as diff_drums_real does; otherwise as 4-lane drums, as diff_drums does</value>
   </data>
   <data name="DifficultyLinesLabel" xml:space="preserve">
     <value>Lines</value>
@@ -2951,7 +2951,7 @@ Saving also makes these changes to song.ini:
     <value>{0} · {1}</value>
   </data>
   <data name="DifficultyLegend" xml:space="preserve">
-    <value>Dashed lines are where each rank starts; shaded stretches count the most towards the score; blue is a solo. Click to move the playhead.</value>
+    <value>Dashed lines mark each rank's start; shaded stretches count most toward the score; blue is a solo. Click to move the playhead.</value>
   </data>
   <data name="ArtTab" xml:space="preserve">
     <value>Art</value>
@@ -3015,14 +3015,14 @@ Saving also makes these changes to song.ini:
     <comment>{0} is the file name; {1} is the reason.</comment>
   </data>
   <data name="ArtVideoNeedsFfmpeg" xml:space="preserve">
-    <value>The video can't be previewed, as FFmpeg isn't installed with Chart Builder. It's still saved with the song.</value>
+    <value>The video can't preview: FFmpeg isn't installed with Chart Builder. It's still saved with the song.</value>
   </data>
   <data name="ArtVideoStartLabel" xml:space="preserve">
     <value>Video start (ms)</value>
     <comment>Beside the box under the background video that sets song.ini's video_start_time.</comment>
   </data>
   <data name="ArtVideoStartToolTip" xml:space="preserve">
-    <value>Where in the video the song starts, to line it up with the audio: song.ini's video_start_time. Positive skips that much of the video, so it runs ahead; negative holds its first frame that long, so it runs behind. The video shows each value as you change it, at the playhead.</value>
+    <value>Where the song starts in the video, to line it up with the audio: song.ini's video_start_time. Positive skips that much video; negative holds the first frame that long. The video previews each value at the playhead.</value>
   </data>
   <data name="ArtVideoStartRevertToolTip" xml:space="preserve">
     <value>Put the video start back as saved</value>
@@ -3031,7 +3031,7 @@ Saving also makes these changes to song.ini:
     <value>Audio delay (ms)</value>
   </data>
   <data name="ChartSettingsDelayToolTip" xml:space="preserve">
-    <value>How much later than its notes the chart plays against the audio: song.ini's delay</value>
+    <value>How much later than its notes the chart plays: song.ini's delay</value>
   </data>
   <data name="ChartSettingsDifficultyHeader" xml:space="preserve">
     <value>Difficulty</value>
@@ -3041,7 +3041,7 @@ Saving also makes these changes to song.ini:
     <value>Whether the chart has this part. Turning off a part with notes asks first.</value>
   </data>
   <data name="ChartSettingsDifficultyToolTip" xml:space="preserve">
-    <value>The part's difficulty rating, 0 to 6 as the games show it; ? while it's unrated. Click to change it</value>
+    <value>The part's difficulty rating, 0 to 6 as the games show it; ? while unrated. Click to change it</value>
   </data>
   <data name="ChartSettingsProDrumsDifficultyLabel" xml:space="preserve">
     <value>Pro drums</value>
@@ -3058,7 +3058,7 @@ Saving also makes these changes to song.ini:
     <value>Tracks</value>
   </data>
   <data name="ChartSettingsTracksNote" xml:space="preserve">
-    <value>Mute, solo and volume are only for listening: they aren't saved or undone.</value>
+    <value>Mute, solo and volume are listen-only: not saved or undone.</value>
   </data>
   <data name="PendingFileFormat" xml:space="preserve">
     <value>{0} from {1}</value>
@@ -3126,7 +3126,7 @@ Saving also makes these changes to song.ini:
     <comment>Settings: the row that opens the Input devices window.</comment>
   </data>
   <data name="InputDevicesDescription" xml:space="preserve">
-    <value>Play the keyboard, game controllers (guitars, drums, gamepads) and MIDI devices (drum kits, on Windows) as instruments, to playtest a chart and to record into it. Their controls are bound to each instrument's frets, strum and pads in the Input Devices window.</value>
+    <value>Play the keyboard, game controllers (guitars, drums, gamepads) and MIDI devices (drum kits, on Windows) as instruments to playtest and record. Bind their controls to each instrument's frets, strum and pads in the Input Devices window.</value>
     <comment>Settings: what the Instrument devices row does.</comment>
   </data>
   <data name="InputDevicesKeywords" xml:space="preserve">
@@ -3146,7 +3146,7 @@ Saving also makes these changes to song.ini:
     <comment>Settings: how long before a note a playtest takes a hit for it.</comment>
   </data>
   <data name="PlaytestEarlyDescription" xml:space="preserve">
-    <value>How long before a note a hit still counts, in real time. At a slower speed the notes come slower, and the window stays as long.</value>
+    <value>How long before a note a hit still counts, in real time. At slower speeds notes come slower, and the window stays as long.</value>
     <comment>Settings: what the early hit window does.</comment>
   </data>
   <data name="PlaytestEarlyKeywords" xml:space="preserve">
@@ -3170,7 +3170,7 @@ Saving also makes these changes to song.ini:
     <comment>Settings: whether Pro drums cymbal notes need a cymbal hit.</comment>
   </data>
   <data name="PlaytestCymbalsDescription" xml:space="preserve">
-    <value>On Pro drums, a cymbal note needs a cymbal and a tom note a tom, for each colour whose cymbal and tom are bound to different controls. A colour with one control hits either.</value>
+    <value>On Pro drums, a cymbal note needs a cymbal and a tom note a tom, for each color with separate cymbal and tom controls. One control hits either.</value>
     <comment>Settings: what Cymbals must match does.</comment>
   </data>
   <data name="PlaytestCymbalsKeywords" xml:space="preserve">
@@ -3182,7 +3182,7 @@ Saving also makes these changes to song.ini:
     <comment>Settings: whether a playtest judges Expert+ double kick notes.</comment>
   </data>
   <data name="PlaytestDoubleKickDescription" xml:space="preserve">
-    <value>Whether Expert's 2× kick notes are played in a playtest, or left out as the games leave them out without Expert+.</value>
+    <value>Whether Expert's 2× kick notes play in a playtest, or are left out as the games leave them out without Expert+.</value>
     <comment>Settings: what Judge the 2× kick does.</comment>
   </data>
   <data name="PlaytestDoubleKickKeywords" xml:space="preserve">
@@ -3194,7 +3194,7 @@ Saving also makes these changes to song.ini:
     <comment>Settings: whether a drum hit with no note to hit breaks the playtest combo.</comment>
   </data>
   <data name="PlaytestOverhitsDescription" xml:space="preserve">
-    <value>Whether a pad hit with no note to hit breaks the combo, as a strum with nothing to hit does on guitar.</value>
+    <value>Whether a pad hit with no note breaks combo, as an empty strum does on guitar.</value>
     <comment>Settings: what Overhits break the combo does.</comment>
   </data>
   <data name="PlaytestOverhitsKeywords" xml:space="preserve">
@@ -3206,7 +3206,7 @@ Saving also makes these changes to song.ini:
     <comment>Settings: whether a playtest checks how hard drum accents and ghosts are hit.</comment>
   </data>
   <data name="PlaytestDynamicsDescription" xml:space="preserve">
-    <value>With a MIDI kit, counts an accent hit softly or a ghost hit hard as a problem. The note is still hit.</value>
+    <value>With a MIDI kit, an accent hit softly or a ghost hit hard counts as a problem. The note still counts as hit.</value>
     <comment>Settings: what Judge accents and ghosts does.</comment>
   </data>
   <data name="PlaytestDynamicsKeywords" xml:space="preserve">
@@ -3218,7 +3218,7 @@ Saving also makes these changes to song.ini:
     <comment>Settings: how a guitar controller records notes in record mode.</comment>
   </data>
   <data name="GuitarRecordStyleDescription" xml:space="preserve">
-    <value>How a guitar controller records: a strum places the frets held, as the games play; or each fret places a note as it's pressed, as the number keys do.</value>
+    <value>How a guitar controller records: a strum places held frets, as the games play; or each fret places a note as pressed, as the number keys do.</value>
     <comment>Settings: what Guitar records by does.</comment>
   </data>
   <data name="GuitarRecordStyleKeywords" xml:space="preserve">
@@ -3238,7 +3238,7 @@ Saving also makes these changes to song.ini:
     <comment>Settings: whether a MIDI kit records accents and ghosts by how hard it is hit.</comment>
   </data>
   <data name="RecordDynamicsDescription" xml:space="preserve">
-    <value>When recording drums from a MIDI kit, a hard hit is an accent and a soft one a ghost, by the velocities set for the kit in the Input Devices window.</value>
+    <value>When recording drums from a MIDI kit, hard hits are accents and soft ones ghosts, by the kit velocities in the Input Devices window.</value>
     <comment>Settings: what Dynamics from velocity does.</comment>
   </data>
   <data name="RecordDynamicsKeywords" xml:space="preserve">
@@ -3298,7 +3298,7 @@ Saving also makes these changes to song.ini:
     <comment>The Input devices window: the heading over the devices connected.</comment>
   </data>
   <data name="InputDevicesHint" xml:space="preserve">
-    <value>A device's light, and the actions its controls are bound to, light up as you play it. Devices are read only while this window is open, or while playtesting or recording.</value>
+    <value>A device's light and its bound actions light up as you play it. Devices are read only while this window is open, or while playtesting or recording.</value>
     <comment>The Input devices window: the note under the devices.</comment>
   </data>
   <data name="InputRescanButton" xml:space="preserve">
@@ -3354,11 +3354,11 @@ Saving also makes these changes to song.ini:
     <comment>The Input devices window: beside a device's input offset, opens the calibration tool to measure it.</comment>
   </data>
   <data name="InputCalibrateToolTip" xml:space="preserve">
-    <value>Measure the offset by hitting the device along with notes on a highway</value>
+    <value>Measure the offset by hitting the device along with highway notes</value>
     <comment>The Calibrate… button's tooltip.</comment>
   </data>
   <data name="InputOffsetToolTip" xml:space="preserve">
-    <value>How much later than you play it the device reports it, as a wireless guitar or a drum module can: taken off each input's time</value>
+    <value>How much later than played the device reports input, as a wireless guitar or drum module can: subtracted from each input's time</value>
     <comment>The input offset's tooltip.</comment>
   </data>
   <data name="InputMidiSettings" xml:space="preserve">
@@ -3394,7 +3394,7 @@ Saving also makes these changes to song.ini:
     <comment>The Input devices window: binds a MIDI device's notes to the drums by the General MIDI drum map.</comment>
   </data>
   <data name="InputPresetGeneralMidiToolTip" xml:space="preserve">
-    <value>Bind this device's notes to the drums as most kits send them, in place of its drums bindings</value>
+    <value>Bind this device's notes to the drums as most kits send them, replacing its drum bindings</value>
     <comment>The General MIDI drum map button's tooltip.</comment>
   </data>
   <data name="InputPresetGuitarButton" xml:space="preserve">
@@ -3402,7 +3402,7 @@ Saving also makes these changes to song.ini:
     <comment>The Input devices window: binds a controller as an Xbox 360 guitar.</comment>
   </data>
   <data name="InputPresetGuitarToolTip" xml:space="preserve">
-    <value>Bind this controller as an Xbox 360 guitar is laid out, in place of its 5-fret bindings</value>
+    <value>Bind this controller as an Xbox 360 guitar is laid out, replacing its 5-fret bindings</value>
     <comment>The Xbox guitar layout button's tooltip.</comment>
   </data>
   <data name="InputPresetGeneralMidi" xml:space="preserve">
@@ -3610,7 +3610,7 @@ Saving also makes these changes to song.ini:
     <comment>The transport bar: forgets everything the playtest found.</comment>
   </data>
   <data name="PlaytestClearToolTip" xml:space="preserve">
-    <value>Clear the playtest: its marks on every lane, its problems and its stats</value>
+    <value>Clear the playtest: its marks on every lane, problems and stats</value>
     <comment>The Clear button's tooltip.</comment>
   </data>
   <data name="PlaytestButton" xml:space="preserve">
@@ -3618,7 +3618,7 @@ Saving also makes these changes to song.ini:
     <comment>The transport bar: the button that turns playtest on and off, for screen readers.</comment>
   </data>
   <data name="PlaytestStartToolTip" xml:space="preserve">
-    <value>Playtest (P): playing the song plays the focused lane with your keyboard and controllers, judged as the games judge it</value>
+    <value>Playtest (P): playing the song plays the focused lane with keyboard and controllers, judged as the games judge it</value>
     <comment>The Playtest button's tooltip while playtest is off.</comment>
   </data>
   <data name="PlaytestStopToolTip" xml:space="preserve">
@@ -3638,7 +3638,7 @@ Saving also makes these changes to song.ini:
     <comment>The message bar when playtest is turned off.</comment>
   </data>
   <data name="PlaytestNotPlayable" xml:space="preserve">
-    <value>Click a 5-fret or drums lane to playtest it: vocals and 6-fret can't be playtested yet.</value>
+    <value>Click a 5-fret or drums lane to playtest it; vocals and 6-fret can't playtest yet.</value>
     <comment>Why playing the song with playtest on doesn't playtest the focused lane.</comment>
   </data>
   <data name="PanelAutoHideToolTip" xml:space="preserve">

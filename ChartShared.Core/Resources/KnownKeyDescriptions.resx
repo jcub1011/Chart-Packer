@@ -42,28 +42,28 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <data name="name" xml:space="preserve">
-    <value>Title of the song</value>
+    <value>Song title</value>
   </data>
   <data name="artist" xml:space="preserve">
-    <value>Artist or band who performed the song</value>
+    <value>Artist or band</value>
   </data>
   <data name="album" xml:space="preserve">
-    <value>Album the song appears on</value>
+    <value>Album</value>
   </data>
   <data name="genre" xml:space="preserve">
-    <value>Genre of the song</value>
+    <value>Genre</value>
   </data>
   <data name="year" xml:space="preserve">
-    <value>Year the song was released</value>
+    <value>Release year</value>
   </data>
   <data name="charter" xml:space="preserve">
-    <value>Who charted the song</value>
+    <value>Song charter</value>
   </data>
   <data name="song_length" xml:space="preserve">
-    <value>Length of the audio, in milliseconds</value>
+    <value>Audio length in milliseconds</value>
   </data>
   <data name="preview_start_time" xml:space="preserve">
-    <value>Where the song preview starts, in milliseconds</value>
+    <value>Preview start in milliseconds</value>
   </data>
   <data name="delay" xml:space="preserve">
     <value>Shifts the chart against the audio, in milliseconds (can be negative)</value>
@@ -135,10 +135,10 @@
     <value>Dance difficulty</value>
   </data>
   <data name="sub_genre" xml:space="preserve">
-    <value>More specific genre of the song</value>
+    <value>More specific genre</value>
   </data>
   <data name="preview_end_time" xml:space="preserve">
-    <value>Where the song preview ends, in milliseconds</value>
+    <value>Preview end in milliseconds</value>
   </data>
   <data name="preview" xml:space="preserve">
     <value>Preview start and end, in milliseconds, e.g. 55000 85000</value>
@@ -147,37 +147,37 @@
     <value>Age rating: 1 family friendly, 2 supervision recommended, 3 mature, 4 or 0 unrated</value>
   </data>
   <data name="version" xml:space="preserve">
-    <value>Revision number of the chart</value>
+    <value>Chart revision number</value>
   </data>
   <data name="album_track" xml:space="preserve">
-    <value>Position of the song when sorting by album</value>
+    <value>Sort position within album</value>
   </data>
   <data name="playlist" xml:space="preserve">
-    <value>Playlist the song is grouped under</value>
+    <value>Playlist grouping</value>
   </data>
   <data name="sub_playlist" xml:space="preserve">
-    <value>Sub-playlist within the playlist</value>
+    <value>Sub-playlist grouping</value>
   </data>
   <data name="playlist_track" xml:space="preserve">
-    <value>Position of the song when sorting by playlist</value>
+    <value>Sort position within playlist</value>
   </data>
   <data name="loading_phrase" xml:space="preserve">
-    <value>Flavour text shown while the song loads</value>
+    <value>Flavor text shown while the song loads</value>
   </data>
   <data name="tags" xml:space="preserve">
     <value>Miscellaneous tags, e.g. cover</value>
   </data>
   <data name="modchart" xml:space="preserve">
-    <value>Marks the song as a modchart, for filtering</value>
+    <value>Marks song as modchart for filtering</value>
   </data>
   <data name="lyrics" xml:space="preserve">
-    <value>Marks the song as having lyrics, for filtering</value>
+    <value>Marks song as having lyrics for filtering</value>
   </data>
   <data name="pro_drums" xml:space="preserve">
-    <value>Forces the drums track to be pro drums</value>
+    <value>Forces drums track to pro drums</value>
   </data>
   <data name="five_lane_drums" xml:space="preserve">
-    <value>Forces the drums track to be 5-lane</value>
+    <value>Forces drums track to 5-lane</value>
   </data>
   <data name="drum_fallback_blue" xml:space="preserve">
     <value>Which note 5-lane drums fall back to on 4-lane</value>
@@ -189,7 +189,7 @@
     <value>Vocals track speed, as a percentage (default 100)</value>
   </data>
   <data name="tuning_offset_cents" xml:space="preserve">
-    <value>Nudges vocal pitch by this many cents, for non-A440 songs</value>
+    <value>Vocal pitch offset in cents, for non-A440 songs</value>
   </data>
   <data name="real_guitar_tuning" xml:space="preserve">
     <value>Tuning for 17-fret pro guitar</value>
@@ -261,28 +261,28 @@
     <value>MIDI velocity that marks drum notes as ghost notes (Editor on Fire)</value>
   </data>
   <data name="icon" xml:space="preserve">
-    <value>Name of the icon shown for the song</value>
+    <value>Icon name</value>
   </data>
   <data name="cover" xml:space="preserve">
-    <value>File name of the cover image</value>
+    <value>Cover image file name</value>
   </data>
   <data name="background" xml:space="preserve">
-    <value>File name of the background image</value>
+    <value>Background image file name</value>
   </data>
   <data name="video" xml:space="preserve">
-    <value>File name of the background video</value>
+    <value>Background video file name</value>
   </data>
   <data name="video_loop" xml:space="preserve">
     <value>Whether the background video loops</value>
   </data>
   <data name="video_start_time" xml:space="preserve">
-    <value>Where video playback starts, in milliseconds (can be negative)</value>
+    <value>Video playback start in milliseconds (can be negative)</value>
   </data>
   <data name="video_end_time" xml:space="preserve">
-    <value>Where video playback ends, in milliseconds (-1 for none)</value>
+    <value>Video playback end in milliseconds (-1 for none)</value>
   </data>
   <data name="cassettecolor" xml:space="preserve">
-    <value>Hex colour of the cassette on the song screen (Frets on Fire X)</value>
+    <value>Hex color of the cassette on the song screen (Frets on Fire X)</value>
   </data>
   <data name="link_name_a" xml:space="preserve">
     <value>Name of banner A (Phase Shift)</value>
@@ -297,21 +297,21 @@
     <value>Link opened by clicking banner B (Phase Shift)</value>
   </data>
   <data name="tutorial" xml:space="preserve">
-    <value>Marks the song as a tutorial (Frets on Fire X)</value>
+    <value>Marks song as tutorial (Frets on Fire X)</value>
   </data>
   <data name="boss_battle" xml:space="preserve">
-    <value>Marks the song as a boss battle (Frets on Fire X)</value>
+    <value>Marks song as boss battle (Frets on Fire X)</value>
   </data>
   <data name="unlock_id" xml:space="preserve">
     <value>Career ID of the song (Frets on Fire X)</value>
   </data>
   <data name="unlock_require" xml:space="preserve">
-    <value>Career ID that must be completed to unlock the song (Frets on Fire X)</value>
+    <value>Career ID required to unlock song (Frets on Fire X)</value>
   </data>
   <data name="unlock_text" xml:space="preserve">
     <value>Text shown while the song is locked (Frets on Fire X)</value>
   </data>
   <data name="unlock_completed" xml:space="preserve">
-    <value>Whether the song is unlocked (Frets on Fire X)</value>
+    <value>Whether song is unlocked (Frets on Fire X)</value>
   </data>
 </root>
