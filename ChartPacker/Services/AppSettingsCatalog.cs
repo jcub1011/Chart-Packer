@@ -349,6 +349,7 @@ namespace ChartPacker.Services
                         Set = theme => player.AlbumArtTheming = theme,
                     },
                     AppLog.CreateSetting(logging, () => settings.Settings.LoggingEnabled, enabled => settings.Settings.LoggingEnabled = enabled),
+                    .. UpdateCheck.CreateSettings(general),
                 ]);
         }
     }

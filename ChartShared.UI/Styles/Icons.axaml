@@ -212,4 +212,6 @@
     <StreamGeometry x:Key="LoopStroke">M11.333,1.333 l2.667,2.667 l-2.667,2.667 M2,7.333 v-0.667 a2.667,2.667 0 0 1 2.667,-2.667 h9.333 M4.667,14.667 l-2.667,-2.667 l2.667,-2.667 M14,8.667 v0.667 a2.667,2.667 0 0 1 -2.667,2.667 H2</StreamGeometry>
     <!-- "drum": hit sounds, each note sounding as it's reached. -->
     <StreamGeometry x:Key="HitSoundsStroke">M1.333,1.333 l5.333,5.333 M14.667,1.333 l-5.333,5.333 M1.333,6 A6.667,3.333 0 1 0 14.667,6 A6.667,3.333 0 1 0 1.333,6 Z M4.667,8.933 v5.267 M8,9.333 v5.333 M11.333,8.933 v5.267 M1.333,6 v5.333 a6.667,3.333 0 0 0 13.333,0 V6</StreamGeometry>
+    <!-- "circle-arrow-up": a newer release is available on GitHub. -->
+    <StreamGeometry x:Key="UpdateAvailableStroke">M1.333,8 A6.667,6.667 0 1 0 14.667,8 A6.667,6.667 0 1 0 1.333,8 Z M10.667,8 L8,5.333 L5.333,8 M8,10.667 V5.333</StreamGeometry>
 </ResourceDictionary>
