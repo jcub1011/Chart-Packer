@@ -884,6 +884,22 @@ Open it anyway?</value>
     <value>hit sound note volume loud clap</value>
     <comment>Search words for the hit sound volume setting, separated by spaces.</comment>
   </data>
+  <data name="MasterVolumeLabel" xml:space="preserve">
+    <value>Master volume</value>
+    <comment>A setting: how loud everything is.</comment>
+  </data>
+  <data name="MasterVolumeDescription" xml:space="preserve">
+    <value>How loud the song and its sounds are, from silence to full.</value>
+    <comment>The master volume setting's description.</comment>
+  </data>
+  <data name="MasterVolumeKeywords" xml:space="preserve">
+    <value>master volume loud sound overall</value>
+    <comment>Search words for the master volume setting, separated by spaces.</comment>
+  </data>
+  <data name="VolumeToolTip" xml:space="preserve">
+    <value>Overall volume. Click to change it.</value>
+    <comment>The transport bar's volume button's tooltip.</comment>
+  </data>
   <data name="LoopToolTipFormat" xml:space="preserve">
     <value>Loop the region from {0} to {1}. L sets it from the selection.</value>
     <comment>The loop button's tooltip, with the loop region's start and end times.</comment>

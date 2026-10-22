@@ -47,6 +47,8 @@ namespace ChartBuilder.ViewModels
         private readonly Func<int, IAudioOutput>? _openOutput;
         private readonly AudioLatencyService? _latency;
         private readonly Func<(int Metronome, int Hits)> _volumes;
+        private readonly Func<double> _masterVolume;
+        private readonly Action<double> _setMasterVolume;
         private readonly Action? _calibrate;
         private readonly DispatcherTimer _timer;
         private readonly CancellationTokenSource _cancel = new();
@@ -82,16 +84,21 @@ namespace ChartBuilder.ViewModels
         /// <param name="openOutput">Opens the audio output at a rate.</param>
         /// <param name="latency">The audio/visual latency, which follows the output's device.</param>
         /// <param name="volumes">The metronome's and the hit sounds' volumes, in percent, as Settings has them now.</param>
+        /// <param name="masterVolume">The master volume, from silence to full, as Settings has it now.</param>
+        /// <param name="setMasterVolume">Keeps the master volume in Settings, as the transport bar's slider moves it.</param>
         /// <param name="calibrate">Opens the calibration tool, from the transport bar's latency (charter-spec C11).</param>
         /// <param name="editorAudio">Where the mix's waveform comes from, as its stems' peaks are read.</param>
-        public PlaybackViewModel(EditorSong? song, Func<int, IAudioOutput>? openOutput, AudioLatencyService? latency, Func<(int Metronome, int Hits)>? volumes = null, Action? calibrate = null, EditorAudio? editorAudio = null)
+        public PlaybackViewModel(EditorSong? song, Func<int, IAudioOutput>? openOutput, AudioLatencyService? latency, Func<(int Metronome, int Hits)>? volumes = null, Action? calibrate = null, EditorAudio? editorAudio = null, Func<double>? masterVolume = null, Action<double>? setMasterVolume = null)
         {
             _song = song;
             _openOutput = openOutput;
             _latency = latency;
             _volumes = volumes ?? (() => (50, 50));
+            _masterVolume = masterVolume ?? (() => 1);
+            _setMasterVolume = setMasterVolume ?? (_ => { });
             _calibrate = calibrate;
             _tracks = song?.Tracks ?? [];
+            Volume = Sanitized(_masterVolume());
             _timer = new DispatcherTimer(DispatcherPriority.Background) { Interval = PositionInterval };
             _timer.Tick += (_, _) => RefreshPosition();
             LengthSeconds = PlaceholderLengthSeconds;
@@ -141,6 +148,14 @@ namespace ChartBuilder.ViewModels
         /// <summary>Whether a speed other than 100% keeps the audio's pitch. On by default, as in Chart Packer's inspector.</summary>
         [ObservableProperty]
         public partial bool PitchCorrection { get; set; } = true;
+
+        /// <summary>The master volume, from silence to full. Kept in the settings, so it carries over to the next run.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(VolumeText))]
+        public partial double Volume { get; set; }
+
+        /// <summary>The master volume as the transport bar's flyout shows it, e.g. "80%".</summary>
+        public string VolumeText => string.Format(CultureInfo.CurrentCulture, "{0:P0}", Volume);
 
         /// <summary>Whether the metronome clicks each beat of the chart's tempo map.</summary>
         [ObservableProperty]
@@ -223,6 +238,7 @@ namespace ChartBuilder.ViewModels
         {
             if (_player is not { } player || end <= start)
                 return;
+            RefreshMasterVolume();
             UpdateSounds();
             player.PlayRegion(TimeSpan.FromSeconds(Math.Max(0, start)), TimeSpan.FromSeconds(end), loops: false);
             SetPlaying(true);
@@ -310,6 +326,7 @@ namespace ChartBuilder.ViewModels
                 _followingDevice = _latency?.Follow(output);
                 player.PitchCorrection = PitchCorrection;
                 player.Speed = SpeedPercent / 100f;
+                RefreshMasterVolume();
                 player.Stopped += (_, _) => Dispatcher.UIThread.Post(OnStopped);
 
                 LengthSeconds = LengthOf(_song, player);
@@ -438,6 +455,7 @@ namespace ChartBuilder.ViewModels
             }
 
             // The volumes may have changed in Settings since.
+            RefreshMasterVolume();
             UpdateSounds();
             if (IsLooping && Loop is { } loop)
                 player.PlayRegion(TimeSpan.FromSeconds(loop.Start), TimeSpan.FromSeconds(loop.End), loops: true);
@@ -482,6 +500,33 @@ namespace ChartBuilder.ViewModels
             if (_player is { } player)
                 player.PitchCorrection = value;
         }
+
+        partial void OnVolumeChanged(double value)
+        {
+            double volume = Sanitized(value);
+            if (volume != value)
+            {
+                Volume = volume;
+                return;
+            }
+
+            _setMasterVolume(volume);
+            if (_player is not null)
+                _player.Volume = (float)volume;
+        }
+
+        /// <summary>Takes up the master volume again, as Settings may have changed it since.</summary>
+        public void RefreshMasterVolume()
+        {
+            double volume = Sanitized(_masterVolume());
+            if (volume != Volume)
+                Volume = volume;
+            else if (_player is not null)
+                _player.Volume = (float)volume;
+        }
+
+        private static double Sanitized(double volume) =>
+            double.IsFinite(volume) ? Math.Clamp(volume, 0, 1) : 1;
 
         partial void OnIsMetronomeOnChanged(bool value) => UpdateSounds();
 
