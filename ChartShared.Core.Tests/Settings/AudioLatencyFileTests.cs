@@ -148,6 +148,64 @@ public sealed class AudioLatencyFileTests
         Assert.IsFalse(File.Exists(_path));
     }
 
+    [TestMethod]
+    public void TheDetectedLatencyIsAddedToWhateverIsFound()
+    {
+        File.WriteAllText(_path, """{ "byId": { "{a}": 10 }, "byName": { "B": -30 }, "fallback": 40 }""");
+        var file = Open();
+
+        var byId = file.Find("A", "{a}", 23);
+        Assert.AreEqual(new LatencyLookup(10, LatencySource.Id, 23), byId);
+        Assert.AreEqual(33, byId.Milliseconds);
+        Assert.AreEqual(-7, file.Find("B", "{b}", 23).Milliseconds);
+        Assert.AreEqual(new LatencyLookup(40, LatencySource.Fallback, 23), file.Find("C", "{c}", 23));
+        Assert.AreEqual(63, file.Find("C", "{c}", 23).Milliseconds);
+    }
+
+    [TestMethod]
+    public void NothingDetectedAddsNothing()
+    {
+        Open().Save("Speakers", "{speakers}", 12);
+
+        var found = Open().Find("Speakers", "{speakers}", null);
+
+        Assert.AreEqual(new LatencyLookup(12, LatencySource.Id), found);
+        Assert.AreEqual(12, found.Milliseconds);
+    }
+
+    [TestMethod]
+    public void DetectingIsOnUnlessTheFileTurnsItOff()
+    {
+        Assert.IsTrue(Open().DetectEnabled);
+        Assert.AreEqual(23, Open().Find("Speakers", "{speakers}", 23).Milliseconds);
+
+        File.WriteAllText(_path, """{ "detect": "no", "fallback": 5 }""");
+        Assert.IsTrue(Open().DetectEnabled);
+
+        File.WriteAllText(_path, """{ "detect": false, "fallback": 5 }""");
+        Assert.IsFalse(Open().DetectEnabled);
+        var found = Open().Find("Speakers", "{speakers}", 23);
+        Assert.AreEqual(new LatencyLookup(5, LatencySource.Fallback), found);
+        Assert.AreEqual(5, found.Milliseconds);
+    }
+
+    [TestMethod]
+    public void TurningDetectingOffKeepsEverythingElse()
+    {
+        File.WriteAllText(_path, """{ "fromLater": 1, "byId": { "{a}": 10 }, "fallback": 5 }""");
+
+        Assert.IsTrue(Open().SetDetect(false));
+
+        var json = Read();
+        Assert.IsFalse((bool)json["detect"]!);
+        Assert.AreEqual(1, (int)json["fromLater"]!);
+        Assert.AreEqual(10, (int)json["byId"]!["{a}"]!);
+        Assert.AreEqual(5, (int)json["fallback"]!);
+
+        Assert.IsTrue(Open().SetDetect(true));
+        Assert.IsTrue(Open().DetectEnabled);
+    }
+
     private AudioLatencyFile Open() => new(_path);
 
     private JsonObject Read() => (JsonObject)JsonNode.Parse(File.ReadAllText(_path))!;

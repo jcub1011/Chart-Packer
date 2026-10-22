@@ -32,12 +32,12 @@ public interface IAudioOutput : IDisposable
     /// <summary>Starts, or carries on, playing the queue.</summary>
     void Resume();
 
-    /// <summary>The device the queue is playing on.</summary>
+    /// <summary>The device the queue is playing on, with the latency read for it.</summary>
     AudioDevice Device { get; }
 
     /// <summary>
     /// Raised with the new device when the queue moves to another device, as it does when the OS's
-    /// default output changes. It may be raised on any thread.
+    /// default output changes, or when the latency read for it changes. It may be raised on any thread.
     /// </summary>
     event Action<AudioDevice>? DeviceChanged;
 }

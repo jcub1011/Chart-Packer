@@ -91,9 +91,17 @@
                         IsSnapToTickEnabled="True"
                         AutomationProperties.Name="{x:Static res:SharedStrings.CalibrationLatencyLabel}" />
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                    <TextBlock Grid.Column="0" Classes="note" VerticalAlignment="Center" Text="{x:Static res:SharedStrings.CalibrationKeysHint}" />
+                    <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                        <!-- What the app could read from the device, added to the value above, and the whole latency (issue #140). -->
+                        <TextBlock Classes="note"
+                                   TextWrapping="Wrap"
+                                   Text="{Binding DetectedText}"
+                                   ToolTip.Tip="{x:Static res:SharedStrings.CalibrationDetectedToolTip}" />
+                        <TextBlock Classes="note" TextWrapping="Wrap" Text="{x:Static res:SharedStrings.CalibrationKeysHint}" />
+                    </StackPanel>
                     <Button Grid.Column="1"
                             Classes="nudge"
+                            VerticalAlignment="Center"
                             Content="{x:Static res:SharedStrings.CalibrationReset}"
                             Command="{Binding ResetCommand}" />
                 </Grid>

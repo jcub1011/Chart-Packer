@@ -1634,6 +1634,14 @@ Acceptance criteria:
    - `Position` already allows for the audio waiting in SDL's stream queue.
    - The calibration covers everything after that: SDL's device buffer and the output device's
      own latency, which the app can't see.
+   - *Changed for issue #140:* the app reads what it can of that latency
+     (`DeviceLatency`): SDL's device buffer (`SDL_GetAudioDeviceFormat`'s sample frames at the
+     device's rate) and, on Windows, what WASAPI reports for the endpoint, the stream latency and
+     device period of a shared-mode stream (`WindowsAudioEndpoint`). It comes with the device
+     (`AudioDevice.DetectedLatencyMs`), and is **added** to the calibrated latency, so the
+     calibration is only what's left: a Bluetooth link's delay, the display's, and whatever else
+     the app can't see ([C11](#c11-calibration-tool) item 3). The latency drawn with is the two
+     added up (`LatencyLookup.Milliseconds`). `Position` is unchanged.
    - The latency is in real time, so it is scaled by the playback speed to give song time.
    - *Changed for issue #103:* pausing leaves the audio, the cursor and the playhead where they were
      drawn, and playing holds there until it's heard, so neither jumps
@@ -1699,7 +1707,10 @@ device isn't measured.
 1. **The test.** The window has the shared title bar (`TitleBar`), and two columns: the highway on
    the left, and on the right the controls in sections, as the song inspector lays them out
    (`Inspector.axaml`): the output device, the latency (with **Reset to 0**), Compare, and how to
-   calibrate. Cancel and Save are in a toolbar along the bottom.
+   calibrate. *Changed for issue #140:* the latency set here is what's beyond the latency
+   detected from the device. Under it, the tool shows the detected latency and the two added up
+   ("Plus 23 ms detected from the device: 35 ms in all."), or that nothing detected is added.
+   Cancel and Save are in a toolbar along the bottom.
    - The highway is the real one (`NoteHighwayView`), as the song's preview draws it, not a
      drawing of its own. What it draws, and when the frame reaches the screen, is what the user
      will be judging against while charting.
@@ -1713,7 +1724,8 @@ device isn't measured.
      −350 ms. With it, the pattern repeats every 3 s, and the whole ±500 ms range can't be
      mistaken for anything else.
    - **As playback draws it.** The highway is drawn at `SmoothPosition` − latency
-     (`LatencyCompensation.Drawn`), exactly as a song's highway is ([C10](#c10-playback)). The
+     (`LatencyCompensation.Drawn`), exactly as a song's highway is ([C10](#c10-playback)), the
+     latency being the value plus what's detected from the device (*changed for issue #140*). The
      clicks never move: changing the latency **moves the notes**, so the value found is the one
      playback needs, through the same code.
    - The user adjusts the latency until each click is heard as a note hits the line. Controls:
@@ -1725,7 +1737,8 @@ device isn't measured.
 
      The notes move as soon as the value changes.
    - **Compare.** While **Hold for no calibration** or Space is held down, the notes are drawn with
-     no latency, and the highway says so. Let go, they're drawn with the value again, so the user
+     no latency but what's detected from the device (*changed for issue #140*), and the highway
+     says so. Let go, they're drawn with the value again, so the user
      can see how much it moves them. The value itself doesn't change. Space never presses the
      button with the focus, and the window losing focus lets it go.
    - **Tap along** (*changed for issue #105*). **Start** hides the notes, so only the sound is
@@ -1746,7 +1759,9 @@ device isn't measured.
      - **Scoring** (`AudioTapTest`): as item 2's, except that a tap counts against a click from
        250 ms before it to 500 ms after it, so a Bluetooth latency isn't taken for the next beat.
      - **The result** goes in the latency, clamped to ±500 ms, with the spread and the taps used. It
-       isn't saved, so the user can check it against the notes before **Save**. A change of output
+       isn't saved, so the user can check it against the notes before **Save**. *Changed for issue
+       #140:* the taps measure the whole latency, so what's detected from the device is taken off
+       it first, and the status says so. A change of output
        device stops a test that's running.
    - The highway is only watched: it can't be scrubbed here, and Shift doesn't show its whole
      chart.
@@ -1803,6 +1818,11 @@ device isn't measured.
    - **Lookup order:** the stored value for the device's ID, then for its name, then a **global
      fallback**. When a device is found by name, its value is also saved under its ID if it has
      one, so a later rename doesn't lose it.
+   - *Changed for issue #140:* the value found is what the device's latency is beyond what's
+     **detected** from it ([C10](#c10-playback) item 5). While the file's `detect` switch is on
+     (it is unless it's `false`), the detected latency is added to it; off, the value found is
+     the whole latency. **Detect output latency** in both apps' Settings turns it on and off. It
+     is kept in the shared file, so both apps and the tool always agree.
    - The tool always says which device it is calibrating.
 4. **Where it applies.**
    - Chart Builder ([C10](#c10-playback));
@@ -1814,7 +1834,7 @@ device isn't measured.
      played a column at a time, where tens of milliseconds don't show, and its position is the
      seek position. The merge window resumes from the audio's own position, not the drawn one.
 5. **Saving.** **Save** stores the value in the shared latency file. **Cancel** restores the
-   previous value. **Reset** sets 0.
+   previous value. **Reset** sets 0, leaving only what's detected from the device.
 
 *Settled in CM2:*
 
@@ -1823,6 +1843,12 @@ device isn't measured.
   the answer.
 - **The Settings rows.** The latency is an action-only row (`ActionSetting`), with a
   **Calibrate…** button, in both apps' Settings.
+
+*Changed for issue #140:* the first-use prompt still comes on a device with only the fallback,
+with or without a detected latency added, as detecting can't see a Bluetooth link's delay or the
+display's. Below the latency row, both apps' Settings
+have a **Detect output latency** toggle (`audio.detectLatency` in Chart Builder,
+`playback.detectLatency` in Chart Packer), on by default, which sets the shared file's `detect`.
 
 *Changed for issue #49:* the flashing light, the hand-drawn highway, the beeps and the tap test are
 gone. The beeps were moved by the latency against a fixed flash (`CalibrationSchedule`), the
@@ -1838,7 +1864,7 @@ Acceptance criteria:
   median estimate is within ±2 ms of the offset, and 95% of estimates are within ±20 ms. Taps in
   the lead-in are ignored, and only the closest tap to a note counts.
 - **AC C11.3** When the output moves to another device (`DeviceChanged`), Chart Builder and the tool
-  load that device's stored latency, or the fallback.
+  load that device's stored latency, or its detected latency, or the fallback.
 - **AC C11.4** The metronome clicks as each of the tool's notes is struck, accented on every fourth,
   the first beat of each bar.
 - **AC C11.5** Cancel leaves the stored latency as it was before the tool opened.
@@ -1853,6 +1879,11 @@ Acceptance criteria:
   within ±2 ms of the latency, and 95% of estimates are within ±20 ms. Taps with the count-in are
   ignored, the test's own clicks are only the 16, and a tap 450 ms late counts against its own click. Every device's presses count, each
   with its own offset.
+- **AC C11.9** While detecting is on, a device's latency is its calibrated latency, or the
+  fallback, plus the latency detected from it; while it's off, nothing is added. The tool edits
+  and saves only the calibrated part, and its reset sets that to 0 (issue #140).
+- **AC C11.10** The detected latency is the device buffer's frames at the device's rate plus the
+  OS's latency, rounded to the millisecond and within 0 to 500 ms, and none when neither is known.
 
 ### C12. Waveform
 
@@ -2901,8 +2932,9 @@ it is made):
 │ │ ━━━━━━━━━━━━━━━━━ │ │  ┌────────────────────────────────────────────┐  │
 │ │ ═════════════════ │ │  │ ◷ [ +42 ] ms ↶    [−10 −5 −1 +1 +5 +10]    │  │
 │ │                   │ │  │ ━━━━━━━━━━━━━━━━━━━●━━━━━━━━━━━━━━━━━━━━━  │  │
-│ │ ═════════════════ │ │  │ The arrow keys move it by 1 ms, …          │  │
-│ │ [ ][ ][ ][ ][ ]   │ │  └────────────────────────────────────────────┘  │
+│ │ ═════════════════ │ │  │ Plus 23 ms detected from the device: 65 ms…│  │
+│ │ [ ][ ][ ][ ][ ]   │ │  │ The arrow keys move it by 1 ms, …          │  │
+│ │                   │ │  └────────────────────────────────────────────┘  │
 │ │                   │ │  Compare                                         │
 │ │                   │ │  ┌────────────────────────────────────────────┐  │
 │ │                   │ │  │ [◉ Hold for no calibration]                │  │
@@ -3024,6 +3056,7 @@ tool.
 | Spectrogram memory budget (under Audio assist) | 256 MB (64 to 4096) |
 | Metronome volume / hit-sound volume | 50% / 50%. At 50%, each sound plays at the level `Synth` makes it. A change applies from the next time playback starts. |
 | Audio/visual latency | Per output device, plus a global fallback of 0 ms ([C11](#c11-calibration-tool)) |
+| Detect output latency | On. The latency detected from the device is added to its calibrated latency. Kept in `audio-latency.json`, shared by both apps (issue #140) |
 | Prompt for calibration on first editor use | On |
 | Autosave interval | 2 minutes (1 to 60) |
 | Default charter name | Empty. Prefills `charter` for a new chart, and fills an empty `charter` on save |
@@ -3041,6 +3074,10 @@ looked up in that order ([C11](#c11-calibration-tool)). Values are kept within �
 changes only the device saved, keeping the rest of the file (`AudioLatencyFile`). The file is
 written to a temp file and renamed into place, under the same lock as `settings.json`, so a reader
 never sees half of it and the two apps' saves don't overwrite each other.
+
+*Changed for issue #140:* the values are what each device's latency is beyond what's detected
+from it. The file also holds `"detect"`, whether the detected latency is added to the value found.
+It's on unless it's `false`.
 
 The new-chart settings (default charter name and default resolution) moved from `AppSettings` to
 `BuilderSettings` when new charts moved to Chart Builder, before any release included them, so
@@ -3074,7 +3111,7 @@ layout. It isn't a row in Settings.
 | Tempo map | Tick ↔ seconds property tests against `TempoMap`; anchors stay put under edits (AC C4.1) |
 | Lint | At least one fixture per CHR rule, and a clean fixture triggers none (AC C16.1) |
 | Analysis | Synthetic click tracks at fixed and changing tempos for `TempoEstimator`; synthetic drum hits in separate bands for `OnsetDetector`; spectrogram bins checked against known sine frequencies |
-| Calibration | The input-device test's estimator with simulated taps that have a known offset, jitter and outliers (AC C11.2); the drawn position for a given latency (AC C11.1); the tool's chart and its clicks (AC C11.4); what counts as a tap (AC C11.6); saving a device's offset (AC C11.7); the audio tap test's estimator and every device's taps with their offsets (AC C11.8) |
+| Calibration | The input-device test's estimator with simulated taps that have a known offset, jitter and outliers (AC C11.2); the drawn position for a given latency (AC C11.1); the tool's chart and its clicks (AC C11.4); what counts as a tap (AC C11.6); saving a device's offset (AC C11.7); the audio tap test's estimator and every device's taps with their offsets (AC C11.8); the detected latency, its lookup and its switch (AC C11.9, C11.10) |
 | Reduction | Each rule in [C9](#c9-difficulty-authoring), on fixtures |
 | View models | `ChartEditorViewModel`, the Editor window's and calibration view models against fake services. There are no automated UI tests, as in v1. |
 | Playtest and input | Each 5-fret and drums rule with synthetic timed inputs (AC C19.2); timestamps through the song clock at several speeds and across seeks (AC C19.1, C19.4); bindings routing keys, buttons, axes, hats and MIDI notes, and their file round trip (AC C19.3); recording from timed actions. Device backends are checked by hand. |
@@ -3158,7 +3195,8 @@ Decisions already made for v1, recorded here so they aren't reopened by accident
 - **Reduction rules:** set per run in the Reduce dialog, or Chart Packer's Generate Lower
   Difficulties window, starting from the defaults both apps share. Nothing is stored per song ([C9](#c9-difficulty-authoring)).
 - **Calibration device key:** a stable OS device ID where there is one, then the device name, then
-  the global fallback ([C11](#c11-calibration-tool)).
+  the global fallback, with the latency detected from the device added while detecting is on
+  ([C11](#c11-calibration-tool)).
 - **`.chart` after import:** removed on the first save, after a confirmation. No backup is kept
   ([C2](#c2-open-and-import)).
 - **Suggested difficulty:** shown in Chart Builder only, with fixed parameters in v1. Tuning and

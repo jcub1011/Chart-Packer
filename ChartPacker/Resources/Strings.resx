@@ -2362,10 +2362,20 @@ Each one is checked first. Anything that has changed since it was compared, or w
     <value>Audio/visual latency</value>
   </data>
   <data name="AudioLatencyDescription" xml:space="preserve">
-    <value>How much later the audio is heard than the screen shows it, measured for each output device by the calibration tool. The highway, lyrics and background are drawn that much earlier.</value>
+    <value>How much later the audio is heard than the screen shows it, measured for each output device by the calibration tool. The highway, lyrics and background are drawn that much earlier. It's what the latency is beyond what's detected from the device, which is added to it.</value>
   </data>
   <data name="AudioLatencyKeywords" xml:space="preserve">
     <value>latency delay offset sync calibrate calibration audio video lag bluetooth</value>
+  </data>
+  <data name="DetectLatencyLabel" xml:space="preserve">
+    <value>Detect output latency</value>
+    <comment>A switch: whether the latency read from the output device's buffers is added to its calibrated latency.</comment>
+  </data>
+  <data name="DetectLatencyDescription" xml:space="preserve">
+    <value>Read the latency of the output device's buffers from the system, and add it to the device's calibrated latency. It can't include a Bluetooth link's delay, or the display's, so calibrate to cover those. Shared with Chart Builder.</value>
+  </data>
+  <data name="DetectLatencyKeywords" xml:space="preserve">
+    <value>detect automatic auto latency delay buffer hardware device sync calibration audio lag</value>
   </data>
   <data name="CalibrateButton" xml:space="preserve">
     <value>Calibrate…</value>

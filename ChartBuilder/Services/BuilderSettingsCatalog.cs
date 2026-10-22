@@ -9,6 +9,7 @@ using ChartShared.Core.Charting.Playtest;
 using ChartShared.Core.Settings;
 using ChartShared.UI;
 using ChartShared.UI.Resources;
+using ChartShared.UI.Services;
 
 namespace ChartBuilder.Services
 {
@@ -18,11 +19,12 @@ namespace ChartBuilder.Services
     /// </summary>
     public static class BuilderSettingsCatalog
     {
+        /// <param name="latency">The app's audio latency, whose detecting is switched on and off here (issue #140).</param>
         /// <param name="calibrate">Opens the calibration tool, which edits the audio latency (charter-spec C11).</param>
         /// <param name="editReductionRules">Opens the Reduce dialog's Settings mode, which edits the default rules (charter-spec C9).</param>
         /// <param name="openInputDevices">Opens the Input devices window, which edits the instrument bindings (charter-spec C19).</param>
         /// <param name="resetBindings">Puts every instrument profile's bindings back to the keyboard's defaults.</param>
-        public static SettingsCatalog Create(BuilderSettingsService settings, Action calibrate, Action editReductionRules, Action openInputDevices, Action resetBindings)
+        public static SettingsCatalog Create(BuilderSettingsService settings, AudioLatencyService latency, Action calibrate, Action editReductionRules, Action openInputDevices, Action resetBindings)
         {
             var charter = new SettingCategory("charter", Strings.SettingsCategoryCharter);
             var newCharts = new SettingCategory("charter.newCharts", Strings.SettingsCategoryNewCharts, charter);
@@ -134,6 +136,18 @@ namespace ChartBuilder.Services
                         Description = Strings.AudioLatencyDescription,
                         Keywords = SettingKeywords.Split(Strings.AudioLatencyKeywords),
                         Actions = [new SettingAction(Strings.CalibrateButton, calibrate)],
+                    },
+                    // Kept in the shared latency file, not Chart Builder's settings, so Chart Packer agrees (issue #140).
+                    new ToggleSetting
+                    {
+                        Id = "audio.detectLatency",
+                        Category = audio,
+                        Label = Strings.DetectLatencyLabel,
+                        Description = Strings.DetectLatencyDescription,
+                        Keywords = SettingKeywords.Split(Strings.DetectLatencyKeywords),
+                        DefaultValue = true,
+                        Get = () => latency.DetectEnabled,
+                        Set = detect => latency.DetectEnabled = detect,
                     },
                     new ToggleSetting
                     {

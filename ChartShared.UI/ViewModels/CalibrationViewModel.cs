@@ -99,9 +99,10 @@ namespace ChartShared.UI.ViewModels
             _clock = clock ?? TimeProvider.System;
             _inputClock = inputClock ?? (() => InputClock.Now);
             var device = latency.Device ?? AudioDevice.Unknown;
-            _calibration = new LatencyCalibration(latency.File, device.Name, device.Id);
+            _calibration = new LatencyCalibration(latency.File, device.Name, device.Id, device.DetectedLatencyMs);
             Value = _calibration.Value;
             DeviceName = DeviceNameOf(device.Name);
+            Detected = _calibration.Detected;
             Scene = SceneOf(CalibrationChart.Notes(CalibrationChart.BeatsIn(MixLength - Lead)), Lead);
 
             _timer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TickInterval };
@@ -120,13 +121,30 @@ namespace ChartShared.UI.ViewModels
 
         public override string Title => SharedStrings.CalibrationWindowTitle;
 
-        /// <summary>The latency being tried, in milliseconds: positive when the audio is heard after the display shows it.</summary>
+        /// <summary>
+        /// The latency being tried, in milliseconds: positive when the audio is heard after the display shows it. It's what
+        /// the latency is beyond <see cref="Detected"/>, which is added to it (issue #140).
+        /// </summary>
         [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(DetectedText))]
         public partial int Value { get; set; }
 
         /// <summary>The name of the device being calibrated.</summary>
         [ObservableProperty]
         public partial string DeviceName { get; private set; }
+
+        /// <summary>
+        /// The latency detected from the device, in milliseconds, which is added to <see cref="Value"/>; null when it
+        /// couldn't be detected or detecting is off.
+        /// </summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(DetectedText))]
+        public partial int? Detected { get; private set; }
+
+        /// <summary>What's detected from the device and added to the value, and the whole latency, as the latency card shows them.</summary>
+        public string DetectedText => Detected is { } ms
+            ? string.Format(CultureInfo.CurrentCulture, SharedStrings.CalibrationDetectedFormat, ms, Value + ms)
+            : SharedStrings.CalibrationNotDetected;
 
         /// <summary>Whether the hold button is held down, which holds calibration off.</summary>
         [ObservableProperty]
@@ -171,13 +189,13 @@ namespace ChartShared.UI.ViewModels
         public bool HasDeviceOffsets => _tapInput is not null;
 
         /// <summary>
-        /// Where the highway is drawn: where the clicks are heard, less the latency, as playback draws a song. Without
-        /// audio, the time since <see cref="Start"/>.
+        /// Where the highway is drawn: where the clicks are heard, less the latency and what's detected from the device, as
+        /// playback draws a song. Held off, only what's detected. Without audio, the time since <see cref="Start"/>.
         /// </summary>
         public override TimeSpan Now()
         {
             var position = _player is { IsPlaying: true } player ? player.SmoothPosition : _clock.GetElapsedTime(_startedAt);
-            return LatencyCompensation.Drawn(position, IsCalibrationOff ? 0 : Value, 1);
+            return LatencyCompensation.Drawn(position, (IsCalibrationOff ? 0 : Value) + (Detected ?? 0), 1);
         }
 
         /// <summary>Opens the output and starts the clicks. Never throws: a device that can't be opened is said in <see cref="Message"/>.</summary>
@@ -343,17 +361,21 @@ namespace ChartShared.UI.ViewModels
                 return;
             }
 
+            // The taps measure the whole latency; what's detected from the device is added anyway, so the value is the rest.
             int measured = (int)Math.Round(estimate.OffsetMilliseconds);
-            int latency = Math.Clamp(measured, MinLatency, MaxLatency);
+            int beyond = measured - (Detected ?? 0);
+            int latency = Math.Clamp(beyond, MinLatency, MaxLatency);
             bool wide = estimate.SpreadMilliseconds > TapTest.WideSpreadMilliseconds;
-            IsTapStatusWarning = wide || latency != measured;
+            IsTapStatusWarning = wide || latency != beyond;
             TapStatus = string.Format(
                 CultureInfo.CurrentCulture,
                 wide ? SharedStrings.CalibrationTapResultWideFormat : SharedStrings.CalibrationTapResultFormat,
                 measured,
                 Math.Round(estimate.SpreadMilliseconds),
                 estimate.Kept);
-            if (latency != measured)
+            if (Detected is { } detected)
+                TapStatus += " " + string.Format(CultureInfo.CurrentCulture, SharedStrings.CalibrationTapLessDetectedFormat, detected, beyond);
+            if (latency != beyond)
                 TapStatus += " " + string.Format(CultureInfo.CurrentCulture, SharedStrings.CalibrationTapClampedFormat, latency);
             Value = latency;
         }
@@ -458,8 +480,9 @@ namespace ChartShared.UI.ViewModels
                 return;
 
             CancelTaps();
-            _calibration.OnDeviceChanged(device.Name, device.Id);
+            _calibration.OnDeviceChanged(device.Name, device.Id, device.DetectedLatencyMs);
             DeviceName = DeviceNameOf(device.Name);
+            Detected = _calibration.Detected;
             Value = _calibration.Value;
             OnChangedChanged();
         }

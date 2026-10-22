@@ -17,6 +17,10 @@ namespace ChartShared.Audio.Playback;
 /// SDL moves the stream without saying so, and only reports device events to an event loop this
 /// app doesn't run, so <see cref="Device"/> is checked when playback starts and once a second.
 /// </para>
+/// <para>
+/// The device carries the latency the app can read for it (<see cref="DeviceLatency"/>): SDL's device
+/// buffer, and on Windows what WASAPI reports for the endpoint (issue #140).
+/// </para>
 /// </remarks>
 public sealed unsafe class SdlAudioOutput : IAudioOutput
 {
@@ -30,6 +34,7 @@ public sealed unsafe class SdlAudioOutput : IAudioOutput
     private readonly Timer _deviceCheck;
     private SDL_AudioStream* _stream;
     private AudioDevice _device;
+    private (string Name, string? Id, TimeSpan? Latency)? _osLatency;
 
     /// <exception cref="AudioDeviceException">No output device could be opened.</exception>
     internal SdlAudioOutput(int sampleRate)
@@ -187,19 +192,49 @@ public sealed unsafe class SdlAudioOutput : IAudioOutput
         }
     }
 
-    /// <summary>The device the stream is on now, or null once it's closed.</summary>
+    /// <summary>The device the stream is on now, with the latency read for it, or null once it's closed.</summary>
     private AudioDevice? ReadDevice()
     {
         string? name;
+        int sampleFrames = 0;
+        int deviceRate = 0;
         lock (_lock)
         {
             if (_stream is null)
                 return null;
 
             // The stream's device is the default device, which SDL resolves to the physical one it's on.
-            name = SDL_GetAudioDeviceName(SDL_GetAudioStreamDevice(_stream));
+            var device = SDL_GetAudioStreamDevice(_stream);
+            name = SDL_GetAudioDeviceName(device);
+
+            // SDL's device buffer, which the stream's queue doesn't count (C10 item 5).
+            SDL_AudioSpec spec;
+            int frames;
+            if (SDL_GetAudioDeviceFormat(device, &spec, &frames))
+            {
+                sampleFrames = frames;
+                deviceRate = spec.freq;
+            }
         }
+        name ??= "";
         var id = OperatingSystem.IsWindows() ? WindowsAudioEndpoint.DefaultRenderId() : null;
-        return new AudioDevice(name ?? "", id);
+        return new AudioDevice(name, id, DeviceLatency.Milliseconds(sampleFrames, deviceRate, OsLatency(name, id)));
+    }
+
+    /// <summary>
+    /// What the OS says the device adds after SDL's buffer, read again only when the device changes, as that's a COM
+    /// call and this is read once a second. Only <see cref="ReadDevice"/> uses it, from the constructor or one
+    /// <see cref="CheckDevice"/> at a time.
+    /// </summary>
+    private TimeSpan? OsLatency(string name, string? id)
+    {
+        if (!OperatingSystem.IsWindows())
+            return null;
+        if (_osLatency is { } known && known.Name == name && known.Id == id)
+            return known.Latency;
+
+        var latency = WindowsAudioEndpoint.DefaultRenderLatency();
+        _osLatency = (name, id, latency);
+        return latency;
     }
 }
