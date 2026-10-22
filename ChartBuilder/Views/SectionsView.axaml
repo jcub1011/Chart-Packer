@@ -14,8 +14,6 @@
          then the focused part's own, each with a go-to, a delete, and fields that rename and move it once Enter is pressed
          or the field is left. Insert section and Insert event add them at the cursor, on the grid. -->
     <UserControl.Resources>
-        <bctl:LaneMenuConverter x:Key="Menu" Check="{StaticResource CheckStroke}" />
-
         <!-- A row: a bar on its left in the accent for a section and manila for a song event; the name or text, or a song
              event's label; move to the playhead, go-to and delete; where it is; and its tick. A song event the editor places can't be deleted, and its tick is
              only shown. -->
@@ -124,6 +122,7 @@
                         <Button Classes="labelled"
                                 FontSize="12"
                                 ToolTip.Tip="{x:Static res:Strings.SectionsInsertSectionToolTip}"
+                                bctl:LaneMenu.Items="{Binding InsertSectionMenu}"
                                 AutomationProperties.Name="{x:Static res:Strings.SectionsInsertSectionButton}">
                             <StackPanel Orientation="Horizontal" Spacing="4">
                                 <ctl:LineIcon Data="{StaticResource AddStroke}" />
@@ -131,13 +130,13 @@
                                 <ctl:LineIcon Data="{StaticResource ChevronDownStroke}" />
                             </StackPanel>
                             <Button.Flyout>
-                                <MenuFlyout Placement="BottomEdgeAlignedLeft"
-                                            ItemsSource="{Binding InsertSectionMenu, Converter={StaticResource Menu}}" />
+                                <MenuFlyout Placement="BottomEdgeAlignedLeft" />
                             </Button.Flyout>
                         </Button>
                         <Button Classes="labelled"
                                 FontSize="12"
                                 ToolTip.Tip="{x:Static res:Strings.SectionsInsertEventToolTip}"
+                                bctl:LaneMenu.Items="{Binding InsertEventMenu}"
                                 AutomationProperties.Name="{x:Static res:Strings.SectionsInsertEventButton}">
                             <StackPanel Orientation="Horizontal" Spacing="4">
                                 <ctl:LineIcon Data="{StaticResource AddStroke}" />
@@ -145,8 +144,7 @@
                                 <ctl:LineIcon Data="{StaticResource ChevronDownStroke}" />
                             </StackPanel>
                             <Button.Flyout>
-                                <MenuFlyout Placement="BottomEdgeAlignedLeft"
-                                            ItemsSource="{Binding InsertEventMenu, Converter={StaticResource Menu}}" />
+                                <MenuFlyout Placement="BottomEdgeAlignedLeft" />
                             </Button.Flyout>
                         </Button>
                     </WrapPanel>
