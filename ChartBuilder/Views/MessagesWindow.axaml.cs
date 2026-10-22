@@ -12,6 +12,7 @@ namespace ChartBuilder.Views
         public MessagesWindow()
         {
             InitializeComponent();
+            WindowChrome.ShowIcon(this, WindowTitleBar);
             Opened += (_, _) => WindowChrome.UseDarkTitleBar(this);
         }
 
