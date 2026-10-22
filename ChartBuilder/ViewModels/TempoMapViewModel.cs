@@ -23,11 +23,11 @@ namespace ChartBuilder.ViewModels
     {
         private readonly TempoMapViewModel _owner;
         private string _bpmText = "";
-        private string _numeratorText = "";
-        private int _denominator;
         private string _tickText = "";
         private string _where;
         private bool _isCurrent;
+        private decimal? _editNumerator;
+        private int _editDenominator;
 
         internal TempoChangeItem(TempoMapViewModel owner, TempoMapRow row, string where)
         {
@@ -41,6 +41,9 @@ namespace ChartBuilder.ViewModels
             RemoveSignatureCommand = new RelayCommand(() => owner.RemoveSignature(this));
             RemoveBothCommand = new RelayCommand(() => owner.RemoveBoth(this));
             ToggleAnchorCommand = new RelayCommand(() => owner.ToggleAnchor(this));
+            MoveToPlayheadCommand = new RelayCommand(() => owner.MoveToPlayhead(this));
+            ApplySignatureCommand = new RelayCommand(() => owner.ApplySignature(this));
+            ChooseSignatureCommand = new RelayCommand<string>(text => owner.ChooseSignature(this, text));
         }
 
         /// <summary>The change, and what's in force there.</summary>
@@ -84,39 +87,40 @@ namespace ChartBuilder.ViewModels
         /// <summary>The BPM in force here, shown greyed in the BPM field when there's no tempo marker.</summary>
         public string BpmInForce => TempoMapViewModel.BpmText(Row.TempoInForce);
 
-        /// <summary>The time signature's beats, typed to change them; empty when there's none here.</summary>
-        public string NumeratorText
+        /// <summary>The time signature here, or the one in force here, e.g. "7/8", on the button that opens its editor.</summary>
+        public string SignatureText
         {
-            get => _numeratorText;
-            set
+            get
             {
-                if (value == _numeratorText)
-                    return;
-                _numeratorText = value;
-                OnPropertyChanged();
-                _owner.SetNumerator(this, value);
+                (int numerator, int denominator) = Row.Signature is { } placed
+                    ? (placed.Numerator, placed.Denominator)
+                    : (Row.SignatureInForce.Numerator, Row.SignatureInForce.Denominator);
+                return string.Format(CultureInfo.CurrentCulture, "{0}/{1}", numerator, denominator);
             }
         }
 
-        /// <summary>The beats in force here, shown greyed in the beats field when there's no time signature.</summary>
-        public string NumeratorInForce => Row.SignatureInForce.Numerator.ToString(CultureInfo.CurrentCulture);
+        /// <summary>The time signatures the editor offers in one click.</summary>
+        public IReadOnlyList<string> SignaturePresets => TempoMapViewModel.SignaturePresets;
+
+        /// <summary>The beats in the time signature's editor, applied with <see cref="ApplySignatureCommand"/>.</summary>
+        public decimal? EditNumerator
+        {
+            get => _editNumerator;
+            set => SetProperty(ref _editNumerator, value);
+        }
+
+        /// <summary>The note value in the time signature's editor, applied with <see cref="ApplySignatureCommand"/>.</summary>
+        public int EditDenominator
+        {
+            get => _editDenominator;
+            set => SetProperty(ref _editDenominator, value);
+        }
+
+        /// <summary>Whether the time signature's editor offers to remove it: there's one here, and not at the song's start.</summary>
+        public bool CanRemoveSignature => HasSignature && Row.Tick > 0;
 
         /// <summary>The note values a beat can be, the one in force among them.</summary>
         public IReadOnlyList<int> Denominators { get; private set; } = [];
-
-        /// <summary>The time signature's note value, or the one in force here when there's no time signature.</summary>
-        public int Denominator
-        {
-            get => _denominator;
-            set
-            {
-                if (value == _denominator || value <= 0)
-                    return;
-                _denominator = value;
-                OnPropertyChanged();
-                _owner.SetDenominator(this, value);
-            }
-        }
 
         /// <summary>Its tick, which is typed to move it.</summary>
         public string TickText
@@ -159,6 +163,30 @@ namespace ChartBuilder.ViewModels
 
         public IRelayCommand ToggleAnchorCommand { get; }
 
+        /// <summary>Moves the change to the playhead, on the grid, as Add tempo change places one there.</summary>
+        public IRelayCommand MoveToPlayheadCommand { get; }
+
+        /// <summary>Places the time signature in the editor's fields here, or changes the one here to it.</summary>
+        public IRelayCommand ApplySignatureCommand { get; }
+
+        /// <summary>Places one of <see cref="SignaturePresets"/> here, given as "7/8".</summary>
+        public IRelayCommand<string> ChooseSignatureCommand { get; }
+
+        /// <summary>Fills the time signature's editor with the signature here, or the one in force here, as it opens.</summary>
+        public void BeginSignatureEdit()
+        {
+            if (Row.Signature is { } placed)
+            {
+                EditNumerator = placed.Numerator;
+                EditDenominator = placed.Denominator;
+            }
+            else
+            {
+                EditNumerator = Row.SignatureInForce.Numerator;
+                EditDenominator = Row.SignatureInForce.Denominator;
+            }
+        }
+
         /// <summary>Takes up the tick an edit of its own has moved it to, so the next refresh finds this row for it.</summary>
         internal void Rekey(long tick) => Row = Row with { Tick = tick };
 
@@ -186,6 +214,7 @@ namespace ChartBuilder.ViewModels
                 OnPropertyChanged(nameof(CanRemove));
                 OnPropertyChanged(nameof(RemovesOne));
                 OnPropertyChanged(nameof(RemovesEither));
+                OnPropertyChanged(nameof(CanRemoveSignature));
             }
 
             // Always, so the anchor button shows the marker again after a refused toggle.
@@ -193,27 +222,19 @@ namespace ChartBuilder.ViewModels
             if (old is not { } previous || previous.Tick != row.Tick)
                 OnPropertyChanged(nameof(Tick));
             OnPropertyChanged(nameof(BpmInForce));
-            OnPropertyChanged(nameof(NumeratorInForce));
+            OnPropertyChanged(nameof(SignatureText));
 
             string bpm = row.Tempo is { } tempo ? TempoMapViewModel.BpmText(tempo.MicrosecondsPerQuarter) : "";
             if (force || bpm != _bpmText)
                 SetField(ref _bpmText, bpm, nameof(BpmText));
 
-            string numerator = row.Signature is { } signature ? signature.Numerator.ToString(CultureInfo.CurrentCulture) : "";
-            if (force || numerator != _numeratorText)
-                SetField(ref _numeratorText, numerator, nameof(NumeratorText));
-
-            // A new list of note values loses the drop-down's choice, so it's said again after.
+            // The time signature editor's note values, with the one here among them.
             int denominator = row.Signature?.Denominator ?? row.SignatureInForce.Denominator;
-            bool newList = !Denominators.Contains(denominator);
-            if (newList)
+            if (!Denominators.Contains(denominator))
             {
                 Denominators = [.. NewChartSettings.Denominators.Append(denominator).Distinct().Order()];
                 OnPropertyChanged(nameof(Denominators));
             }
-
-            if (force || newList || denominator != _denominator)
-                SetField(ref _denominator, denominator, nameof(Denominator));
 
             string tick = row.Tick.ToString(CultureInfo.CurrentCulture);
             if (force || tick != _tickText)
@@ -253,6 +274,10 @@ namespace ChartBuilder.ViewModels
     {
         /// <summary>The time signatures Add time signature offers, before Custom….</summary>
         private static readonly (int Numerator, int Denominator)[] CommonSignatures = [(2, 4), (3, 4), (4, 4), (5, 4), (6, 8), (7, 8), (12, 8)];
+
+        /// <summary>The common time signatures as they're written, e.g. "6/8", which a row's time signature editor offers.</summary>
+        internal static readonly IReadOnlyList<string> SignaturePresets =
+            [.. CommonSignatures.Select(s => string.Format(CultureInfo.InvariantCulture, "{0}/{1}", s.Numerator, s.Denominator))];
 
         private readonly ChartEditorViewModel _editor;
         private List<TempoChangeItem> _items = [];
@@ -301,7 +326,7 @@ namespace ChartBuilder.ViewModels
         /// <summary><b>Add time signature</b>'s menu: the common signatures, then Custom….</summary>
         public IReadOnlyList<LaneMenuItem> AddSignatureMenu { get; }
 
-        /// <summary>The tempo and time signature at the cursor, e.g. "At the cursor: 140 BPM · 3/4".</summary>
+        /// <summary>The tempo and time signature at the cursor, e.g. "140 BPM · 3/4".</summary>
         [ObservableProperty]
         public partial string AtCursorText { get; private set; } = "";
 
@@ -429,38 +454,6 @@ namespace ChartBuilder.ViewModels
             Edit(item, blocked => TempoMapEdits.PlaceBpm(Session.Chart, tick, tempo, Session.Delay, Session.KeepTimes, blocked));
         }
 
-        /// <summary>
-        /// Sets the time signature's beats at <paramref name="item"/>'s tick, adding a time signature there when there's
-        /// none; an empty field removes it.
-        /// </summary>
-        internal void SetNumerator(TempoChangeItem item, string text)
-        {
-            if (string.IsNullOrWhiteSpace(text))
-            {
-                if (item.HasSignature)
-                    RemoveSignature(item);
-                else
-                    Edited(item);
-                return;
-            }
-
-            if (!int.TryParse(text, NumberStyles.Integer, CultureInfo.CurrentCulture, out int numerator))
-            {
-                Session.Status = Strings.TempoMapBadNumerator;
-                Edited(item);
-                return;
-            }
-
-            PlaceSignature(item, numerator, item.Denominator);
-        }
-
-        /// <summary>Sets the time signature's note value at <paramref name="item"/>'s tick, adding a time signature there when there's none.</summary>
-        internal void SetDenominator(TempoChangeItem item, int denominator)
-        {
-            int numerator = item.Row.Signature?.Numerator ?? item.Row.SignatureInForce.Numerator;
-            PlaceSignature(item, numerator, denominator);
-        }
-
         private void PlaceSignature(TempoChangeItem item, int numerator, int denominator)
         {
             var signature = item.Row.Signature;
@@ -471,6 +464,40 @@ namespace ChartBuilder.ViewModels
             }
 
             Execute(item, TempoMapEdits.PlaceSignature(Session.Chart, item.Tick, numerator, denominator));
+        }
+
+        /// <summary>Places the time signature in <paramref name="item"/>'s editor at its tick.</summary>
+        internal void ApplySignature(TempoChangeItem item)
+        {
+            if (item.EditNumerator is not { } beats || beats < 1 || beats != Math.Floor(beats) || beats > int.MaxValue || item.EditDenominator <= 0)
+            {
+                Session.Status = Strings.TempoMapBadNumerator;
+                return;
+            }
+
+            PlaceSignature(item, (int)beats, item.EditDenominator);
+        }
+
+        /// <summary>Places <paramref name="text"/>, a time signature written as "7/8", at <paramref name="item"/>'s tick.</summary>
+        internal void ChooseSignature(TempoChangeItem item, string? text)
+        {
+            string[] parts = text?.Split('/') ?? [];
+            if (parts.Length == 2
+                && int.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out int numerator)
+                && int.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out int denominator))
+                PlaceSignature(item, numerator, denominator);
+        }
+
+        /// <summary>
+        /// Moves <paramref name="item"/>'s tempo marker and time signature to the playhead, on the grid: the tick Add tempo
+        /// change would place a marker at.
+        /// </summary>
+        internal void MoveToPlayhead(TempoChangeItem item)
+        {
+            long to = Session.CursorTick;
+            if (!item.CanRemove || to == item.Tick)
+                return;
+            _ = MoveAsync(item, to);
         }
 
         /// <summary>Moves <paramref name="item"/>'s tempo marker and time signature to the tick typed; anything else typed is put back.</summary>
@@ -615,7 +642,7 @@ namespace ChartBuilder.ViewModels
                 var row = current.Row;
                 AtCursorText = string.Format(
                     CultureInfo.CurrentCulture,
-                    Strings.TempoMapAtCursorFormat,
+                    Strings.TempoMapAtCursorValueFormat,
                     BpmText(row.TempoInForce),
                     row.SignatureInForce.Numerator,
                     row.SignatureInForce.Denominator);

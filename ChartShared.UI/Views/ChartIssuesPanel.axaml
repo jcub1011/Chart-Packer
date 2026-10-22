@@ -1,0 +1,204 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ChartShared.UI.ViewModels"
+             xmlns:views="using:ChartShared.UI.Views"
+             xmlns:res="using:ChartShared.UI.Resources"
+             xmlns:ui="using:ChartShared.UI.Controls"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="420" d:DesignHeight="600"
+             x:Class="ChartShared.UI.Views.ChartIssuesPanel"
+             x:DataType="vm:ChartIssuesViewModel">
+
+    <!-- A chart's findings (GitHub issues #53, #128): searched and filtered, in sections by how serious they are, with
+         their counts at the foot. Chart Packer's chart issues window and Chart Builder's Findings tab are both this, so
+         they do the same things the same way. -->
+
+    <UserControl.Resources>
+        <!-- A filter chip: clicking it turns it on or off, which only its colours show, so it keeps its size. -->
+        <DataTemplate x:Key="FilterChipTemplate" x:DataType="vm:CountedFilterChipViewModel">
+            <ToggleButton Classes="filterChip"
+                          IsChecked="{Binding IsOn}"
+                          ToolTip.Tip="{Binding ToolTip}"
+                          AutomationProperties.Name="{Binding Label}">
+                <TextBlock Text="{Binding Label}" VerticalAlignment="Center" />
+            </ToggleButton>
+        </DataTemplate>
+
+        <ItemsPanelTemplate x:Key="ChipsPanel">
+            <WrapPanel ItemSpacing="4" LineSpacing="4" />
+        </ItemsPanelTemplate>
+    </UserControl.Resources>
+
+    <UserControl.Styles>
+        <!-- The footer's counts: each in its severity's colour when there are any, dimmed when there are none. -->
+        <Style Selector="TextBlock.count">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Opacity" Value="0.6" />
+        </Style>
+        <Style Selector="TextBlock.count.warning">
+            <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}" />
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+        <Style Selector="TextBlock.count.error">
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlErrorTextForegroundBrush}" />
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+        <Style Selector="TextBlock.count.info">
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+        <Style Selector="TextBlock.separator">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Opacity" Value="0.4" />
+        </Style>
+        <Style Selector="ui|LineIcon.warn">
+            <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}" />
+        </Style>
+        <Style Selector="ui|LineIcon.warn.fail">
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlErrorTextForegroundBrush}" />
+        </Style>
+        <Style Selector="ui|LineIcon.done">
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+        </Style>
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="*,Auto">
+        <DockPanel Grid.Row="0">
+            <!-- Search, and the filter flyout, as the Validator's search strip is. -->
+            <Border DockPanel.Dock="Top"
+                    Padding="6"
+                    BorderThickness="0,0,0,1"
+                    BorderBrush="{DynamicResource SubtleBorderBrush}">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                    <TextBox Grid.Column="0"
+                             Classes="clearButton"
+                             VerticalContentAlignment="Center"
+                             Text="{Binding SearchText}"
+                             PlaceholderText="{x:Static res:SharedStrings.ChartIssuesSearchWatermark}"
+                             AutomationProperties.Name="{x:Static res:SharedStrings.ChartIssuesSearchWatermark}">
+                        <TextBox.InnerLeftContent>
+                            <ui:LineIcon Data="{StaticResource SearchStroke}" Margin="8,0,0,0" Opacity="0.6" />
+                        </TextBox.InnerLeftContent>
+                        <TextBox.KeyBindings>
+                            <KeyBinding Gesture="Escape" Command="{Binding ClearSearchCommand}" />
+                        </TextBox.KeyBindings>
+                    </TextBox>
+
+                    <!-- On/off chips: with none on in a group, it lets every finding through. -->
+                    <Button Grid.Column="1"
+                            Classes="tool"
+                            Classes.active="{Binding HasActiveFilters}"
+                            VerticalAlignment="Center"
+                            ToolTip.Tip="{x:Static res:SharedStrings.ChartIssuesFilterToolTip}"
+                            AutomationProperties.Name="{x:Static res:SharedStrings.ChartIssuesFilterToolTip}">
+                        <Panel Width="32" Height="32">
+                            <ui:LineIcon Data="{StaticResource FilterStroke}" HorizontalAlignment="Center" />
+                            <Border Classes="badge" IsVisible="{Binding HasActiveFilters}">
+                                <TextBlock Text="{Binding ActiveFilterCount}" />
+                            </Border>
+                        </Panel>
+                        <Button.Flyout>
+                            <Flyout Placement="BottomEdgeAlignedRight">
+                                <ScrollViewer MaxHeight="520" HorizontalScrollBarVisibility="Disabled">
+                                    <StackPanel Width="340" Spacing="14" Margin="2">
+                                        <StackPanel Classes="filter-section">
+                                            <TextBlock Classes="caption" Text="{x:Static res:SharedStrings.ChartIssuesFilterSeverityLabel}" />
+                                            <ItemsControl ItemsSource="{Binding SeverityChips}"
+                                                          ItemTemplate="{StaticResource FilterChipTemplate}"
+                                                          ItemsPanel="{StaticResource ChipsPanel}" />
+                                        </StackPanel>
+
+                                        <!-- Only the instruments, difficulties and types the findings have. -->
+                                        <StackPanel Classes="filter-section">
+                                            <TextBlock Classes="caption" Text="{x:Static res:SharedStrings.ChartIssuesFilterInstrumentLabel}" />
+                                            <ItemsControl ItemsSource="{Binding InstrumentChips}"
+                                                          ItemTemplate="{StaticResource FilterChipTemplate}"
+                                                          ItemsPanel="{StaticResource ChipsPanel}"
+                                                          IsVisible="{Binding HasInstrumentChips}" />
+                                            <TextBlock Classes="muted"
+                                                       FontSize="12"
+                                                       IsVisible="{Binding !HasInstrumentChips}"
+                                                       Text="{x:Static res:SharedStrings.ChartIssuesFilterNone}" />
+                                        </StackPanel>
+
+                                        <StackPanel Classes="filter-section">
+                                            <TextBlock Classes="caption" Text="{x:Static res:SharedStrings.ChartIssuesFilterDifficultyLabel}" />
+                                            <ItemsControl ItemsSource="{Binding DifficultyChips}"
+                                                          ItemTemplate="{StaticResource FilterChipTemplate}"
+                                                          ItemsPanel="{StaticResource ChipsPanel}"
+                                                          IsVisible="{Binding HasDifficultyChips}" />
+                                            <TextBlock Classes="muted"
+                                                       FontSize="12"
+                                                       IsVisible="{Binding !HasDifficultyChips}"
+                                                       Text="{x:Static res:SharedStrings.ChartIssuesFilterNone}" />
+                                        </StackPanel>
+
+                                        <StackPanel Classes="filter-section">
+                                            <TextBlock Classes="caption" Text="{x:Static res:SharedStrings.ChartIssuesFilterTypeLabel}" />
+                                            <ItemsControl ItemsSource="{Binding TypeChips}"
+                                                          ItemTemplate="{StaticResource FilterChipTemplate}"
+                                                          ItemsPanel="{StaticResource ChipsPanel}"
+                                                          IsVisible="{Binding HasTypeChips}" />
+                                            <TextBlock Classes="muted"
+                                                       FontSize="12"
+                                                       IsVisible="{Binding !HasTypeChips}"
+                                                       Text="{x:Static res:SharedStrings.ChartIssuesFilterNone}" />
+                                        </StackPanel>
+
+                                        <Button HorizontalAlignment="Right"
+                                                Content="{x:Static res:SharedStrings.ChartIssuesResetFilters}"
+                                                Command="{Binding ClearFiltersCommand}" />
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </Flyout>
+                        </Button.Flyout>
+                    </Button>
+                </Grid>
+            </Border>
+
+            <!-- How many of the findings the search and filter show, while they leave some out. -->
+            <Border DockPanel.Dock="Top"
+                    Padding="12,5"
+                    BorderThickness="0,0,0,1"
+                    BorderBrush="{DynamicResource SubtleBorderBrush}"
+                    IsVisible="{Binding IsNarrowed}">
+                <TextBlock Classes="muted"
+                           FontSize="12"
+                           HorizontalAlignment="Right"
+                           TextTrimming="CharacterEllipsis"
+                           Text="{Binding ShownSummaryText}" />
+            </Border>
+
+            <views:ChartIssuesView />
+        </DockPanel>
+
+        <!-- The counts of every finding, whatever the search and filter show, then what the host puts beside them, such as
+             a window's Close. Nothing in it grows, so nothing above it moves; narrow, the counts wrap. -->
+        <Border Grid.Row="1" Classes="toolbar" BorderThickness="0,1,0,0">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                <Grid Grid.Column="0" ColumnDefinitions="16,*" ColumnSpacing="8" VerticalAlignment="Center" Margin="4,0,0,0">
+                    <Panel Grid.Column="0" VerticalAlignment="Center">
+                        <ui:LineIcon Classes="warn"
+                                     Classes.fail="{Binding HasErrors}"
+                                     Data="{StaticResource WarningStroke}"
+                                     IsVisible="{Binding !IsClean}" />
+                        <ui:LineIcon Classes="done" Data="{StaticResource CheckStroke}" IsVisible="{Binding IsClean}" />
+                    </Panel>
+                    <WrapPanel Grid.Column="1" Orientation="Horizontal">
+                        <TextBlock Classes="count" Classes.warning="{Binding HasWarnings}" Text="{Binding WarningCountText}" />
+                        <TextBlock Classes="separator" Text="{x:Static res:SharedStrings.ChartIssuesCountsSeparator}" />
+                        <TextBlock Classes="count" Classes.error="{Binding HasErrors}" Text="{Binding ErrorCountText}" />
+                        <TextBlock Classes="separator" Text="{x:Static res:SharedStrings.ChartIssuesCountsSeparator}" />
+                        <TextBlock Classes="count" Classes.info="{Binding HasInfos}" Text="{Binding InfoCountText}" />
+                    </WrapPanel>
+                </Grid>
+                <ContentPresenter Grid.Column="1"
+                                  VerticalAlignment="Center"
+                                  Content="{Binding $parent[views:ChartIssuesPanel].FooterActions}" />
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

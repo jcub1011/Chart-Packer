@@ -22,7 +22,9 @@ namespace ChartShared.UI.Services
         /// Asks the user to choose between two actions, such as Save or Discard, or to cancel. Cancelling or closing the
         /// prompt is <see cref="ConfirmChoice.Cancel"/>.
         /// </summary>
-        Task<ConfirmChoice> ChooseAsync(string title, string message, string firstLabel, string secondLabel);
+        /// <param name="firstIcon">The line icon beside the first action, by its key, such as <c>SaveStroke</c>; null for none.</param>
+        /// <param name="secondIcon">The line icon beside the second action, by its key; null for none.</param>
+        Task<ConfirmChoice> ChooseAsync(string title, string message, string firstLabel, string secondLabel, string? firstIcon = null, string? secondIcon = null);
 
         /// <summary>Tells the user something they must see before going on, with only OK to close it.</summary>
         Task AlertAsync(string title, string message);

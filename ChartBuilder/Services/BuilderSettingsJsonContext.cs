@@ -11,6 +11,8 @@ namespace ChartBuilder.Services
     [JsonSerializable(typeof(BuilderSettings))]
     [JsonSerializable(typeof(LaneDockState))]
     [JsonSerializable(typeof(List<RecentSong>))]
+    [JsonSerializable(typeof(List<string>))]
+    [JsonSerializable(typeof(Dictionary<string, List<string>>))]
     [JsonSerializable(typeof(ReductionDefaults))]
     [JsonSerializable(typeof(OverwritePolicy))]
     internal sealed partial class BuilderSettingsJsonContext : JsonSerializerContext

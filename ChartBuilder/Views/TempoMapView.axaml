@@ -3,6 +3,7 @@
              xmlns:vm="using:ChartBuilder.ViewModels"
              xmlns:res="using:ChartBuilder.Resources"
              xmlns:ctl="using:ChartShared.UI.Controls"
+             xmlns:sres="using:ChartShared.UI.Resources"
              xmlns:bctl="using:ChartBuilder.Controls"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -15,9 +16,10 @@
 
     <!-- Tempo map (charter-spec C1, C4, C14), a tab in the Editor's left panel: the chart's resolution and the audio's
          delay, the audio's proposals, then every tick where the tempo or the time signature changes, in time order,
-         each with a go-to, an anchor, a remove, and fields that change, add or remove the tempo and the time signature
-         there once Enter is pressed or the field is left. A field with nothing placed at the tick shows what's in force
-         there, greyed. Focusable so a click on empty space can take focus from an edit box, which commits it. -->
+         each with an anchor, a move to the playhead, a go-to, a remove, a field that changes, adds or removes the tempo
+         there once Enter is pressed or the field is left, and a button that opens the time signature's editor. Each part
+         is a section of the tab. A field with nothing placed at the tick shows what's in force there, greyed. Focusable so
+         a click on empty space can take focus from an edit box, which commits it. -->
     <UserControl.Resources>
         <bctl:LaneMenuConverter x:Key="Menu" Check="{StaticResource CheckStroke}" />
     </UserControl.Resources>
@@ -44,285 +46,389 @@
             <Setter Property="MinHeight" Value="26" />
             <Setter Property="Padding" Value="6,3" />
         </Style>
-        <Style Selector="ComboBox.tempo-field">
-            <Setter Property="FontSize" Value="12" />
-            <Setter Property="MinHeight" Value="26" />
-            <Setter Property="Padding" Value="6,2" />
+        <!-- A small rounded label: what's in force at the cursor, and a row's time signature, which opens its editor. -->
+        <Style Selector="Border.pill">
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Padding" Value="8,2" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+            <Setter Property="Background" Value="{DynamicResource ToolbarGroupBrush}" />
         </Style>
-        <!-- The note value in force, where no time signature is placed, greyed as the fields' placeholders are. -->
-        <Style Selector="ComboBox.inherited">
+        <Style Selector="Button.signature">
+            <Setter Property="MinHeight" Value="26" />
+            <Setter Property="MinWidth" Value="46" />
+            <Setter Property="Padding" Value="8,0" />
+            <Setter Property="CornerRadius" Value="13" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontFeatures" Value="tnum" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+            <Setter Property="Background" Value="{DynamicResource ToolbarBrush}" />
+        </Style>
+        <!-- The time signature in force, where none is placed, greyed as the fields' placeholders are. -->
+        <Style Selector="Button.signature.inherited">
             <Setter Property="Opacity" Value="0.6" />
+        </Style>
+        <!-- A preset in the time signature's editor. -->
+        <Style Selector="Button.preset-signature">
+            <Setter Property="MinWidth" Value="40" />
+            <Setter Property="Height" Value="26" />
+            <Setter Property="Padding" Value="6,0" />
+            <Setter Property="CornerRadius" Value="13" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontFeatures" Value="tnum" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
         </Style>
     </UserControl.Styles>
 
-    <DockPanel>
-        <!-- Timing (charter-spec C1): the resolution, and the audio's delay (song.ini's delay), each change an undo step as
-             it's made. Then, from the audio (C14): Detect from audio, which sets the starting BPM and proposes a tempo map;
-             a proposed tempo map to review, with its options in its flyout; and Find first downbeat. -->
-        <Border DockPanel.Dock="Top"
-                Padding="12,10,12,10"
-                BorderThickness="0,0,0,1"
-                BorderBrush="{DynamicResource SubtleBorderBrush}">
-            <StackPanel Spacing="6">
-                <TextBlock Classes="caption" Text="{x:Static res:Strings.ChartSettingsSectionTiming}" />
-                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" ColumnSpacing="10" RowSpacing="6">
-                    <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.ChartSettingsResolutionLabel}" />
-                    <ComboBox Grid.Row="0" Grid.Column="1"
-                              HorizontalAlignment="Left"
-                              MinWidth="130"
-                              ItemsSource="{Binding ChartSettings.Resolutions}"
-                              SelectedItem="{Binding ChartSettings.SelectedResolution}"
-                              AutomationProperties.Name="{x:Static res:Strings.ChartSettingsResolutionLabel}" />
-                    <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.ChartSettingsDelayLabel}" />
-                    <NumericUpDown Grid.Row="1" Grid.Column="1"
-                                   HorizontalAlignment="Left"
-                                   Width="130"
-                                   Value="{Binding ChartSettings.DelayMs}"
-                                   Minimum="{x:Static vm:ChartSettingsViewModel.MinDelayMs}"
-                                   Maximum="{x:Static vm:ChartSettingsViewModel.MaxDelayMs}"
-                                   Increment="1"
-                                   FormatString="0"
-                                   IsEnabled="{Binding ChartSettings.CanEditSong}"
-                                   ToolTip.Tip="{x:Static res:Strings.ChartSettingsDelayToolTip}"
-                                   AutomationProperties.Name="{x:Static res:Strings.ChartSettingsDelayLabel}" />
-                </Grid>
-                <!-- What stops a change being applied, such as a resolution change that failed. -->
-                <TextBlock TextWrapping="Wrap"
-                           Foreground="{DynamicResource WarningTextBrush}"
-                           Text="{Binding ChartSettings.Problem}"
-                           IsVisible="{Binding ChartSettings.HasProblem}" />
-
-                <TextBlock Classes="caption" Margin="0,6,0,0" Text="{x:Static res:Strings.TempoMapFromAudioHeading}" />
-                <WrapPanel ItemSpacing="6" LineSpacing="6">
-                    <!-- Detect from audio (charter-spec C1, C14): the starting BPM from the mix, and a tempo map to review. -->
-                    <Button Classes="labelled"
-                            FontSize="12"
-                            Content="{x:Static res:Strings.DetectFromAudioButton}"
-                            Command="{Binding ChartSettings.DetectFromAudioCommand}"
-                            IsEnabled="{Binding ChartSettings.CanDetect}"
-                            ToolTip.Tip="{x:Static res:Strings.DetectFromAudioToolTip}"
-                            ToolTip.ShowOnDisabled="True" />
-                    <Button x:Name="ProposeTempoMapButton"
-                            Classes="labelled"
-                            FontSize="12"
-                            IsEnabled="{Binding AudioAssist.HasAudio}"
-                            ToolTip.Tip="{x:Static res:Strings.ProposeTempoMapToolTip}"
-                            ToolTip.ShowOnDisabled="True"
-                            AutomationProperties.Name="{x:Static res:Strings.ProposeTempoMapButton}">
-                        <StackPanel Orientation="Horizontal" Spacing="4">
-                            <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.ProposeTempoMapButton}" />
-                            <ctl:LineIcon Data="{StaticResource ChevronDownStroke}" />
-                        </StackPanel>
-                        <Button.Flyout>
-                            <Flyout Placement="BottomEdgeAlignedLeft">
-                                <StackPanel Spacing="10" MinWidth="280" DataContext="{Binding AudioAssist}" x:DataType="vm:AudioAssistViewModel">
-                                    <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.ProposeTempoMapHeading}" />
-                                    <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
-                                        <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.ProposalListenLabel}" />
-                                        <StackPanel Grid.Row="0" Grid.Column="1" Spacing="2">
-                                            <RadioButton Content="{x:Static res:Strings.ProposalListenMix}" IsChecked="{Binding ListenToMix}" />
-                                            <RadioButton Content="{x:Static res:Strings.ProposalListenLane}" IsChecked="{Binding ListenToLane}" />
-                                        </StackPanel>
-                                        <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.ProposalAnchorEveryLabel}" />
-                                        <NumericUpDown Grid.Row="1"
-                                                       Grid.Column="1"
-                                                       Value="{Binding AnchorEvery}"
-                                                       Minimum="0"
-                                                       Maximum="64"
-                                                       Increment="1"
-                                                       FormatString="0"
-                                                       ParsingNumberStyle="Integer"
-                                                       ToolTip.Tip="{x:Static res:Strings.ProposalAnchorEveryToolTip}"
-                                                       AutomationProperties.Name="{x:Static res:Strings.ProposalAnchorEveryLabel}" />
-                                        <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.ProposalMergeLabel}" />
-                                        <NumericUpDown Grid.Row="2"
-                                                       Grid.Column="1"
-                                                       Value="{Binding MergeMs}"
-                                                       Minimum="0"
-                                                       Maximum="20"
-                                                       Increment="1"
-                                                       FormatString="0"
-                                                       ToolTip.Tip="{x:Static res:Strings.ProposalMergeToolTip}"
-                                                       AutomationProperties.Name="{x:Static res:Strings.ProposalMergeLabel}" />
-                                        <TextBlock Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.ProposalScopeLabel}" />
-                                        <TextBlock Grid.Row="3" Grid.Column="1" VerticalAlignment="Center" TextWrapping="Wrap" Text="{Binding ProposalScopeText}" />
-                                    </Grid>
-                                    <Button Classes="accent"
-                                            HorizontalAlignment="Right"
-                                            Content="{x:Static res:Strings.ProposalGenerate}"
-                                            Command="{Binding ProposeTempoMapCommand}"
-                                            Click="OnProposeTempoMapClick" />
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+        <bctl:PanelSectionStack TabKey="tempo-map">
+            <!-- Timing (charter-spec C1): the resolution, and the audio's delay (song.ini's delay), each change an undo step
+                 as it's made. -->
+            <bctl:PanelSection Key="timing" Header="{x:Static res:Strings.ChartSettingsSectionTiming}" Padding="12,8,12,12">
+                <StackPanel Spacing="6">
+                    <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" ColumnSpacing="10" RowSpacing="6">
+                        <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.ChartSettingsResolutionLabel}" />
+                        <ComboBox Grid.Row="0" Grid.Column="1"
+                                  HorizontalAlignment="Left"
+                                  MinWidth="110"
+                                  ItemsSource="{Binding ChartSettings.Resolutions}"
+                                  SelectedItem="{Binding ChartSettings.SelectedResolution}"
+                                  ToolTip.Tip="{x:Static res:Strings.ChartResolutionToolTip}"
+                                  AutomationProperties.Name="{x:Static res:Strings.ChartSettingsResolutionLabel}" />
+                        <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.ChartSettingsDelayLabel}" />
+                        <!-- Dragged sideways, as the video's start is; set as one undo step once it's left alone. -->
+                        <NumericUpDown Grid.Row="1" Grid.Column="1"
+                                       ctl:DragScrub.IsEnabled="True"
+                                       HorizontalAlignment="Left"
+                                       Width="110"
+                                       ShowButtonSpinner="False"
+                                       Value="{Binding ChartSettings.DelayMs}"
+                                       Minimum="{x:Static vm:ChartSettingsViewModel.MinDelayMs}"
+                                       Maximum="{x:Static vm:ChartSettingsViewModel.MaxDelayMs}"
+                                       Increment="1"
+                                       FormatString="0"
+                                       ParsingNumberStyle="Integer"
+                                       IsEnabled="{Binding ChartSettings.CanEditSong}"
+                                       AutomationProperties.Name="{x:Static res:Strings.ChartSettingsDelayLabel}">
+                            <ToolTip.Tip>
+                                <StackPanel MaxWidth="320" Spacing="6">
+                                    <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.ChartSettingsDelayToolTip}" />
+                                    <TextBlock Classes="muted" TextWrapping="Wrap" Text="{x:Static sres:SharedStrings.OffsetControlsHelp}" />
                                 </StackPanel>
-                            </Flyout>
-                        </Button.Flyout>
-                    </Button>
-                    <Button Classes="labelled"
-                            FontSize="12"
-                            Content="{x:Static res:Strings.FindDownbeatButton}"
-                            Command="{Binding AudioAssist.FindFirstDownbeatCommand}"
-                            IsEnabled="{Binding AudioAssist.HasAudio}"
-                            ToolTip.Tip="{x:Static res:Strings.FindDownbeatToolTip}"
-                            ToolTip.ShowOnDisabled="True" />
-                </WrapPanel>
-                <ProgressBar IsIndeterminate="True"
-                             HorizontalAlignment="Left"
-                             Width="60"
-                             IsVisible="{Binding ChartSettings.IsDetecting}" />
-                <TextBlock Classes="muted"
-                           FontSize="11"
-                           TextWrapping="Wrap"
-                           IsVisible="{Binding ChartSettings.HasDetectStatus}"
-                           Text="{Binding ChartSettings.DetectStatus}" />
-            </StackPanel>
-        </Border>
-
-        <TextBlock DockPanel.Dock="Top"
-                   Classes="caption"
-                   Margin="12,10,12,0"
-                   Text="{x:Static res:Strings.TempoMapHeading}" />
-        <TextBlock DockPanel.Dock="Top"
-                   Classes="muted"
-                   FontSize="11"
-                   Margin="12,2,12,0"
-                   Text="{Binding AtCursorText}" />
-
-        <WrapPanel DockPanel.Dock="Top" Margin="12,8,12,6" ItemSpacing="6" LineSpacing="6">
-            <Button Classes="labelled"
-                    FontSize="12"
-                    Command="{Binding AddTempoChangeCommand}"
-                    ToolTip.Tip="{x:Static res:Strings.TempoMapAddTempoToolTip}"
-                    AutomationProperties.Name="{x:Static res:Strings.TempoMapAddTempoButton}">
-                <StackPanel Orientation="Horizontal" Spacing="4">
-                    <ctl:LineIcon Data="{StaticResource AddStroke}" />
-                    <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.TempoMapAddTempoButton}" />
+                            </ToolTip.Tip>
+                        </NumericUpDown>
+                    </Grid>
+                    <!-- What stops a change being applied, such as a resolution change that failed. -->
+                    <TextBlock TextWrapping="Wrap"
+                               Foreground="{DynamicResource WarningTextBrush}"
+                               Text="{Binding ChartSettings.Problem}"
+                               IsVisible="{Binding ChartSettings.HasProblem}" />
                 </StackPanel>
-            </Button>
-            <Button Classes="labelled"
-                    FontSize="12"
-                    ToolTip.Tip="{x:Static res:Strings.TempoMapAddSignatureToolTip}"
-                    AutomationProperties.Name="{x:Static res:Strings.TempoMapAddSignatureButton}">
-                <StackPanel Orientation="Horizontal" Spacing="4">
-                    <ctl:LineIcon Data="{StaticResource AddStroke}" />
-                    <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.TempoMapAddSignatureButton}" />
-                    <ctl:LineIcon Data="{StaticResource ChevronDownStroke}" />
+            </bctl:PanelSection>
+
+            <!-- From the audio (charter-spec C14): Detect from audio, which sets the starting BPM and proposes a tempo map; a
+                 proposed tempo map to review, with its options in its flyout; and Find first downbeat. -->
+            <bctl:PanelSection Key="audio" Header="{x:Static res:Strings.TempoMapFromAudioHeading}" Padding="12,8,12,12">
+                <StackPanel Spacing="6">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <Button Classes="tool"
+                                Command="{Binding ChartSettings.DetectFromAudioCommand}"
+                                IsEnabled="{Binding ChartSettings.CanDetect}"
+                                ToolTip.Tip="{x:Static res:Strings.DetectFromAudioToolTip}"
+                                AutomationProperties.Name="{x:Static res:Strings.DetectFromAudioButton}">
+                            <ctl:LineIcon Data="{StaticResource AudioWaveStroke}" />
+                        </Button>
+                        <Button x:Name="ProposeTempoMapButton"
+                                Classes="tool"
+                                Width="40"
+                                IsEnabled="{Binding AudioAssist.HasAudio}"
+                                ToolTip.Tip="{x:Static res:Strings.ProposeTempoMapToolTip}"
+                                AutomationProperties.Name="{x:Static res:Strings.ProposeTempoMapButton}">
+                            <StackPanel Orientation="Horizontal" Spacing="1">
+                                <ctl:LineIcon Data="{StaticResource TransformStroke}" />
+                                <ctl:LineIcon Width="10" Height="10" Data="{StaticResource ChevronDownStroke}" />
+                            </StackPanel>
+                            <Button.Flyout>
+                                <Flyout Placement="BottomEdgeAlignedLeft">
+                                    <StackPanel Spacing="10" MinWidth="280" DataContext="{Binding AudioAssist}" x:DataType="vm:AudioAssistViewModel">
+                                        <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.ProposeTempoMapHeading}" />
+                                        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
+                                            <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.ProposalListenLabel}" />
+                                            <StackPanel Grid.Row="0" Grid.Column="1" Spacing="2">
+                                                <RadioButton Content="{x:Static res:Strings.ProposalListenMix}" IsChecked="{Binding ListenToMix}" />
+                                                <RadioButton Content="{x:Static res:Strings.ProposalListenLane}" IsChecked="{Binding ListenToLane}" />
+                                            </StackPanel>
+                                            <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.ProposalAnchorEveryLabel}" />
+                                            <NumericUpDown Grid.Row="1"
+                                                           Grid.Column="1"
+                                                           Value="{Binding AnchorEvery}"
+                                                           Minimum="0"
+                                                           Maximum="64"
+                                                           Increment="1"
+                                                           FormatString="0"
+                                                           ParsingNumberStyle="Integer"
+                                                           ToolTip.Tip="{x:Static res:Strings.ProposalAnchorEveryToolTip}"
+                                                           AutomationProperties.Name="{x:Static res:Strings.ProposalAnchorEveryLabel}" />
+                                            <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.ProposalMergeLabel}" />
+                                            <NumericUpDown Grid.Row="2"
+                                                           Grid.Column="1"
+                                                           Value="{Binding MergeMs}"
+                                                           Minimum="0"
+                                                           Maximum="20"
+                                                           Increment="1"
+                                                           FormatString="0"
+                                                           ToolTip.Tip="{x:Static res:Strings.ProposalMergeToolTip}"
+                                                           AutomationProperties.Name="{x:Static res:Strings.ProposalMergeLabel}" />
+                                            <TextBlock Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.ProposalScopeLabel}" />
+                                            <TextBlock Grid.Row="3" Grid.Column="1" VerticalAlignment="Center" TextWrapping="Wrap" Text="{Binding ProposalScopeText}" />
+                                        </Grid>
+                                        <Button Classes="accent"
+                                                HorizontalAlignment="Right"
+                                                Content="{x:Static res:Strings.ProposalGenerate}"
+                                                Command="{Binding ProposeTempoMapCommand}"
+                                                Click="OnProposeTempoMapClick" />
+                                    </StackPanel>
+                                </Flyout>
+                            </Button.Flyout>
+                        </Button>
+                        <Button Classes="tool"
+                                Command="{Binding AudioAssist.FindFirstDownbeatCommand}"
+                                IsEnabled="{Binding AudioAssist.HasAudio}"
+                                ToolTip.Tip="{x:Static res:Strings.FindDownbeatToolTip}"
+                                AutomationProperties.Name="{x:Static res:Strings.FindDownbeatButton}">
+                            <ctl:LineIcon Data="{StaticResource CodaStroke}" />
+                        </Button>
+                        <ProgressBar IsIndeterminate="True"
+                                     VerticalAlignment="Center"
+                                     Margin="6,0,0,0"
+                                     Width="60"
+                                     IsVisible="{Binding ChartSettings.IsDetecting}" />
+                    </StackPanel>
+                    <TextBlock Classes="muted"
+                               FontSize="11"
+                               TextWrapping="Wrap"
+                               IsVisible="{Binding ChartSettings.HasDetectStatus}"
+                               Text="{Binding ChartSettings.DetectStatus}" />
                 </StackPanel>
-                <Button.Flyout>
-                    <MenuFlyout Placement="BottomEdgeAlignedLeft"
-                                ItemsSource="{Binding AddSignatureMenu, Converter={StaticResource Menu}}" />
-                </Button.Flyout>
-            </Button>
-        </WrapPanel>
+            </bctl:PanelSection>
 
-        <TextBlock DockPanel.Dock="Bottom"
-                   Classes="muted"
-                   FontSize="11"
-                   Margin="12,4,12,8"
-                   TextWrapping="Wrap"
-                   Text="{x:Static res:Strings.TempoMapKeysHint}" />
-
-        <!-- One virtualizing list, so only the rows on screen are made. Not a ListBox, whose keys would take the fields'
-             arrows. -->
-        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-            <ItemsControl x:Name="ChangeList" Margin="8,0,8,8" ItemsSource="{Binding Rows}">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <VirtualizingStackPanel />
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                    <!-- A row: the BPM and the time signature, then the anchor, go-to and remove; below, where it is and
-                         its tick. -->
-                    <DataTemplate DataType="vm:TempoChangeItem">
-                        <Border Classes="tempo-row" Classes.tempo="{Binding HasTempo}" Classes.current="{Binding IsCurrent}">
-                            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="6" RowSpacing="4">
-                                <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal" Spacing="4">
-                                    <TextBox Name="BpmBox"
-                                             Classes="tempo-field"
-                                             Width="64"
-                                             Text="{Binding BpmText, UpdateSourceTrigger=LostFocus}"
-                                             PlaceholderText="{Binding BpmInForce}"
-                                             ToolTip.Tip="{x:Static res:Strings.TempoMapBpmToolTip}"
-                                             AutomationProperties.Name="{x:Static res:Strings.PropertiesBpmLabel}" />
-                                    <TextBlock Classes="muted" FontSize="11" VerticalAlignment="Center" Text="{x:Static res:Strings.TempoMapBpmLabel}" />
-                                    <TextBox Name="NumeratorBox"
-                                             Classes="tempo-field"
-                                             Width="38"
-                                             Margin="6,0,0,0"
-                                             Text="{Binding NumeratorText, UpdateSourceTrigger=LostFocus}"
-                                             PlaceholderText="{Binding NumeratorInForce}"
-                                             ToolTip.Tip="{x:Static res:Strings.TempoMapNumeratorToolTip}"
-                                             AutomationProperties.Name="{x:Static res:Strings.ChartSettingsNumeratorName}" />
-                                    <TextBlock VerticalAlignment="Center" Text="/" />
-                                    <ComboBox Classes="tempo-field"
-                                              Classes.inherited="{Binding !HasSignature}"
-                                              MinWidth="56"
-                                              ItemsSource="{Binding Denominators}"
-                                              SelectedItem="{Binding Denominator}"
-                                              ToolTip.Tip="{x:Static res:Strings.TempoMapDenominatorToolTip}"
-                                              AutomationProperties.Name="{x:Static res:Strings.ChartSettingsDenominatorName}" />
-                                </StackPanel>
-                                <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
-                                    <ToggleButton Classes="tool"
-                                                  Content="⚓"
-                                                  IsVisible="{Binding HasTempo}"
-                                                  IsChecked="{Binding IsAnchored, Mode=OneWay}"
-                                                  Command="{Binding ToggleAnchorCommand}"
-                                                  ToolTip.Tip="{x:Static res:Strings.TempoMapAnchorToolTip}"
-                                                  AutomationProperties.Name="{x:Static res:Strings.PropertiesAnchoredLabel}" />
-                                    <Button Classes="labelled"
-                                            FontSize="12"
-                                            Content="{x:Static res:Strings.SectionsGoToButton}"
-                                            Command="{Binding GoToCommand}"
-                                            ToolTip.Tip="{x:Static res:Strings.SectionsGoToToolTip}"
-                                            AutomationProperties.Name="{x:Static res:Strings.SectionsGoToToolTip}" />
-                                    <Button Classes="tool"
-                                            Command="{Binding RemoveCommand}"
-                                            IsVisible="{Binding RemovesOne}"
-                                            ToolTip.Tip="{x:Static res:Strings.TempoMapRemoveToolTip}"
-                                            AutomationProperties.Name="{x:Static res:Strings.TempoMapRemoveToolTip}">
-                                        <ctl:LineIcon Data="{StaticResource ClearStroke}" />
-                                    </Button>
-                                    <!-- A tempo marker and a time signature at one tick: which to remove. -->
-                                    <Button Classes="tool"
-                                            IsVisible="{Binding RemovesEither}"
-                                            ToolTip.Tip="{x:Static res:Strings.TempoMapRemoveToolTip}"
-                                            AutomationProperties.Name="{x:Static res:Strings.TempoMapRemoveToolTip}">
-                                        <ctl:LineIcon Data="{StaticResource ClearStroke}" />
-                                        <Button.Flyout>
-                                            <MenuFlyout Placement="BottomEdgeAlignedRight">
-                                                <MenuItem Header="{x:Static res:Strings.TempoMapRemoveTempo}" Command="{Binding RemoveTempoCommand}">
-                                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource ClearStroke}" /></MenuItem.Icon>
-                                                </MenuItem>
-                                                <MenuItem Header="{x:Static res:Strings.TempoMapRemoveSignature}" Command="{Binding RemoveSignatureCommand}">
-                                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource ClearStroke}" /></MenuItem.Icon>
-                                                </MenuItem>
-                                                <MenuItem Header="{x:Static res:Strings.TempoMapRemoveBoth}" Command="{Binding RemoveBothCommand}">
-                                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource ClearStroke}" /></MenuItem.Icon>
-                                                </MenuItem>
-                                            </MenuFlyout>
-                                        </Button.Flyout>
-                                    </Button>
-                                </StackPanel>
-                                <TextBlock Grid.Row="1" Grid.Column="0"
-                                           Classes="muted"
-                                           FontSize="11"
-                                           VerticalAlignment="Center"
-                                           TextTrimming="CharacterEllipsis"
-                                           Text="{Binding Where}" />
-                                <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="4">
-                                    <TextBlock Classes="muted" FontSize="11" VerticalAlignment="Center" Text="{x:Static res:Strings.SectionsTickLabel}" />
-                                    <TextBox Classes="tempo-field"
-                                             Width="76"
-                                             IsEnabled="{Binding CanRemove}"
-                                             Text="{Binding TickText, UpdateSourceTrigger=LostFocus}"
-                                             ToolTip.Tip="{x:Static res:Strings.TempoMapTickToolTip}"
-                                             AutomationProperties.Name="{x:Static res:Strings.SectionsTickLabel}" />
-                                </StackPanel>
-                            </Grid>
+            <!-- Every change, filling what's left of the tab: what's in force at the cursor, the add buttons, the list and
+                 the keys. -->
+            <bctl:PanelSection Key="changes" Header="{x:Static res:Strings.TempoMapHeading}" Fills="True" FillMinHeight="220">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Top" Margin="12,8,12,6" Spacing="8">
+                        <Border Classes="pill" HorizontalAlignment="Left">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock Classes="muted" FontSize="12" VerticalAlignment="Center" Text="{x:Static res:Strings.TempoMapAtCursorLabel}" />
+                                <TextBlock FontSize="12" FontFeatures="tnum" VerticalAlignment="Center" Text="{Binding AtCursorText}" />
+                            </StackPanel>
                         </Border>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        </ScrollViewer>
-    </DockPanel>
+                        <WrapPanel ItemSpacing="6" LineSpacing="6">
+                            <Button Classes="labelled"
+                                    FontSize="12"
+                                    Command="{Binding AddTempoChangeCommand}"
+                                    ToolTip.Tip="{x:Static res:Strings.TempoMapAddTempoToolTip}"
+                                    AutomationProperties.Name="{x:Static res:Strings.TempoMapAddTempoToolTip}">
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <ctl:LineIcon Data="{StaticResource AddStroke}" />
+                                    <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.TempoMapAddTempoButton}" />
+                                </StackPanel>
+                            </Button>
+                            <Button Classes="labelled"
+                                    FontSize="12"
+                                    ToolTip.Tip="{x:Static res:Strings.TempoMapAddSignatureToolTip}"
+                                    AutomationProperties.Name="{x:Static res:Strings.TempoMapAddSignatureToolTip}">
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <ctl:LineIcon Data="{StaticResource AddStroke}" />
+                                    <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.TempoMapAddSignatureButton}" />
+                                    <ctl:LineIcon Data="{StaticResource ChevronDownStroke}" />
+                                </StackPanel>
+                                <Button.Flyout>
+                                    <MenuFlyout Placement="BottomEdgeAlignedLeft"
+                                                ItemsSource="{Binding AddSignatureMenu, Converter={StaticResource Menu}}" />
+                                </Button.Flyout>
+                            </Button>
+                        </WrapPanel>
+                    </StackPanel>
+
+                    <TextBlock DockPanel.Dock="Bottom"
+                               Classes="muted"
+                               FontSize="11"
+                               Margin="12,4,12,8"
+                               TextWrapping="Wrap"
+                               Text="{x:Static res:Strings.TempoMapKeysHint}" />
+
+                    <!-- One virtualizing list, so only the rows on screen are made. Not a ListBox, whose keys would take the
+                         fields' arrows. A row's right-click menu goes to it, moves it to the playhead or deletes it. -->
+                    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                        <ItemsControl x:Name="ChangeList" Margin="8,0,8,8" ItemsSource="{Binding Rows}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <VirtualizingStackPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <!-- A row: the BPM and the time signature, then the anchor, move to the playhead, go-to and
+                                     remove; below, where it is and its tick. -->
+                                <DataTemplate DataType="vm:TempoChangeItem">
+                                    <Border Classes="tempo-row" Classes.tempo="{Binding HasTempo}" Classes.current="{Binding IsCurrent}">
+                                        <Border.ContextMenu>
+                                            <ContextMenu Opening="OnRowMenuOpening" />
+                                        </Border.ContextMenu>
+                                        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="6" RowSpacing="4">
+                                            <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal" Spacing="4">
+                                                <TextBox Name="BpmBox"
+                                                         Classes="tempo-field"
+                                                         Width="64"
+                                                         Text="{Binding BpmText, UpdateSourceTrigger=LostFocus}"
+                                                         PlaceholderText="{Binding BpmInForce}"
+                                                         ToolTip.Tip="{x:Static res:Strings.TempoMapBpmToolTip}"
+                                                         AutomationProperties.Name="{x:Static res:Strings.PropertiesBpmLabel}" />
+                                                <TextBlock Classes="muted" FontSize="11" VerticalAlignment="Center" Text="{x:Static res:Strings.TempoMapBpmLabel}" />
+                                                <!-- The time signature: a pill that opens its editor, the common ones a click away. -->
+                                                <Button Name="SignatureButton"
+                                                        Classes="signature"
+                                                        Classes.inherited="{Binding !HasSignature}"
+                                                        Margin="6,0,0,0"
+                                                        Content="{Binding SignatureText}"
+                                                        ToolTip.Tip="{x:Static res:Strings.TempoMapSignatureToolTip}"
+                                                        AutomationProperties.Name="{x:Static res:Strings.TempoMapSignatureToolTip}">
+                                                    <Button.Flyout>
+                                                        <Flyout Placement="BottomEdgeAlignedLeft" Opening="OnSignatureFlyoutOpening">
+                                                            <StackPanel Spacing="10" MinWidth="220" x:DataType="vm:TempoChangeItem">
+                                                                <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.TempoMapSignatureHeading}" />
+                                                                <ItemsControl ItemsSource="{Binding SignaturePresets}">
+                                                                    <ItemsControl.ItemsPanel>
+                                                                        <ItemsPanelTemplate>
+                                                                            <WrapPanel ItemSpacing="4" LineSpacing="4" />
+                                                                        </ItemsPanelTemplate>
+                                                                    </ItemsControl.ItemsPanel>
+                                                                    <ItemsControl.ItemTemplate>
+                                                                        <DataTemplate x:DataType="x:String">
+                                                                            <Button Classes="preset-signature"
+                                                                                    Content="{Binding}"
+                                                                                    Command="{Binding $parent[ItemsControl].((vm:TempoChangeItem)DataContext).ChooseSignatureCommand}"
+                                                                                    CommandParameter="{Binding}"
+                                                                                    Click="OnSignatureChosen" />
+                                                                        </DataTemplate>
+                                                                    </ItemsControl.ItemTemplate>
+                                                                </ItemsControl>
+                                                                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="8">
+                                                                    <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.TempoMapSignatureBeatsLabel}" />
+                                                                    <NumericUpDown Name="NumeratorBox"
+                                                                                   Grid.Row="0"
+                                                                                   Grid.Column="1"
+                                                                                   Value="{Binding EditNumerator}"
+                                                                                   Minimum="1"
+                                                                                   Maximum="64"
+                                                                                   Increment="1"
+                                                                                   FormatString="0"
+                                                                                   ParsingNumberStyle="Integer"
+                                                                                   ToolTip.Tip="{x:Static res:Strings.TempoMapNumeratorToolTip}"
+                                                                                   AutomationProperties.Name="{x:Static res:Strings.ChartSettingsNumeratorName}" />
+                                                                    <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.TempoMapSignatureNoteLabel}" />
+                                                                    <ComboBox Grid.Row="1"
+                                                                              Grid.Column="1"
+                                                                              HorizontalAlignment="Stretch"
+                                                                              ItemsSource="{Binding Denominators}"
+                                                                              SelectedItem="{Binding EditDenominator}"
+                                                                              ToolTip.Tip="{x:Static res:Strings.TempoMapDenominatorToolTip}"
+                                                                              AutomationProperties.Name="{x:Static res:Strings.ChartSettingsDenominatorName}" />
+                                                                </Grid>
+                                                                <Grid ColumnDefinitions="Auto,*,Auto">
+                                                                    <Button Grid.Column="0"
+                                                                            Classes="labelled"
+                                                                            Content="{x:Static res:Strings.TempoMapSignatureRemove}"
+                                                                            Command="{Binding RemoveSignatureCommand}"
+                                                                            IsVisible="{Binding CanRemoveSignature}"
+                                                                            Click="OnSignatureChosen" />
+                                                                    <Button Grid.Column="2"
+                                                                            Classes="accent"
+                                                                            Content="{x:Static res:Strings.TempoMapSignatureApply}"
+                                                                            Command="{Binding ApplySignatureCommand}"
+                                                                            Click="OnSignatureChosen" />
+                                                                </Grid>
+                                                            </StackPanel>
+                                                        </Flyout>
+                                                    </Button.Flyout>
+                                                </Button>
+                                            </StackPanel>
+                                            <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                                                <ToggleButton Classes="tool"
+                                                              IsVisible="{Binding HasTempo}"
+                                                              IsChecked="{Binding IsAnchored, Mode=OneWay}"
+                                                              Command="{Binding ToggleAnchorCommand}"
+                                                              ToolTip.Tip="{x:Static res:Strings.TempoMapAnchorToolTip}"
+                                                              AutomationProperties.Name="{x:Static res:Strings.PropertiesAnchoredLabel}">
+                                                    <ctl:LineIcon Data="{StaticResource AnchorStroke}" />
+                                                </ToggleButton>
+                                                <Button Classes="tool"
+                                                        Command="{Binding MoveToPlayheadCommand}"
+                                                        IsEnabled="{Binding CanRemove}"
+                                                        ToolTip.Tip="{x:Static res:Strings.TempoMapMoveToPlayheadToolTip}"
+                                                        AutomationProperties.Name="{x:Static res:Strings.TempoMapMoveToPlayhead}">
+                                                    <ctl:LineIcon Data="{StaticResource PlayheadStroke}" />
+                                                </Button>
+                                                <Button Classes="tool"
+                                                        Command="{Binding GoToCommand}"
+                                                        ToolTip.Tip="{x:Static res:Strings.SectionsGoToToolTip}"
+                                                        AutomationProperties.Name="{x:Static res:Strings.SectionsGoToToolTip}">
+                                                    <ctl:LineIcon Data="{StaticResource ArrowRightStroke}" />
+                                                </Button>
+                                                <Button Classes="tool"
+                                                        Command="{Binding RemoveCommand}"
+                                                        IsVisible="{Binding RemovesOne}"
+                                                        ToolTip.Tip="{x:Static res:Strings.TempoMapRemoveToolTip}"
+                                                        AutomationProperties.Name="{x:Static res:Strings.TempoMapRemoveToolTip}">
+                                                    <ctl:LineIcon Data="{StaticResource ClearStroke}" />
+                                                </Button>
+                                                <!-- A tempo marker and a time signature at one tick: which to remove. -->
+                                                <Button Classes="tool"
+                                                        IsVisible="{Binding RemovesEither}"
+                                                        ToolTip.Tip="{x:Static res:Strings.TempoMapRemoveToolTip}"
+                                                        AutomationProperties.Name="{x:Static res:Strings.TempoMapRemoveToolTip}">
+                                                    <ctl:LineIcon Data="{StaticResource ClearStroke}" />
+                                                    <Button.Flyout>
+                                                        <MenuFlyout Placement="BottomEdgeAlignedRight">
+                                                            <MenuItem Header="{x:Static res:Strings.TempoMapRemoveTempo}" Command="{Binding RemoveTempoCommand}">
+                                                                <MenuItem.Icon><ctl:LineIcon Data="{StaticResource ClearStroke}" /></MenuItem.Icon>
+                                                            </MenuItem>
+                                                            <MenuItem Header="{x:Static res:Strings.TempoMapRemoveSignature}" Command="{Binding RemoveSignatureCommand}">
+                                                                <MenuItem.Icon><ctl:LineIcon Data="{StaticResource ClearStroke}" /></MenuItem.Icon>
+                                                            </MenuItem>
+                                                            <MenuItem Header="{x:Static res:Strings.TempoMapRemoveBoth}" Command="{Binding RemoveBothCommand}">
+                                                                <MenuItem.Icon><ctl:LineIcon Data="{StaticResource ClearStroke}" /></MenuItem.Icon>
+                                                            </MenuItem>
+                                                        </MenuFlyout>
+                                                    </Button.Flyout>
+                                                </Button>
+                                            </StackPanel>
+                                            <TextBlock Grid.Row="1" Grid.Column="0"
+                                                       Classes="muted"
+                                                       FontSize="11"
+                                                       VerticalAlignment="Center"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       Text="{Binding Where}" />
+                                            <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="4">
+                                                <TextBlock Classes="muted" FontSize="11" VerticalAlignment="Center" Text="{x:Static res:Strings.SectionsTickLabel}" />
+                                                <TextBox Classes="tempo-field"
+                                                         Width="76"
+                                                         IsEnabled="{Binding CanRemove}"
+                                                         Text="{Binding TickText, UpdateSourceTrigger=LostFocus}"
+                                                         ToolTip.Tip="{x:Static res:Strings.TempoMapTickToolTip}"
+                                                         AutomationProperties.Name="{x:Static res:Strings.SectionsTickLabel}" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </DockPanel>
+            </bctl:PanelSection>
+        </bctl:PanelSectionStack>
+    </ScrollViewer>
 </UserControl>

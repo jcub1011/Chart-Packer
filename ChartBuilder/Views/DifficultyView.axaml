@@ -3,6 +3,7 @@
              xmlns:vm="using:ChartBuilder.ViewModels"
              xmlns:res="using:ChartBuilder.Resources"
              xmlns:bctl="using:ChartBuilder.Controls"
+             xmlns:ctl="using:ChartShared.UI.Controls"
              xmlns:conv="using:ChartShared.UI.Converters"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -23,114 +24,149 @@
                                        Fallback="{StaticResource DifficultyUnsetBrush}" />
     </UserControl.Resources>
 
-    <!-- The difficulty analysis (docs/difficulty-model.md §9): the track analyzed and its rank, the spider graph of its
-         attributes for the scope picked, and its difficulty over the song, which a click scrubs. -->
-    <Grid RowDefinitions="Auto,*" Margin="10,8">
-        <StackPanel Grid.Row="0" Spacing="6">
-            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+    <UserControl.Styles>
+        <!-- The band along the top: what's shown, and the button that opens it in a window of its own. -->
+        <Style Selector="Border.view-band">
+            <Setter Property="MinHeight" Value="40" />
+            <Setter Property="Padding" Value="8,4" />
+            <Setter Property="Background" Value="{DynamicResource ToolbarBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+        </Style>
+    </UserControl.Styles>
+
+    <!-- The difficulty analysis (docs/difficulty-model.md §9): the track analyzed, then its rank and the spider graph of its
+         attributes for the scope picked, the lines to draw, and its difficulty over the song, which a click scrubs. Each is
+         a section; the graph fills what's left, and the tab scrolls before anything overlaps. -->
+    <DockPanel>
+        <Border DockPanel.Dock="Top" Classes="view-band">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6" VerticalAlignment="Center">
                 <ComboBox Grid.Column="0"
                           HorizontalAlignment="Stretch"
+                          VerticalAlignment="Center"
                           ItemsSource="{Binding TrackChoices}"
                           SelectedItem="{Binding SelectedTrack}"
                           DisplayMemberBinding="{Binding Label, x:DataType=vm:PreviewTrackChoice}"
                           ToolTip.Tip="{x:Static res:Strings.DifficultyTrackToolTip}"
                           AutomationProperties.Name="{x:Static res:Strings.DifficultyTrackToolTip}" />
-                <Button Grid.Column="1"
-                        Content="{x:Static res:Strings.PreviewOpenWindow}"
+                <Button x:Name="PopOutButton"
+                        Grid.Column="1"
+                        Classes="tool"
+                        VerticalAlignment="Center"
                         Command="{Binding OpenWindowCommand}"
-                        ToolTip.Tip="{x:Static res:Strings.DifficultyOpenWindowToolTip}" />
+                        ToolTip.Tip="{x:Static res:Strings.DifficultyOpenWindowToolTip}"
+                        AutomationProperties.Name="{x:Static res:Strings.DifficultyOpenWindowToolTip}">
+                    <ctl:LineIcon Data="{StaticResource PopOutStroke}" />
+                </Button>
             </Grid>
+        </Border>
 
-            <CheckBox Content="{x:Static res:Strings.DifficultyProView}"
-                      IsChecked="{Binding IsProView}"
-                      IsVisible="{Binding ShowsProToggle}"
-                      ToolTip.Tip="{x:Static res:Strings.DifficultyProViewToolTip}" />
+        <TextBlock DockPanel.Dock="Top"
+                   Classes="muted"
+                   TextWrapping="Wrap"
+                   Margin="12,10"
+                   Text="{Binding Placeholder}"
+                   IsVisible="{Binding !HasAnalysis}" />
 
-            <TextBlock Classes="muted"
-                       TextWrapping="Wrap"
-                       Margin="0,8"
-                       Text="{Binding Placeholder}"
-                       IsVisible="{Binding !HasAnalysis}" />
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding HasAnalysis}">
+            <bctl:PanelSectionStack TabKey="difficulty">
+                <!-- The rank, the scope it's for, and the attributes behind it. -->
+                <bctl:PanelSection Key="rating" Header="{x:Static res:Strings.DifficultyRatingSection}" Padding="12,8,12,12">
+                    <StackPanel Spacing="8">
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                            <Border Grid.Column="0"
+                                    Classes="chip large"
+                                    VerticalAlignment="Center"
+                                    Background="{Binding Tier, Converter={StaticResource DifficultyTierBrush}}"
+                                    ToolTip.Tip="{Binding RankToolTip}">
+                                <TextBlock Foreground="#0E0F14" FontWeight="SemiBold" Text="{Binding RankText}" />
+                            </Border>
+                            <CheckBox Grid.Column="1"
+                                      HorizontalAlignment="Right"
+                                      Content="{x:Static res:Strings.DifficultyProView}"
+                                      IsChecked="{Binding IsProView}"
+                                      IsVisible="{Binding ShowsProToggle}"
+                                      ToolTip.Tip="{x:Static res:Strings.DifficultyProViewToolTip}" />
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <ComboBox Grid.Column="0"
+                                      HorizontalAlignment="Stretch"
+                                      ItemsSource="{Binding Scopes}"
+                                      SelectedItem="{Binding SelectedScope}"
+                                      DisplayMemberBinding="{Binding Label, x:DataType=vm:DifficultyScopeChoice}"
+                                      ToolTip.Tip="{x:Static res:Strings.DifficultyScopeToolTip}"
+                                      AutomationProperties.Name="{x:Static res:Strings.DifficultyScopeToolTip}" />
+                            <CheckBox Grid.Column="1"
+                                      Content="{x:Static res:Strings.DifficultyIsolated}"
+                                      IsChecked="{Binding IsIsolated}"
+                                      IsVisible="{Binding IsSelectionScope}"
+                                      ToolTip.Tip="{x:Static res:Strings.DifficultyIsolatedToolTip}" />
+                        </Grid>
+                        <bctl:DifficultySpiderView Height="200"
+                                                   Values="{Binding SpiderValues}"
+                                                   Comparison="{Binding SpiderComparison}"
+                                                   Labels="{Binding AxisLabels}"
+                                                   StrokeBrush="{DynamicResource AccentTextBrush}"
+                                                   FillBrush="{DynamicResource AccentTintBrush}"
+                                                   ComparisonBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                                                   RingBrush="{DynamicResource SubtleBorderBrush}"
+                                                   ReferenceBrush="#4A4D66"
+                                                   TextBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                                                   ToolTip.Tip="{x:Static res:Strings.DifficultySpiderToolTip}"
+                                                   AutomationProperties.Name="{x:Static res:Strings.DifficultySpiderName}" />
+                        <TextBlock Classes="muted" HorizontalAlignment="Center" TextWrapping="Wrap" Text="{Binding ScopeText}" />
+                    </StackPanel>
+                </bctl:PanelSection>
 
-            <StackPanel Spacing="6" IsVisible="{Binding HasAnalysis}">
-                <Border Classes="chip large"
-                        HorizontalAlignment="Left"
-                        Background="{Binding Tier, Converter={StaticResource DifficultyTierBrush}}"
-                        ToolTip.Tip="{Binding RankToolTip}">
-                    <TextBlock Foreground="#0E0F14" FontWeight="SemiBold" Text="{Binding RankText}" />
-                </Border>
+                <!-- Which of the graph's lines are drawn. -->
+                <bctl:PanelSection Key="lines" Header="{x:Static res:Strings.DifficultyLinesLabel}" Padding="12,8,12,12">
+                    <ItemsControl ItemsSource="{Binding Lines}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel ItemSpacing="10" LineSpacing="2" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:DifficultyLineToggle">
+                                <CheckBox IsChecked="{Binding IsShown}" ToolTip.Tip="{x:Static res:Strings.DifficultyLineToolTip}">
+                                    <StackPanel Orientation="Horizontal" Spacing="5">
+                                        <Border Width="10" Height="3" VerticalAlignment="Center" Background="{Binding Brush}" />
+                                        <TextBlock Text="{Binding Label}" />
+                                    </StackPanel>
+                                </CheckBox>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </bctl:PanelSection>
 
-                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                    <ComboBox Grid.Column="0"
-                              HorizontalAlignment="Stretch"
-                              ItemsSource="{Binding Scopes}"
-                              SelectedItem="{Binding SelectedScope}"
-                              DisplayMemberBinding="{Binding Label, x:DataType=vm:DifficultyScopeChoice}"
-                              ToolTip.Tip="{x:Static res:Strings.DifficultyScopeToolTip}"
-                              AutomationProperties.Name="{x:Static res:Strings.DifficultyScopeToolTip}" />
-                    <CheckBox Grid.Column="1"
-                              Content="{x:Static res:Strings.DifficultyIsolated}"
-                              IsChecked="{Binding IsIsolated}"
-                              IsVisible="{Binding IsSelectionScope}"
-                              ToolTip.Tip="{x:Static res:Strings.DifficultyIsolatedToolTip}" />
-                </Grid>
-                <bctl:DifficultySpiderView Height="200"
-                                           Values="{Binding SpiderValues}"
-                                           Comparison="{Binding SpiderComparison}"
-                                           Labels="{Binding AxisLabels}"
-                                           StrokeBrush="{DynamicResource AccentTextBrush}"
-                                           FillBrush="{DynamicResource AccentTintBrush}"
-                                           ComparisonBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"
-                                           RingBrush="{DynamicResource SubtleBorderBrush}"
-                                           ReferenceBrush="#4A4D66"
-                                           TextBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"
-                                           ToolTip.Tip="{x:Static res:Strings.DifficultySpiderToolTip}"
-                                           AutomationProperties.Name="{x:Static res:Strings.DifficultySpiderName}" />
-                <TextBlock Classes="muted" HorizontalAlignment="Center" Text="{Binding ScopeText}" />
-
-                <TextBlock Classes="caption" Margin="0,6,0,0" Text="{x:Static res:Strings.DifficultyLinesLabel}" />
-                <ItemsControl ItemsSource="{Binding Lines}">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <WrapPanel ItemSpacing="10" LineSpacing="2" />
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="vm:DifficultyLineToggle">
-                            <CheckBox IsChecked="{Binding IsShown}" ToolTip.Tip="{x:Static res:Strings.DifficultyLineToolTip}">
-                                <StackPanel Orientation="Horizontal" Spacing="5">
-                                    <Border Width="10" Height="3" VerticalAlignment="Center" Background="{Binding Brush}" />
-                                    <TextBlock Text="{Binding Label}" />
-                                </StackPanel>
-                            </CheckBox>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </StackPanel>
-        </StackPanel>
-
-        <DockPanel Grid.Row="1" Margin="0,6,0,0" IsVisible="{Binding HasAnalysis}">
-            <TextBlock DockPanel.Dock="Bottom"
-                       Classes="muted"
-                       FontSize="11"
-                       TextWrapping="Wrap"
-                       Margin="0,4,0,0"
-                       Text="{x:Static res:Strings.DifficultyLegend}" />
-            <bctl:DifficultyGraphView MinHeight="140"
-                                      Cursor="SizeWestEast"
-                                      Graph="{Binding Graph}"
-                                      VisibleLines="{Binding VisibleLines}"
-                                      SelectionStart="{Binding SelectionStart}"
-                                      SelectionEnd="{Binding SelectionEnd}"
-                                      Position="{Binding Playback.PositionSeconds}"
-                                      IsPlaying="{Binding Playback.IsPlaying}"
-                                      Clock="{Binding Playback.Clock}"
-                                      Describe="{Binding Describe}"
-                                      LineBrush="{DynamicResource AccentTextBrush}"
-                                      TickBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"
-                                      SpanBrush="{DynamicResource AccentTintBrush}"
-                                      PlayheadBrush="{DynamicResource AccentTextBrush}"
-                                      AutomationProperties.Name="{x:Static res:Strings.DifficultyGraphName}" />
-        </DockPanel>
-    </Grid>
+                <!-- The difficulty over the song, never shorter than can be read: the tab scrolls first. -->
+                <bctl:PanelSection Key="graph" Header="{x:Static res:Strings.DifficultyGraphSection}" Padding="12,8,12,10" Fills="True" FillMinHeight="220">
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Bottom"
+                                   Classes="muted"
+                                   FontSize="11"
+                                   TextWrapping="Wrap"
+                                   Margin="0,6,0,0"
+                                   Text="{x:Static res:Strings.DifficultyLegend}" />
+                        <bctl:DifficultyGraphView MinHeight="140"
+                                                  ClipToBounds="True"
+                                                  Cursor="SizeWestEast"
+                                                  Graph="{Binding Graph}"
+                                                  VisibleLines="{Binding VisibleLines}"
+                                                  SelectionStart="{Binding SelectionStart}"
+                                                  SelectionEnd="{Binding SelectionEnd}"
+                                                  Position="{Binding Playback.PositionSeconds}"
+                                                  IsPlaying="{Binding Playback.IsPlaying}"
+                                                  Clock="{Binding Playback.Clock}"
+                                                  Describe="{Binding Describe}"
+                                                  LineBrush="{DynamicResource AccentTextBrush}"
+                                                  TickBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                                                  SpanBrush="{DynamicResource AccentTintBrush}"
+                                                  PlayheadBrush="{DynamicResource AccentTextBrush}"
+                                                  AutomationProperties.Name="{x:Static res:Strings.DifficultyGraphName}" />
+                    </DockPanel>
+                </bctl:PanelSection>
+            </bctl:PanelSectionStack>
+        </ScrollViewer>
+    </DockPanel>
 </UserControl>

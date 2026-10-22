@@ -37,6 +37,7 @@ namespace ChartBuilder.ViewModels
             _where = where;
             GoToCommand = new RelayCommand(() => owner.GoTo(this));
             DeleteCommand = new RelayCommand(() => owner.Delete(this));
+            MoveToPlayheadCommand = new RelayCommand(() => owner.MoveToPlayhead(this));
         }
 
         /// <summary>The event, the track it's on, and what it is.</summary>
@@ -104,6 +105,9 @@ namespace ChartBuilder.ViewModels
         public IRelayCommand GoToCommand { get; }
 
         public IRelayCommand DeleteCommand { get; }
+
+        /// <summary>Moves the event to the playhead, on the grid, as Insert section places one there.</summary>
+        public IRelayCommand MoveToPlayheadCommand { get; }
 
         /// <summary>Takes up the event as an edit of its own has made it, so the next refresh finds this row for it.</summary>
         internal void Rekey(TextEvent now) => Row = Row with { Event = now };
@@ -305,6 +309,18 @@ namespace ChartBuilder.ViewModels
             if (!item.Row.IsPlaced && long.TryParse(text, NumberStyles.Integer, CultureInfo.CurrentCulture, out long tick))
                 now = Session.Tools.MoveEvent(item.Row.Part, item.Row.Event, tick);
             Edited(item, now);
+        }
+
+        /// <summary>
+        /// Moves <paramref name="item"/>'s event to the playhead, on the grid: the tick Insert section would place a section
+        /// at. A song event the editor places stays where it is.
+        /// </summary>
+        internal void MoveToPlayhead(EventItem item)
+        {
+            long tick = Session.CursorTick;
+            if (item.Row.IsPlaced || tick == item.Row.Event.Tick)
+                return;
+            Edited(item, Session.Tools.MoveEvent(item.Row.Part, item.Row.Event, tick));
         }
 
         // Done or not, the row shows the event as it then is.

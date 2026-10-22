@@ -10,11 +10,28 @@ namespace ChartBuilder.Views
     /// </summary>
     public partial class DifficultyView : UserControl
     {
+        public static readonly StyledProperty<bool> CanPopOutProperty =
+            AvaloniaProperty.Register<DifficultyView, bool>(nameof(CanPopOut), true);
+
         private DifficultyViewModel? _shownFor;
 
         public DifficultyView()
         {
             InitializeComponent();
+        }
+
+        /// <summary>Whether it offers to open the analysis in a window of its own: not when it's in that window.</summary>
+        public bool CanPopOut
+        {
+            get => GetValue(CanPopOutProperty);
+            set => SetValue(CanPopOutProperty, value);
+        }
+
+        protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+        {
+            base.OnPropertyChanged(change);
+            if (change.Property == CanPopOutProperty)
+                PopOutButton.IsVisible = change.GetNewValue<bool>();
         }
 
         protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)

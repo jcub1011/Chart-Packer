@@ -148,7 +148,7 @@
     <StreamGeometry x:Key="PasteMergeStroke">M6,1.333 H10 A0.667,0.667 0 0 1 10.667,2 V3.333 A0.667,0.667 0 0 1 10,4 H6 A0.667,0.667 0 0 1 5.333,3.333 V2 A0.667,0.667 0 0 1 6,1.333 Z M10.667,2.667 h1.333 a1.333,1.333 0 0 1 1.333,1.333 v9.333 a1.333,1.333 0 0 1 -1.333,1.333 H4 a1.333,1.333 0 0 1 -1.333,-1.333 V4 a1.333,1.333 0 0 1 1.333,-1.333 h1.333 M6,9.333 h4 M8,11.333 v-4</StreamGeometry>
     <!-- "square-dashed": select. -->
     <StreamGeometry x:Key="SelectStroke">M3.333,2 a1.333,1.333 0 0 0 -1.333,1.333 M12.667,2 a1.333,1.333 0 0 1 1.333,1.333 M14,12.667 a1.333,1.333 0 0 1 -1.333,1.333 M3.333,14 a1.333,1.333 0 0 1 -1.333,-1.333 M6,2 h0.667 M6,14 h0.667 M9.333,2 h0.667 M9.333,14 h0.667 M2,6 v0.667 M14,6 v0.667 M2,9.333 v0.667 M14,9.333 v0.667</StreamGeometry>
-    <!-- "wand-sparkles": change the selected notes. -->
+    <!-- "wand-sparkles": change the selected notes, or propose a tempo map. -->
     <StreamGeometry x:Key="TransformStroke">M14.427,2.427 l-0.853,-0.853 a0.807,0.807 0 0 0 -1.147,0 L1.573,12.427 a0.807,0.807 0 0 0 0,1.147 l0.853,0.853 a0.8,0.8 0 0 0 1.147,0 L14.427,3.573 a0.8,0.8 0 0 0 0,-1.147 M9.333,4.667 l2,2 M3.333,4 v2.667 M12.667,9.333 v2.667 M6.667,1.333 v1.333 M4.667,5.333 H2 M14,10.667 h-2.667 M7.333,2 H6</StreamGeometry>
     <!-- "arrow-left-right": flip left for right. -->
     <StreamGeometry x:Key="FlipStroke">M5.333,2 L2.667,4.667 l2.667,2.667 M2.667,4.667 h10.667 M10.667,14 l2.667,-2.667 l-2.667,-2.667 M13.333,11.333 H2.667</StreamGeometry>
@@ -172,10 +172,22 @@
     <StreamGeometry x:Key="FixAllStroke">M12,4 L4.667,11.333 l-3.333,-3.333 M14.667,6.667 l-5,5 L8.667,10.667</StreamGeometry>
     <!-- "type": a text event. -->
     <StreamGeometry x:Key="TextEventStroke">M8,2.667 v10.667 M2.667,4.667 V3.333 a0.667,0.667 0 0 1 0.667,-0.667 h9.333 a0.667,0.667 0 0 1 0.667,0.667 v1.333 M6,13.333 h4</StreamGeometry>
-    <!-- "flag": the coda. -->
+    <!-- "flag": the coda, or the first downbeat. -->
     <StreamGeometry x:Key="CodaStroke">M2.667,14.667 V2.667 a0.667,0.667 0 0 1 0.267,-0.533 A4,4 0 0 1 5.333,1.333 c2,0 3.333,1.333 4.889,1.333 q1.333,0 2.045,-0.533 A0.667,0.667 0 0 1 13.333,2.667 v6.667 a0.667,0.667 0 0 1 -0.267,0.533 A4,4 0 0 1 10.667,10.667 c-2,0 -3.333,-1.333 -5.333,-1.333 a4,4 0 0 0 -2.667,1.019</StreamGeometry>
     <!-- "replace": when the output already exists. -->
     <StreamGeometry x:Key="OverwriteStroke">M9.333,2.667 a0.667,0.667 0 0 1 0.667,-0.667 M10,6.667 a0.667,0.667 0 0 1 -0.667,-0.667 M14,2.667 a0.667,0.667 0 0 0 -0.667,-0.667 M14,6 a0.667,0.667 0 0 1 -0.667,0.667 M2,4.667 l2,2 l2,-2 M4,6.667 V3.333 a1.333,1.333 0 0 1 1.333,-1.333 h1.333 M2.667,9.333 H6 A0.667,0.667 0 0 1 6.667,10 V13.333 A0.667,0.667 0 0 1 6,14 H2.667 A0.667,0.667 0 0 1 2,13.333 V10 A0.667,0.667 0 0 1 2.667,9.333 Z</StreamGeometry>
     <!-- "magnet": snap to the grid. -->
     <StreamGeometry x:Key="QuantizeStroke">M8,10 l2.667,2.667 M1.568,7.099 a0.803,0.803 0 0 0 0,1.136 l1.531,1.531 a0.803,0.803 0 0 0 1.136,0 l4.019,-4.019 a0.667,0.667 0 1 1 2,2 l-4.019,4.019 a0.803,0.803 0 0 0 0,1.136 l1.531,1.531 a0.803,0.803 0 0 0 1.136,0 l4.243,-4.245 A0.667,0.667 0 0 0 5.811,2.855 z M3.333,5.333 l2.667,2.667</StreamGeometry>
+    <!-- "pin": a side panel kept open beside the chart; turned on its side, it auto-hides. -->
+    <StreamGeometry x:Key="PinStroke">M8,11.333 v3.333 M6,7.173 a1.333,1.333 0 0 1 -0.74,1.193 l-1.187,0.6 A1.333,1.333 0 0 0 3.333,10.16 V10.667 a0.667,0.667 0 0 0 0.667,0.667 h8 a0.667,0.667 0 0 0 0.667,-0.667 v-0.507 a1.333,1.333 0 0 0 -0.74,-1.193 l-1.187,-0.6 A1.333,1.333 0 0 1 10,7.173 V4.667 a0.667,0.667 0 0 1 0.667,-0.667 a1.333,1.333 0 0 0 0,-2.667 H5.333 a1.333,1.333 0 0 0 0,2.667 a0.667,0.667 0 0 1 0.667,0.667 z</StreamGeometry>
+    <!-- "grip-vertical": something that can be dragged into another place. -->
+    <StreamGeometry x:Key="GripStroke">M5.333,8 A0.667,0.667 0 1 0 6.667,8 A0.667,0.667 0 1 0 5.333,8 Z M5.333,3.333 A0.667,0.667 0 1 0 6.667,3.333 A0.667,0.667 0 1 0 5.333,3.333 Z M5.333,12.667 A0.667,0.667 0 1 0 6.667,12.667 A0.667,0.667 0 1 0 5.333,12.667 Z M9.333,8 A0.667,0.667 0 1 0 10.667,8 A0.667,0.667 0 1 0 9.333,8 Z M9.333,3.333 A0.667,0.667 0 1 0 10.667,3.333 A0.667,0.667 0 1 0 9.333,3.333 Z M9.333,12.667 A0.667,0.667 0 1 0 10.667,12.667 A0.667,0.667 0 1 0 9.333,12.667 Z</StreamGeometry>
+    <!-- "anchor": a tempo marker anchored to its time in the audio. -->
+    <StreamGeometry x:Key="AnchorStroke">M8,14.667 V5.333 M3.333,8 H1.333 a6.667,6.667 0 0 0 13.333,0 h-2 M6,3.333 A2,2 0 1 0 10,3.333 A2,2 0 1 0 6,3.333 Z</StreamGeometry>
+    <!-- "square-arrow-out-up-right": open in a window of its own. -->
+    <StreamGeometry x:Key="PopOutStroke">M14,8.667 v4 a1.333,1.333 0 0 1 -1.333,1.333 H3.333 a1.333,1.333 0 0 1 -1.333,-1.333 V3.333 a1.333,1.333 0 0 1 1.333,-1.333 h4 M14,2 l-6,6 M10,2 h4 v4</StreamGeometry>
+    <!-- "audio-waveform": find something in the audio. -->
+    <StreamGeometry x:Key="AudioWaveStroke">M1.333,8.667 a1.333,1.333 0 0 0 1.333,-1.333 V4.667 a1.333,1.333 0 0 1 2.667,0 v8.667 a1.333,1.333 0 0 0 2.667,0 V2.667 a1.333,1.333 0 0 1 2.667,0 v8.667 a1.333,1.333 0 0 0 2.667,0 v-2.667 a1.333,1.333 0 0 1 1.333,-1.333</StreamGeometry>
+    <!-- "locate-fixed": to where the playhead is. -->
+    <StreamGeometry x:Key="PlayheadStroke">M1.333,8 h2 M12.667,8 h2 M8,1.333 v2 M8,12.667 v2 M3.333,8 A4.667,4.667 0 1 0 12.667,8 A4.667,4.667 0 1 0 3.333,8 Z M6,8 A2,2 0 1 0 10,8 A2,2 0 1 0 6,8 Z</StreamGeometry>
 </ResourceDictionary>

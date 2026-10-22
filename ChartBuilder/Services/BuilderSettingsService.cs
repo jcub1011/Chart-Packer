@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using ChartShared.Core;
@@ -101,6 +102,7 @@ namespace ChartBuilder.Services
             settings.EditorLeftPanelWidth = Size(settings.EditorLeftPanelWidth, BuilderSettings.MinEditorPanelWidth, BuilderSettings.DefaultEditorLeftPanelWidth);
             settings.EditorRightPanelWidth = Size(settings.EditorRightPanelWidth, BuilderSettings.MinEditorPanelWidth, BuilderSettings.DefaultEditorRightPanelWidth);
             settings.EditorTimelineHeight = Size(settings.EditorTimelineHeight, BuilderSettings.MinEditorTimelineHeight, BuilderSettings.DefaultEditorTimelineHeight);
+            SanitizePanelLayout(settings);
 
             if (settings.EditorFullscreen)
                 settings.EditorMaximized = true;
@@ -114,6 +116,38 @@ namespace ChartBuilder.Services
         /// </summary>
         private static double Size(double value, double min, double fallback) =>
             double.IsFinite(value) ? Math.Clamp(value, min, BuilderSettings.MaxEditorPanelSize) : fallback;
+
+        /// <summary>
+        /// The side panels' auto-hide, from the collapsed flags of files saved before it, and their tabs' and sections'
+        /// layout, with blank and repeated keys dropped.
+        /// </summary>
+        private static void SanitizePanelLayout(BuilderSettings settings)
+        {
+            settings.EditorLeftPanelAutoHide ??= settings.EditorLeftPanelCollapsed;
+            settings.EditorRightPanelAutoHide ??= settings.EditorRightPanelCollapsed;
+            settings.EditorLeftTabs = Keys(settings.EditorLeftTabs);
+            settings.EditorRightTabs = Keys(settings.EditorRightTabs);
+            settings.EditorCollapsedSections = Keys(settings.EditorCollapsedSections);
+            if (settings.EditorSectionOrder is { } orders)
+            {
+                var kept = new Dictionary<string, List<string>>();
+                foreach (var (tab, order) in orders.Take(PanelLayoutStore.MaxKeys))
+                {
+                    if (!string.IsNullOrWhiteSpace(tab) && Keys(order) is { } keys)
+                        kept[tab] = keys;
+                }
+                settings.EditorSectionOrder = kept.Count > 0 ? kept : null;
+            }
+        }
+
+        // A saved list of layout keys, without blanks or repeats; null when nothing's left.
+        private static List<string>? Keys(List<string>? keys)
+        {
+            if (keys is null)
+                return null;
+            var kept = keys.Where(k => !string.IsNullOrWhiteSpace(k)).Distinct().Take(PanelLayoutStore.MaxKeys).ToList();
+            return kept.Count > 0 ? kept : null;
+        }
 
         /// <summary>The editor's saved normal bounds, as <see cref="WindowBounds.FromSaved"/> reads them: dropped whole when half-saved.</summary>
         private static void SanitizeEditorBounds(BuilderSettings settings)

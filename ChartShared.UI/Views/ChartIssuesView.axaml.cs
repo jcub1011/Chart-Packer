@@ -70,14 +70,11 @@ namespace ChartShared.UI.Views
 
         private static void AddActions(ItemCollection items, FindingItem item, FindingFix fix)
         {
-            items.Add(Action(SharedStrings.FindingFixMenuItem, fix.Fix, "QuickFixStroke"));
+            items.Add(MenuActions.Create(SharedStrings.FindingFixMenuItem, fix.Fix, "QuickFixStroke"));
             if (fix.FixAllInPart is { } inPart)
-                items.Add(Action(item.FixAllInPartText, inPart, "FixAllInPartStroke"));
+                items.Add(MenuActions.Create(item.FixAllInPartText, inPart, "FixAllInPartStroke"));
             if (fix.FixAll is { } all)
-                items.Add(Action(SharedStrings.FindingFixAllMenuItem, all, "FixAllStroke"));
+                items.Add(MenuActions.Create(SharedStrings.FindingFixAllMenuItem, all, "FixAllStroke"));
         }
-
-        private static MenuItem Action(string header, Action action, string icon) =>
-            new() { Header = header, Command = new RelayCommand(action), Icon = LineIcon.For(icon) };
     }
 }

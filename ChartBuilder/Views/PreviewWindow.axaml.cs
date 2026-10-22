@@ -1,3 +1,4 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using ChartBuilder.ViewModels;
@@ -11,7 +12,16 @@ namespace ChartBuilder.Views
         public PreviewWindow()
         {
             InitializeComponent();
+            WindowChrome.ShowIcon(this, WindowTitleBar);
             Opened += (_, _) => WindowChrome.UseDarkTitleBar(this);
+        }
+
+        // Full screen is the highway alone, without the title bar.
+        protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+        {
+            base.OnPropertyChanged(change);
+            if (change.Property == WindowStateProperty && WindowTitleBar is { } titleBar)
+                titleBar.IsVisible = change.GetNewValue<WindowState>() != WindowState.FullScreen;
         }
 
         protected override void OnKeyDown(KeyEventArgs e)

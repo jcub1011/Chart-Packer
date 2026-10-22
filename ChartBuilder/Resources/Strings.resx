@@ -242,13 +242,9 @@
     <value>Properties</value>
     <comment>The right panel's tab.</comment>
   </data>
-  <data name="CollapsePanelToolTip" xml:space="preserve">
-    <value>Collapse</value>
-    <comment>Tucks a side panel away against the window's edge.</comment>
-  </data>
   <data name="ExpandPanelToolTip" xml:space="preserve">
-    <value>Expand</value>
-    <comment>Brings back a collapsed side panel.</comment>
+    <value>Show</value>
+    <comment>An auto-hiding side panel's tab title on its strip: flies the panel out on that tab.</comment>
   </data>
   <data name="PropertiesNothingSelected" xml:space="preserve">
     <value>Nothing selected</value>
@@ -1721,7 +1717,7 @@ Saving also makes these changes to song.ini:
     <comment>The left panel's tab listing the chart's sections and other text events.</comment>
   </data>
   <data name="SectionsInsertSectionButton" xml:space="preserve">
-    <value>Insert section</value>
+    <value>Section</value>
   </data>
   <data name="SectionsInsertSectionToolTip" xml:space="preserve">
     <value>Add a section at the cursor, on the grid</value>
@@ -1735,7 +1731,7 @@ Saving also makes these changes to song.ini:
     <comment>The name Custom… gives a new section to rename; "Section 2" and on when a section has it already.</comment>
   </data>
   <data name="SectionsInsertEventButton" xml:space="preserve">
-    <value>Insert event</value>
+    <value>Event</value>
   </data>
   <data name="SectionsInsertEventToolTip" xml:space="preserve">
     <value>Add a song event or a text event at the cursor, on the grid</value>
@@ -1804,10 +1800,6 @@ Saving also makes these changes to song.ini:
     <value>Written as {0}. Its tick can be changed here, or it can be deleted.</value>
     <comment>A song event's label's tooltip. {0} is its text, e.g. [music_start].</comment>
   </data>
-  <data name="SectionsGoToButton" xml:space="preserve">
-    <value>→</value>
-    <comment>A row's button that moves the cursor to its event.</comment>
-  </data>
   <data name="SectionsGoToToolTip" xml:space="preserve">
     <value>Move the cursor to it</value>
   </data>
@@ -1826,13 +1818,13 @@ Saving also makes these changes to song.ini:
     <comment>The heading over the Tempo map tab's Propose tempo map and Find first downbeat.</comment>
   </data>
   <data name="TempoMapAddTempoButton" xml:space="preserve">
-    <value>Add tempo change</value>
+    <value>Tempo</value>
   </data>
   <data name="TempoMapAddTempoToolTip" xml:space="preserve">
     <value>Add a tempo change at the cursor, on the grid, then type its BPM</value>
   </data>
   <data name="TempoMapAddSignatureButton" xml:space="preserve">
-    <value>Add time signature</value>
+    <value>Time Signature</value>
   </data>
   <data name="TempoMapAddSignatureToolTip" xml:space="preserve">
     <value>Add a time signature change at the start of the measure the cursor is in</value>
@@ -1845,9 +1837,9 @@ Saving also makes these changes to song.ini:
     <value>Tempo and Time Signature Changes</value>
     <comment>The heading over the Tempo map tab's list.</comment>
   </data>
-  <data name="TempoMapAtCursorFormat" xml:space="preserve">
-    <value>At the cursor: {0} BPM · {1}/{2}</value>
-    <comment>What's in force at the cursor. {0} is the BPM; {1}/{2} the time signature.</comment>
+  <data name="TempoMapAtCursorValueFormat" xml:space="preserve">
+    <value>{0} BPM · {1}/{2}</value>
+    <comment>What's in force at the cursor, after "At the cursor". {0} is the BPM; {1}/{2} the time signature.</comment>
   </data>
   <data name="TempoMapBpmLabel" xml:space="preserve">
     <value>BPM</value>
@@ -3506,5 +3498,137 @@ Saving also makes these changes to song.ini:
   <data name="PlaytestNotPlayable" xml:space="preserve">
     <value>Click a 5-fret or drums lane to playtest it: vocals and 6-fret can't be playtested yet.</value>
     <comment>Why playing the song with playtest on doesn't playtest the focused lane.</comment>
+  </data>
+  <data name="PanelAutoHideToolTip" xml:space="preserve">
+    <value>Auto-hide</value>
+    <comment>The pin on a pinned side panel: hides it to a strip along the window's edge, flying out over the chart when a tab's title is clicked.</comment>
+  </data>
+  <data name="PanelPinToolTip" xml:space="preserve">
+    <value>Keep open</value>
+    <comment>The pin on an auto-hiding side panel: pins it open beside the chart.</comment>
+  </data>
+  <data name="TabMoveLeft" xml:space="preserve">
+    <value>Move left</value>
+    <comment>A side-panel tab's menu: swaps it with the tab to its left.</comment>
+  </data>
+  <data name="TabMoveRight" xml:space="preserve">
+    <value>Move right</value>
+    <comment>A side-panel tab's menu: swaps it with the tab to its right.</comment>
+  </data>
+  <data name="TabResetOrder" xml:space="preserve">
+    <value>Reset tab order</value>
+    <comment>A side-panel tab's menu: puts the panel's tabs back in their default order.</comment>
+  </data>
+  <data name="SectionHeaderToolTip" xml:space="preserve">
+    <value>Click to collapse or expand; drag to move</value>
+    <comment>A side-panel section's header.</comment>
+  </data>
+  <data name="SectionMoveUp" xml:space="preserve">
+    <value>Move up</value>
+    <comment>A side-panel section's menu: moves it above the section before it.</comment>
+  </data>
+  <data name="SectionMoveDown" xml:space="preserve">
+    <value>Move down</value>
+    <comment>A side-panel section's menu: moves it below the section after it.</comment>
+  </data>
+  <data name="SectionCollapseAll" xml:space="preserve">
+    <value>Collapse all</value>
+    <comment>A side-panel section's menu: collapses every section of the tab.</comment>
+  </data>
+  <data name="SectionExpandAll" xml:space="preserve">
+    <value>Expand all</value>
+    <comment>A side-panel section's menu: expands every section of the tab.</comment>
+  </data>
+  <data name="SectionResetLayout" xml:space="preserve">
+    <value>Reset layout</value>
+    <comment>A side-panel section's menu: puts the tab's sections back in their default order, all expanded.</comment>
+  </data>
+  <data name="ChartResolutionShortFormat" xml:space="preserve">
+    <value>{0} TPB</value>
+    <comment>A chart resolution in the Tempo map tab, e.g. "480 TPB": ticks per beat.</comment>
+  </data>
+  <data name="ChartResolutionToolTip" xml:space="preserve">
+    <value>Ticks per beat (TPB): how finely the chart divides a beat</value>
+    <comment>The Tempo map tab's resolution drop-down.</comment>
+  </data>
+  <data name="TempoMapAtCursorLabel" xml:space="preserve">
+    <value>At the cursor</value>
+    <comment>Before what's in force at the cursor in the Tempo map tab.</comment>
+  </data>
+  <data name="TempoMapSignatureToolTip" xml:space="preserve">
+    <value>Time signature: click to change it</value>
+    <comment>A Tempo map row's time signature button. Greyed, it's the one in force there.</comment>
+  </data>
+  <data name="TempoMapSignatureHeading" xml:space="preserve">
+    <value>Time Signature</value>
+    <comment>The heading of a Tempo map row's time signature editor.</comment>
+  </data>
+  <data name="TempoMapSignatureBeatsLabel" xml:space="preserve">
+    <value>Beats</value>
+    <comment>The time signature editor: how many beats a measure has.</comment>
+  </data>
+  <data name="TempoMapSignatureNoteLabel" xml:space="preserve">
+    <value>Note value</value>
+    <comment>The time signature editor: the note a beat is.</comment>
+  </data>
+  <data name="TempoMapSignatureApply" xml:space="preserve">
+    <value>Apply</value>
+    <comment>The time signature editor: places the time signature typed.</comment>
+  </data>
+  <data name="TempoMapSignatureRemove" xml:space="preserve">
+    <value>Remove</value>
+    <comment>The time signature editor: removes the time signature placed at the row.</comment>
+  </data>
+  <data name="TempoMapMoveToPlayhead" xml:space="preserve">
+    <value>Move to the playhead</value>
+    <comment>A Tempo map row's button and menu item: moves the change to the playhead, on the grid.</comment>
+  </data>
+  <data name="TempoMapMoveToPlayheadToolTip" xml:space="preserve">
+    <value>Move this change to the playhead, on the grid</value>
+    <comment>A Tempo map row's Move to the playhead button.</comment>
+  </data>
+  <data name="TempoMapGoTo" xml:space="preserve">
+    <value>Go to</value>
+    <comment>A Tempo map row's menu: moves the cursor to the change.</comment>
+  </data>
+  <data name="TempoMapDelete" xml:space="preserve">
+    <value>Delete</value>
+    <comment>A Tempo map row's menu: deletes the tempo marker or time signature there.</comment>
+  </data>
+  <data name="TempoMapDeleteTempo" xml:space="preserve">
+    <value>Delete tempo</value>
+    <comment>A Tempo map row's menu, with a tempo marker and a time signature there.</comment>
+  </data>
+  <data name="TempoMapDeleteSignature" xml:space="preserve">
+    <value>Delete time signature</value>
+    <comment>A Tempo map row's menu, with a tempo marker and a time signature there.</comment>
+  </data>
+  <data name="TempoMapDeleteBoth" xml:space="preserve">
+    <value>Delete both</value>
+    <comment>A Tempo map row's menu, with a tempo marker and a time signature there.</comment>
+  </data>
+  <data name="PreviewPlaybackSection" xml:space="preserve">
+    <value>Playback</value>
+    <comment>The Preview tab's section with practice, speed, look-ahead and the suggested rating.</comment>
+  </data>
+  <data name="PreviewHighwaySection" xml:space="preserve">
+    <value>Highway</value>
+    <comment>The Preview tab's section with the highway.</comment>
+  </data>
+  <data name="PreviewLookAheadFormat" xml:space="preserve">
+    <value>{0:0.0} s</value>
+    <comment>How far ahead the preview looks, e.g. "1.4 s".</comment>
+  </data>
+  <data name="DifficultyRatingSection" xml:space="preserve">
+    <value>Rating</value>
+    <comment>The Difficulty tab's section with the rank and the spider graph.</comment>
+  </data>
+  <data name="DifficultyGraphSection" xml:space="preserve">
+    <value>Over the Song</value>
+    <comment>The Difficulty tab's section with the difficulty graph.</comment>
+  </data>
+  <data name="SectionsMoveToPlayheadToolTip" xml:space="preserve">
+    <value>Move this event to the playhead, on the grid</value>
+    <comment>A Sections row's Move to the playhead button.</comment>
   </data>
 </root>
