@@ -312,10 +312,14 @@ namespace ChartPacker.ViewModels
         [NotifyCanExecuteChangedFor(nameof(GenerateLowerDifficultiesCommand))]
         [NotifyCanExecuteChangedFor(nameof(EditChartCommand))]
         [NotifyPropertyChangedFor(nameof(IsSingleSelection))]
+        [NotifyPropertyChangedFor(nameof(IsMultipleSelection))]
         public partial int SelectedCount { get; set; }
 
         /// <summary>One song is selected: the right-click menu offers Edit Chart.</summary>
         public bool IsSingleSelection => SelectedCount == 1;
+
+        /// <summary>More than one song is selected: the right-click menu offers Merge.</summary>
+        public bool IsMultipleSelection => SelectedCount > 1;
 
         /// <summary>Max scan depth, set from the Settings window.</summary>
         [ObservableProperty]
