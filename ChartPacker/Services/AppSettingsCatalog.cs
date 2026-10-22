@@ -187,6 +187,18 @@ namespace ChartPacker.Services
                         Keywords = SettingKeywords.Split(Strings.AudioLatencyKeywords),
                         Actions = [new SettingAction(Strings.CalibrateButton, calibrate)],
                     },
+                    // Kept in the shared latency file, not Chart Packer's settings, so Chart Builder agrees (issue #140).
+                    new ToggleSetting
+                    {
+                        Id = "playback.detectLatency",
+                        Category = audio,
+                        Label = Strings.DetectLatencyLabel,
+                        Description = Strings.DetectLatencyDescription,
+                        Keywords = SettingKeywords.Split(Strings.DetectLatencyKeywords),
+                        DefaultValue = true,
+                        Get = () => player.DetectLatency,
+                        Set = detect => player.DetectLatency = detect,
+                    },
                     new ToggleSetting
                     {
                         Id = "playback.showWaveforms",

@@ -18,4 +18,17 @@ public sealed class WindowsAudioEndpointTests
             Assert.StartsWith("{0.0.0.", id, $"'{id}' isn't a render endpoint's ID.");
         Assert.AreEqual(id, WindowsAudioEndpoint.DefaultRenderId());
     }
+
+    [TestMethod]
+    public void TheDefaultOutputsLatencyIsWithinASecondOrNone()
+    {
+        // Null on a machine with no output device, as a build server may be.
+        var latency = WindowsAudioEndpoint.DefaultRenderLatency();
+
+        if (latency is { } found)
+        {
+            Assert.IsGreaterThanOrEqualTo(TimeSpan.Zero, found);
+            Assert.IsLessThan(TimeSpan.FromSeconds(1), found);
+        }
+    }
 }

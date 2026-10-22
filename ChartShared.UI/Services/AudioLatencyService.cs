@@ -19,11 +19,31 @@ namespace ChartShared.UI.Services
         /// <summary>The device last played on, or null before anything has played.</summary>
         public AudioDevice? Device { get; private set; }
 
-        /// <summary>The device's latency, in milliseconds; 0 before anything has played.</summary>
+        /// <summary>
+        /// The device's whole latency, in milliseconds: its calibrated latency plus what's detected from it, while
+        /// detecting is on; 0 before anything has played.
+        /// </summary>
         public int Milliseconds { get; private set; }
 
         /// <summary>Where <see cref="Milliseconds"/> came from; <see cref="LatencySource.Fallback"/> for a device never calibrated.</summary>
         public LatencySource Source { get; private set; } = LatencySource.Fallback;
+
+        /// <summary>
+        /// Whether the latency detected from the device is added to its calibrated latency (issue #140), kept in the
+        /// shared file so both apps and the calibration tool agree. Setting it reads the device's latency again.
+        /// </summary>
+        public bool DetectEnabled
+        {
+            get => file.DetectEnabled;
+            set
+            {
+                if (value == file.DetectEnabled)
+                    return;
+
+                file.SetDetect(value);
+                Reload();
+            }
+        }
 
         /// <summary>Raised on the UI thread when <see cref="Device"/> or <see cref="Milliseconds"/> changes.</summary>
         public event EventHandler? Changed;
@@ -54,7 +74,7 @@ namespace ChartShared.UI.Services
             if (Device is not { } device)
                 return;
 
-            var found = file.FindAndRemember(device.Name, device.Id);
+            var found = file.FindAndRemember(device.Name, device.Id, device.DetectedLatencyMs);
             Milliseconds = found.Milliseconds;
             Source = found.Source;
             Changed?.Invoke(this, EventArgs.Empty);

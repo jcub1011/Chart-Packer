@@ -450,7 +450,24 @@ namespace ChartPacker.ViewModels
             if (_latencyFile is null || _output?.Device is not { } device)
                 return;
 
-            _latencyMilliseconds = _latencyFile.Find(device.Name, device.Id).Milliseconds;
+            _latencyMilliseconds = _latencyFile.Find(device.Name, device.Id, device.DetectedLatencyMs).Milliseconds;
+        }
+
+        /// <summary>
+        /// Whether the latency detected from the device is added to its calibrated latency (issue #140), kept in the shared
+        /// latency file; false, and not kept, without one. Setting it reads the song's device's latency again.
+        /// </summary>
+        public bool DetectLatency
+        {
+            get => _latencyFile?.DetectEnabled ?? false;
+            set
+            {
+                if (_latencyFile is null || value == _latencyFile.DetectEnabled)
+                    return;
+
+                _latencyFile.SetDetect(value);
+                RefreshLatency();
+            }
         }
 
         public string TracksHeader => string.Format(CultureInfo.CurrentCulture, Strings.TracksHeaderFormat, Tracks.Count);
