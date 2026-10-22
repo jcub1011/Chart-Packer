@@ -5,6 +5,8 @@ using System.Linq;
 using System.Threading.Tasks;
 using ChartBuilder.Resources;
 using ChartBuilder.Services;
+using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Authoring;
 using ChartShared.Core.Charting.Commands;
 using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charting.Layout;
@@ -33,6 +35,10 @@ namespace ChartBuilder.ViewModels
         // How many dialogs have the playback lent to them (BorrowPlayback), and whether it looped before the first.
         private int _playbackBorrows;
         private bool _loopedBeforeBorrow;
+
+        // Generate fills' and Generate star power's options, as last picked.
+        private FillOptions _fillOptions = FillOptions.Default;
+        private StarPowerOptions _starPowerOptions = StarPowerOptions.Default;
 
         /// <summary>The ways record mode can put a pass in: merged with what's there, or over it.</summary>
         public IReadOnlyList<RecordModeChoice> RecordModeChoices { get; } =
@@ -359,6 +365,43 @@ namespace ChartBuilder.ViewModels
             Session.Tools.Cancel();
             var reduce = ReduceViewModel.ForRun(this, _settings, lane, all);
             await _dialogs.ShowReduceAsync(reduce);
+        }
+
+        /// <summary>
+        /// Opens Generate fills' options (charter-spec C6 item 5), from the Edit menu of a lane of the drums
+        /// <paramref name="part"/>, and proposes fills with the options picked, over the span of a selection of the part or
+        /// the whole part. The options are kept while the editor is open, so the next run starts from the last one's.
+        /// </summary>
+        public async Task GenerateFillsAsync(ChartInstrument part)
+        {
+            if (_dialogs is null)
+                return;
+            Session.Tools.Cancel();
+            var span = Session.Selection.SpanIn(part);
+            var options = new GenerateFillsViewModel(_fillOptions, overSelection: span is not null);
+            if (!await _dialogs.AskGenerateFillsAsync(options))
+                return;
+            _fillOptions = options.Options;
+            Session.Fills.Start(_fillOptions, span);
+        }
+
+        /// <summary>
+        /// Opens Generate star power's options (charter-spec C8 item 1), from the Edit menu of a lane of
+        /// <paramref name="part"/>, and proposes star power for it with the options picked, over the span of a selection of
+        /// the part or the whole part. The options are kept while the editor is open, so the next run starts from the last
+        /// one's.
+        /// </summary>
+        public async Task GenerateStarPowerAsync(ChartInstrument part)
+        {
+            if (_dialogs is null)
+                return;
+            Session.Tools.Cancel();
+            var span = Session.Selection.SpanIn(part);
+            var options = new GenerateStarPowerViewModel(part, _starPowerOptions, overSelection: span is not null);
+            if (!await _dialogs.AskGenerateStarPowerAsync(options))
+                return;
+            _starPowerOptions = options.Options;
+            Session.StarPower.Start(part, _starPowerOptions, span);
         }
 
         /// <summary>Opens the highway preview in a window of its own (charter-spec C18).</summary>

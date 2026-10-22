@@ -1,0 +1,72 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:ChartBuilder.ViewModels"
+        xmlns:res="using:ChartBuilder.Resources"
+        xmlns:sres="using:ChartShared.UI.Resources"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="360" d:DesignHeight="280"
+        x:Class="ChartBuilder.Views.GenerateFillsWindow"
+        x:DataType="vm:GenerateFillsViewModel"
+        Icon="/Assets/ChartBuilder.ico"
+        Title="{x:Static res:Strings.GenerateFillsHeading}"
+        Background="{DynamicResource AppBackgroundBrush}"
+        WindowStartupLocation="CenterOwner"
+        SizeToContent="Height"
+        CanResize="False"
+        ShowInTaskbar="False"
+        Width="360">
+
+    <!-- Generate fills' options (charter-spec C6 item 5), from a drums lane's Edit menu. -->
+    <StackPanel Margin="20" Spacing="14">
+        <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap" Text="{x:Static res:Strings.GenerateFillsIntro}" />
+
+        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
+            <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.GenerateFillsSpacingLabel}" />
+            <NumericUpDown Grid.Row="0"
+                           Grid.Column="1"
+                           Value="{Binding Spacing}"
+                           Minimum="1"
+                           Maximum="64"
+                           Increment="1"
+                           FormatString="0"
+                           ParsingNumberStyle="Integer"
+                           ToolTip.Tip="{x:Static res:Strings.GenerateFillsSpacingToolTip}"
+                           AutomationProperties.Name="{x:Static res:Strings.GenerateFillsSpacingLabel}" />
+            <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.GenerateFillsLengthLabel}" />
+            <NumericUpDown Grid.Row="1"
+                           Grid.Column="1"
+                           Value="{Binding Length}"
+                           Minimum="1"
+                           Maximum="16"
+                           Increment="1"
+                           FormatString="0"
+                           ParsingNumberStyle="Integer"
+                           ToolTip.Tip="{x:Static res:Strings.GenerateFillsLengthToolTip}"
+                           AutomationProperties.Name="{x:Static res:Strings.GenerateFillsLengthLabel}" />
+            <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.GenerateFillsEndLabel}" />
+            <ComboBox Grid.Row="2"
+                      Grid.Column="1"
+                      HorizontalAlignment="Stretch"
+                      ItemsSource="{Binding EndChoices}"
+                      SelectedItem="{Binding SelectedEnd}"
+                      DisplayMemberBinding="{Binding Label, x:DataType=vm:FillEndChoice}"
+                      ToolTip.Tip="{x:Static res:Strings.GenerateFillsEndToolTip}"
+                      AutomationProperties.Name="{x:Static res:Strings.GenerateFillsEndLabel}" />
+            <TextBlock Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.GenerateScopeLabel}" />
+            <TextBlock Grid.Row="3" Grid.Column="1" VerticalAlignment="Center" Text="{Binding ScopeText}" />
+        </Grid>
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+            <Button Classes="accent"
+                    Content="{x:Static res:Strings.GenerateButton}"
+                    IsDefault="True"
+                    Click="OnGenerate"
+                    AutomationProperties.Name="{x:Static res:Strings.GenerateButton}" />
+            <Button Content="{x:Static sres:SharedStrings.CancelButton}"
+                    IsCancel="True"
+                    Click="OnCancel"
+                    AutomationProperties.Name="{x:Static sres:SharedStrings.CancelButton}" />
+        </StackPanel>
+    </StackPanel>
+</Window>

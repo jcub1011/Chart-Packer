@@ -342,7 +342,27 @@ public sealed class EditorToolsTests
 
     [TestMethod]
     [DynamicData(nameof(Views))]
-    public void TheSustainToolEndsTheSelectedNotesOnTheGrid(LaneView view)
+    public void WhatTheEraseToolWouldTakeAwayIsTheNoteWhoseGemOrTailIsThere(LaneView view)
+    {
+        // What the canvas shows in red before a click.
+        var session = Of(Guitar());
+        var track = Expert(session);
+        var sustain = new EditableNote(0, 480, 1);
+        var open = new EditableNote(960, 480, Open);
+        track.Notes.Add(sustain);
+        track.Notes.Add(open);
+        int? openLane = view == LaneView.Highway ? 2 : Open;
+
+        Assert.AreEqual(sustain, session.Tools.EraseTargetAt(At(session, 0, 1, view))?.Note);
+        Assert.AreEqual(sustain, session.Tools.EraseTargetAt(At(session, 300, 1, view))?.Note, "Its tail.");
+        Assert.AreEqual(open, session.Tools.EraseTargetAt(At(session, 960, openLane, view))?.Note);
+        Assert.IsNull(session.Tools.EraseTargetAt(At(session, 1200, openLane, view)), "An open note's tail is passed over.");
+        Assert.IsNull(session.Tools.EraseTargetAt(At(session, 0, 3, view)));
+    }
+
+    [TestMethod]
+    [DynamicData(nameof(Views))]
+    public void ThePlaceToolCtrlDragsASelectedNoteToLengthenEachSustain(LaneView view)
     {
         // A disjoint chord and an extended sustain are both allowed (C5 item 3).
         var session = Of(Guitar());
@@ -352,11 +372,11 @@ public sealed class EditorToolsTests
 
         // Selected before the tool is picked: changing tools keeps the selection.
         session.Selection.Select(GuitarExpert, track.Notes);
-        session.Tool = EditorTool.Sustain;
+        session.Tool = EditorTool.Place;
 
-        DragFromTo(session, At(session, 0, 0, view), At(session, 950, 0, view));
+        DragFromTo(session, At(session, 0, 0, view), At(session, 950, 0, view), EditorModifiers.Control);
 
-        Assert.AreSequenceEqual([new EditableNote(0, 960, 0), new EditableNote(240, 720, 1)], track.Notes.ToList());
+        Assert.AreSequenceEqual([new EditableNote(0, 960, 0), new EditableNote(240, 960, 1)], track.Notes.ToList());
         Assert.AreEqual(1, session.UndoStack.UndoCount);
     }
 

@@ -140,6 +140,7 @@ specifications; no code from any implementation of them is used.
 | [disc-album](https://lucide.dev/icons/disc-album) | Album art |
 | [download](https://lucide.dev/icons/download) | Download a file |
 | [ellipsis](https://lucide.dev/icons/ellipsis) | More tools |
+| [eraser](https://lucide.dev/icons/eraser) | The Erase tool |
 | [eye](https://lucide.dev/icons/eye) | Ghost difficulty; what's shown |
 | [file-clock](https://lucide.dev/icons/file-clock) | Open recent |
 | [file-pen-line](https://lucide.dev/icons/file-pen-line) | Edit chart |
@@ -151,18 +152,24 @@ specifications; no code from any implementation of them is used.
 | [folder-open](https://lucide.dev/icons/folder-open) | Choose the songs folder; open; show in the file manager |
 | [folder-output](https://lucide.dev/icons/folder-output) | Choose the output folder; export |
 | [funnel](https://lucide.dev/icons/funnel) | Filter |
+| [highlighter](https://lucide.dev/icons/highlighter) | The Phrase tool |
 | [image](https://lucide.dev/icons/image) | An image |
 | [info](https://lucide.dev/icons/info) | More information |
+| [link](https://lucide.dev/icons/link) | The Sync tool |
 | [list-checks](https://lucide.dev/icons/list-checks) | Fix all of a finding in a part |
-| [magnet](https://lucide.dev/icons/magnet) | Quantize |
+| [magnet](https://lucide.dev/icons/magnet) | Quantize; snap to the grid |
 | [merge](https://lucide.dev/icons/merge) | Merge |
+| [metronome](https://lucide.dev/icons/metronome) | The Tempo tool |
 | [midi-port](https://lucide.dev/icons/midi-port) | A MIDI chart |
 | [minus](https://lucide.dev/icons/minus) | Less, e.g. zoom out |
+| [mouse-pointer-2](https://lucide.dev/icons/mouse-pointer-2) | The Select tool |
 | [move-right](https://lucide.dev/icons/move-right) | Sustain for one grid step |
 | [package](https://lucide.dev/icons/package) | Pack |
 | [package-open](https://lucide.dev/icons/package-open) | Unpack |
 | [panel-left-close](https://lucide.dev/icons/panel-left-close) | Collapse a side panel |
 | [pause](https://lucide.dev/icons/pause) | Pause |
+| [pencil](https://lucide.dev/icons/pencil) | The Place tool |
+| [phi](https://lucide.dev/icons/phi) | Snap to onset |
 | [play](https://lucide.dev/icons/play) | Play |
 | [plus](https://lucide.dev/icons/plus) | Add |
 | [refresh-cw](https://lucide.dev/icons/refresh-cw) | Rescan |
@@ -174,6 +181,7 @@ specifications; no code from any implementation of them is used.
 | [settings](https://lucide.dev/icons/settings) | Settings |
 | [skip-back](https://lucide.dev/icons/skip-back) | Previous |
 | [skip-forward](https://lucide.dev/icons/skip-forward) | Next |
+| [sparkles](https://lucide.dev/icons/sparkles) | Generate star power and fills |
 | [square](https://lucide.dev/icons/square) | Stop |
 | [square-dashed](https://lucide.dev/icons/square-dashed) | Select |
 | [step-forward](https://lucide.dev/icons/step-forward) | Play from the preview start |

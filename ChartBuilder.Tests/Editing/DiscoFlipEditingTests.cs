@@ -368,6 +368,22 @@ public sealed class DiscoFlipEditingTests
     }
 
     [TestMethod]
+    public void ThePhraseToolDrawsASectionOnlyInProDrumsLanesAndAPhraseInAny()
+    {
+        var chart = Drums();
+        chart.AddPart(ChartInstrument.Guitar);
+        var session = Of(chart, focused: DrumsExpert);
+        session.Tool = EditorTool.Phrase;
+
+        session.PhraseKind = RailKind.DiscoFlip;
+        Assert.IsTrue(session.Tools.DrawsIn(DrumsExpert));
+        Assert.IsFalse(session.Tools.DrawsIn(GuitarExpert), "Its start isn't shown there, as a press is refused.");
+
+        session.PhraseKind = (RailKind)PhraseKind.StarPower;
+        Assert.IsTrue(session.Tools.DrawsIn(GuitarExpert));
+    }
+
+    [TestMethod]
     [DynamicData(nameof(Views))]
     public void ThePhraseToolDrawsASectionOnTheLanesDifficultyAsOneStep(LaneView view)
     {
@@ -430,6 +446,24 @@ public sealed class DiscoFlipEditingTests
 
     [TestMethod]
     [DynamicData(nameof(Views))]
+    public void TheEraseToolErasesASectionInTheRail(LaneView view)
+    {
+        var chart = Drums();
+        Place(chart, ChartDifficulty.Expert, Pad(480, Red));
+        new AddDiscoFlip(ChartDifficulty.Expert, 0, 960).Apply(chart);
+        var session = Of(chart, focused: DrumsExpert);
+        session.Tool = EditorTool.Erase;
+        var point = RailAt(session, 480, RailKind.DiscoFlip, view, DrumsExpert);
+
+        Assert.AreEqual(new DiscoFlipSection(ChartDifficulty.Expert, new DiscoFlipRange(0, 960, 0)), session.Tools.EraseTargetAt(point)?.DiscoFlip);
+        Click(session, point);
+
+        Assert.IsEmpty(session.DiscoFlipRangesOf(DrumsExpert));
+        Assert.AreEqual(1, session.UndoStack.UndoCount);
+    }
+
+    [TestMethod]
+    [DynamicData(nameof(Views))]
     public void PressingASectionsBarSelectsItAndShiftAddsOrTakesAway(LaneView view)
     {
         var chart = Drums();
@@ -444,7 +478,8 @@ public sealed class DiscoFlipEditingTests
         var hard = new DiscoFlipSection(ChartDifficulty.Hard, new DiscoFlipRange(0, 960, 0));
         session.Selection.Select(DrumsExpert, Notes(session));
 
-        session.Tool = EditorTool.Erase;
+        // Every tool but the erase tool selects in the rail.
+        session.Tool = EditorTool.Place;
         Click(session, RailAt(session, 480, RailKind.DiscoFlip, view, DrumsExpert));
         Assert.AreSequenceEqual([first], session.Selection.DiscoFlips.ToList());
         Assert.IsFalse(session.Selection.HasNotes, "Selecting a section drops the notes selected.");

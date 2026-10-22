@@ -46,6 +46,52 @@ public sealed class MouseGestureTests
 
     [TestMethod]
     [DynamicData(nameof(Views))]
+    public void TheMiddleButtonWithTheTempoToolRemovesTheMarkerThereAndNotTheNotes(LaneView view)
+    {
+        var session = Of(Guitar());
+        var track = Expert(session);
+        track.Notes.Add(new EditableNote(960, 1, 2));
+        session.Chart.TempoMap.Tempos.Add(new TempoChange(960, 400_000));
+        session.Tool = EditorTool.Tempo;
+
+        session.Tools.PressErase(At(session, 965, 2, view));
+        session.Tools.Release(At(session, 965, 2, view));
+
+        Assert.AreSequenceEqual([new TempoChange(0, 500_000)], session.Chart.TempoMap.Tempos.ToList());
+        Assert.AreSequenceEqual([new EditableNote(960, 1, 2)], track.Notes.ToList());
+        Assert.AreEqual(1, session.UndoStack.UndoCount);
+
+        session.Tools.PressErase(At(session, 2000, 2, view));
+        Assert.AreEqual(1, session.UndoStack.UndoCount, "Away from a marker, nothing is removed.");
+    }
+
+    [TestMethod]
+    public void TheMiddleButtonWithTheTempoToolLeavesTheFirstMarkerAndSaysWhy()
+    {
+        var session = Of(Guitar());
+        session.Tool = EditorTool.Tempo;
+
+        session.Tools.PressErase(At(session, 0, 2));
+
+        Assert.HasCount(1, session.Chart.TempoMap.Tempos);
+        Assert.IsNotNull(session.Status);
+        Assert.AreEqual(0, session.UndoStack.UndoCount);
+    }
+
+    [TestMethod]
+    public void TheMiddleButtonWithTheTempoToolRemovesAMarkerFromAVocalLane()
+    {
+        var session = Of(WithVocals([]));
+        session.Chart.TempoMap.Tempos.Add(new TempoChange(960, 400_000));
+        session.Tool = EditorTool.Tempo;
+
+        session.Tools.PressErase(VocalAt(962, 60));
+
+        Assert.AreSequenceEqual([new TempoChange(0, 500_000)], session.Chart.TempoMap.Tempos.ToList());
+    }
+
+    [TestMethod]
+    [DynamicData(nameof(Views))]
     public void TheMiddleButtonErasesEveryPhrasePassedOverInTheRailAsOneStep(LaneView view)
     {
         var chart = Guitar();
@@ -438,7 +484,7 @@ public sealed class MouseGestureTests
 
         session.Tool = EditorTool.Place;
         Assert.AreSequenceEqual([note], session.Selection.Notes.ToList());
-        session.Tool = EditorTool.Sustain;
+        session.Tool = EditorTool.Erase;
         Assert.AreSequenceEqual([note], session.Selection.Notes.ToList());
         session.Tool = EditorTool.Select;
 
