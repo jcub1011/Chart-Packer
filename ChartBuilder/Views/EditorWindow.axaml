@@ -820,6 +820,26 @@
                             </ToolTip.Tip>
                             <ctl:LineIcon Data="{StaticResource HitSoundsStroke}" />
                         </ToggleButton>
+                        <Button Classes="tool"
+                                ToolTip.Tip="{x:Static res:Strings.VolumeToolTip}"
+                                AutomationProperties.Name="{x:Static res:Strings.VolumeToolTip}">
+                            <Button.Flyout>
+                                <Flyout Placement="Top">
+                                    <StackPanel Spacing="8" MinWidth="220">
+                                        <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.MasterVolumeLabel}" />
+                                        <Slider Minimum="0"
+                                                Maximum="1"
+                                                SmallChange="0.05"
+                                                LargeChange="0.1"
+                                                Value="{Binding Playback.Volume, Mode=TwoWay}"
+                                                ToolTip.Tip="{x:Static res:Strings.MasterVolumeLabel}"
+                                                AutomationProperties.Name="{x:Static res:Strings.MasterVolumeLabel}" />
+                                        <TextBlock Classes="muted" Text="{Binding Playback.VolumeText}" />
+                                    </StackPanel>
+                                </Flyout>
+                            </Button.Flyout>
+                            <ctl:LineIcon Data="{StaticResource VolumeStroke}" />
+                        </Button>
                         <Button Classes="labelled"
                                 Command="{Binding Playback.OpenCalibrationCommand}"
                                 ToolTip.Tip="{x:Static res:Strings.LatencyToolTip}"

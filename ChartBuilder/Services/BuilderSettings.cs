@@ -127,6 +127,12 @@ namespace ChartBuilder.Services
         /// <summary>How much memory every stem's spectrogram may take together, in MB (charter-spec C13 item 3).</summary>
         public int SpectrogramBudgetMb { get; set; } = 256;
 
+        /// <summary>The master volume of fresh settings: full.</summary>
+        public const double DefaultMasterVolume = 1;
+
+        /// <summary>The master volume, from silence to full.</summary>
+        public double MasterVolume { get; set; } = DefaultMasterVolume;
+
         /// <summary>The metronome's volume, in percent of full.</summary>
         public int MetronomeVolume { get; set; } = 50;
 

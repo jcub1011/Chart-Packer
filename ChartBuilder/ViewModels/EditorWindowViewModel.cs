@@ -62,7 +62,7 @@ namespace ChartBuilder.ViewModels
             Song = song;
             Song.DefaultCharter = settings.Settings.DefaultCharterName;
             Audio = new EditorAudio(song, settings.Settings, Messages);
-            Playback = new PlaybackViewModel(song, services.OpenOutput, services.Latency, () => (settings.Settings.MetronomeVolume, settings.Settings.HitSoundVolume), services.Calibrate, Audio);
+            Playback = new PlaybackViewModel(song, services.OpenOutput, services.Latency, () => (settings.Settings.MetronomeVolume, settings.Settings.HitSoundVolume), services.Calibrate, Audio, () => settings.Settings.MasterVolume, volume => settings.Settings.MasterVolume = double.IsFinite(volume) ? Math.Clamp(volume, 0, 1) : BuilderSettings.DefaultMasterVolume);
             _undo = new ChartUndoStack(song.Chart, startsSaved);
             _undo.Changed += OnChartChanged;
             ChartSettings = new ChartSettingsViewModel(settings, services.Confirmations, song, ApplyChartSettings, () => Editor?.AudioAssist, () => Editor?.Session.ReadOptions);
@@ -279,6 +279,7 @@ namespace ChartBuilder.ViewModels
         {
             await _settingsWindow.ShowAsync();
             Editor.ReloadSettings();
+            Playback.RefreshMasterVolume();
             Song.DefaultCharter = _settings.Settings.DefaultCharterName;
             if (_autosave is { } autosave)
                 autosave.Interval = TimeSpan.FromMinutes(_settings.Settings.AutosaveMinutes);

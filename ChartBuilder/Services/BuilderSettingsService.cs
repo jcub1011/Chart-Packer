@@ -89,7 +89,11 @@ namespace ChartBuilder.Services
                 ? Math.Clamp(settings.EditorHighwaySpeed, BuilderSettings.MinEditorHighwaySpeed, BuilderSettings.MaxEditorHighwaySpeed)
                 : 1;
             settings.AutosaveMinutes = Math.Clamp(settings.AutosaveMinutes, BuilderSettings.MinAutosaveMinutes, BuilderSettings.MaxAutosaveMinutes);
-            settings.LastTranscodeBitrateKbps = Math.Clamp(settings.LastTranscodeBitrateKbps, 32, 512);            settings.MetronomeVolume = Math.Clamp(settings.MetronomeVolume, 0, 100);
+            settings.LastTranscodeBitrateKbps = Math.Clamp(settings.LastTranscodeBitrateKbps, 32, 512);
+            settings.MasterVolume = double.IsFinite(settings.MasterVolume)
+                ? Math.Clamp(settings.MasterVolume, 0, 1)
+                : BuilderSettings.DefaultMasterVolume;
+            settings.MetronomeVolume = Math.Clamp(settings.MetronomeVolume, 0, 100);
             settings.HitSoundVolume = Math.Clamp(settings.HitSoundVolume, 0, 100);
             settings.PreviewLookAhead = double.IsFinite(settings.PreviewLookAhead) ? Math.Clamp(settings.PreviewLookAhead, 0.5, 4) : 1.4;
             settings.ReducePreviewCategories &= ReductionChangeCategories.All;
