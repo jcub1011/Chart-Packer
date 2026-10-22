@@ -57,6 +57,21 @@ public sealed class StarPowerGenerationEditingTests
     }
 
     [TestMethod]
+    public void TheEraseToolKeepsOrDropsAGhostRatherThanErasingUnderIt()
+    {
+        var session = Session();
+        session.Tool = EditorTool.Erase;
+        session.StarPower.Start(ChartInstrument.Guitar, StarPowerOptions.Default, null);
+        var second = session.StarPower.Proposals[1].Phrase;
+
+        Click(session, RailAt(session, second.Tick + 200, PhraseKind.StarPower, key: GuitarExpert));
+
+        Assert.IsFalse(session.StarPower.IsKept(1));
+        Assert.AreSame(session.StarPower, session.Proposals, "The run goes on.");
+        Assert.AreEqual(0, session.UndoStack.UndoCount);
+    }
+
+    [TestMethod]
     public void AcceptingAddsOnlyTheKeptPhrasesAsOneStepAndUndoRemovesThemAll()
     {
         var session = Session();

@@ -178,30 +178,69 @@
             <!-- The toolbar's groups wrap onto more rows as the window narrows, rather than scrolling. -->
             <Border Classes="toolbar">
                 <WrapPanel ItemSpacing="8" LineSpacing="6">
-                    <!-- The editing tools (charter-spec §4.5: EditorTools), one picked at a time. Beside the Phrase tool is
-                         the kind of phrase it adds, of those the part in focus can have (C8), and Generate fills (C6
-                         item 5), whose options are in its flyout. -->
+                    <WrapPanel.Styles>
+                        <Style Selector="ToggleButton.labelled">
+                            <Setter Property="Height" Value="28" />
+                            <Setter Property="Padding" Value="10,0" />
+                            <Setter Property="CornerRadius" Value="6" />
+                            <Setter Property="BorderThickness" Value="0" />
+                            <Setter Property="Background" Value="Transparent" />
+                            <Setter Property="VerticalContentAlignment" Value="Center" />
+                        </Style>
+                        <Style Selector="ToggleButton.labelled:checked /template/ ContentPresenter#PART_ContentPresenter">
+                            <Setter Property="Background" Value="{DynamicResource AccentTintBrush}" />
+                            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+                        </Style>
+                        <!-- Between the rows of choices of the place tool's options. -->
+                        <Style Selector="Border.choice-divider">
+                            <Setter Property="Width" Value="1" />
+                            <Setter Property="Margin" Value="4,5" />
+                            <Setter Property="Background" Value="{DynamicResource SubtleBorderBrush}" />
+                        </Style>
+                    </WrapPanel.Styles>
+
+                    <!-- The editing tools (charter-spec §4.5: EditorTools), one picked at a time, as icons whose tips name
+                         them. Beside the Phrase tool is the kind of phrase it adds, of those the part in focus can have
+                         (C8). Generate fills and Generate star power are in each lane's Edit menu, as they work on the
+                         lane's part. -->
                     <Border Classes="toolbar-group">
                         <StackPanel Orientation="Horizontal" Spacing="2">
-                            <StackPanel.Styles>
-                                <Style Selector="ToggleButton.labelled">
-                                    <Setter Property="Height" Value="28" />
-                                    <Setter Property="Padding" Value="10,0" />
-                                    <Setter Property="CornerRadius" Value="6" />
-                                    <Setter Property="BorderThickness" Value="0" />
-                                    <Setter Property="Background" Value="Transparent" />
-                                    <Setter Property="VerticalContentAlignment" Value="Center" />
-                                </Style>
-                                <Style Selector="ToggleButton.labelled:checked /template/ ContentPresenter#PART_ContentPresenter">
-                                    <Setter Property="Background" Value="{DynamicResource AccentTintBrush}" />
-                                    <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
-                                </Style>
-                            </StackPanel.Styles>
-                            <ToggleButton Classes="labelled" Content="{x:Static res:Strings.ToolSelect}" IsChecked="{Binding Editor.IsSelectTool}" ToolTip.Tip="{x:Static res:Strings.ToolSelectToolTip}" />
-                            <ToggleButton Classes="labelled" Content="{x:Static res:Strings.ToolPlace}" IsChecked="{Binding Editor.IsPlaceTool}" ToolTip.Tip="{x:Static res:Strings.ToolPlaceToolTip}" />
-                            <ToggleButton Classes="labelled" Content="{x:Static res:Strings.ToolErase}" IsChecked="{Binding Editor.IsEraseTool}" ToolTip.Tip="{x:Static res:Strings.ToolEraseToolTip}" />
-                            <ToggleButton Classes="labelled" Content="{x:Static res:Strings.ToolSustain}" IsChecked="{Binding Editor.IsSustainTool}" ToolTip.Tip="{x:Static res:Strings.ToolSustainToolTip}" />
-                            <ToggleButton Classes="labelled" Content="{x:Static res:Strings.ToolPhrase}" IsChecked="{Binding Editor.IsPhraseTool}" ToolTip.Tip="{x:Static res:Strings.ToolPhraseToolTip}" />
+                            <ToggleButton Classes="tool" IsChecked="{Binding Editor.IsSelectTool}" AutomationProperties.Name="{x:Static res:Strings.ToolSelect}">
+                                <ToolTip.Tip>
+                                    <StackPanel MaxWidth="320" Spacing="4">
+                                        <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.ToolSelect}" />
+                                        <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.ToolSelectToolTip}" />
+                                    </StackPanel>
+                                </ToolTip.Tip>
+                                <ctl:LineIcon Data="{StaticResource PointerStroke}" />
+                            </ToggleButton>
+                            <ToggleButton Classes="tool" IsChecked="{Binding Editor.IsPlaceTool}" AutomationProperties.Name="{x:Static res:Strings.ToolPlace}">
+                                <ToolTip.Tip>
+                                    <StackPanel MaxWidth="320" Spacing="4">
+                                        <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.ToolPlace}" />
+                                        <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.ToolPlaceToolTip}" />
+                                    </StackPanel>
+                                </ToolTip.Tip>
+                                <ctl:LineIcon Data="{StaticResource PencilStroke}" />
+                            </ToggleButton>
+                            <ToggleButton Classes="tool" IsChecked="{Binding Editor.IsEraseTool}" AutomationProperties.Name="{x:Static res:Strings.ToolErase}">
+                                <ToolTip.Tip>
+                                    <StackPanel MaxWidth="320" Spacing="4">
+                                        <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.ToolErase}" />
+                                        <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.ToolEraseToolTip}" />
+                                    </StackPanel>
+                                </ToolTip.Tip>
+                                <ctl:LineIcon Data="{StaticResource EraserStroke}" />
+                            </ToggleButton>
+                            <ToggleButton Classes="tool" IsChecked="{Binding Editor.IsPhraseTool}" AutomationProperties.Name="{x:Static res:Strings.ToolPhrase}">
+                                <ToolTip.Tip>
+                                    <StackPanel MaxWidth="320" Spacing="4">
+                                        <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.ToolPhrase}" />
+                                        <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.ToolPhraseToolTip}" />
+                                    </StackPanel>
+                                </ToolTip.Tip>
+                                <ctl:LineIcon Data="{StaticResource HighlighterStroke}" />
+                            </ToggleButton>
                             <ComboBox VerticalAlignment="Center"
                                       Height="28"
                                       MinWidth="124"
@@ -210,116 +249,74 @@
                                       DisplayMemberBinding="{Binding Label, x:DataType=vm:PhraseKindChoice}"
                                       ToolTip.Tip="{x:Static res:Strings.ToolPhraseKindToolTip}"
                                       AutomationProperties.Name="{x:Static res:Strings.ToolPhraseKindName}" />
-                            <Button x:Name="GenerateFillsButton"
-                                    Classes="labelled"
-                                    Background="Transparent"
-                                    BorderThickness="0"
-                                    Content="{x:Static res:Strings.GenerateFillsButton}"
-                                    IsEnabled="{Binding Editor.CanGenerateFills}"
-                                    ToolTip.Tip="{x:Static res:Strings.GenerateFillsToolTip}"
-                                    ToolTip.ShowOnDisabled="True">
-                                <Button.Flyout>
-                                    <Flyout Placement="BottomEdgeAlignedLeft">
-                                        <StackPanel Spacing="10" MinWidth="260">
-                                            <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.GenerateFillsHeading}" />
-                                            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
-                                                <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.GenerateFillsSpacingLabel}" />
-                                                <NumericUpDown Grid.Row="0"
-                                                               Grid.Column="1"
-                                                               Value="{Binding Editor.FillSpacing}"
-                                                               Minimum="1"
-                                                               Maximum="64"
-                                                               Increment="1"
-                                                               FormatString="0"
-                                                               ParsingNumberStyle="Integer"
-                                                               ToolTip.Tip="{x:Static res:Strings.GenerateFillsSpacingToolTip}"
-                                                               AutomationProperties.Name="{x:Static res:Strings.GenerateFillsSpacingLabel}" />
-                                                <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.GenerateFillsLengthLabel}" />
-                                                <NumericUpDown Grid.Row="1"
-                                                               Grid.Column="1"
-                                                               Value="{Binding Editor.FillLength}"
-                                                               Minimum="1"
-                                                               Maximum="16"
-                                                               Increment="1"
-                                                               FormatString="0"
-                                                               ParsingNumberStyle="Integer"
-                                                               ToolTip.Tip="{x:Static res:Strings.GenerateFillsLengthToolTip}"
-                                                               AutomationProperties.Name="{x:Static res:Strings.GenerateFillsLengthLabel}" />
-                                                <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.GenerateFillsEndLabel}" />
-                                                <ComboBox Grid.Row="2"
-                                                          Grid.Column="1"
-                                                          HorizontalAlignment="Stretch"
-                                                          ItemsSource="{Binding Editor.FillEndChoices}"
-                                                          SelectedItem="{Binding Editor.SelectedFillEnd}"
-                                                          DisplayMemberBinding="{Binding Label, x:DataType=vm:FillEndChoice}"
-                                                          ToolTip.Tip="{x:Static res:Strings.GenerateFillsEndToolTip}"
-                                                          AutomationProperties.Name="{x:Static res:Strings.GenerateFillsEndLabel}" />
-                                                <TextBlock Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.GenerateFillsScopeLabel}" />
-                                                <TextBlock Grid.Row="3" Grid.Column="1" VerticalAlignment="Center" Text="{Binding Editor.FillScopeText}" />
-                                            </Grid>
-                                            <Button Classes="accent"
-                                                    HorizontalAlignment="Right"
-                                                    Content="{x:Static res:Strings.GenerateFillsGenerate}"
-                                                    Command="{Binding Editor.GenerateFillsCommand}"
-                                                    Click="OnGenerateFillsClick" />
-                                        </StackPanel>
-                                    </Flyout>
-                                </Button.Flyout>
-                            </Button>
-                            <Button x:Name="GenerateStarPowerButton"
-                                    Classes="labelled"
-                                    Background="Transparent"
-                                    BorderThickness="0"
-                                    Content="{x:Static res:Strings.GenerateStarPowerButton}"
-                                    IsEnabled="{Binding Editor.CanGenerateStarPower}"
-                                    ToolTip.Tip="{x:Static res:Strings.GenerateStarPowerToolTip}"
-                                    ToolTip.ShowOnDisabled="True">
-                                <Button.Flyout>
-                                    <Flyout Placement="BottomEdgeAlignedLeft">
-                                        <StackPanel Spacing="10" MinWidth="260">
-                                            <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.GenerateStarPowerHeading}" />
-                                            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
-                                                <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.GenerateStarPowerSpacingLabel}" />
-                                                <NumericUpDown Grid.Row="0"
-                                                               Grid.Column="1"
-                                                               Value="{Binding Editor.StarPowerSpacing}"
-                                                               Minimum="10"
-                                                               Maximum="60"
-                                                               Increment="5"
-                                                               FormatString="0"
-                                                               ParsingNumberStyle="Integer"
-                                                               ToolTip.Tip="{x:Static res:Strings.GenerateStarPowerSpacingToolTip}"
-                                                               AutomationProperties.Name="{x:Static res:Strings.GenerateStarPowerSpacingLabel}" />
-                                                <CheckBox Grid.Row="1"
-                                                          Grid.Column="0"
-                                                          Grid.ColumnSpan="2"
-                                                          Content="{x:Static res:Strings.GenerateStarPowerSpikesLabel}"
-                                                          IsChecked="{Binding Editor.StarPowerPlanForSpikes}"
-                                                          ToolTip.Tip="{x:Static res:Strings.GenerateStarPowerSpikesToolTip}" />
-                                                <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.GenerateFillsScopeLabel}" />
-                                                <TextBlock Grid.Row="2" Grid.Column="1" VerticalAlignment="Center" Text="{Binding Editor.FillScopeText}" />
-                                            </Grid>
-                                            <Button Classes="accent"
-                                                    HorizontalAlignment="Right"
-                                                    Content="{x:Static res:Strings.GenerateFillsGenerate}"
-                                                    Command="{Binding Editor.GenerateStarPowerCommand}"
-                                                    Click="OnGenerateStarPowerClick" />
-                                        </StackPanel>
-                                    </Flyout>
-                                </Button.Flyout>
-                            </Button>
-                            <ToggleButton Classes="labelled" Content="{x:Static res:Strings.ToolTempo}" IsChecked="{Binding Editor.IsTempoTool}" ToolTip.Tip="{x:Static res:Strings.ToolTempoToolTip}" />
-                            <ToggleButton Classes="labelled" Content="{x:Static res:Strings.ToolSync}" IsChecked="{Binding Editor.IsSyncTool}" ToolTip.Tip="{x:Static res:Strings.ToolSyncToolTip}" />
+                            <ToggleButton Classes="tool" IsChecked="{Binding Editor.IsTempoTool}" AutomationProperties.Name="{x:Static res:Strings.ToolTempo}">
+                                <ToolTip.Tip>
+                                    <StackPanel MaxWidth="320" Spacing="4">
+                                        <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.ToolTempo}" />
+                                        <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.ToolTempoToolTip}" />
+                                    </StackPanel>
+                                </ToolTip.Tip>
+                                <ctl:LineIcon Data="{StaticResource MetronomeStroke}" />
+                            </ToggleButton>
+                            <ToggleButton Classes="tool" IsChecked="{Binding Editor.IsSyncTool}" AutomationProperties.Name="{x:Static res:Strings.ToolSync}">
+                                <ToolTip.Tip>
+                                    <StackPanel MaxWidth="320" Spacing="4">
+                                        <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.ToolSync}" />
+                                        <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.ToolSyncToolTip}" />
+                                    </StackPanel>
+                                </ToolTip.Tip>
+                                <ctl:LineIcon Data="{StaticResource LinkStroke}" />
+                            </ToggleButton>
                         </StackPanel>
                     </Border>
 
-                    <!-- The grid notes snap to (charter-spec C4 item 4): [ and ] step through it. -->
+                    <!-- The place tool's options on a 5-fret or GHL lane, while the place tool is picked: what the chord a
+                         note goes in is made, whether it's an open note, and what a drag does. -->
+                    <Border Classes="toolbar-group" IsVisible="{Binding Editor.ShowsFretPlaceOptions}">
+                        <StackPanel Orientation="Horizontal" Spacing="2">
+                            <ToggleButton Classes="labelled" Content="{x:Static res:Strings.PlaceNatural}" IsChecked="{Binding Editor.IsNaturalPlace}" ToolTip.Tip="{x:Static res:Strings.PlaceNaturalToolTip}" />
+                            <ToggleButton Classes="labelled" Content="{x:Static res:Strings.PlaceHopo}" IsChecked="{Binding Editor.IsHopoPlace}" ToolTip.Tip="{x:Static res:Strings.PlaceHopoToolTip}" />
+                            <ToggleButton Classes="labelled" Content="{x:Static res:Strings.PlaceStrum}" IsChecked="{Binding Editor.IsStrumPlace}" ToolTip.Tip="{x:Static res:Strings.PlaceStrumToolTip}" />
+                            <ToggleButton Classes="labelled" Content="{x:Static res:Strings.PlaceTap}" IsChecked="{Binding Editor.IsTapPlace}" ToolTip.Tip="{x:Static res:Strings.PlaceTapToolTip}" />
+                            <Border Classes="choice-divider" />
+                            <ToggleButton Classes="labelled" Content="{x:Static res:Strings.PlaceOpen}" IsChecked="{Binding Editor.PlaceOpen}" ToolTip.Tip="{x:Static res:Strings.PlaceOpenToolTip}" />
+                            <Border Classes="choice-divider" />
+                            <ToggleButton Classes="labelled" Content="{x:Static res:Strings.PlaceDragRun}" IsChecked="{Binding Editor.IsRunDrag}" ToolTip.Tip="{x:Static res:Strings.PlaceDragRunToolTip}" />
+                            <ToggleButton Classes="labelled" Content="{x:Static res:Strings.PlaceDragSustain}" IsChecked="{Binding Editor.IsSustainDrag}" ToolTip.Tip="{x:Static res:Strings.PlaceDragSustainToolTip}" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- The place tool's options on a drums lane, while the place tool is picked: cymbal or tom on Pro
+                         drums, the pad's dynamics, and a 2× kick on Expert. -->
+                    <Border Classes="toolbar-group" IsVisible="{Binding Editor.ShowsDrumPlaceOptions}">
+                        <StackPanel Orientation="Horizontal" Spacing="2">
+                            <StackPanel Orientation="Horizontal" Spacing="2" IsVisible="{Binding Editor.ShowsTomChoice}">
+                                <ToggleButton Classes="labelled" Content="{x:Static res:Strings.PlaceCymbal}" IsChecked="{Binding Editor.IsCymbalPlace}" ToolTip.Tip="{x:Static res:Strings.PlaceCymbalToolTip}" />
+                                <ToggleButton Classes="labelled" Content="{x:Static res:Strings.PlaceTom}" IsChecked="{Binding Editor.IsTomPlace}" ToolTip.Tip="{x:Static res:Strings.PlaceTomToolTip}" />
+                                <Border Classes="choice-divider" />
+                            </StackPanel>
+                            <ToggleButton Classes="labelled" Content="{x:Static res:Strings.PlaceNormal}" IsChecked="{Binding Editor.IsNormalPlace}" ToolTip.Tip="{x:Static res:Strings.PlaceNormalToolTip}" />
+                            <ToggleButton Classes="labelled" Content="{x:Static res:Strings.PlaceAccent}" IsChecked="{Binding Editor.IsAccentPlace}" ToolTip.Tip="{x:Static res:Strings.PlaceAccentToolTip}" />
+                            <ToggleButton Classes="labelled" Content="{x:Static res:Strings.PlaceGhost}" IsChecked="{Binding Editor.IsGhostPlace}" ToolTip.Tip="{x:Static res:Strings.PlaceGhostToolTip}" />
+                            <StackPanel Orientation="Horizontal" Spacing="2" IsVisible="{Binding Editor.ShowsDoubleKickChoice}">
+                                <Border Classes="choice-divider" />
+                                <ToggleButton Classes="labelled" Content="{x:Static res:Strings.PlaceDoubleKick}" IsChecked="{Binding Editor.PlaceDoubleKick}" ToolTip.Tip="{x:Static res:Strings.PlaceDoubleKickToolTip}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- The grid notes snap to (charter-spec C4 item 4), on while the magnet is lit: [ and ] step through it. -->
                     <Border Classes="toolbar-group">
-                        <StackPanel Orientation="Horizontal" Spacing="6" Height="28">
-                            <CheckBox VerticalAlignment="Center"
-                                      Content="{x:Static res:Strings.SnapLabel}"
-                                      IsChecked="{Binding Editor.IsSnapOn}"
-                                      ToolTip.Tip="{x:Static res:Strings.SnapToolTip}" />
+                        <StackPanel Orientation="Horizontal" Spacing="2" Height="28">
+                            <ToggleButton Classes="tool" IsChecked="{Binding Editor.IsSnapOn}" AutomationProperties.Name="{x:Static res:Strings.SnapLabel}">
+                                <ToolTip.Tip>
+                                    <StackPanel MaxWidth="320" Spacing="4">
+                                        <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.SnapLabel}" />
+                                        <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.SnapButtonToolTip}" />
+                                    </StackPanel>
+                                </ToolTip.Tip>
+                                <ctl:LineIcon Data="{StaticResource QuantizeStroke}" />
+                            </ToggleButton>
                             <ComboBox VerticalAlignment="Center"
                                       MinWidth="76"
                                       ItemsSource="{Binding Editor.SnapChoices}"
@@ -330,14 +327,19 @@
                         </StackPanel>
                     </Border>
 
-                    <!-- Audio assist (charter-spec C14): snap to onset (O) and Nudge to onsets (Shift+O). A proposed tempo
-                         map and Find first downbeat are in the Tempo map tab. -->
+                    <!-- Audio assist (charter-spec C14): snap to onset (O), on while the phi is lit, and Nudge to onsets
+                         (Shift+O). A proposed tempo map and Find first downbeat are in the Tempo map tab. -->
                     <Border Classes="toolbar-group" IsVisible="{Binding Editor.AudioAssist.HasAudio}">
-                        <StackPanel Orientation="Horizontal" Spacing="6" Height="28">
-                            <CheckBox VerticalAlignment="Center"
-                                      Content="{x:Static res:Strings.SnapToOnsetLabel}"
-                                      IsChecked="{Binding Editor.AudioAssist.IsSnapToOnset}"
-                                      ToolTip.Tip="{x:Static res:Strings.SnapToOnsetToolTip}" />
+                        <StackPanel Orientation="Horizontal" Spacing="2" Height="28">
+                            <ToggleButton Classes="tool" IsChecked="{Binding Editor.AudioAssist.IsSnapToOnset}" AutomationProperties.Name="{x:Static res:Strings.SnapToOnsetLabel}">
+                                <ToolTip.Tip>
+                                    <StackPanel MaxWidth="320" Spacing="4">
+                                        <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.SnapToOnsetLabel}" />
+                                        <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.SnapToOnsetToolTip}" />
+                                    </StackPanel>
+                                </ToolTip.Tip>
+                                <ctl:LineIcon Data="{StaticResource OnsetStroke}" />
+                            </ToggleButton>
                             <Button Classes="labelled"
                                     Background="Transparent"
                                     BorderThickness="0"

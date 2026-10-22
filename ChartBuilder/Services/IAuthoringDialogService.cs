@@ -18,6 +18,12 @@ namespace ChartBuilder.Services
         /// <summary>Asks for the lane mapping of a paste between 5-fret and GHL: the one confirmed, or null if cancelled.</summary>
         Task<LaneMapping?> AskLaneMappingAsync(LaneMappingViewModel viewModel);
 
+        /// <summary>Asks for Generate fills' options, picked in <paramref name="viewModel"/>: whether Generate was pressed.</summary>
+        Task<bool> AskGenerateFillsAsync(GenerateFillsViewModel viewModel);
+
+        /// <summary>Asks for Generate star power's options, picked in <paramref name="viewModel"/>: whether Generate was pressed.</summary>
+        Task<bool> AskGenerateStarPowerAsync(GenerateStarPowerViewModel viewModel);
+
         /// <summary>
         /// Shows the highway preview in a window of its own beside the Editor, which can go full screen (charter-spec C18);
         /// one at a time, so showing it again brings it to the front.
@@ -128,6 +134,19 @@ namespace ChartBuilder.Services
             var dialog = new LaneMappingWindow { DataContext = viewModel };
             WindowChrome.UseOwnerIcon(dialog, window);
             return await dialog.ShowDialog<LaneMapping?>(window);
+        }
+
+        public Task<bool> AskGenerateFillsAsync(GenerateFillsViewModel viewModel) => AskAsync(new GenerateFillsWindow { DataContext = viewModel });
+
+        public Task<bool> AskGenerateStarPowerAsync(GenerateStarPowerViewModel viewModel) => AskAsync(new GenerateStarPowerWindow { DataContext = viewModel });
+
+        // Shows a dialog that closes with whether it was confirmed; false when there's no window to show it over.
+        private async Task<bool> AskAsync(Window dialog)
+        {
+            if (owner() is not { } window)
+                return false;
+            WindowChrome.UseOwnerIcon(dialog, window);
+            return await dialog.ShowDialog<bool>(window);
         }
     }
 }

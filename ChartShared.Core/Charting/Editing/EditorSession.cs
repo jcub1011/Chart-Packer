@@ -12,7 +12,6 @@ public enum EditorTool
     Select,
     Place,
     Erase,
-    Sustain,
     Phrase,
     Tempo,
 
@@ -318,6 +317,20 @@ public sealed class EditorSession
             RaiseState();
         }
     }
+
+    /// <summary>What the Place tool makes of a note it puts down: the chord's type, an open note, a sustain, a tom and so on.</summary>
+    public PlaceOptions Placing
+    {
+        get;
+        set
+        {
+            ArgumentNullException.ThrowIfNull(value);
+            if (field == value)
+                return;
+            field = value;
+            RaiseState();
+        }
+    } = PlaceOptions.Default;
 
     /// <summary>Whether notes keep their times rather than their ticks when the tempo changes (charter-spec C4 item 3).</summary>
     public bool KeepTimes { get; set; }

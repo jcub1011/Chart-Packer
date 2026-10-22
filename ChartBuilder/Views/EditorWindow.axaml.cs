@@ -7,8 +7,10 @@ using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Threading;
 using ChartBuilder.Controls;
+using ChartBuilder.Controls.Editing;
 using ChartBuilder.Services;
 using ChartBuilder.ViewModels;
+using ChartShared.Core.Charting.Editing;
 using ChartShared.UI.Views;
 
 namespace ChartBuilder.Views
@@ -66,6 +68,7 @@ namespace ChartBuilder.Views
                 _isSpaceHeld = false;
                 _viewModel?.Editor.RecordReleaseAll();
                 _viewModel?.Editor.Playtest.ReleaseKeys();
+                _viewModel?.Editor.HoldModifiers(EditorModifiers.None);
             };
             TopBand.SizeChanged += (_, _) => ApplyLayout();
             TitleBand.SizeChanged += (_, e) => LoadingOverlay.Margin = new Thickness(0, e.NewSize.Height, 0, 0);
@@ -89,6 +92,11 @@ namespace ChartBuilder.Views
             // Playtest's keys, tunnelled, so they play wherever focus is: on the play button just clicked, say.
             AddHandler(KeyDownEvent, OnPlaytestKeyDown, RoutingStrategies.Tunnel);
             AddHandler(KeyUpEvent, OnPlaytestKeyUp, RoutingStrategies.Tunnel);
+
+            // The modifier keys held, wherever focus is, even when something took the key: the place tool's options show
+            // what Ctrl and Alt swap while they're held.
+            AddHandler(KeyDownEvent, OnModifierKeys, RoutingStrategies.Tunnel, handledEventsToo: true);
+            AddHandler(KeyUpEvent, OnModifierKeys, RoutingStrategies.Tunnel, handledEventsToo: true);
         }
 
         protected override void OnDataContextChanged(EventArgs e)
@@ -173,6 +181,8 @@ namespace ChartBuilder.Views
             e.Handled = playtest.HandleKey(e.PhysicalKey, e.KeyModifiers, down: false);
         }
 
+        private void OnModifierKeys(object? sender, KeyEventArgs e) => _viewModel?.Editor.HoldModifiers(EditorCanvas.ModifiersOf(e.KeyModifiers));
+
         private void OnOpeningInput(object? sender, RoutedEventArgs e)
         {
             if (_viewModel is { IsOpening: true })
@@ -190,11 +200,6 @@ namespace ChartBuilder.Views
             _isSpaceHeld = false;
             e.Handled = true;
         }
-
-        /// <summary>Generate fills' options close once the fills are proposed, so the ghosts can be seen. Posted, as closing the flyout clears the button's bound command before it runs.</summary>
-        private void OnGenerateFillsClick(object? sender, RoutedEventArgs e) => Dispatcher.UIThread.Post(() => GenerateFillsButton.Flyout?.Hide());
-
-        private void OnGenerateStarPowerClick(object? sender, RoutedEventArgs e) => Dispatcher.UIThread.Post(() => GenerateStarPowerButton.Flyout?.Hide());
 
         private void OnDragOver(object? sender, DragEventArgs e) =>
             e.DragEffects = DroppedFiles.SongOf(e) is not null || DroppedFiles.AudioOf(e).Count > 0 ? DragDropEffects.Copy : DragDropEffects.None;

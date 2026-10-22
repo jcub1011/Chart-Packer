@@ -169,8 +169,8 @@ public sealed class PhraseEditingTests
         Expert(session).Notes.Add(new EditableNote(480, 1, 1));
         session.Selection.Select(GuitarExpert, Expert(session).Notes);
 
-        // Every tool selects in the rail.
-        session.Tool = EditorTool.Erase;
+        // Every tool but the erase tool selects in the rail.
+        session.Tool = EditorTool.Place;
         Click(session, RailAt(session, 600, PhraseKind.StarPower, view));
         Assert.AreSequenceEqual([starPower], session.Selection.Phrases.ToList());
         Assert.IsFalse(session.Selection.HasNotes, "Selecting a phrase drops the notes selected.");
@@ -184,6 +184,46 @@ public sealed class PhraseEditingTests
         Click(session, RailAt(session, 3000, PhraseKind.StarPower, view));
         Assert.IsFalse(session.Selection.HasPhrases);
         Assert.AreEqual(0, session.UndoStack.UndoCount);
+    }
+
+    [TestMethod]
+    [DynamicData(nameof(Views))]
+    public void TheEraseToolErasesAPhraseInTheRailAndShiftSelectsIt(LaneView view)
+    {
+        var session = Of(Guitar());
+        var starPower = new Phrase(PhraseKind.StarPower, 0, 960);
+        var solo = new Phrase(PhraseKind.Solo, 480, 960);
+        Add(session, ChartInstrument.Guitar, starPower, solo);
+        session.Tool = EditorTool.Erase;
+
+        Assert.AreEqual(starPower, session.Tools.EraseTargetAt(RailAt(session, 600, PhraseKind.StarPower, view))?.Phrase);
+        Assert.IsNull(session.Tools.EraseTargetAt(RailAt(session, 3000, PhraseKind.StarPower, view)));
+
+        Click(session, RailAt(session, 600, PhraseKind.Solo, view), EditorModifiers.Shift);
+        Assert.AreSequenceEqual([solo], session.Selection.Phrases.ToList());
+        Assert.AreSequenceEqual([starPower, solo], Phrases(session, ChartInstrument.Guitar));
+
+        Click(session, RailAt(session, 600, PhraseKind.StarPower, view));
+        Assert.AreSequenceEqual([solo], Phrases(session, ChartInstrument.Guitar));
+        Assert.AreEqual(1, session.UndoStack.UndoCount);
+    }
+
+    [TestMethod]
+    [DynamicData(nameof(Views))]
+    public void ThePhraseToolStartsDrawingOnTheGridWhereItsPressDraws(LaneView view)
+    {
+        // Where the canvas draws its line before a press.
+        var session = Of(Guitar());
+        var solo = new Phrase(PhraseKind.Solo, 480, 960);
+        Add(session, ChartInstrument.Guitar, solo);
+
+        Assert.IsNull(session.Tools.PhraseDrawStart(At(session, 130, 1, view)), "Only the Phrase tool draws.");
+
+        session.Tool = EditorTool.Phrase;
+        Assert.AreEqual(120L, session.Tools.PhraseDrawStart(At(session, 130, 1, view)));
+        Assert.AreEqual(1920L, session.Tools.PhraseDrawStart(RailAt(session, 1910, PhraseKind.Solo, view)), "An empty part of the rail.");
+        Assert.IsNull(session.Tools.PhraseDrawStart(RailAt(session, 600, PhraseKind.Solo, view)), "A press on a bar selects it.");
+        Assert.IsNull(session.Tools.PhraseDrawStart(At(session, 130, null, view)), "Outside the lanes.");
     }
 
     [TestMethod]

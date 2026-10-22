@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using ChartBuilder.Resources;
 using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Authoring;
 using ChartShared.Core.Charting.Commands;
 using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charting.Layout;
@@ -301,6 +302,14 @@ namespace ChartBuilder.ViewModels
                 return [];
             bool hasNotes = part[track.Difficulty].Notes.Count > 0;
             var others = Enum.GetValues<ChartDifficulty>().Where(d => d != track.Difficulty).Reverse();
+
+            // The generators work on the whole part, so on whichever lane of it the menu is opened from, and only on the
+            // parts they can: star power on 5-fret and keys, fills on drums.
+            var generate = new List<LaneMenuItem>();
+            if (StarPowerGenerator.CanGenerate(part.Kind))
+                generate.Add(LaneMenuItem.Action(Strings.LaneGenerateStarPower, part.HasNotes, () => _ = editor.GenerateStarPowerAsync(track.Instrument), "GenerateStroke"));
+            if (part.Kind == ChartInstrumentKind.Drums)
+                generate.Add(LaneMenuItem.Action(Strings.LaneGenerateFills, part.HasNotes, () => _ = editor.GenerateFillsAsync(track.Instrument),"GenerateStroke"));
             return
             [
                 LaneMenuItem.Submenu(
@@ -308,6 +317,7 @@ namespace ChartBuilder.ViewModels
                     [.. others.Select(d => LaneMenuItem.Action(ChartLabels.DifficultyName(d), hasNotes, () => _ = editor.CopyDifficultyAsync(track, d)))],
                     "CopyStroke"),
                 LaneMenuItem.Action(Strings.LaneReduce, part.HasNotes, () => _ = editor.ReduceAsync(track), "SortDescendingStroke"),
+                .. generate,
                 LaneMenuItem.Action(Strings.LaneSelectLane, hasNotes, () => editor.Session.Tools.SelectLane(track), "SelectStroke"),
                 LaneMenuItem.Action(Strings.LaneSelectSection, true, () => editor.Session.Tools.SelectSectionAtCursor(), "SelectStroke"),
                 LaneMenuItem.Action(Strings.LaneCut, true, editor.Cut, "CutStroke"),

@@ -123,6 +123,30 @@ public sealed class SelectionRangeTests
         Assert.HasCount(2, session.Selection.Notes);
     }
 
+    [TestMethod]
+    public void TheSpanInAPartIsTheSelectionsOnlyWhenItsOfThatPart()
+    {
+        var session = TwoDifficulties();
+        var guitar = session.Chart.PartOf(ChartInstrument.Guitar)!;
+
+        session.Selection.Select(GuitarExpert, [Expert(session).Notes[1], Expert(session).Notes[2]]);
+        Assert.AreEqual((480L, 961L), session.Selection.SpanIn(ChartInstrument.Guitar), "The notes' span.");
+        Assert.IsNull(session.Selection.SpanIn(ChartInstrument.Bass), "Another part's generator takes its whole part.");
+
+        session.Selection.SelectRange(0, 960, [GuitarExpert, GuitarHard]);
+        Assert.AreEqual((0L, 960L), session.Selection.SpanIn(ChartInstrument.Guitar), "A range across the part's lanes.");
+        Assert.IsNull(session.Selection.SpanIn(ChartInstrument.Bass));
+
+        var solo = new Phrase(PhraseKind.Solo, 480, 960);
+        guitar.Phrases.Add(solo);
+        session.Selection.SelectPhrases(ChartInstrument.Guitar, [solo]);
+        Assert.AreEqual((480L, 1440L), session.Selection.SpanIn(ChartInstrument.Guitar), "The part's phrases.");
+        Assert.IsNull(session.Selection.SpanIn(ChartInstrument.Bass));
+
+        session.Selection.Clear();
+        Assert.IsNull(session.Selection.SpanIn(ChartInstrument.Guitar));
+    }
+
     // Expert: 0, 480, 960 and 1440; Hard: 0 and 480.
     private static EditorSession TwoDifficulties()
     {

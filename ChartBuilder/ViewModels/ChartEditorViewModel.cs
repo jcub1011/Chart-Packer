@@ -9,7 +9,6 @@ using ChartBuilder.Resources;
 using ChartBuilder.Services;
 using ChartShared.Audio.Synthesis;
 using ChartShared.Core.Charting;
-using ChartShared.Core.Charting.Authoring;
 using ChartShared.Core.Charting.Commands;
 using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charting.Layout;
@@ -26,9 +25,6 @@ namespace ChartBuilder.ViewModels
 
     /// <summary>A kind of phrase the toolbar's picker offers the Phrase tool, or disco flip.</summary>
     public sealed record PhraseKindChoice(RailKind Kind, string Label);
-
-    /// <summary>What a generated fill must end on, as Generate fills' options offer it.</summary>
-    public sealed record FillEndChoice(FillEnd End, string Label);
 
     /// <summary>
     /// The chart's editor (charter-spec §4.5, C3): the lanes and their canvases, the tools, the snap, and the editor's
@@ -63,6 +59,12 @@ namespace ChartBuilder.ViewModels
         private bool _syncing;
         private IReadOnlyList<PhraseKindChoice>? _phraseChoices;
 
+        // The modifier keys held (HoldModifiers), whose swaps the place tool's options show while they're held.
+        private EditorModifiers _heldModifiers;
+
+        // What the place tool's options last showed for (RefreshPlacing): the tool, the lane in focus, the drums' variant and the options.
+        private (EditorTool, ChartTrackKey?, DrumsVariant?, PlaceOptions)? _placingShown;
+
         // The frame the playhead was last followed in.
         private TimeSpan? _followed;
 
@@ -87,8 +89,6 @@ namespace ChartBuilder.ViewModels
                 KeepTimes = saved.TempoEdits == TempoEditMode.KeepTimes,
             };
             SnapChoices = [.. SnapGrid.CommonDivisions.Select(d => new SnapChoice(d, BuilderSettingsCatalog.SnapLabel(d)))];
-            FillEndChoices = [new FillEndChoice(FillEnd.Crash, Strings.GenerateFillsEndCrash), new FillEndChoice(FillEnd.AnyNote, Strings.GenerateFillsEndAnyNote)];
-            SelectedFillEnd = FillEndChoices[0];
             SelectedRecordMode = RecordModeChoices[0];
             SelectedQuantize = SnapChoices.FirstOrDefault(c => c.Division == saved.QuantizeDivision) ?? SnapChoices.First(c => c.Division == SnapGrid.Default.Division);
             IsRecordQuantized = saved.RecordQuantize;
@@ -229,12 +229,6 @@ namespace ChartBuilder.ViewModels
             set => SetTool(EditorTool.Erase, value);
         }
 
-        public bool IsSustainTool
-        {
-            get => Session.Tool == EditorTool.Sustain;
-            set => SetTool(EditorTool.Sustain, value);
-        }
-
         public bool IsPhraseTool
         {
             get => Session.Tool == EditorTool.Phrase;
@@ -300,47 +294,147 @@ namespace ChartBuilder.ViewModels
             }
         }
 
-        /// <summary>Whether Generate fills can run (charter-spec C6 item 5): the lane in focus is a drums part with notes.</summary>
-        public bool CanGenerateFills =>
-            Session.Focused is { } key && ChartInstruments.KindOf(key.Instrument) == ChartInstrumentKind.Drums && Session.Chart.PartOf(key.Instrument) is { HasNotes: true };
+        // The kind of part in focus, which the place tool's options are offered for; null for none.
+        private ChartInstrumentKind? FocusedKind => Session.Focused is { } key ? ChartInstruments.KindOf(key.Instrument) : null;
+
+        /// <summary>Whether the place tool's options for a 5-fret or GHL lane show: the place tool is picked, and such a lane has focus.</summary>
+        public bool ShowsFretPlaceOptions => IsPlaceTool && FocusedKind is ChartInstrumentKind.FiveFret or ChartInstrumentKind.SixFret;
+
+        /// <summary>Whether the place tool's options for a drums lane show: the place tool is picked, and a drums lane has focus.</summary>
+        public bool ShowsDrumPlaceOptions => IsPlaceTool && FocusedKind is ChartInstrumentKind.Drums;
 
         /// <summary>
-        /// How many measures apart generated fills start, at the least. Generate fills' options are kept while the editor is
-        /// open, so the next run starts from the last one's.
+        /// Whether the place tool offers cymbal or tom: on drums set to Pro, the only drums with toms, as the note menu and
+        /// Properties offer them; drums read as Pro from their markers alone can't have toms set.
         /// </summary>
-        [ObservableProperty]
-        public partial decimal? FillSpacing { get; set; } = FillOptions.Default.SpacingMeasures;
+        public bool ShowsTomChoice => ShowsDrumPlaceOptions && Session.Chart.DrumsVariant == DrumsVariant.Pro;
 
-        /// <summary>How many measures a generated fill lasts.</summary>
-        [ObservableProperty]
-        public partial decimal? FillLength { get; set; } = FillOptions.Default.LengthMeasures;
+        /// <summary>Whether the place tool offers the 2× kick: on Expert, the only difficulty with one.</summary>
+        public bool ShowsDoubleKickChoice => ShowsDrumPlaceOptions && Session.Focused?.Difficulty == ChartDifficulty.Expert;
 
-        public IReadOnlyList<FillEndChoice> FillEndChoices { get; }
+        /// <summary>Whether the place tool leaves the chord a note goes in as it is, a new one natural.</summary>
+        public bool IsNaturalPlace
+        {
+            get => Session.Placing.ChordType == ChordFlags.None;
+            set => SetPlacing(value, Session.Placing with { ChordType = ChordFlags.None });
+        }
 
-        /// <summary>What a generated fill must end on.</summary>
-        [ObservableProperty]
-        public partial FillEndChoice? SelectedFillEnd { get; set; }
+        /// <summary>Whether the place tool makes the chord a note goes in a forced HOPO.</summary>
+        public bool IsHopoPlace
+        {
+            get => Session.Placing.ChordType == ChordFlags.ForceHopo;
+            set => SetPlacing(value, Session.Placing with { ChordType = ChordFlags.ForceHopo });
+        }
 
-        /// <summary>Where Generate fills proposes: over the selection's span when there's one, else the whole part.</summary>
-        public string FillScopeText => Session.Selection.Span is null ? Strings.GenerateFillsScopeWholePart : Strings.GenerateFillsScopeSelection;
+        /// <summary>Whether the place tool makes the chord a note goes in a forced strum.</summary>
+        public bool IsStrumPlace
+        {
+            get => Session.Placing.ChordType == ChordFlags.ForceStrum;
+            set => SetPlacing(value, Session.Placing with { ChordType = ChordFlags.ForceStrum });
+        }
+
+        /// <summary>Whether the place tool makes the chord a note goes in a tap.</summary>
+        public bool IsTapPlace
+        {
+            get => Session.Placing.ChordType == ChordFlags.Tap;
+            set => SetPlacing(value, Session.Placing with { ChordType = ChordFlags.Tap });
+        }
 
         /// <summary>
-        /// Whether Generate star power can run (charter-spec C8 item 1): the lane in focus is a 5-fret or keys part with
-        /// notes.
+        /// Takes in the modifier keys held, wherever focus is in the window: while Alt is held, Open shows the other way
+        /// about, and while Ctrl is, the drag shows the other choice, as the place tool would use them.
         /// </summary>
-        public bool CanGenerateStarPower =>
-            Session.Focused is { } key && StarPowerGenerator.CanGenerate(ChartInstruments.KindOf(key.Instrument)) && Session.Chart.PartOf(key.Instrument) is { HasNotes: true };
+        public void HoldModifiers(EditorModifiers modifiers)
+        {
+            if (modifiers == _heldModifiers)
+                return;
+            bool swapsOpen = IsAltHeld, swapsDrag = IsCtrlHeld;
+            _heldModifiers = modifiers;
+            ModifiersHeld?.Invoke(this, modifiers);
+            if (IsAltHeld != swapsOpen)
+                OnPropertyChanged(nameof(PlaceOpen));
+            if (IsCtrlHeld != swapsDrag)
+            {
+                OnPropertyChanged(nameof(IsRunDrag));
+                OnPropertyChanged(nameof(IsSustainDrag));
+            }
+        }
 
         /// <summary>
-        /// About how many seconds of the part's playing apart generated star power phrases are. Generate star power's
-        /// options are kept while the editor is open, so the next run starts from the last one's.
+        /// The modifier keys held changed, wherever focus is: the lanes take them in, so the place tool's ghost changes
+        /// with Alt even while a lane doesn't have the keys.
         /// </summary>
-        [ObservableProperty]
-        public partial decimal? StarPowerSpacing { get; set; } = (decimal)StarPowerOptions.Default.SpacingSeconds;
+        public event EventHandler<EditorModifiers>? ModifiersHeld;
 
-        /// <summary>Whether generated star power is charged for the part's hard passages, rather than only spread evenly.</summary>
-        [ObservableProperty]
-        public partial bool StarPowerPlanForSpikes { get; set; } = StarPowerOptions.Default.PlanForSpikes;
+        private bool IsAltHeld => _heldModifiers.HasFlag(EditorModifiers.Alt);
+
+        private bool IsCtrlHeld => _heldModifiers.HasFlag(EditorModifiers.Control);
+
+        /// <summary>
+        /// Whether a click of the place tool puts down an open note: <see cref="PlaceOptions.Open"/>, swapped while Alt is
+        /// held. Picked while Alt is held, it's set so as to show what was picked.
+        /// </summary>
+        public bool PlaceOpen
+        {
+            get => Session.Placing.Open != IsAltHeld;
+            set => Session.Placing = Session.Placing with { Open = value != IsAltHeld };
+        }
+
+        /// <summary>Whether a drag of the place tool lays a run of the note: not <see cref="PlaceOptions.DragSustains"/>, swapped while Ctrl is held.</summary>
+        public bool IsRunDrag
+        {
+            get => Session.Placing.DragSustains == IsCtrlHeld;
+            set => SetPlacing(value, Session.Placing with { DragSustains = IsCtrlHeld });
+        }
+
+        /// <summary>Whether a drag of the place tool draws out the note's sustain: <see cref="PlaceOptions.DragSustains"/>, swapped while Ctrl is held.</summary>
+        public bool IsSustainDrag
+        {
+            get => Session.Placing.DragSustains != IsCtrlHeld;
+            set => SetPlacing(value, Session.Placing with { DragSustains = !IsCtrlHeld });
+        }
+
+        /// <summary>Whether the place tool leaves a yellow, blue or green pad a cymbal, unless a tom marker covers it.</summary>
+        public bool IsCymbalPlace
+        {
+            get => !Session.Placing.Tom;
+            set => SetPlacing(value, Session.Placing with { Tom = false });
+        }
+
+        /// <summary>Whether the place tool makes a yellow, blue or green pad a tom, on every difficulty.</summary>
+        public bool IsTomPlace
+        {
+            get => Session.Placing.Tom;
+            set => SetPlacing(value, Session.Placing with { Tom = true });
+        }
+
+        /// <summary>Whether the place tool places pads as normal hits.</summary>
+        public bool IsNormalPlace
+        {
+            get => Session.Placing.Dynamics == NoteDynamics.None;
+            set => SetPlacing(value, Session.Placing with { Dynamics = NoteDynamics.None });
+        }
+
+        /// <summary>Whether the place tool places pads as accents.</summary>
+        public bool IsAccentPlace
+        {
+            get => Session.Placing.Dynamics == NoteDynamics.Accent;
+            set => SetPlacing(value, Session.Placing with { Dynamics = NoteDynamics.Accent });
+        }
+
+        /// <summary>Whether the place tool places pads as ghosts.</summary>
+        public bool IsGhostPlace
+        {
+            get => Session.Placing.Dynamics == NoteDynamics.Ghost;
+            set => SetPlacing(value, Session.Placing with { Dynamics = NoteDynamics.Ghost });
+        }
+
+        /// <summary>Whether the place tool places kicks as 2× kicks, on Expert.</summary>
+        public bool PlaceDoubleKick
+        {
+            get => Session.Placing.DoubleKick;
+            set => Session.Placing = Session.Placing with { DoubleKick = value };
+        }
 
         /// <summary>Whether a run of Generate fills or Generate star power is going on, with its proposals shown as ghosts to keep or drop.</summary>
         public bool IsProposalRunActive => Session.Proposals is not null;
@@ -501,27 +595,6 @@ namespace ChartBuilder.ViewModels
         [RelayCommand]
         private void CoarserSnap() => Session.Snap = Session.Snap.Coarser();
 
-        /// <summary>Proposes fills with the options picked, over the selection's span or the whole part.</summary>
-        [RelayCommand]
-        private void GenerateFills()
-        {
-            var options = new FillOptions(
-                (int)Math.Max(1, FillSpacing ?? FillOptions.Default.SpacingMeasures),
-                (int)Math.Max(1, FillLength ?? FillOptions.Default.LengthMeasures),
-                SelectedFillEnd?.End ?? FillEnd.Crash);
-            Session.Fills.Start(options, Session.Selection.Span);
-        }
-
-        /// <summary>Proposes star power for the part in focus with the options picked, over the selection's span or the whole part.</summary>
-        [RelayCommand]
-        private void GenerateStarPower()
-        {
-            if (Session.Focused is not { } key)
-                return;
-            double spacing = (double)Math.Clamp(StarPowerSpacing ?? (decimal)StarPowerOptions.Default.SpacingSeconds, (decimal)StarPowerOptions.MinSpacingSeconds, (decimal)StarPowerOptions.MaxSpacingSeconds);
-            Session.StarPower.Start(key.Instrument, new StarPowerOptions(spacing, StarPowerPlanForSpikes), Session.Selection.Span);
-        }
-
         [RelayCommand(CanExecute = nameof(IsProposalRunActive))]
         private void KeepAllProposals() => Session.Proposals?.KeepAll();
 
@@ -591,6 +664,18 @@ namespace ChartBuilder.ViewModels
                 OnSessionState(this, EventArgs.Empty);
         }
 
+        /// <summary>
+        /// Picks <paramref name="picked"/> as the place tool's options, from a button of a row of them, one of which is always
+        /// down: pressed again, the button stays down.
+        /// </summary>
+        private void SetPlacing(bool on, PlaceOptions picked)
+        {
+            if (on)
+                Session.Placing = picked;
+            else
+                RefreshPlacing();
+        }
+
         private void OnSessionState(object? sender, EventArgs e)
         {
             OnPropertyChanged(nameof(SelectedSnap));
@@ -598,27 +683,53 @@ namespace ChartBuilder.ViewModels
             OnPropertyChanged(nameof(IsSelectTool));
             OnPropertyChanged(nameof(IsPlaceTool));
             OnPropertyChanged(nameof(IsEraseTool));
-            OnPropertyChanged(nameof(IsSustainTool));
             OnPropertyChanged(nameof(IsPhraseTool));
             OnPropertyChanged(nameof(IsTempoTool));
             OnPropertyChanged(nameof(IsSyncTool));
             OnPropertyChanged(nameof(IsRecording));
             OnPropertyChanged(nameof(RecordToolTip));
-            RefreshFills();
+
+            // The place tool's options go by these alone, so a state change of something else, such as each note record
+            // mode takes in, leaves them be.
+            var placing = (Session.Tool, Session.Focused, Session.Chart.DrumsVariant, Session.Placing);
+            if (placing != _placingShown)
+            {
+                _placingShown = placing;
+                RefreshPlacing();
+            }
+
+            RefreshProposalRun();
             RefreshPhraseChoices();
             RefreshVisibleSpan();
             AudioAssist.Refresh();
             ScheduleRefresh();
         }
 
-        /// <summary>
-        /// Generate fills' and Generate star power's buttons, and the bar over the lanes while a run goes on, after the focus,
-        /// the chart or the run changes.
-        /// </summary>
-        private void RefreshFills()
+        /// <summary>The place tool's options, and which of them show, after the tool, the focus or the options change.</summary>
+        private void RefreshPlacing()
         {
-            OnPropertyChanged(nameof(CanGenerateFills));
-            OnPropertyChanged(nameof(CanGenerateStarPower));
+            OnPropertyChanged(nameof(ShowsFretPlaceOptions));
+            OnPropertyChanged(nameof(ShowsDrumPlaceOptions));
+            OnPropertyChanged(nameof(ShowsTomChoice));
+            OnPropertyChanged(nameof(ShowsDoubleKickChoice));
+            OnPropertyChanged(nameof(IsNaturalPlace));
+            OnPropertyChanged(nameof(IsHopoPlace));
+            OnPropertyChanged(nameof(IsStrumPlace));
+            OnPropertyChanged(nameof(IsTapPlace));
+            OnPropertyChanged(nameof(PlaceOpen));
+            OnPropertyChanged(nameof(IsRunDrag));
+            OnPropertyChanged(nameof(IsSustainDrag));
+            OnPropertyChanged(nameof(IsCymbalPlace));
+            OnPropertyChanged(nameof(IsTomPlace));
+            OnPropertyChanged(nameof(IsNormalPlace));
+            OnPropertyChanged(nameof(IsAccentPlace));
+            OnPropertyChanged(nameof(IsGhostPlace));
+            OnPropertyChanged(nameof(PlaceDoubleKick));
+        }
+
+        /// <summary>The bar over the lanes while a run of Generate fills or Generate star power goes on, after the run changes.</summary>
+        private void RefreshProposalRun()
+        {
             OnPropertyChanged(nameof(IsProposalRunActive));
             OnPropertyChanged(nameof(ProposalRunText));
             OnPropertyChanged(nameof(ProposalRunHint));
@@ -662,7 +773,19 @@ namespace ChartBuilder.ViewModels
         internal static string PhraseKindName(RailKind kind) => kind.Phrase is { } phrase ? PhraseKindName(phrase) : Strings.PhraseKindDiscoFlip;
 
         private static IReadOnlyList<PhraseKindChoice> PhraseChoicesOf(ChartInstrumentKind kind, bool proDrums) =>
-            [.. PhraseRail.ToolKindsOf(kind, proDrums).Select(k => new PhraseKindChoice(k, PhraseKindName(k)))];
+            [.. PhraseRail.ToolKindsOf(kind, proDrums).Select(k => new PhraseKindChoice(k, PhraseKindTitle(k)))];
+
+        /// <summary>A kind the Phrase tool draws, in title case, as its picker names it: Star Power, Drum Fill, Disco Flip…</summary>
+        private static string PhraseKindTitle(RailKind kind) => kind.Phrase switch
+        {
+            null => Strings.PhraseKindTitleDiscoFlip,
+            PhraseKind.StarPower => Strings.PhraseKindTitleStarPower,
+            PhraseKind.Solo => Strings.PhraseKindTitleSolo,
+            PhraseKind.DrumFill => Strings.PhraseKindTitleDrumFill,
+            PhraseKind.Roll => Strings.PhraseKindTitleRoll,
+            PhraseKind.Trill => Strings.PhraseKindTitleTrill,
+            _ => Strings.PhraseKindTitleBigRockEnding,
+        };
 
         // What the session says is why something was refused.
         private void OnStatusPosted(object? sender, string status) => Messages.Warning(status);
@@ -674,8 +797,6 @@ namespace ChartBuilder.ViewModels
             ScheduleRefresh();
             Properties.Refresh();
             RefreshPhraseChoices();
-            OnPropertyChanged(nameof(CanGenerateFills));
-            OnPropertyChanged(nameof(CanGenerateStarPower));
             foreach (var lane in Lanes.All)
                 lane.RefreshDifficulties();
         }
@@ -683,7 +804,6 @@ namespace ChartBuilder.ViewModels
         private void OnSelectionChanged(object? sender, EventArgs e)
         {
             Properties.Refresh();
-            OnPropertyChanged(nameof(FillScopeText));
             AudioAssist.Refresh();
         }
 

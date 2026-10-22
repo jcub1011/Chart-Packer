@@ -166,10 +166,6 @@
     <value>Erase</value>
     <comment>An editing tool: remove notes.</comment>
   </data>
-  <data name="ToolSustain" xml:space="preserve">
-    <value>Sustain</value>
-    <comment>An editing tool: drag out a note's sustain.</comment>
-  </data>
   <data name="ToolPhrase" xml:space="preserve">
     <value>Phrase</value>
     <comment>An editing tool: star power, solos and other phrases.</comment>
@@ -1107,19 +1103,15 @@ Open it anyway?</value>
     <comment>The Select tool's tooltip.</comment>
   </data>
   <data name="ToolPlaceToolTip" xml:space="preserve">
-    <value>Click to place a note on the grid, and drag to lay a run of notes; Ctrl-drag draws out a sustain instead. Hold Alt to place an open note (the kick on drums). Hold Shift to select instead.</value>
+    <value>Click to place a note on the grid, made as the options beside the tools have it, and drag to lay a run of notes; Ctrl-drag draws out a sustain instead (or a run, with Sustain picked). Hold Alt to place an open note, the kick on drums (or a fret, with Open picked). Hold Shift to select instead.</value>
     <comment>The Place tool's tooltip.</comment>
   </data>
   <data name="ToolEraseToolTip" xml:space="preserve">
-    <value>Click or drag over notes to remove them.</value>
+    <value>Click or drag over notes to remove them, and over phrases in the rail beside the lanes. What a click removes is shown in red. Hold Shift to select instead.</value>
     <comment>The Erase tool's tooltip.</comment>
   </data>
-  <data name="ToolSustainToolTip" xml:space="preserve">
-    <value>Drag from a note to set how long it's held; with notes selected, sets them all to end at the pointer. Ctrl-drag a selected note to lengthen or shorten each sustain by the same amount.</value>
-    <comment>The Sustain tool's tooltip.</comment>
-  </data>
   <data name="ToolTempoToolTip" xml:space="preserve">
-    <value>Click to add a tempo marker; drag one to move it, or, when it's anchored, to fit the tempo to the audio. Edit its tempo in Properties.</value>
+    <value>Click to add a tempo marker; drag one to move it, or, when it's anchored, to fit the tempo to the audio. Middle-click a marker to remove it. Edit its tempo in Properties.</value>
     <comment>The Tempo tool's tooltip.</comment>
   </data>
   <data name="ToolSyncToolTip" xml:space="preserve">
@@ -1137,6 +1129,97 @@ Open it anyway?</value>
   <data name="ToolPhraseKindName" xml:space="preserve">
     <value>Phrase kind</value>
     <comment>The accessible name of the picker beside the Phrase tool.</comment>
+  </data>
+  <data name="PlaceNatural" xml:space="preserve">
+    <value>Natural</value>
+    <comment>A place option on 5-fret and GHL lanes: a chord a note joins keeps its marking, and a new one is natural.</comment>
+  </data>
+  <data name="PlaceNaturalToolTip" xml:space="preserve">
+    <value>Place notes as they come: a new chord is natural, and a note added to a chord leaves its marking as it is.</value>
+  </data>
+  <data name="PlaceHopo" xml:space="preserve">
+    <value>HOPO</value>
+    <comment>A place option on 5-fret and GHL lanes: the chord is forced to a hammer-on or pull-off.</comment>
+  </data>
+  <data name="PlaceHopoToolTip" xml:space="preserve">
+    <value>Make the chord each note goes in a forced HOPO (H).</value>
+  </data>
+  <data name="PlaceStrum" xml:space="preserve">
+    <value>Strum</value>
+    <comment>A place option on 5-fret and GHL lanes: the chord is forced to a strum.</comment>
+  </data>
+  <data name="PlaceStrumToolTip" xml:space="preserve">
+    <value>Make the chord each note goes in a forced strum (G).</value>
+  </data>
+  <data name="PlaceTap" xml:space="preserve">
+    <value>Tap</value>
+    <comment>A place option on 5-fret and GHL lanes: the chord is a tap note.</comment>
+  </data>
+  <data name="PlaceTapToolTip" xml:space="preserve">
+    <value>Make the chord each note goes in a tap (T).</value>
+  </data>
+  <data name="PlaceOpen" xml:space="preserve">
+    <value>Open</value>
+    <comment>A place option on 5-fret and GHL lanes: every click places an open note.</comment>
+  </data>
+  <data name="PlaceOpenToolTip" xml:space="preserve">
+    <value>Place open notes wherever you click. Hold Alt to place a fret instead.</value>
+  </data>
+  <data name="PlaceDragRun" xml:space="preserve">
+    <value>Run</value>
+    <comment>A place option on 5-fret and GHL lanes: a drag lays a run of the note.</comment>
+  </data>
+  <data name="PlaceDragRunToolTip" xml:space="preserve">
+    <value>Drag to lay a run of the note on each grid step. Hold Ctrl to draw out a sustain instead.</value>
+  </data>
+  <data name="PlaceDragSustain" xml:space="preserve">
+    <value>Sustain</value>
+    <comment>A place option on 5-fret and GHL lanes: a drag draws out the note's sustain.</comment>
+  </data>
+  <data name="PlaceDragSustainToolTip" xml:space="preserve">
+    <value>Drag to draw out the note's sustain. Hold Ctrl to lay a run instead.</value>
+  </data>
+  <data name="PlaceCymbal" xml:space="preserve">
+    <value>Cymbal</value>
+    <comment>A place option on Pro drums lanes: yellow, blue and green pads stay cymbals.</comment>
+  </data>
+  <data name="PlaceCymbalToolTip" xml:space="preserve">
+    <value>Place yellow, blue and green pads as they are marked: cymbals, unless a tom marker covers them.</value>
+  </data>
+  <data name="PlaceTom" xml:space="preserve">
+    <value>Tom</value>
+    <comment>A place option on Pro drums lanes: yellow, blue and green pads are made toms.</comment>
+  </data>
+  <data name="PlaceTomToolTip" xml:space="preserve">
+    <value>Make each yellow, blue or green pad placed a tom (C). Toms are marked for every difficulty.</value>
+  </data>
+  <data name="PlaceNormal" xml:space="preserve">
+    <value>Normal</value>
+    <comment>A place option on drums lanes: pads are normal hits.</comment>
+  </data>
+  <data name="PlaceNormalToolTip" xml:space="preserve">
+    <value>Place pads as normal hits.</value>
+  </data>
+  <data name="PlaceAccent" xml:space="preserve">
+    <value>Accent</value>
+    <comment>A place option on drums lanes: pads are accents, hit harder.</comment>
+  </data>
+  <data name="PlaceAccentToolTip" xml:space="preserve">
+    <value>Place pads as accents, hit harder (A). Kicks stay normal.</value>
+  </data>
+  <data name="PlaceGhost" xml:space="preserve">
+    <value>Ghost</value>
+    <comment>A place option on drums lanes: pads are ghost notes, hit softer.</comment>
+  </data>
+  <data name="PlaceGhostToolTip" xml:space="preserve">
+    <value>Place pads as ghost notes, hit softer (Shift+A). Kicks stay normal.</value>
+  </data>
+  <data name="PlaceDoubleKick" xml:space="preserve">
+    <value>2× Kick</value>
+    <comment>A place option on Expert drums lanes: kicks are 2× kicks.</comment>
+  </data>
+  <data name="PlaceDoubleKickToolTip" xml:space="preserve">
+    <value>Place kicks as 2× kicks, for Expert+.</value>
   </data>
   <data name="PhraseKindStarPower" xml:space="preserve">
     <value>Star power</value>
@@ -1165,6 +1248,34 @@ Open it anyway?</value>
   <data name="PhraseKindDiscoFlip" xml:space="preserve">
     <value>Disco flip</value>
     <comment>What the Phrase tool can draw on Pro drums besides phrases: a section where the games swap red and yellow.</comment>
+  </data>
+  <data name="PhraseKindTitleStarPower" xml:space="preserve">
+    <value>Star Power</value>
+    <comment>A kind of phrase in the Phrase tool's picker, in title case.</comment>
+  </data>
+  <data name="PhraseKindTitleSolo" xml:space="preserve">
+    <value>Solo</value>
+    <comment>A kind of phrase in the Phrase tool's picker, in title case.</comment>
+  </data>
+  <data name="PhraseKindTitleDrumFill" xml:space="preserve">
+    <value>Drum Fill</value>
+    <comment>A kind of phrase in the Phrase tool's picker, in title case.</comment>
+  </data>
+  <data name="PhraseKindTitleRoll" xml:space="preserve">
+    <value>Roll</value>
+    <comment>A kind of phrase in the Phrase tool's picker, in title case.</comment>
+  </data>
+  <data name="PhraseKindTitleTrill" xml:space="preserve">
+    <value>Trill</value>
+    <comment>A kind of phrase in the Phrase tool's picker, in title case.</comment>
+  </data>
+  <data name="PhraseKindTitleBigRockEnding" xml:space="preserve">
+    <value>Big Rock Ending</value>
+    <comment>A kind of phrase in the Phrase tool's picker, in title case.</comment>
+  </data>
+  <data name="PhraseKindTitleDiscoFlip" xml:space="preserve">
+    <value>Disco Flip</value>
+    <comment>Disco flip sections in the Phrase tool's picker, in title case.</comment>
   </data>
   <data name="PropertiesDiscoFlipHeading" xml:space="preserve">
     <value>Disco Flip</value>
@@ -1213,6 +1324,10 @@ Open it anyway?</value>
   <data name="SnapToolTip" xml:space="preserve">
     <value>The grid notes snap to, as a fraction of a whole note. [ and ] change it.</value>
     <comment>The snap controls' tooltip.</comment>
+  </data>
+  <data name="SnapButtonToolTip" xml:space="preserve">
+    <value>Notes placed and moved snap to the grid picked beside this. Off, they go where the pointer is.</value>
+    <comment>The snap button's tooltip, under its name.</comment>
   </data>
   <data name="LoopLabel" xml:space="preserve">
     <value>Loop</value>
@@ -1862,16 +1977,12 @@ Saving also makes these changes to song.ini:
   <data name="TempoMapKeysHint" xml:space="preserve">
     <value>Ctrl+Shift+↑ and Ctrl+Shift+↓ move the cursor to the next tempo or time signature change and the previous one. The Tempo tool adds and drags tempo markers on the lanes.</value>
   </data>
-  <data name="GenerateFillsButton" xml:space="preserve">
-    <value>Generate fills…</value>
-    <comment>The toolbar button, beside the Phrase tool, that opens Generate fills' options.</comment>
-  </data>
-  <data name="GenerateFillsToolTip" xml:space="preserve">
-    <value>Propose drum fills over the selection, or the whole part, to keep or drop before they're added. For a drums lane with notes.</value>
-    <comment>The Generate fills button's tooltip.</comment>
-  </data>
   <data name="GenerateFillsHeading" xml:space="preserve">
     <value>Generate Fills</value>
+  </data>
+  <data name="GenerateFillsIntro" xml:space="preserve">
+    <value>Propose drum fills over the selection, or the whole part, to keep or drop before they're added.</value>
+    <comment>The Generate fills dialog's introduction.</comment>
   </data>
   <data name="GenerateFillsSpacingLabel" xml:space="preserve">
     <value>Spacing (measures)</value>
@@ -1899,30 +2010,32 @@ Saving also makes these changes to song.ini:
   <data name="GenerateFillsEndAnyNote" xml:space="preserve">
     <value>Any note</value>
   </data>
-  <data name="GenerateFillsScopeLabel" xml:space="preserve">
+  <data name="GenerateScopeLabel" xml:space="preserve">
     <value>Over</value>
-    <comment>Where fills are proposed: the selection, or the whole part.</comment>
+    <comment>Generate fills and Generate star power: where the phrases are proposed, the selection or the whole part.</comment>
   </data>
-  <data name="GenerateFillsScopeSelection" xml:space="preserve">
+  <data name="GenerateScopeSelection" xml:space="preserve">
     <value>The selection</value>
+    <comment>Generate fills and Generate star power: the phrases are proposed over the selection's span.</comment>
   </data>
-  <data name="GenerateFillsScopeWholePart" xml:space="preserve">
+  <data name="GenerateScopeWholePart" xml:space="preserve">
     <value>The whole part</value>
+    <comment>Generate fills and Generate star power: the phrases are proposed over the whole part.</comment>
   </data>
-  <data name="GenerateFillsGenerate" xml:space="preserve">
+  <data name="GenerateButton" xml:space="preserve">
     <value>Generate</value>
-    <comment>Proposes the fills, shown as ghosts to keep or drop.</comment>
-  </data>
-  <data name="GenerateStarPowerButton" xml:space="preserve">
-    <value>Generate star power…</value>
-    <comment>The toolbar button, beside Generate fills, that opens Generate star power's options.</comment>
-  </data>
-  <data name="GenerateStarPowerToolTip" xml:space="preserve">
-    <value>Propose star power phrases over the selection, or the whole part, to keep or drop before they're added. For a 5-fret or keys lane with notes.</value>
-    <comment>The Generate star power button's tooltip.</comment>
+    <comment>Generate fills and Generate star power: proposes the phrases, shown as ghosts to keep or drop.</comment>
   </data>
   <data name="GenerateStarPowerHeading" xml:space="preserve">
     <value>Generate Star Power</value>
+  </data>
+  <data name="GenerateStarPowerTitleFormat" xml:space="preserve">
+    <value>Generate Star Power: {0}</value>
+    <comment>The Generate star power dialog's title. {0} is the part, e.g. Guitar.</comment>
+  </data>
+  <data name="GenerateStarPowerIntro" xml:space="preserve">
+    <value>Propose star power phrases over the selection, or the whole part, to keep or drop before they're added.</value>
+    <comment>The Generate star power dialog's introduction.</comment>
   </data>
   <data name="GenerateStarPowerSpacingLabel" xml:space="preserve">
     <value>Spacing (seconds)</value>
@@ -2301,7 +2414,7 @@ Saving also makes these changes to song.ini:
     <value>The spectrogram of {0} ({1:0} MB) doesn't fit in the spectrogram memory budget beside the ones shown. Raise the budget in Settings, or show fewer spectrograms.</value>
   </data>
   <data name="LaneEditToolTip" xml:space="preserve">
-    <value>Edit: copy, reduce and transform this lane</value>
+    <value>Edit: copy, reduce, generate and transform this lane</value>
   </data>
   <data name="LaneMoreToolTip" xml:space="preserve">
     <value>More lane tools: audio, view, ghost difficulty and edit</value>
@@ -2317,7 +2430,7 @@ Saving also makes these changes to song.ini:
   </data>
   <data name="LaneMoreEdit" xml:space="preserve">
     <value>Edit</value>
-    <comment>A narrow lane's "more" menu submenu: copy, reduce and transform the lane.</comment>
+    <comment>A narrow lane's "more" menu submenu: copy, reduce, generate and transform the lane.</comment>
   </data>
   <data name="LaneCopyToFormat" xml:space="preserve">
     <value>Copy {0} to</value>
@@ -2339,6 +2452,14 @@ Saving also makes these changes to song.ini:
   </data>
   <data name="LaneReduce" xml:space="preserve">
     <value>Reduce…</value>
+  </data>
+  <data name="LaneGenerateStarPower" xml:space="preserve">
+    <value>Generate star power…</value>
+    <comment>A lane's Edit menu item, on 5-fret and keys lanes: opens Generate star power's options for the lane's part.</comment>
+  </data>
+  <data name="LaneGenerateFills" xml:space="preserve">
+    <value>Generate fills…</value>
+    <comment>A lane's Edit menu item, on drums lanes: opens Generate fills' options.</comment>
   </data>
   <data name="ReduceTitleFormat" xml:space="preserve">
     <value>Reduce {0}</value>

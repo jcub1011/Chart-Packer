@@ -155,6 +155,11 @@ namespace ChartBuilder.Controls.Editing
         private static readonly IBrush SectionBrush = new ImmutableSolidColorBrush(SectionColor);
         private static readonly Typeface LabelFace = new(FontFamily.Default, FontStyle.Normal, FontWeight.SemiBold);
 
+        // What a click of the erase tool would take away, in red over it.
+        private static readonly Color EraseColor = Color.FromRgb(0xF8, 0x71, 0x71);
+        private static readonly IBrush EraseBrush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(EraseColor, 0x70));
+        private static readonly IPen ErasePen = new ImmutablePen(EraseColor.ToUInt32(), 1.5);
+
         private readonly GemPainter _gems = new();
         private readonly Dictionary<(string Text, double Size, IBrush Brush, double? MaxWidth), TextLayout> _labels = [];
         private readonly List<string> _measureNumbers = [];
@@ -173,8 +178,8 @@ namespace ChartBuilder.Controls.Editing
         private Point _pressedAt;
         private bool _pressDragged;
 
-        // The modifier keys held as the pointer last moved or a key last went down or up: with Ctrl, the place
-        // tool's ghost is an open note, or a kick.
+        // The modifier keys held as the pointer last moved or a key last went down or up: with Alt, the place tool's ghost
+        // is an open note, or a kick, or a fret while the place tool places open notes.
         private KeyModifiers _keys;
 
         // The proposed beat being dragged by its handle, if one is.
@@ -468,7 +473,7 @@ namespace ChartBuilder.Controls.Editing
                     RenderStrike(context, session, key, track, slots, screen);
                     return;
                 case LayerKind.Overlay:
-                    RenderOverlay(context, session, key, track, slots, screen);
+                    RenderOverlay(context, session, key, track, part, rows, slots, screen);
                     return;
                 case LayerKind.Playtest:
                     RenderPlaytest(context, session, key, slots, screen);
@@ -582,12 +587,17 @@ namespace ChartBuilder.Controls.Editing
             }
         }
 
-        /// <summary>What follows the pointer and the focus: the place tool's ghost, the cursor, a box being drawn, and the focus's edge.</summary>
-        private void RenderOverlay(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, LaneSlots slots, LaneProjection screen)
+        /// <summary>
+        /// What follows the pointer and the focus: the place tool's ghost, what the erase tool would take away, where the
+        /// Phrase tool would start drawing, the cursor, a box being drawn, and the focus's edge.
+        /// </summary>
+        private void RenderOverlay(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, EditablePart part, IReadOnlyList<RailKind> rows, LaneSlots slots, LaneProjection screen)
         {
             var lanes = LanesOf(screen, slots);
             using (context.PushClip(lanes))
                 DrawHover(context, session, key, track, screen, slots);
+            DrawEraseHover(context, session, key, track, part, rows, screen, slots);
+            DrawPhraseHover(context, session, key, part, rows, screen, slots);
 
             DrawCursor(context, session, screen, lanes);
             DrawBox(context, screen);
@@ -678,8 +688,11 @@ namespace ChartBuilder.Controls.Editing
                 layer.Redraw();
         }
 
-        /// <summary>Whether the place tool's ghost is shown under the pointer, which snaps to the song as it moves under it.</summary>
-        private bool IsHoverShown => _hover is not null && !_isPressed && Session?.Tool == EditorTool.Place;
+        /// <summary>
+        /// Whether the place tool's ghost, the erase tool's red or the Phrase tool's line is shown under the pointer, which
+        /// follow the song as it moves under it.
+        /// </summary>
+        private bool IsHoverShown => _hover is not null && !_isPressed && Session?.Tool is EditorTool.Place or EditorTool.Erase or EditorTool.Phrase;
 
         /// <summary>
         /// Follows the cursor: the song and the notes are moved, as far as their page reaches, and drawn again around the
@@ -933,6 +946,9 @@ namespace ChartBuilder.Controls.Editing
             var position = e.GetPosition(this);
             _hover = position;
             _keys = e.KeyModifiers;
+
+            // Keys pressed while the window was in the background reach the toolbar's place options here.
+            _editor?.HoldModifiers(ModifiersOf(e.KeyModifiers));
             if (!_isPressed)
                 Session?.Tools.HoldKeys(ModifiersOf(e.KeyModifiers));
             if (_proposalDrag is { } beat)
@@ -1113,6 +1129,19 @@ namespace ChartBuilder.Controls.Editing
             _overlay.Redraw();
         }
 
+        /// <summary>
+        /// Takes in the modifier keys held as the window sees them, wherever focus is: a key that goes down or up while
+        /// focus is elsewhere, or that something above the lane takes, as Alt can be, never reaches <see cref="OnKeyDown"/>.
+        /// </summary>
+        private void OnModifiersHeld(object? sender, EditorModifiers held)
+        {
+            var keys = (_keys & ~(KeyModifiers.Shift | KeyModifiers.Control | KeyModifiers.Alt))
+                | (held.HasFlag(EditorModifiers.Shift) ? KeyModifiers.Shift : KeyModifiers.None)
+                | (held.HasFlag(EditorModifiers.Control) ? KeyModifiers.Control : KeyModifiers.None)
+                | (held.HasFlag(EditorModifiers.Alt) ? KeyModifiers.Alt : KeyModifiers.None);
+            TakeKeys(keys);
+        }
+
         /// <summary>Moves focus to the lane's other canvas, once it's shown in place of this one.</summary>
         internal void FocusSibling()
         {
@@ -1192,7 +1221,8 @@ namespace ChartBuilder.Controls.Editing
                     (grip, tip) = (flip.Grip, ChartEditorViewModel.PhraseKindName(RailKind.DiscoFlip));
                 }
 
-                if (grip is { } grabbed)
+                // The erase tool erases a bar rather than grabbing it, as its red shows.
+                if (grip is { } grabbed && (session.Tool != EditorTool.Erase || (_keys & KeyModifiers.Shift) != 0))
                 {
                     wanted = grabbed == PhraseGrip.Body ? StandardCursorType.Hand
                         : View == LaneView.Highway ? StandardCursorType.SizeNorthSouth
@@ -1235,7 +1265,7 @@ namespace ChartBuilder.Controls.Editing
             Cursor = cursor;
         }
 
-        private static EditorModifiers ModifiersOf(KeyModifiers keys) =>
+        internal static EditorModifiers ModifiersOf(KeyModifiers keys) =>
             ((keys & KeyModifiers.Shift) != 0 ? EditorModifiers.Shift : EditorModifiers.None)
             | ((keys & KeyModifiers.Control) != 0 ? EditorModifiers.Control : EditorModifiers.None)
             | ((keys & KeyModifiers.Alt) != 0 ? EditorModifiers.Alt : EditorModifiers.None);
@@ -1264,6 +1294,7 @@ namespace ChartBuilder.Controls.Editing
                 editor.Audio.Changed += OnAudioChanged;
                 editor.AudioAssist.PropertyChanged += OnAudioAssistChanged;
                 editor.Playtest.Changed += OnPlaytestChanged;
+                editor.ModifiersHeld += OnModifiersHeld;
             }
 
             _topLevel = TopLevel.GetTopLevel(this);
@@ -1288,6 +1319,7 @@ namespace ChartBuilder.Controls.Editing
                 editor.Audio.Changed -= OnAudioChanged;
                 editor.AudioAssist.PropertyChanged -= OnAudioAssistChanged;
                 editor.Playtest.Changed -= OnPlaytestChanged;
+                editor.ModifiersHeld -= OnModifiersHeld;
             }
 
             if (_topLevel is { } top)
@@ -2141,34 +2173,47 @@ namespace ChartBuilder.Controls.Editing
         }
 
         /// <summary>
-        /// The note the place tool would put down where the pointer is, as it would be drawn: with Alt held, an open
-        /// note, or a kick. None with Shift held, which lends the place tool the select tool's press.
+        /// The note the place tool would put down where the pointer is, as it would be drawn: an open note or a kick with
+        /// Alt held, or a fret while it places open notes, and made as the toolbar's place options have it. None with
+        /// Shift held, which lends the place tool the select tool's press.
         /// </summary>
         private void DrawHover(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, LaneProjection projection, LaneSlots slots)
         {
             if (_hover is not { } hover || _isPressed || session.Tool != EditorTool.Place || (_keys & KeyModifiers.Shift) != 0 || PointAt(hover) is not { Rail: null } point)
                 return;
-            bool apart = (_keys & KeyModifiers.Alt) != 0;
-            if ((apart ? EditorTools.ApartLane(slots) : point.Lane) is not { } lane)
+            if (session.Tools.PlacedLane(track.Kind, point.Lane, slots, alt: (_keys & KeyModifiers.Alt) != 0) is not { } lane)
                 return;
-            long tick = session.Snap.Nearest(point.Tick, session.TempoMap);
+            long tick = session.Quantize(point.Tick, key);
             int column = slots.IndexOf(lane);
             int stored = session.StoredLane(key, tick, lane);
             bool across = slots.Across == lane;
-            if ((column < 0 && !across) || track.TryGetNote(tick, stored, false, out _))
+            var note = session.Tools.PlacedNote(key, track.Kind, tick, stored);
+            if ((column < 0 && !across) || EditorTools.TryGetPlaced(track, note, out _))
                 return;
             double along = projection.AlongOf(session.AudioAt(tick));
 
             // As it would be placed: numbered and coloured as Shown has it, and on Pro drums a cymbal unless a tom marker
-            // covers it. Inside a disco flip section, the red placed in yellow's column is a yellow cymbal, and the yellow
-            // placed in red's a red pad (C6 item 7).
+            // covers it or a tom is picked. Inside a disco flip section, the red placed in yellow's column is a yellow
+            // cymbal, and the yellow placed in red's a red pad (C6 item 7).
             bool drums = track.Kind == ChartInstrumentKind.Drums;
             int laneCount = drums ? slots.Slots.Count - (slots.Across is null ? 1 : 0) : 5;
+            var placing = session.Placing;
             bool cymbal = stored != lane
                 ? lane == 2
                 : drums && session.Chart.DrumsVariant == DrumsVariant.Pro && lane is >= TomMarker.FirstPad and <= TomMarker.LastPad
-                    && !DrumCymbals.IsTom(session.Chart.PartOf(key.Instrument)!, lane, tick);
-            var placed = new ChartNote(tick, 0, drums ? lane - 1 : lane, cymbal ? NoteFlags.Cymbal : NoteFlags.None);
+                    && !placing.Tom && !DrumCymbals.IsTom(session.Chart.PartOf(key.Instrument)!, lane, tick);
+            var flags = cymbal ? NoteFlags.Cymbal : NoteFlags.None;
+            if (drums)
+            {
+                flags |= note.Dynamics switch { NoteDynamics.Accent => NoteFlags.Accent, NoteDynamics.Ghost => NoteFlags.Ghost, _ => NoteFlags.None };
+                flags |= note.DoubleKick ? NoteFlags.DoubleKick : NoteFlags.None;
+            }
+            else
+            {
+                flags |= placing.ChordType switch { ChordFlags.ForceHopo => NoteFlags.Hopo, ChordFlags.Tap => NoteFlags.Tap, _ => NoteFlags.None };
+            }
+
+            var placed = new ChartNote(tick, 0, drums ? lane - 1 : lane, flags);
             var color = HighwayPalette.NoteColor(track.Kind, laneCount, placed);
             double size = GemSize(projection);
 
@@ -2191,6 +2236,90 @@ namespace ChartBuilder.Controls.Editing
                 rect = rect.WithHeight(rect.Height / 2);
             using (context.PushOpacity(0.45))
                 _gems.DrawGem(context, track.Kind, placed, color, rect, outlined: true);
+        }
+
+        /// <summary>
+        /// What a click of the erase tool would take away where the pointer is, in red over it: a note with its sustain, or
+        /// in the phrase rail a phrase's bar or a disco flip section's. None over a proposed phrase's ghost, which a click
+        /// keeps or drops, or with Shift held, which lends the erase tool the select tool's press.
+        /// </summary>
+        private void DrawEraseHover(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, EditablePart part, IReadOnlyList<RailKind> rows, LaneProjection projection, LaneSlots slots)
+        {
+            if (_hover is not { } hover || _isPressed || session.Tool != EditorTool.Erase || (_keys & KeyModifiers.Shift) != 0 || PointAt(hover) is not { } point)
+                return;
+            if (point.Rail is not null && session.Proposals?.HitTest(point) is not null)
+                return;
+
+            switch (session.Tools.EraseTargetAt(point))
+            {
+                case { Note: { } note }:
+                    using (context.PushClip(LanesOf(projection, slots)))
+                        DrawErasedNote(context, session, key, track, note, projection, slots);
+                    break;
+                case { Phrase: { } phrase } when IndexOf(rows, PhraseRail.RowOf(part.Kind, phrase.Kind)) is var row and >= 0:
+                {
+                    var (across1, across2) = PhraseRowOf(projection, rows.Count, row);
+                    context.DrawRectangle(EraseBrush, ErasePen, BoxOf(projection, session, phrase, across1, across2).Inflate(1), 2, 2);
+                    break;
+                }
+                case { DiscoFlip: { } flip } when IndexOf(rows, RailKind.DiscoFlip) is var row and >= 0:
+                {
+                    var (across1, across2) = PhraseRowOf(projection, rows.Count, row);
+                    double start = projection.AlongOf(session.AudioAt(flip.Range.Tick));
+                    double end = flip.Range.EndTick is { } endTick ? projection.AlongOf(session.AudioAt(endTick)) : projection.AlongOf(projection.End);
+                    if (Math.Abs(end - start) < 2)
+                        end = start + (View == LaneView.Highway ? -2 : 2);
+                    context.DrawRectangle(EraseBrush, ErasePen, Box(start, end, across1, across2).Inflate(1), 2, 2);
+                    break;
+                }
+            }
+        }
+
+        /// <summary>A note the erase tool would take away, in red over its gem or bar and its sustain's tail, where DrawNotes draws them.</summary>
+        private void DrawErasedNote(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, EditableNote note, LaneProjection projection, LaneSlots slots)
+        {
+            bool across = slots.Across == note.Lane;
+            int column = slots.IndexOf(session.ShownLane(key, note));
+            if (column < 0 && !across)
+                return;
+            double size = GemSize(projection);
+            double across1 = projection.LaneFrom + 4, across2 = projection.LaneFrom + (projection.LaneSize * slots.Slots.Count) - 4;
+            double along = projection.AlongOf(session.AudioAt(note.Tick));
+            if (note.Length > EditableNote.PlainLength && track.Kind != ChartInstrumentKind.Drums)
+            {
+                double end = projection.AlongOf(session.AudioAt(note.Tick + note.Length));
+                double width = Math.Max(3, projection.LaneSize * 0.2);
+                var tail = across ? Box(along, end, across1, across2) : Box(along, end, projection.AcrossOf(column) - (width / 2), projection.AcrossOf(column) + (width / 2));
+                context.DrawRectangle(EraseBrush, ErasePen, tail);
+            }
+
+            double thickness = Math.Max(4, size * 0.45);
+            var gem = across ? Box(along - (thickness / 2), along + (thickness / 2), across1, across2) : GemRect(projection, column, along, size);
+            context.DrawRectangle(EraseBrush, ErasePen, gem.Inflate(1), 3, 3);
+        }
+
+        /// <summary>
+        /// Where a press of the Phrase tool would start drawing, on the grid: a line across the lanes in the colour of the
+        /// kind picked, and a mark in its row of the rail. None where a press does something else, such as on a phrase's
+        /// bar, or in the lanes with Shift held, which lends the Phrase tool the select tool's press; nor where a press is
+        /// refused, as a disco flip section is off Pro drums.
+        /// </summary>
+        private void DrawPhraseHover(DrawingContext context, EditorSession session, ChartTrackKey key, EditablePart part, IReadOnlyList<RailKind> rows, LaneProjection projection, LaneSlots slots)
+        {
+            if (_hover is not { } hover || _isPressed || session.Tool != EditorTool.Phrase || !session.Tools.DrawsIn(key) || PointAt(hover) is not { } point)
+                return;
+            if ((point.Rail is null && (_keys & KeyModifiers.Shift) != 0) || session.Tools.PhraseDrawStart(point) is not { } tick)
+                return;
+
+            var kind = session.PhraseKind;
+            var brush = _gems.Brush(kind.Phrase is { } phrase ? PhraseColor(phrase) : DiscoFlipColor);
+            double along = projection.AlongOf(session.AudioAt(tick));
+            context.FillRectangle(brush, Box(along - 1, along + 1, projection.LaneFrom, projection.LaneFrom + (projection.LaneSize * slots.Slots.Count)));
+            int row = IndexOf(rows, kind.Phrase is { } drawn ? PhraseRail.RowOf(part.Kind, drawn) : RailKind.DiscoFlip);
+            if (row < 0)
+                return;
+            var (across1, across2) = PhraseRowOf(projection, rows.Count, row);
+            context.FillRectangle(brush, Box(along - 1.5, along + 1.5, across1 - 1, across2 + 1));
         }
 
         /// <summary>The strike line's band, on the cursor, behind the notes: dark across the lanes, as in the games.</summary>

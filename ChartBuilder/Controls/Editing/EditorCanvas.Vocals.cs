@@ -140,7 +140,7 @@ namespace ChartBuilder.Controls.Editing
                         tip = Strings.RailVocalPhraseToolTip;
                     }
                 }
-                else if (session.Tool is EditorTool.Select or EditorTool.Sustain && session.Tools.HitTest(point) is { Grip: VocalNoteGrip.End })
+                else if (session.Tool is EditorTool.Select or EditorTool.Place &&session.Tools.HitTest(point) is { Grip: VocalNoteGrip.End })
                 {
                     wanted = StandardCursorType.SizeWestEast;
                 }
