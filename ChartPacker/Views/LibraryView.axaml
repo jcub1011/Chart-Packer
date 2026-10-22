@@ -366,13 +366,28 @@
                      SelectionMode="Multiple"
                      AutomationProperties.Name="{x:Static res:Strings.LibraryListName}">
                 <!-- Right-clicking a row selects it, or keeps the selection it's part of, so the menu acts on the selection.
-                     Edit Chart is there only with one song selected, the one it opens in Chart Builder. -->
+                     Edit Chart is there only with one song selected, the one it opens in Chart Builder;
+                     Merge only with several selected. Validate, Merge and Generate lower difficulties are the
+                     same as in the Tools menu, with the same icons. -->
                 <ListBox.ContextMenu>
                     <ContextMenu>
                         <MenuItem Header="{x:Static res:Strings.EditChartButton}"
                                   Command="{Binding EditChartCommand}"
                                   IsVisible="{Binding IsSingleSelection}">
                             <MenuItem.Icon><ui:LineIcon Data="{StaticResource EditChartStroke}" /></MenuItem.Icon>
+                        </MenuItem>
+                        <MenuItem Header="{x:Static res:Strings.MenuMerge}"
+                                  Command="{Binding MergeCommand}"
+                                  IsVisible="{Binding IsMultipleSelection}"
+                                  ToolTip.Tip="{x:Static res:Strings.MergeToolTip}"
+                                  ToolTip.ShowOnDisabled="True">
+                            <MenuItem.Icon><ui:LineIcon Data="{StaticResource MergeStroke}" /></MenuItem.Icon>
+                        </MenuItem>
+                        <MenuItem Header="{x:Static res:Strings.MenuValidate}"
+                                  Command="{Binding ValidateCommand}"
+                                  ToolTip.Tip="{x:Static res:Strings.ValidateToolTip}"
+                                  ToolTip.ShowOnDisabled="True">
+                            <MenuItem.Icon><ui:LineIcon Data="{StaticResource CheckStroke}" /></MenuItem.Icon>
                         </MenuItem>
                         <MenuItem Header="{x:Static res:Strings.MenuGenerateLowerDifficultiesContext}"
                                   Command="{Binding GenerateLowerDifficultiesCommand}">
