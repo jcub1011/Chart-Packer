@@ -33,10 +33,6 @@
         <KeyBinding Gesture="Ctrl+Shift+Z" Command="{Binding RedoCommand}" />
     </Window.KeyBindings>
 
-    <Window.Resources>
-        <bctl:LaneMenuConverter x:Key="LaneMenu" Check="{StaticResource CheckStroke}" />
-    </Window.Resources>
-
     <Window.Styles>
         <!-- Centred messages standing in for content that isn't built yet. -->
         <Style Selector="StackPanel.placeholder">
@@ -517,14 +513,14 @@
                         <Button Classes="labelled"
                                 Margin="0,8,0,0"
                                 HorizontalAlignment="Center"
+                                bctl:LaneMenu.Items="{Binding Lanes.AddMenu}"
                                 AutomationProperties.Name="{x:Static res:Strings.AddLaneButton}">
                             <StackPanel Orientation="Horizontal" Spacing="6">
                                 <ctl:LineIcon Data="{StaticResource AddStroke}" />
                                 <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.AddLaneButton}" />
                             </StackPanel>
                             <Button.Flyout>
-                                <MenuFlyout Placement="BottomEdgeAlignedLeft"
-                                            ItemsSource="{Binding Lanes.AddMenu, Converter={StaticResource LaneMenu}}" />
+                                <MenuFlyout Placement="BottomEdgeAlignedLeft" />
                             </Button.Flyout>
                         </Button>
                     </StackPanel>

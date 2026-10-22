@@ -1013,9 +1013,9 @@ namespace ChartBuilder.Controls.Editing
         /// <summary>Opens the note menu at the pointer, for the selected notes, after a right click; nothing with none.</summary>
         private void ShowNoteMenu()
         {
-            if (_lane?.BuildNoteMenu() is not { Count: > 0 } items || !this.TryFindResource("LaneMenu", out var found) || found is not LaneMenuConverter menu)
+            if (_lane?.BuildNoteMenu() is not { Count: > 0 } items)
                 return;
-            new MenuFlyout { ItemsSource = menu.MenuItems(items) }.ShowAt(this, showAtPointer: true);
+            new MenuFlyout { ItemsSource = LaneMenu.MenuItems(items) }.ShowAt(this, showAtPointer: true);
         }
 
         protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)

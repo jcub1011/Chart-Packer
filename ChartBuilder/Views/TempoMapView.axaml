@@ -20,10 +20,6 @@
          there once Enter is pressed or the field is left, and a button that opens the time signature's editor. Each part
          is a section of the tab. A field with nothing placed at the tick shows what's in force there, greyed. Focusable so
          a click on empty space can take focus from an edit box, which commits it. -->
-    <UserControl.Resources>
-        <bctl:LaneMenuConverter x:Key="Menu" Check="{StaticResource CheckStroke}" />
-    </UserControl.Resources>
-
     <UserControl.Styles>
         <Style Selector="Border.tempo-row">
             <Setter Property="Padding" Value="8,5" />
@@ -240,6 +236,7 @@
                             <Button Classes="labelled"
                                     FontSize="12"
                                     ToolTip.Tip="{x:Static res:Strings.TempoMapAddSignatureToolTip}"
+                                    bctl:LaneMenu.Items="{Binding AddSignatureMenu}"
                                     AutomationProperties.Name="{x:Static res:Strings.TempoMapAddSignatureToolTip}">
                                 <StackPanel Orientation="Horizontal" Spacing="4">
                                     <ctl:LineIcon Data="{StaticResource AddStroke}" />
@@ -247,8 +244,7 @@
                                     <ctl:LineIcon Data="{StaticResource ChevronDownStroke}" />
                                 </StackPanel>
                                 <Button.Flyout>
-                                    <MenuFlyout Placement="BottomEdgeAlignedLeft"
-                                                ItemsSource="{Binding AddSignatureMenu, Converter={StaticResource Menu}}" />
+                                    <MenuFlyout Placement="BottomEdgeAlignedLeft" />
                                 </Button.Flyout>
                             </Button>
                         </WrapPanel>

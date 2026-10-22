@@ -16,8 +16,6 @@
          ghost difficulty and the view, adds and closes lanes, and is dragged to dock the lane elsewhere (LaneDockHost);
          and the lane's body, its editor canvas as a highway or a timeline (charter-spec C3). -->
     <UserControl.Resources>
-        <bctl:LaneMenuConverter x:Key="LaneMenu" Check="{StaticResource CheckStroke}" />
-
         <!-- The lane's audio settings: the audio button's, and the "more" menu's in a narrow lane. -->
         <Flyout x:Key="AudioFlyout" Placement="BottomEdgeAlignedRight">
             <StackPanel Spacing="8" Width="260" DataContext="{Binding Audio}" x:DataType="vm:LaneAudioViewModel">
@@ -228,6 +226,7 @@
                 <Button x:Name="PartButton"
                         Grid.Column="0"
                         Classes="lane-part"
+                        bctl:LaneMenu.Items="{Binding PartMenu}"
                         ToolTip.Tip="{x:Static res:Strings.LanePartToolTip}"
                         AutomationProperties.Name="{Binding Title}">
                     <StackPanel Orientation="Horizontal" Spacing="4">
@@ -239,8 +238,7 @@
                         <ctl:LineIcon Data="{StaticResource ChevronDownStroke}" />
                     </StackPanel>
                     <Button.Flyout>
-                        <MenuFlyout Placement="BottomEdgeAlignedLeft"
-                                    ItemsSource="{Binding PartMenu, Converter={StaticResource LaneMenu}}" />
+                        <MenuFlyout Placement="BottomEdgeAlignedLeft" />
                     </Button.Flyout>
                 </Button>
 
@@ -337,22 +335,22 @@
                         </Button>
                         <Button Classes="tool"
                                 IsVisible="{Binding ShowsEditMenu}"
+                                bctl:LaneMenu.Items="{Binding EditMenu}"
                                 ToolTip.Tip="{x:Static res:Strings.LaneEditToolTip}"
                                 AutomationProperties.Name="{x:Static res:Strings.LaneEditToolTip}">
                             <ctl:LineIcon Data="{StaticResource EditChartStroke}" />
                             <Button.Flyout>
-                                <MenuFlyout Placement="BottomEdgeAlignedRight"
-                                            ItemsSource="{Binding EditMenu, Converter={StaticResource LaneMenu}}" />
+                                <MenuFlyout Placement="BottomEdgeAlignedRight" />
                             </Button.Flyout>
                         </Button>
                         <Button Classes="tool"
                                 IsVisible="{Binding !IsVocal}"
+                                bctl:LaneMenu.Items="{Binding GhostMenu}"
                                 ToolTip.Tip="{x:Static res:Strings.LaneGhostToolTip}"
                                 AutomationProperties.Name="{x:Static res:Strings.LaneGhostToolTip}">
                             <ctl:LineIcon Data="{StaticResource ViewStroke}" />
                             <Button.Flyout>
-                                <MenuFlyout Placement="BottomEdgeAlignedRight"
-                                            ItemsSource="{Binding GhostMenu, Converter={StaticResource LaneMenu}}" />
+                                <MenuFlyout Placement="BottomEdgeAlignedRight" />
                             </Button.Flyout>
                         </Button>
                         <Button Classes="tool"
@@ -387,13 +385,12 @@
                                             </Panel>
                                         </MenuItem.Icon>
                                     </MenuItem>
-                                    <MenuItem Header="{x:Static res:Strings.LaneMoreGhost}"
-                                              ItemsSource="{Binding GhostMenu, Converter={StaticResource LaneMenu}}">
+                                    <MenuItem Header="{x:Static res:Strings.LaneMoreGhost}" bctl:LaneMenu.Items="{Binding GhostMenu}">
                                         <MenuItem.Icon><ctl:LineIcon Data="{StaticResource ViewStroke}" /></MenuItem.Icon>
                                     </MenuItem>
                                     <MenuItem Header="{x:Static res:Strings.LaneMoreEdit}"
                                               IsVisible="{Binding ShowsEditMenu}"
-                                              ItemsSource="{Binding EditMenu, Converter={StaticResource LaneMenu}}">
+                                              bctl:LaneMenu.Items="{Binding EditMenu}">
                                         <MenuItem.Icon><ctl:LineIcon Data="{StaticResource EditChartStroke}" /></MenuItem.Icon>
                                     </MenuItem>
                                 </MenuFlyout>
@@ -401,12 +398,12 @@
                         </Button>
                     </Panel>
                     <Button Classes="tool"
+                            bctl:LaneMenu.Items="{Binding AddMenu}"
                             ToolTip.Tip="{x:Static res:Strings.LaneAddToolTip}"
                             AutomationProperties.Name="{x:Static res:Strings.LaneAddToolTip}">
                         <ctl:LineIcon Data="{StaticResource AddStroke}" />
                         <Button.Flyout>
-                            <MenuFlyout Placement="BottomEdgeAlignedRight"
-                                        ItemsSource="{Binding AddMenu, Converter={StaticResource LaneMenu}}" />
+                            <MenuFlyout Placement="BottomEdgeAlignedRight" />
                         </Button.Flyout>
                     </Button>
                     <Button Classes="tool"
