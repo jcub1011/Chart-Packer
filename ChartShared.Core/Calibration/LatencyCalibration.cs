@@ -53,6 +53,23 @@ public sealed class LatencyCalibration
     /// <summary>The output moved to another device: that device's stored latency is loaded in place of this one's (AC C11.3).</summary>
     public void OnDeviceChanged(string deviceName, string? deviceId, int? detected = null) => Load(deviceName, deviceId, detected);
 
+    /// <summary>
+    /// The same device, read again (its detected latency may have changed, or detecting may have been turned on or off):
+    /// reloads the stored and detected latencies without resetting the trial <see cref="Value"/>. Gives whether the
+    /// stored, source, or detected latency changed.
+    /// </summary>
+    public bool Refresh(string deviceName, string? deviceId, int? detected)
+    {
+        DeviceName = deviceName ?? "";
+        DeviceId = deviceId;
+        var found = _file.FindAndRemember(DeviceName, DeviceId, detected);
+        bool changed = found.Calibration != Stored || found.Source != Source || found.Detected != Detected;
+        Stored = found.Calibration;
+        Source = found.Source;
+        Detected = found.Detected;
+        return changed;
+    }
+
     /// <summary>Stores <see cref="Value"/> for the device. Gives false when it couldn't be written.</summary>
     public bool Save()
     {

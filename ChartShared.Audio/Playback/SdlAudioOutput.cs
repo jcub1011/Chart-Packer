@@ -217,24 +217,18 @@ public sealed unsafe class SdlAudioOutput : IAudioOutput
             }
         }
         name ??= "";
-        var id = OperatingSystem.IsWindows() ? WindowsAudioEndpoint.DefaultRenderId() : null;
-        return new AudioDevice(name, id, DeviceLatency.Milliseconds(sampleFrames, deviceRate, OsLatency(name, id)));
-    }
-
-    /// <summary>
-    /// What the OS says the device adds after SDL's buffer, read again only when the device changes, as that's a COM
-    /// call and this is read once a second. Only <see cref="ReadDevice"/> uses it, from the constructor or one
-    /// <see cref="CheckDevice"/> at a time.
-    /// </summary>
-    private TimeSpan? OsLatency(string name, string? id)
-    {
         if (!OperatingSystem.IsWindows())
-            return null;
-        if (_osLatency is { } known && known.Name == name && known.Id == id)
-            return known.Latency;
+            return new AudioDevice(name, null, DeviceLatency.Milliseconds(sampleFrames, deviceRate, null));
 
-        var latency = WindowsAudioEndpoint.DefaultRenderLatency();
-        _osLatency = (name, id, latency);
-        return latency;
+        // The endpoint's ID is cheap to read, so it's read every second; its latency isn't, so it's cached per
+        // device. On a miss both are re-read from the same endpoint in one pass, so they can't come from different
+        // devices when the default changes between reads.
+        var id = WindowsAudioEndpoint.DefaultRenderId();
+        if (_osLatency is { } known && known.Name == name && known.Id == id)
+            return new AudioDevice(name, id, DeviceLatency.Milliseconds(sampleFrames, deviceRate, known.Latency));
+
+        var (freshId, freshLatency) = WindowsAudioEndpoint.DefaultRenderIdAndLatency();
+        _osLatency = (name, freshId, freshLatency);
+        return new AudioDevice(name, freshId, DeviceLatency.Milliseconds(sampleFrames, deviceRate, freshLatency));
     }
 }

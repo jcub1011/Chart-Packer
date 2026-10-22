@@ -53,6 +53,13 @@ internal static unsafe partial class WindowsAudioEndpoint
     /// </remarks>
     public static TimeSpan? DefaultRenderLatency() => OnDefaultRender(ReadLatency);
 
+    /// <summary>
+    /// The default render endpoint's ID and latency, read from the same endpoint in one pass, so the two can't come
+    /// from different devices when the default changes between reads. Either may be null when it can't be read.
+    /// </summary>
+    public static (string? Id, TimeSpan? Latency) DefaultRenderIdAndLatency() =>
+        OnDefaultRender(ReadIdAndLatency);
+
     // What read gives for the default render endpoint, or null when there isn't one, or COM can't be used.
     private static T? OnDefaultRender<T>(Func<IntPtr, T?> read)
     {
@@ -124,6 +131,9 @@ internal static unsafe partial class WindowsAudioEndpoint
             CoTaskMemFree((IntPtr)id);
         }
     }
+
+    private static (string? Id, TimeSpan? Latency) ReadIdAndLatency(IntPtr device) =>
+        (ReadId(device), ReadLatency(device));
 
     private static TimeSpan? ReadLatency(IntPtr device)
     {

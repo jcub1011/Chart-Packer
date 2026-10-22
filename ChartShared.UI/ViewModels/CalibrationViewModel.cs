@@ -473,17 +473,32 @@ namespace ChartShared.UI.ViewModels
             BeginTapsCommand.NotifyCanExecuteChanged();
         }
 
-        /// <summary>The output moved to another device: its stored latency is loaded in place of this one's (AC C11.3).</summary>
+        /// <summary>The output moved to another device, or its detected latency changed: its stored latency is loaded (AC C11.3).</summary>
         private void OnLatencyChanged(object? sender, EventArgs e)
         {
-            if (_latency.Device is not { } device || (device.Name == _calibration.DeviceName && device.Id == _calibration.DeviceId))
+            if (_latency.Device is not { } device)
                 return;
 
-            CancelTaps();
-            _calibration.OnDeviceChanged(device.Name, device.Id, device.DetectedLatencyMs);
-            DeviceName = DeviceNameOf(device.Name);
+            if (device.Name != _calibration.DeviceName || device.Id != _calibration.DeviceId)
+            {
+                CancelTaps();
+                _calibration.OnDeviceChanged(device.Name, device.Id, device.DetectedLatencyMs);
+                DeviceName = DeviceNameOf(device.Name);
+                Detected = _calibration.Detected;
+                Value = _calibration.Value;
+                OnChangedChanged();
+                return;
+            }
+
+            // Same device: the detected latency may have changed, or detecting may have been turned on or off.
+            // The trial value is kept; only a tap test, which is measured against the whole latency, is stopped.
+            var wasDetected = _calibration.Detected;
+            if (!_calibration.Refresh(device.Name, device.Id, device.DetectedLatencyMs))
+                return;
+
+            if (_calibration.Detected != wasDetected)
+                CancelTaps();
             Detected = _calibration.Detected;
-            Value = _calibration.Value;
             OnChangedChanged();
         }
 
