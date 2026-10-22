@@ -380,6 +380,10 @@
     <value>{0} / {1}</value>
     <comment>The playhead's time and the song's length, e.g. "0:42.0 / 3:00.0".</comment>
   </data>
+  <data name="TimelineTickFormat" xml:space="preserve">
+    <value>Tick {0:N0}</value>
+    <comment>The chart tick the playhead is on, left of its time, e.g. "Tick 15,360".</comment>
+  </data>
   <data name="TimelineToolTip" xml:space="preserve">
     <value>Click or drag to move the playhead. Scroll to move it a bar, Shift+scroll four.</value>
   </data>

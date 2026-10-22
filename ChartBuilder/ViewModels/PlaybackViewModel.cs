@@ -105,7 +105,7 @@ namespace ChartBuilder.ViewModels
         /// <summary>Raised when the playhead is moved by hand, on the timeline, rather than by playing or by <see cref="SeekTo"/>.</summary>
         public event EventHandler? Scrubbed;
 
-        public static IReadOnlyList<int> SpeedPercents { get; } = [25, 50, 75, 100, 125, 150, 200];
+        public static IReadOnlyList<int> SpeedPercents { get; } = [10, 25, 50, 75, 100, 125, 150, 200];
 
         /// <summary>Whether there's audio to play.</summary>
         [ObservableProperty]

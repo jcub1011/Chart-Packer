@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
+using Avalonia.Media;
 using Avalonia.Threading;
 using ChartBuilder.Resources;
 using ChartBuilder.Services;
@@ -13,6 +14,7 @@ using ChartShared.Core.Charting.Commands;
 using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charting.Layout;
 using ChartShared.Core.Charts;
+using ChartShared.UI.Controls.Highway;
 using ChartShared.UI.Services;
 using ChartShared.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -36,9 +38,6 @@ namespace ChartBuilder.ViewModels
     {
         // How long after an edit the hit sounds and the overview are worked out again, so a burst of edits does it once.
         private static readonly TimeSpan RefreshDelay = TimeSpan.FromMilliseconds(250);
-
-        // How many columns the overview's note density has across the song.
-        private const int DensityColumns = 600;
 
         // Tap tempo's message, which each tap updates.
         private const string TapTempoMessageKey = "tap-tempo";
@@ -90,7 +89,7 @@ namespace ChartBuilder.ViewModels
             };
             SnapChoices = [.. SnapGrid.CommonDivisions.Select(d => new SnapChoice(d, BuilderSettingsCatalog.SnapLabel(d)))];
             SelectedRecordMode = RecordModeChoices[0];
-            SelectedQuantize = SnapChoices.FirstOrDefault(c => c.Division == saved.QuantizeDivision) ?? SnapChoices.First(c => c.Division == SnapGrid.Default.Division);
+            SelectedQuantize = SnapChoices.FirstOrDefault(c => c.Division == saved.QuantizeDivision) ?? SnapChoices.First(c => c.Division == BuilderSettings.DefaultQuantizeDivision);
             IsRecordQuantized = saved.RecordQuantize;
             WheelUpIsLater = IsWheelUpLater(saved);
             Lanes = new LaneDockViewModel(layout, this);
@@ -457,6 +456,10 @@ namespace ChartBuilder.ViewModels
         [ObservableProperty]
         public partial OverviewData? Overview { get; private set; }
 
+        /// <summary>The chart tick the playhead is on, for beside its time, e.g. "Tick 15,360"; Tick 0 before the chart starts.</summary>
+        public string PlayheadTickText => string.Format(
+            CultureInfo.CurrentCulture, Strings.TimelineTickFormat, Math.Max(0, (long)Math.Floor(Session.TickAt(Playback.PositionSeconds))));
+
         /// <summary>Where the span of the song the lanes show starts, in seconds of audio, as the overview marks it.</summary>
         [ObservableProperty]
         public partial double VisibleStart { get; private set; }
@@ -792,6 +795,7 @@ namespace ChartBuilder.ViewModels
 
         private void OnChartChanged(object? sender, EditorChartChangedEventArgs e)
         {
+            OnPropertyChanged(nameof(PlayheadTickText)); // A tempo change moves the ticks against the audio.
             if (e.IsPreview)
                 return;
             ScheduleRefresh();
@@ -812,6 +816,7 @@ namespace ChartBuilder.ViewModels
         {
             ScheduleRefresh();
             Properties.Refresh();
+            OnPropertyChanged(nameof(PlayheadTickText));
         }
 
         private void OnLayoutChanged(object? sender, EventArgs e) => ScheduleRefresh();
@@ -839,6 +844,9 @@ namespace ChartBuilder.ViewModels
 
         private void OnPlaybackChanged(object? sender, PropertyChangedEventArgs e)
         {
+            if (e.PropertyName == nameof(PlaybackViewModel.PositionSeconds))
+                OnPropertyChanged(nameof(PlayheadTickText));
+
             switch (e.PropertyName)
             {
                 case nameof(PlaybackViewModel.PositionSeconds) when !Playback.IsPlaying && !_syncing:
@@ -913,7 +921,7 @@ namespace ChartBuilder.ViewModels
             }
         }
 
-        private OverviewData? OverviewOf(ChartTrackKey? key) => OverviewData.Of(Session, key, Playback.LengthSeconds, DensityColumns);
+        private OverviewData? OverviewOf(ChartTrackKey? key) => OverviewData.Of(Session, key, Playback.LengthSeconds);
     }
 
     /// <summary>A section, at its time in the audio, for the overview.</summary>
@@ -926,11 +934,20 @@ namespace ChartBuilder.ViewModels
     public readonly record struct OverviewProposal(double Start, double End, bool Kept);
 
     /// <summary>
-    /// What the bottom timeline shows of the whole song (charter-spec C3 item 2): sections, the note density of the lane in
-    /// focus, from 0 to 1 in columns across the song, every one of its phrases, a row for each of the phrase rail's rows,
-    /// the ghosts of a run of Generate fills or Generate star power going on, and the synchronized region and the
-    /// passages synced with it, each as audio seconds.
+    /// A note of the lane in focus, for the overview: when it starts and its sustain ends in the audio (its start, with
+    /// none), the row of its fret, pad or column from the top, or -1 for one across them all, as a kick or an open note,
+    /// its colour on the highway, and whether it's drawn in the top half of its row, as a six-fret black fret played with a
+    /// white one covers its top half on the highway.
     /// </summary>
+    public readonly record struct OverviewNote(double Start, double End, int Row, Color Color, bool Top = false);
+
+    /// <summary>
+    /// What the bottom timeline shows of the whole song (charter-spec C3 item 2): sections, the notes of the lane in focus,
+    /// every one of its phrases, a row for each of the phrase rail's rows, the ghosts of a run of Generate fills or Generate
+    /// star power going on, and the synchronized region and the passages synced with it, each as audio seconds.
+    /// </summary>
+    /// <param name="NoteRows">How many rows the notes are drawn in: a fret, pad or column each; none with no lane.</param>
+    /// <param name="Notes">The notes of the lane in focus, as the games read them, in time order.</param>
     /// <param name="Rows">The rows of the phrase rail of the lane in focus, in order; none with no lane.</param>
     /// <param name="Phrases">
     /// Its phrases: star power as the games read it, overlapping phrases as one; disco flips of the difficulty shown; and
@@ -939,17 +956,18 @@ namespace ChartBuilder.ViewModels
     /// <param name="Proposals">The run's proposals, whichever lane is in focus, so they can always be found; none without a run.</param>
     public sealed record OverviewData(
         IReadOnlyList<OverviewSection> Sections,
-        IReadOnlyList<float> Density,
+        int NoteRows,
+        IReadOnlyList<OverviewNote> Notes,
         IReadOnlyList<RailKind> Rows,
         IReadOnlyList<OverviewPhrase> Phrases,
         IReadOnlyList<OverviewProposal> Proposals,
         IReadOnlyList<(double Start, double End, bool IsRegion)> Synced)
     {
         /// <summary>
-        /// The overview of <paramref name="session"/>'s song for the lane <paramref name="key"/>, the density in
-        /// <paramref name="columns"/> columns over <paramref name="length"/> seconds; null while the length isn't known.
+        /// The overview of <paramref name="session"/>'s song, <paramref name="length"/> seconds long, for the lane
+        /// <paramref name="key"/>; null while the length isn't known.
         /// </summary>
-        internal static OverviewData? Of(EditorSession session, ChartTrackKey? key, double length, int columns)
+        internal static OverviewData? Of(EditorSession session, ChartTrackKey? key, double length)
         {
             if (!(length > 0))
                 return null;
@@ -962,24 +980,30 @@ namespace ChartBuilder.ViewModels
                     sections.Add(new OverviewSection(session.AudioAt(e.Tick), name));
             }
 
-            var density = new float[columns];
+            int noteRows = 0;
+            var notes = new List<OverviewNote>();
             IReadOnlyList<RailKind> rows = [];
             var phrases = new List<OverviewPhrase>();
             if (key is { } track && chart.PartOf(track.Instrument) is { } part)
             {
+                // In the highway's rows and colours: six-fret's black and white frets share a column, a black fret played
+                // with a white one in its top half, and a black fret is drawn in its outline's colour, as faded black
+                // wouldn't show on the timeline.
                 var game = session.GameTrack(track);
+                var kind = part.Kind;
+                int laneCount = HighwayLane.LaneCountOf(kind, session.IsFiveLaneDrums);
+                noteRows = laneCount;
+                var whites = kind == ChartInstrumentKind.SixFret
+                    ? game.Notes.Where(n => n.Lane is >= 0 and < 3).Select(n => (n.Tick, n.Lane)).ToHashSet()
+                    : [];
                 foreach (var note in game.Notes)
                 {
-                    int column = (int)(session.AudioAt(note.Tick) / length * columns);
-                    if (column >= 0 && column < columns)
-                        density[column]++;
-                }
-
-                float most = density.Length > 0 ? density.Max() : 0;
-                if (most > 0)
-                {
-                    for (int i = 0; i < density.Length; i++)
-                        density[i] /= most;
+                    double start = session.AudioAt(note.Tick);
+                    double end = note.Length > 0 ? session.AudioAt(note.Tick + note.Length) : start;
+                    int row = note.Lane == ChartNote.OpenLane ? -1 : HighwayPalette.Column(kind, laneCount, note.Lane);
+                    var color = HighwayPalette.NoteColor(kind, laneCount, note);
+                    bool top = HighwayPalette.IsBlackFret(kind, note.Lane) && whites.Contains((note.Tick, note.Lane - 3));
+                    notes.Add(new OverviewNote(start, end, row, color == HighwayPalette.BlackFret ? HighwayPalette.BlackFretOutline : color, top));
                 }
 
                 rows = PhraseRail.RowsOf(part.Kind);
@@ -1015,7 +1039,7 @@ namespace ChartBuilder.ViewModels
                     synced.Add((session.AudioAt(start), session.AudioAt(start + to - from), false));
             }
 
-            return new OverviewData(sections, density, rows, phrases, proposals, synced);
+            return new OverviewData(sections, noteRows, notes, rows, phrases, proposals, synced);
         }
     }
 }
