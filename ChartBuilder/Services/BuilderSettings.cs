@@ -1,4 +1,6 @@
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
+using ChartShared.Audio.Waveforms;
 using ChartShared.Core.Charting;
 using ChartShared.Core.Charting.Authoring;
 using ChartShared.Core.Charting.Editing;
@@ -115,8 +117,18 @@ namespace ChartBuilder.Services
         /// <summary>Which way the mouse wheel moves the cursor, in both lane views and on the timeline along the bottom.</summary>
         public WheelScrollDirection WheelScrollDirection { get; set; } = WheelScrollDirection.UpIsLater;
 
+        /// <summary>
+        /// How finely each track's waveform is read. Finer detail shows note starts more sharply
+        /// in the lanes but takes longer to read and more memory.
+        /// </summary>
+        public const WaveformFidelity DefaultWaveformFidelity = WaveformFidelity.High;
+
         /// <summary>What a lane draws its audio as, until it's switched (<c>W</c>): the waveform or the spectrogram (charter-spec C12, C13).</summary>
         public LaneBackdrop DefaultLaneBackdrop { get; set; } = LaneBackdrop.Waveform;
+
+        /// <summary>How finely each track's waveform is read.</summary>
+        [JsonConverter(typeof(JsonStringEnumConverter<WaveformFidelity>))]
+        public WaveformFidelity WaveformFidelity { get; set; } = DefaultWaveformFidelity;
 
         /// <summary>The least the spectrogram memory budget can be, in MB.</summary>
         public const int MinSpectrogramBudgetMb = 64;
