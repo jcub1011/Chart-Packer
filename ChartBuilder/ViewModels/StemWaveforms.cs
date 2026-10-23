@@ -18,16 +18,20 @@ namespace ChartBuilder.ViewModels
     /// of any <see cref="AudioSource"/> from them, a stem's own or several mixed, in mono or by channel.
     /// </summary>
     /// <remarks>
-    /// <para>Peaks are read at <see cref="WaveformResolution.High"/> (5 ms) and drawn at whatever the zoom needs, a
-    /// power of two of buckets to a bar, so one read serves every zoom. A stem's channels are only read the first time a
-    /// lane asks for it in stereo; until then it's drawn in mono.</para>
+    /// <para>Peaks are read at the fidelity the editor is set to (<see cref="WaveformFidelity"/>, High at first)
+    /// and drawn at whatever the zoom needs, a power of two of buckets to a bar, so one read serves every zoom.
+    /// A stem's channels are only read the first time a lane asks for it in stereo; until then it's drawn in mono.</para>
     /// <para>Several stems are mixed in the background, and the mix kept until their peaks change, so drawing never waits
     /// for it. Its members are for the UI thread, and <see cref="Changed"/> is raised there, at most every
     /// <see cref="ChangedInterval"/>.</para>
     /// </remarks>
     public sealed class StemWaveforms : IDisposable
     {
-        public static readonly WaveformResolution Resolution = WaveformResolution.High;
+        /// <summary>The fidelity the peaks are read at.</summary>
+        public WaveformFidelity Fidelity { get; }
+
+        /// <summary>The resolution the peaks are read at, from <see cref="Fidelity"/>.</summary>
+        public WaveformResolution Resolution { get; }
 
         private static readonly TimeSpan ProgressInterval = TimeSpan.FromMilliseconds(250);
         private static readonly TimeSpan ChangedInterval = TimeSpan.FromMilliseconds(150);
@@ -56,10 +60,12 @@ namespace ChartBuilder.ViewModels
         private bool _changePending;
         private bool _disposed;
 
-        public StemWaveforms(SongEntry? entry, IReadOnlyList<SongTrack> tracks)
+        public StemWaveforms(SongEntry? entry, IReadOnlyList<SongTrack> tracks, WaveformFidelity fidelity = WaveformFidelity.High)
         {
             _entry = entry;
             _tracks = tracks;
+            Fidelity = Enum.IsDefined(fidelity) ? fidelity : WaveformFidelity.High;
+            Resolution = WaveformResolution.Of(Fidelity);
             _changed = new DispatcherTimer(DispatcherPriority.Background) { Interval = ChangedInterval };
             _changed.Tick += (_, _) => RaiseChanged();
         }

@@ -2,9 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using ChartShared.Audio.Waveforms;
 using ChartShared.Core;
 using ChartShared.Core.Charting;
 using ChartShared.Core.Charting.Editing;
+using ChartShared.Core.Charting.Layout;
 using ChartShared.Core.Charting.Playtest;
 using ChartShared.Core.Launching;
 using ChartShared.Core.Settings;
@@ -85,6 +87,11 @@ namespace ChartBuilder.Services
                 settings.DefaultEditorView = LaneView.Highway;
             if (!Enum.IsDefined(settings.WheelScrollDirection))
                 settings.WheelScrollDirection = WheelScrollDirection.UpIsLater;
+            if (!Enum.IsDefined(settings.DefaultLaneBackdrop))
+                settings.DefaultLaneBackdrop = LaneBackdrop.Waveform;
+            if (!Enum.IsDefined(settings.WaveformFidelity))
+                settings.WaveformFidelity = BuilderSettings.DefaultWaveformFidelity;
+            settings.SpectrogramBudgetMb = Math.Clamp(settings.SpectrogramBudgetMb, BuilderSettings.MinSpectrogramBudgetMb, BuilderSettings.MaxSpectrogramBudgetMb);
             settings.EditorHighwaySpeed = double.IsFinite(settings.EditorHighwaySpeed)
                 ? Math.Clamp(settings.EditorHighwaySpeed, BuilderSettings.MinEditorHighwaySpeed, BuilderSettings.MaxEditorHighwaySpeed)
                 : 1;

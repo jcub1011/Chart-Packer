@@ -2,6 +2,7 @@ using System;
 using System.Globalization;
 using System.Linq;
 using ChartBuilder.Resources;
+using ChartShared.Audio.Waveforms;
 using ChartShared.Core.Charting;
 using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charting.Layout;
@@ -29,14 +30,15 @@ namespace ChartBuilder.Services
             var charter = new SettingCategory("charter", Strings.SettingsCategoryCharter);
             var newCharts = new SettingCategory("charter.newCharts", Strings.SettingsCategoryNewCharts, charter);
             var editing = new SettingCategory("charter.editing", Strings.SettingsCategoryEditing, charter);
-            var audioAssist = new SettingCategory("charter.audioAssist", Strings.SettingsCategoryAudioAssist, charter);
-            var audio = new SettingCategory("audio", Strings.SettingsCategoryAudio);
+            var playback = new SettingCategory("playback", Strings.SettingsCategoryPlayback);
+            var audio = new SettingCategory("playback.audio", Strings.SettingsCategoryAudio, playback);
+            var visualizers = new SettingCategory("playback.visualizers", Strings.SettingsCategoryVisualizers, playback);
             var input = new SettingCategory("input", Strings.SettingsCategoryInput);
             var general = new SettingCategory("general", SharedStrings.SettingsCategoryGeneral);
             var logging = new SettingCategory("general.logging", SharedStrings.SettingsCategoryLogging, general);
 
             return new SettingsCatalog(
-                [charter, newCharts, editing, audioAssist, audio, input, general, logging],
+                [charter, newCharts, editing, playback, audio, visualizers, input, general, logging],
                 [
                     // The bindings are per device and control, so they're set in the Input devices window (charter-spec C19 item 2).
                     new ActionSetting
@@ -130,7 +132,7 @@ namespace ChartBuilder.Services
                     // The latency is per device, so it's edited in the calibration tool rather than here (charter-spec §10).
                     new ActionSetting
                     {
-                        Id = "audio.latency",
+                        Id = "playback.latency",
                         Category = audio,
                         Label = Strings.AudioLatencyLabel,
                         Description = Strings.AudioLatencyDescription,
@@ -140,7 +142,7 @@ namespace ChartBuilder.Services
                     // Kept in the shared latency file, not Chart Builder's settings, so Chart Packer agrees (issue #140).
                     new ToggleSetting
                     {
-                        Id = "audio.detectLatency",
+                        Id = "playback.detectLatency",
                         Category = audio,
                         Label = Strings.DetectLatencyLabel,
                         Description = Strings.DetectLatencyDescription,
@@ -151,7 +153,7 @@ namespace ChartBuilder.Services
                     },
                     new ToggleSetting
                     {
-                        Id = "audio.promptForCalibration",
+                        Id = "playback.promptForCalibration",
                         Category = audio,
                         Label = Strings.PromptForCalibrationLabel,
                         Description = Strings.PromptForCalibrationDescription,
@@ -160,6 +162,25 @@ namespace ChartBuilder.Services
                         Get = () => settings.Settings.PromptForCalibration,
                         Set = prompt => settings.Settings.PromptForCalibration = prompt,
                     },
+                    new RangeSetting
+                    {
+                        Id = "playback.masterVolume",
+                        Category = audio,
+                        Label = Strings.MasterVolumeLabel,
+                        Description = Strings.MasterVolumeDescription,
+                        Keywords = SettingKeywords.Split(Strings.MasterVolumeKeywords),
+                        DefaultValue = BuilderSettings.DefaultMasterVolume,
+                        Minimum = 0,
+                        Maximum = 1,
+                        SmallChange = 0.05,
+                        Format = volume => volume.ToString("P0", CultureInfo.CurrentCulture),
+                        Get = () => settings.Settings.MasterVolume,
+                        Set = volume => settings.Settings.MasterVolume = volume,
+                    },
+                    Volume("playback.metronomeVolume", audio, Strings.MetronomeVolumeLabel, Strings.MetronomeVolumeDescription, Strings.MetronomeVolumeKeywords,
+                        () => settings.Settings.MetronomeVolume, volume => settings.Settings.MetronomeVolume = volume),
+                    Volume("playback.hitSoundVolume", audio, Strings.HitSoundVolumeLabel, Strings.HitSoundVolumeDescription, Strings.HitSoundVolumeKeywords,
+                        () => settings.Settings.HitSoundVolume, volume => settings.Settings.HitSoundVolume = volume),
                     new TextSetting
                     {
                         Id = "charter.defaultCharterName",
@@ -302,8 +323,8 @@ namespace ChartBuilder.Services
                     },
                     new ChoiceSetting<LaneBackdrop>
                     {
-                        Id = "charter.laneBackdrop",
-                        Category = audioAssist,
+                        Id = "playback.laneBackdrop",
+                        Category = visualizers,
                         Label = Strings.LaneBackdropLabel,
                         Description = Strings.LaneBackdropDescription,
                         Keywords = SettingKeywords.Split(Strings.LaneBackdropKeywords),
@@ -316,10 +337,28 @@ namespace ChartBuilder.Services
                         Get = () => settings.Settings.DefaultLaneBackdrop,
                         Set = backdrop => settings.Settings.DefaultLaneBackdrop = backdrop,
                     },
+                    new ChoiceSetting<WaveformFidelity>
+                    {
+                        Id = "playback.waveformFidelity",
+                        Category = visualizers,
+                        Label = Strings.WaveformFidelityLabel,
+                        Description = Strings.WaveformFidelityDescription,
+                        Keywords = SettingKeywords.Split(Strings.WaveformFidelityKeywords),
+                        DefaultValue = BuilderSettings.DefaultWaveformFidelity,
+                        Choices =
+                        [
+                            new SettingChoice<WaveformFidelity>(WaveformFidelity.Low, Strings.WaveformFidelityLow),
+                            new SettingChoice<WaveformFidelity>(WaveformFidelity.Medium, Strings.WaveformFidelityMedium),
+                            new SettingChoice<WaveformFidelity>(WaveformFidelity.High, Strings.WaveformFidelityHigh),
+                            new SettingChoice<WaveformFidelity>(WaveformFidelity.Ultra, Strings.WaveformFidelityUltra),
+                        ],
+                        Get = () => settings.Settings.WaveformFidelity,
+                        Set = fidelity => settings.Settings.WaveformFidelity = fidelity,
+                    },
                     new IntegerSetting
                     {
-                        Id = "charter.spectrogramBudget",
-                        Category = audioAssist,
+                        Id = "playback.spectrogramBudget",
+                        Category = visualizers,
                         Label = Strings.SpectrogramBudgetLabel,
                         Description = Strings.SpectrogramBudgetDescription,
                         Keywords = SettingKeywords.Split(Strings.SpectrogramBudgetKeywords),
@@ -329,25 +368,6 @@ namespace ChartBuilder.Services
                         Get = () => settings.Settings.SpectrogramBudgetMb,
                         Set = megabytes => settings.Settings.SpectrogramBudgetMb = megabytes,
                     },
-                    new RangeSetting
-                    {
-                        Id = "audio.masterVolume",
-                        Category = audio,
-                        Label = Strings.MasterVolumeLabel,
-                        Description = Strings.MasterVolumeDescription,
-                        Keywords = SettingKeywords.Split(Strings.MasterVolumeKeywords),
-                        DefaultValue = BuilderSettings.DefaultMasterVolume,
-                        Minimum = 0,
-                        Maximum = 1,
-                        SmallChange = 0.05,
-                        Format = volume => volume.ToString("P0", CultureInfo.CurrentCulture),
-                        Get = () => settings.Settings.MasterVolume,
-                        Set = volume => settings.Settings.MasterVolume = volume,
-                    },
-                    Volume("audio.metronomeVolume", audio, Strings.MetronomeVolumeLabel, Strings.MetronomeVolumeDescription, Strings.MetronomeVolumeKeywords,
-                        () => settings.Settings.MetronomeVolume, volume => settings.Settings.MetronomeVolume = volume),
-                    Volume("audio.hitSoundVolume", audio, Strings.HitSoundVolumeLabel, Strings.HitSoundVolumeDescription, Strings.HitSoundVolumeKeywords,
-                        () => settings.Settings.HitSoundVolume, volume => settings.Settings.HitSoundVolume = volume),
                     AppLog.CreateSetting(logging, () => settings.Settings.LoggingEnabled, enabled => settings.Settings.LoggingEnabled = enabled),
                     .. UpdateCheck.CreateSettings(general),
                     new ChoiceSetting<StartupAction>

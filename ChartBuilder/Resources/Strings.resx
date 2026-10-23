@@ -2151,8 +2151,13 @@ Saving also changes song.ini:
     <value>Cancel</value>
     <comment>Ends Generate fills, adding nothing.</comment>
   </data>
-  <data name="SettingsCategoryAudioAssist" xml:space="preserve">
-    <value>Audio Assist</value>
+  <data name="SettingsCategoryPlayback" xml:space="preserve">
+    <value>Playback</value>
+    <comment>Settings: the category of audio playback and its visualizers.</comment>
+  </data>
+  <data name="SettingsCategoryVisualizers" xml:space="preserve">
+    <value>Visualizers</value>
+    <comment>Settings: the category of the waveforms and spectrograms drawn while playing.</comment>
   </data>
   <data name="LaneBackdropLabel" xml:space="preserve">
     <value>Lanes show</value>
@@ -2162,6 +2167,34 @@ Saving also changes song.ini:
   </data>
   <data name="LaneBackdropKeywords" xml:space="preserve">
     <value>waveform spectrogram audio lane behind beside</value>
+  </data>
+  <data name="WaveformFidelityLabel" xml:space="preserve">
+    <value>Waveform detail</value>
+    <comment>Settings: the row that picks how finely waveforms are read.</comment>
+  </data>
+  <data name="WaveformFidelityDescription" xml:space="preserve">
+    <value>How finely each track's waveform is read: finer detail shows note starts more sharply in the lanes but takes longer to read and more memory. Changing it re-reads the tracks.</value>
+    <comment>Settings: what the Waveform detail row does.</comment>
+  </data>
+  <data name="WaveformFidelityKeywords" xml:space="preserve">
+    <value>waveform resolution fidelity detail quality precision sharp fine lanes highway</value>
+    <comment>Settings: search words for the Waveform detail row, separated by spaces.</comment>
+  </data>
+  <data name="WaveformFidelityLow" xml:space="preserve">
+    <value>Low (20 ms)</value>
+    <comment>A choice of Waveform detail: how long each bar of the waveform is.</comment>
+  </data>
+  <data name="WaveformFidelityMedium" xml:space="preserve">
+    <value>Medium (10 ms)</value>
+    <comment>A choice of Waveform detail: how long each bar of the waveform is.</comment>
+  </data>
+  <data name="WaveformFidelityHigh" xml:space="preserve">
+    <value>High (5 ms)</value>
+    <comment>A choice of Waveform detail: how long each bar of the waveform is.</comment>
+  </data>
+  <data name="WaveformFidelityUltra" xml:space="preserve">
+    <value>Ultra (2.5 ms)</value>
+    <comment>A choice of Waveform detail: how long each bar of the waveform is.</comment>
   </data>
   <data name="SpectrogramBudgetLabel" xml:space="preserve">
     <value>Spectrogram memory budget (MB)</value>
