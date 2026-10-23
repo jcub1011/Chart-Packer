@@ -9,6 +9,7 @@ using ChartPacker.Resources;
 using ChartPacker.Services;
 using ChartShared.Core.Charting;
 using ChartShared.Core.Charting.Authoring;
+using ChartShared.Core.Charting.Authoring.Generation;
 using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charts;
 using ChartShared.Core.Scanning;
@@ -39,6 +40,7 @@ namespace ChartPacker.ViewModels
         private static readonly ReductionPreviewMemory PreviewSettings = new();
 
         private readonly Func<ReductionDefaults> _rules;
+        private readonly Func<IDifficultyGenerator> _generator;
         private readonly PlayerViewModel _player;
         private readonly PlayerPreviewPlayback _playback;
         private readonly DispatcherTimer _redraw;
@@ -63,14 +65,17 @@ namespace ChartPacker.ViewModels
 
         /// <param name="player">Plays the song shown, for the preview; the host's own, which the host disposes.</param>
         /// <param name="rules">The rules to generate by, as they are now.</param>
+        /// <param name="generator">The difficulty generator to draft with, as it is now.</param>
         /// <param name="nothing">What it says when the song has nothing to generate.</param>
         /// <param name="pickSong">What it says with no song shown.</param>
-        public GenerationPreviewViewModel(PlayerViewModel player, Func<ReductionDefaults> rules, string nothing, string pickSong)
+        public GenerationPreviewViewModel(PlayerViewModel player, Func<ReductionDefaults> rules, Func<IDifficultyGenerator> generator, string nothing, string pickSong)
         {
             ArgumentNullException.ThrowIfNull(player);
             ArgumentNullException.ThrowIfNull(rules);
+            ArgumentNullException.ThrowIfNull(generator);
             _player = player;
             _rules = rules;
+            _generator = generator;
             _nothing = nothing;
             _pickSong = pickSong;
             _playback = new PlayerPreviewPlayback(player);
@@ -173,6 +178,7 @@ namespace ChartPacker.ViewModels
 
             LaddersStatus = Strings.GenerateDifficultiesWorking;
             var rules = _rules();
+            var generator = _generator();
             var token = _closing.Token;
             try
             {
@@ -181,7 +187,7 @@ namespace ChartPacker.ViewModels
                     return;
                 LoadPlayer(song, read);
 
-                var (generation, checks, ladders) = await Task.Run(() => Work(song, read, rules), token);
+                var (generation, checks, ladders) = await Task.Run(() => Work(song, read, rules, generator), token);
                 if (redraw != _previews || token.IsCancellationRequested)
                     return;
                 _shown = (song, read, generation, checks);
@@ -267,9 +273,10 @@ namespace ChartPacker.ViewModels
         private static (SongGeneration Generation, IReadOnlyDictionary<ChartInstrument, ReductionCheck> Checks, IReadOnlyList<GenerateDifficultiesPartPreview> Ladders) Work(
             GenerateDifficultiesSong song,
             SongRead read,
-            ReductionDefaults rules)
+            ReductionDefaults rules,
+            IDifficultyGenerator generator)
         {
-            var generation = SongDifficultyGeneration.Prepare(read.Chart, song.Pairs, rules, song.Work);
+            var generation = SongDifficultyGeneration.Prepare(read.Chart, song.Pairs, rules, generator, song.Work);
             var checks = new Dictionary<ChartInstrument, ReductionCheck>();
             var ladders = new List<GenerateDifficultiesPartPreview>();
             foreach (var (part, generated) in generation.Parts.OrderBy(static p => p.Key))

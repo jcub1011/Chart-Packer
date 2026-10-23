@@ -135,6 +135,28 @@ public static class Reducer
         var spacing = SpacingOf(rules.ThinningDivision, rules.BurstDivision, rules.MaxBurst, chart.Resolution);
         var kept = Thin(chords, scores, spacing, whole.Phrases, Outside(target.Notes, range), riffs);
 
+        return VoiceKeptFrets(chart, source, target, chords, phrases, kept, rules, ghl, Column, range, options, inRange.Length);
+    }
+
+    /// <summary>
+    /// Voices <paramref name="kept"/> chord indexes of <paramref name="chords"/> (spec 3.4.5-6):
+    /// Rules' lane-range fitting, chord narrowing, opens, sustains and HOPO/tap handling.
+    /// Shared by Rules and the learned generators so every generator produces the same kind of draft.
+    /// </summary>
+    internal static ReductionResult VoiceKeptFrets(
+        EditableChart chart,
+        EditableTrack source,
+        EditableTrack target,
+        List<(long Tick, EditableNote[] Notes)> chords,
+        List<(int Start, int End)> phrases,
+        IReadOnlyList<int> kept,
+        FretReductionRules rules,
+        bool ghl,
+        Func<EditableNote, int> column,
+        (long From, long To)? range,
+        ChartReadOptions? options,
+        int inRangeCount)
+    {
         // Each chord's fret columns, one bit each (none for opens alone), and whether it has an open.
         var shape = new int[chords.Count];
         var hasOpen = new bool[chords.Count];
@@ -145,16 +167,12 @@ public static class Reducer
                 if (n.Lane == ChartNote.OpenLane)
                     hasOpen[i] = true;
                 else
-                    shape[i] |= 1 << Column(n);
+                    shape[i] |= 1 << column(n);
             }
         }
 
         bool OpenOnly(int i) => shape[i] == 0;
 
-        // Where the rules fret opens, each phrase of the source with opens alone and pressed notes both: there each open is
-        // green, and each fret next to an open alone, with the same chord repeated beside it, is lifted a column, so going
-        // between them is still a move. Frets further from an open keep their place, so a fill keeps its top; a chord with
-        // an open and frets has the open as its green. With green the highest column, nothing can be lifted off it.
         int highest = rules.HighestLane;
         var mixed = new bool[chords.Count];
         var lifted = new bool[chords.Count];
@@ -175,21 +193,17 @@ public static class Reducer
             }
         }
 
-        // A chord's notes as pressed: in a phrase whose opens are fretted, an open with frets is green (on GHL, the first
-        // white), pressed with them.
         EditableNote[] Pressed(int i) => mixed[i] && hasOpen[i] && !OpenOnly(i)
             ? [.. chords[i].Notes.Select(static n => n.Lane == ChartNote.OpenLane ? n with { Lane = 0 } : n)]
             : chords[i].Notes;
 
-        // Each kept chord's columns, then each phrase fitted to the range as a whole.
         var columns = new Dictionary<int, List<int>>();
         foreach (int i in kept)
         {
-            if (SelectColumns(Pressed(i), rules.MaxChordSize, Column) is { } chosen)
+            if (SelectColumns(Pressed(i), rules.MaxChordSize, column) is { } chosen)
                 columns[i] = chosen;
         }
 
-        // The phrases cover the chords in order, so one walk through the kept chords, which are in order too, splits them.
         var placedAt = new Dictionary<int, (int Anchor, int Width)>();
         int next = 0;
         foreach (var (start, end) in phrases)
@@ -198,8 +212,6 @@ public static class Reducer
             for (; next < kept.Count && kept[next] <= end; next++)
                 inPhrase.Add(kept[next]);
 
-            // A fret is lifted by the source's opens, so each difficulty has it alike, and by an open the draft keeps beside
-            // it, which is green, where it's kept off green too: thinned out, green is free again.
             bool BesideOpen(int k) => mixed[start] && !hasOpen[inPhrase[k]] && ((k > 0 && OpenOnly(inPhrase[k - 1])) || (k + 1 < inPhrase.Count && OpenOnly(inPhrase[k + 1])));
             var frets = new List<int>();
             var floors = new List<int>();
@@ -212,7 +224,7 @@ public static class Reducer
             }
 
             int[] anchorsOf = [.. frets.Select(i => columns[i][0])];
-            var tops = frets.Select(i => Pressed(i).Where(static n => n.Lane != ChartNote.OpenLane).Max(Column)).ToArray();
+            var tops = frets.Select(i => Pressed(i).Where(static n => n.Lane != ChartNote.OpenLane).Max(column)).ToArray();
             int[] places = [.. frets.Select((i, k) => anchorsOf[k] + (lifted[i] || floors[k] > 0 ? 1 : 0))];
             var fitted = FitPhrase(anchorsOf, [.. frets.Select(i => columns[i][^1] - columns[i][0])], highest, tops, places, floors);
             for (int k = 0; k < frets.Count; k++)
@@ -225,13 +237,11 @@ public static class Reducer
         {
             var (tick, chord) = chords[i];
 
-            // In a phrase whose opens are fretted, opens alone are the chord's longest on green (on GHL, the first white); one
-            // with frets is pressed with them.
             List<EditableNote> placed = !mixed[i] ? [.. chord.Where(static n => n.Lane == ChartNote.OpenLane)]
                 : OpenOnly(i) ? [chord.MaxBy(static n => n.Length)! with { Lane = 0 }]
                 : [];
             if (columns.TryGetValue(i, out var chosen))
-                placed.AddRange(Place(Pressed(i), chosen, placedAt[i].Anchor, placedAt[i].Width, highest, ghl, Column));
+                placed.AddRange(Place(Pressed(i), chosen, placedAt[i].Anchor, placedAt[i].Width, highest, ghl, column));
 
             foreach (var note in placed)
             {
@@ -265,7 +275,6 @@ public static class Reducer
             var fromSource = HopoStates(GameView.Frets(source.Notes, source.FlaggedChords, chart.Resolution, read, []));
             var wanted = kept.Select(i => chords[i].Tick).Where(fromSource.ContainsKey).ToDictionary(static t => t, t => fromSource[t]);
 
-            // The target's first chord after the range follows the draft's last now, so it's played as it was before.
             int first = range is { } after ? target.Notes.FirstAfter(after.To) : target.Notes.Count;
             if (first < target.Notes.Count && HopoStates(GameView.Frets(target.Notes, target.FlaggedChords, chart.Resolution, read, [])).TryGetValue(target.Notes[first].Tick, out var was))
                 wanted[target.Notes[first].Tick] = was;
@@ -273,7 +282,7 @@ public static class Reducer
             flags = PlayedAs(wanted, notes, flags, chart.Resolution, read);
         }
 
-        return new ReductionResult(notes, flags, [], inRange.Length - made);
+        return new ReductionResult(notes, flags, [], inRangeCount - made);
     }
 
     /// <summary>

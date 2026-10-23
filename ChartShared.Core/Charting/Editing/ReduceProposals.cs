@@ -1,4 +1,5 @@
 using ChartShared.Core.Charting.Authoring;
+using ChartShared.Core.Charting.Authoring.Generation;
 using ChartShared.Core.Charting.Commands;
 using ChartShared.Core.Charts;
 
@@ -64,6 +65,20 @@ public sealed class ReduceProposals
     public bool Start(ChartInstrument part, ChartDifficulty from, ChartDifficulty to, FretReductionRules rules, (long From, long To)? range = null) =>
         Start(part, range, [(from, to)], (chart, f, t) => Reducer.Reduce(chart, part, f, t, rules, range, _session.ReadOptions));
 
+    /// <summary>
+    /// Starts a run of a 5-fret part with <paramref name="generator"/>, in place of any going on.
+    /// Voicing follows <paramref name="voiceRules"/>. Unsupported parts fall back to Rules.
+    /// </summary>
+    /// <returns>Whether there was anything to reduce.</returns>
+    public bool Start(ChartInstrument part, ChartDifficulty from, ChartDifficulty to, IDifficultyGenerator generator, FretReductionRules voiceRules, (long From, long To)? range = null)
+    {
+        ArgumentNullException.ThrowIfNull(generator);
+        ArgumentNullException.ThrowIfNull(voiceRules);
+        if (!generator.Supports(ChartInstruments.KindOf(part)))
+            return Start(part, from, to, voiceRules, range);
+        return Start(part, range, [(from, to)], (chart, f, t) => generator.Reduce(chart, part, f, t, voiceRules, range, _session.ReadOptions).Result);
+    }
+
     /// <summary>Starts a run of the drums, in place of any going on.</summary>
     /// <returns>Whether there was anything to reduce.</returns>
     public bool Start(ChartDifficulty from, ChartDifficulty to, DrumReductionRules rules, (long From, long To)? range = null)
@@ -81,6 +96,20 @@ public sealed class ReduceProposals
     {
         ArgumentNullException.ThrowIfNull(targets);
         return Start(part, range, [.. targets.Keys.Select(static t => ((ChartDifficulty?)null, t))], (chart, f, t) => Reducer.Reduce(chart, part, f, t, targets[t], range, _session.ReadOptions));
+    }
+
+    /// <summary>
+    /// Starts a run of a 5-fret part over several difficulties with <paramref name="generator"/>, in place of
+    /// any going on. Voicing of each target follows its <paramref name="voiceRules"/>.
+    /// </summary>
+    /// <returns>Whether there was anything to reduce.</returns>
+    public bool StartAll(ChartInstrument part, IDifficultyGenerator generator, IReadOnlyDictionary<ChartDifficulty, FretReductionRules> voiceRules, (long From, long To)? range = null)
+    {
+        ArgumentNullException.ThrowIfNull(generator);
+        ArgumentNullException.ThrowIfNull(voiceRules);
+        if (!generator.Supports(ChartInstruments.KindOf(part)))
+            return StartAll(part, voiceRules, range);
+        return Start(part, range, [.. voiceRules.Keys.Select(static t => ((ChartDifficulty?)null, t))], (chart, f, t) => generator.Reduce(chart, part, f, t, voiceRules[t], range, _session.ReadOptions).Result);
     }
 
     /// <summary>Starts a run of the drums over several difficulties, in place of any going on.</summary>

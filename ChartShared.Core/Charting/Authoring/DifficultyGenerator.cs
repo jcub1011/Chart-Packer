@@ -1,3 +1,4 @@
+using ChartShared.Core.Charting.Authoring.Generation;
 using ChartShared.Core.Charting.Commands;
 using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charts;
@@ -99,6 +100,34 @@ public static class DifficultyGenerator
         return kind == ChartInstrumentKind.Drums
             ? Draft(chart, part, steps, (c, f, t) => Reducer.Reduce(c, f, t, rules.DrumsFor(t), variant))
             : Draft(chart, part, steps, (c, f, t) => Reducer.Reduce(c, part, f, t, rules.FretsFor(kind, t), options: options));
+    }
+
+    /// <summary>
+    /// Fills <paramref name="targets"/> of <paramref name="part"/> with <paramref name="generator"/>, each from
+    /// the nearest difficulty above it with notes. Voicing follows <paramref name="voiceRulesFor"/>;
+    /// drums and unsupported families fall back to Rules. HOPOs are read with <paramref name="options"/>.
+    /// </summary>
+    public static GeneratedDifficulties Generate(EditableChart chart, ChartInstrument part, IReadOnlyCollection<ChartDifficulty> targets, IDifficultyGenerator generator, Func<ChartDifficulty, FretReductionRules> voiceRulesFor, DrumsVariant variant, ReductionDefaults fallbackRules, ChartReadOptions? options = null)
+    {
+        ArgumentNullException.ThrowIfNull(chart);
+        ArgumentNullException.ThrowIfNull(targets);
+        ArgumentNullException.ThrowIfNull(generator);
+        ArgumentNullException.ThrowIfNull(voiceRulesFor);
+        ArgumentNullException.ThrowIfNull(fallbackRules);
+        var kind = ChartInstruments.KindOf(part);
+        if (!CanGenerate(kind))
+            throw new ArgumentException("Only 5-fret (keys too), GHL and drum parts can be filled.", nameof(part));
+
+        List<(ChartDifficulty? From, ChartDifficulty To)> steps = [.. targets.Select(static t => ((ChartDifficulty?)null, t))];
+        if (kind == ChartInstrumentKind.Drums || !generator.Supports(kind))
+        {
+            var rulesFallback = new RulesGenerator();
+            return Draft(chart, part, steps, kind == ChartInstrumentKind.Drums
+                ? (c, f, t) => Reducer.Reduce(c, f, t, fallbackRules.DrumsFor(t), variant)
+                : (c, f, t) => rulesFallback.Reduce(c, part, f, t, voiceRulesFor(t)).Result);
+        }
+
+        return Draft(chart, part, steps, (c, f, t) => generator.Reduce(c, part, f, t, voiceRulesFor(t)).Result);
     }
 
     /// <summary>

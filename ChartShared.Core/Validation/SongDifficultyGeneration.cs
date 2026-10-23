@@ -1,5 +1,6 @@
 using ChartShared.Core.Charting;
 using ChartShared.Core.Charting.Authoring;
+using ChartShared.Core.Charting.Authoring.Generation;
 using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charting.Saving;
 using ChartShared.Core.Charts;
@@ -185,6 +186,52 @@ public static class SongDifficultyGeneration
         Prepare(read, pairs, rules, SongGenerationWork.DifficultiesOnly);
 
     /// <summary>
+    /// Fills every missing difficulty of <paramref name="read"/>'s chart with <paramref name="generator"/>.
+    /// Voicing follows <paramref name="rules"/>; drums and unsupported families fall back to Rules.
+    /// Nothing is written. It can run off the UI thread.
+    /// </summary>
+    public static SongGeneration Prepare(SongChartRead read, IReadOnlyList<KeyValuePair<string, string>> pairs, ReductionDefaults rules, IDifficultyGenerator generator, SongGenerationWork work)
+    {
+        ArgumentNullException.ThrowIfNull(read);
+        ArgumentNullException.ThrowIfNull(pairs);
+        ArgumentNullException.ThrowIfNull(rules);
+        ArgumentNullException.ThrowIfNull(generator);
+        ArgumentNullException.ThrowIfNull(work);
+        var (load, options, _, import, chartName) = read;
+        var chart = load.Chart;
+        var starPower = new Dictionary<ChartInstrument, IReadOnlyList<Phrase>>();
+        foreach (var part in work.StarPower.Distinct().Order())
+        {
+            if (chart.PartOf(part) is not { } given || StarPowerGenerator.HasStarPower(given))
+                continue;
+            var proposals = StarPowerGenerator.Propose(chart, part, StarPowerOptions.Default, options).Proposals;
+            if (StarPowerGenerator.CommandOf(part, proposals) is not { } add)
+                continue;
+
+            if (starPower.Count == 0)
+                chart = chart.Clone();
+            add.Apply(chart);
+            starPower[part] = [.. proposals.Select(static p => p.Phrase)];
+        }
+
+        var variant = DifficultyGenerator.DrumsVariantOf(chart, options);
+        var parts = new Dictionary<ChartInstrument, GeneratedDifficulties>();
+        foreach (var (part, targets) in work.Difficulties ? DifficultyGenerator.TargetsFor(chart, work.Scope ?? LowerDifficultyScope.Missing) : new Dictionary<ChartInstrument, IReadOnlyList<ChartDifficulty>>())
+        {
+            var kind = ChartInstruments.KindOf(part);
+            var generated = DifficultyGenerator.Generate(chart, part, targets, generator, t => rules.FretsFor(kind, t), variant, rules, options);
+            parts[part] = generated;
+            chart = generated.Drafted;
+        }
+
+        var loaded = chart.Parts.Select(static p => p.Instrument).ToHashSet();
+        var changes = PendingSongIniChanges.Of(chart, new PendingSongIniInputs(loaded, pairs) { Import = import });
+        var after = MidiChartWriter.SettingsAfterSave(chart, ChartReadOptions.From(PendingSongIniChanges.Apply(pairs, changes)));
+        string? removeChart = chartName.Equals(ChartFiles.MidiName, StringComparison.OrdinalIgnoreCase) ? null : chartName;
+        return new SongGeneration(parts, chart, after, changes, removeChart, starPower);
+    }
+
+    /// <summary>
     /// Does <paramref name="work"/> to <paramref name="read"/>'s chart: star power generated for each of its parts that
     /// still has none, with the defaults (<see cref="StarPowerOptions.Default"/>), then, when it asks, every missing
     /// difficulty in its scope filled (<see cref="DifficultyGenerator.TargetsFor"/>) by <paramref name="rules"/>. Nothing is written,
@@ -283,6 +330,17 @@ public static class SongDifficultyGeneration
     /// <exception cref="IOException">The song can't be read, or the chart can't be kept.</exception>
     /// <exception cref="UnauthorizedAccessException">Access is denied.</exception>
     /// <exception cref="OperationCanceledException">It was cancelled.</exception>
+    /// <summary>
+    /// Reads <paramref name="entry"/>'s chart, does <paramref name="work"/> to it and keeps it in one go
+    /// (<see cref="ReadAsync"/>, <see cref="Prepare(SongChartRead, IReadOnlyList{KeyValuePair{string, string}}, ReductionDefaults, SongGenerationWork)"/>,
+    /// <see cref="StageAsync"/>), off the calling thread.
+    /// </summary>
+    /// <returns>The chart kept; null when the song has nothing to fill or generate.</returns>
+    /// <exception cref="InvalidOperationException">The draft changes the chart otherwise, the song has no chart, or a draft can't be added.</exception>
+    /// <exception cref="InvalidDataException">The chart didn't read back as it was written.</exception>
+    /// <exception cref="IOException">The song can't be read, or the chart can't be kept.</exception>
+    /// <exception cref="UnauthorizedAccessException">Access is denied.</exception>
+    /// <exception cref="OperationCanceledException">It was cancelled.</exception>
     public static Task<GeneratedChart?> GenerateAsync(
         SongEntry entry,
         IReadOnlyList<KeyValuePair<string, string>> pairs,
@@ -301,6 +359,34 @@ public static class SongDifficultyGeneration
         {
             var read = await ReadAsync(entry, pairs, draft, cancellationToken).ConfigureAwait(false);
             var generation = Prepare(read, pairs, rules, work);
+            return generation.IsEmpty ? null : await StageAsync(generation, stash, cancellationToken).ConfigureAwait(false);
+        }, cancellationToken);
+    }
+
+    /// <summary>
+    /// Reads <paramref name="entry"/>'s chart, does <paramref name="work"/> to it with <paramref name="generator"/> and keeps it in one go,
+    /// off the calling thread.
+    /// </summary>
+    public static Task<GeneratedChart?> GenerateAsync(
+        SongEntry entry,
+        IReadOnlyList<KeyValuePair<string, string>> pairs,
+        MetadataDraft? draft,
+        ReductionDefaults rules,
+        IDifficultyGenerator generator,
+        SongGenerationWork work,
+        GeneratedChartStash stash,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        ArgumentNullException.ThrowIfNull(pairs);
+        ArgumentNullException.ThrowIfNull(rules);
+        ArgumentNullException.ThrowIfNull(generator);
+        ArgumentNullException.ThrowIfNull(work);
+        ArgumentNullException.ThrowIfNull(stash);
+        return Task.Run(async () =>
+        {
+            var read = await ReadAsync(entry, pairs, draft, cancellationToken).ConfigureAwait(false);
+            var generation = Prepare(read, pairs, rules, generator, work);
             return generation.IsEmpty ? null : await StageAsync(generation, stash, cancellationToken).ConfigureAwait(false);
         }, cancellationToken);
     }

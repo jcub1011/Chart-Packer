@@ -294,6 +294,30 @@
 
                         <TextBlock Classes="heading" Margin="0,14,0,0" Text="{x:Static sres:SharedStrings.ReductionRulesHeading}" />
                         <TextBlock Classes="note" Text="{x:Static res:Strings.LowerDifficultiesRulesNote}" />
+                        <TextBlock Classes="heading" Margin="0,14,0,0" Text="Generator" />
+                        <ComboBox HorizontalAlignment="Stretch"
+                                  ItemsSource="{Binding GeneratorChoices}"
+                                  SelectedItem="{Binding SelectedGenerator}" />
+                        <StackPanel Spacing="6" IsVisible="{Binding IsPatterns}">
+                            <TextBlock Classes="note" Text="{Binding PackStatus}" IsVisible="{Binding HasPackStatus}" TextWrapping="Wrap" />
+                            <TextBlock Classes="caption" Text="Pack file (.json, empty for the built-in demo)" />
+                            <TextBox Text="{Binding PackPath}" PlaceholderText="Paste a pack .json path, e.g. a trained pack" />
+                            <Button Content="Load pack"
+                                    Command="{Binding LoadPackCommand}" />
+                            <TextBlock Classes="caption" Text="Style" />
+                            <ComboBox HorizontalAlignment="Stretch"
+                                      ItemsSource="{Binding PatternsStyles}"
+                                      SelectedItem="{Binding PatternsStyle}" />
+                            <TextBlock Classes="caption" Text="Fewer notes ↔ more notes" />
+                            <Slider Minimum="-1.5" Maximum="1.5" TickFrequency="0.5" IsSnapToTickEnabled="True"
+                                    Value="{Binding PatternsDensity}" />
+                            <TextBlock Classes="caption" Text="Train a pack from reference songs" />
+                            <TextBox Text="{Binding CorpusPath}" PlaceholderText="Corpus folder, e.g. D:\Chart Crawl Results\charts" />
+                            <TextBox Text="{Binding TrainOutputPath}" PlaceholderText="Output pack .json path" />
+                            <Button Content="Train pack from folder"
+                                    Command="{Binding TrainPackCommand}" />
+                            <TextBlock Classes="note" Text="{Binding TrainStatus}" TextWrapping="Wrap" />
+                        </StackPanel>
                         <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="8" Margin="0,4,0,0">
                             <TextBlock Grid.Row="0" Grid.Column="0" Classes="caption" VerticalAlignment="Center"
                                        Text="{x:Static sres:SharedStrings.ReductionFamilyLabel}" />

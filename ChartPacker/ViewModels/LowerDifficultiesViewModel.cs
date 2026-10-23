@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -9,6 +10,7 @@ using Avalonia.Threading;
 using ChartPacker.Resources;
 using ChartPacker.Services;
 using ChartShared.Core.Charting.Authoring;
+using ChartShared.Core.Charting.Authoring.Generation;
 using ChartShared.Core.Charting.Saving;
 using ChartShared.Core.Charts;
 using ChartShared.Core.Metadata;
@@ -168,7 +170,7 @@ namespace ChartPacker.ViewModels
             _scope = ScopeOf();
 
             Rules = new ReductionRulesViewModel(rules.Load(), ChartInstrumentKind.FiveFret, ChartDifficulty.Hard);
-            Generation = new GenerationPreviewViewModel(player, () => Rules.Defaults, Strings.LowerDifficultiesNothing, Strings.LowerDifficultiesPickSong);
+            Generation = new GenerationPreviewViewModel(player, () => Rules.Defaults, CurrentGenerator, Strings.LowerDifficultiesNothing, Strings.LowerDifficultiesPickSong);
             Rules.Changed += (_, _) =>
             {
                 RulesSaveStatus = "";
@@ -240,6 +242,162 @@ namespace ChartPacker.ViewModels
         public partial string RulesSaveStatus { get; private set; } = "";
 
         public bool HasRulesSaveStatus => RulesSaveStatus.Length > 0;
+
+        /// <summary>The generator drafts are made with: Rules (today's Reduce) or Patterns (count-based).</summary>
+        public IReadOnlyList<string> GeneratorChoices { get; } = ["Rules", "Patterns"];
+
+        /// <summary>Which generator drafts are made with. Patterns falls back to Rules per part when it can't run.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(IsPatterns))]
+        public partial string SelectedGenerator { get; set; } = "Rules";
+
+        /// <summary>Whether Patterns-specific settings show.</summary>
+        public bool IsPatterns => string.Equals(SelectedGenerator, "Patterns", StringComparison.OrdinalIgnoreCase);
+
+        /// <summary>Pack file for Patterns, as a path. Empty uses the built-in demo pack.</summary>
+        [ObservableProperty]
+        public partial string PackPath { get; set; } = "";
+
+        /// <summary>What pack Patterns runs with: the loaded pack, the demo, or why it fell back.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasPackStatus))]
+        public partial string PackStatus { get; private set; } = "Patterns runs the built-in demo pack until one is loaded.";
+
+        public bool HasPackStatus => PackStatus.Length > 0;
+
+        /// <summary>Style the Patterns draft imitates, from the loaded pack (Any first).</summary>
+        [ObservableProperty]
+        public partial string PatternsStyle { get; set; } = "Any";
+
+        public IReadOnlyList<string> PatternsStyles => _pack?.Manifest.Styles.Select(static s => s.Id).Prepend("Any").Distinct().ToList() ?? ["Any"];
+
+        /// <summary>Fewer notes left, more notes right. Centred changes nothing (spec 3.4).</summary>
+        [ObservableProperty]
+        public partial double PatternsDensity { get; set; }
+
+        /// <summary>Folder of reference songs (notes.mid) to count into a pack.</summary>
+        [ObservableProperty]
+        public partial string CorpusPath { get; set; } = "";
+
+        /// <summary>Where Train writes the pack (.json).</summary>
+        [ObservableProperty]
+        public partial string TrainOutputPath { get; set; } = "";
+
+        /// <summary>What training did, or why it couldn't.</summary>
+        [ObservableProperty]
+        public partial string TrainStatus { get; private set; } = "";
+
+        private PatternPack? _pack;
+
+        /// <summary>The generator drafts are made with now, by the choice above.</summary>
+        public IDifficultyGenerator CurrentGenerator()
+        {
+            if (!string.Equals(SelectedGenerator, "Patterns", StringComparison.OrdinalIgnoreCase))
+                return new RulesGenerator();
+            var pack = _pack ?? PatternPackWriter.Demo();
+            return new PatternsGenerator(pack, new PatternsOptions(Style: string.IsNullOrWhiteSpace(PatternsStyle) ? "Any" : PatternsStyle, Density: PatternsDensity));
+        }
+
+        partial void OnSelectedGeneratorChanged(string value) => Generation.ScheduleRedraw();
+
+        partial void OnPatternsStyleChanged(string value) => Generation.ScheduleRedraw();
+
+        partial void OnPatternsDensityChanged(double value) => Generation.ScheduleRedraw();
+
+        /// <summary>Loads the pack at <see cref="PackPath"/>, for Patterns to run with.</summary>
+        [RelayCommand]
+        private void LoadPack()
+        {
+            if (string.IsNullOrWhiteSpace(PackPath) || !File.Exists(PackPath))
+            {
+                _pack = null;
+                PackStatus = "Patterns runs the built-in demo pack until one is loaded.";
+                OnPropertyChanged(nameof(PatternsStyles));
+                Generation.ScheduleRedraw();
+                return;
+            }
+
+            try
+            {
+                _pack = PatternPackLoader.Load(PackPath);
+                PackStatus = $"Loaded {_pack.Manifest.Name} ({_pack.Manifest.Styles.Count} styles, {string.Join(", ", _pack.Manifest.Pairs)}).";
+                if (!_pack.Manifest.Styles.Any(s => s.Id == PatternsStyle))
+                    PatternsStyle = "Any";
+            }
+            catch (Exception ex)
+            {
+                _pack = null;
+                PackStatus = $"Pack not loaded ({ex.Message}). Patterns falls back to Rules.";
+            }
+
+            OnPropertyChanged(nameof(PatternsStyles));
+            Generation.ScheduleRedraw();
+        }
+
+        /// <summary>Counts <see cref="CorpusPath"/> into a pattern pack at <see cref="TrainOutputPath"/> (spec 6.4).</summary>
+        [RelayCommand]
+        private async Task TrainPackAsync()
+        {
+            if (string.IsNullOrWhiteSpace(CorpusPath) || !Directory.Exists(CorpusPath))
+            {
+                TrainStatus = "Pick a corpus folder first.";
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(TrainOutputPath))
+            {
+                TrainStatus = "Pick an output .json path first.";
+                return;
+            }
+
+            string output = TrainOutputPath.Trim();
+            try
+            {
+                // A folder was pasted instead of a file (e.g. ...\chart-output): write a dated pack inside it.
+                if (Directory.Exists(output) || !output.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+                {
+                    string folder = Directory.Exists(output) ? output : Path.GetDirectoryName(output) ?? output;
+                    if (string.IsNullOrWhiteSpace(Path.GetExtension(output)))
+                        folder = output;
+                    Directory.CreateDirectory(folder);
+                    output = Path.Combine(folder, $"pattern-pack-{DateTime.Now:yyyyMMdd-HHmmss}.json");
+                    TrainOutputPath = output;
+                }
+                else
+                {
+                    Directory.CreateDirectory(Path.GetDirectoryName(output)!);
+                }
+            }
+            catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
+            {
+                TrainStatus = $"Can't write to {output}: {ex.Message}";
+                return;
+            }
+
+            TrainStatus = "Training…";
+            try
+            {
+                var result = await Task.Run(() => PatternPackTrainer.TrainFromFolder(CorpusPath));
+                try
+                {
+                    PatternPackWriter.Write(output, result.Pack);
+                }
+                catch (UnauthorizedAccessException ex)
+                {
+                    TrainStatus = $"Training counted {result.Parts} parts but can't write {output}: access denied. {ex.Message}";
+                    return;
+                }
+
+                string warnings = result.Warnings.Count == 0 ? "" : " Warnings: " + string.Join(" ", result.Warnings);
+                TrainStatus = $"Trained {result.Parts} parts, {result.Beats} beats from {result.Songs} songs to {output}.{warnings}";
+                PackPath = output;
+                LoadPack();
+            }
+            catch (Exception ex)
+            {
+                TrainStatus = $"Training failed: {ex.Message}";
+            }
+        }
 
         /// <summary>The song picked, as it'd be generated: each part's ladder, and the picked part's drafts in the preview.</summary>
         public GenerationPreviewViewModel Generation { get; }
@@ -698,6 +856,7 @@ namespace ChartPacker.ViewModels
         private async Task GenerateAllAsync()
         {
             var rules = Rules.Defaults;
+            var generator = CurrentGenerator();
             var scope = _scope;
 
             // Each song as drafted now, its draft copied, as the work is done off the UI thread the drafts live on.
@@ -725,7 +884,9 @@ namespace ChartPacker.ViewModels
                     string? failure = null;
                     try
                     {
-                        chart = await SongDifficultyGeneration.GenerateAsync(request.Row.Entry, request.Row.Pairs, request.Draft, rules, request.Work, _stash, ct).ConfigureAwait(false);
+                        chart = generator is RulesGenerator
+                            ? await SongDifficultyGeneration.GenerateAsync(request.Row.Entry, request.Row.Pairs, request.Draft, rules, request.Work, _stash, ct).ConfigureAwait(false)
+                            : await SongDifficultyGeneration.GenerateAsync(request.Row.Entry, request.Row.Pairs, request.Draft, rules, generator, request.Work, _stash, ct).ConfigureAwait(false);
                     }
                     catch (Exception ex) when (ex is not OperationCanceledException and not OutOfMemoryException)
                     {
