@@ -23,6 +23,12 @@ namespace ChartShared.UI.ViewModels
         /// <summary>The parts the one song's chart has, by part id; null when that isn't known, as for several songs.</summary>
         IReadOnlyDictionary<string, ChartPart>? ChartParts { get; }
 
+        /// <summary>
+        /// The tier the difficulty model suggests for each <c>diff_*</c> key the one song's chart can be rated for, ignoring
+        /// case; null when that isn't known, as for several songs.
+        /// </summary>
+        IReadOnlyDictionary<string, int>? SuggestedRatings { get; }
+
         /// <summary>Why there's no metadata to show, such as a folder without a song.ini; null for none.</summary>
         string? LoadNote { get; }
 

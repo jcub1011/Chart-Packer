@@ -2,6 +2,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:ChartBuilder.ViewModels"
         xmlns:res="using:ChartBuilder.Resources"
+        xmlns:ui="using:ChartShared.UI.Controls"
+        xmlns:chrome="using:Avalonia.Controls.Chrome"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="640" d:DesignHeight="460"
@@ -13,7 +15,10 @@
         Width="640" Height="460"
         MinWidth="420" MinHeight="300"
         ShowInTaskbar="False"
-        WindowStartupLocation="CenterOwner">
+        WindowStartupLocation="CenterOwner"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaTitleBarHeightHint="30"
+        WindowDecorationsTheme="{StaticResource TitleBarDecorations}">
 
     <Window.Styles>
         <!-- The list sits in a framed panel, like Chart Packer's job results. -->
@@ -51,12 +56,49 @@
         </Style>
     </Window.Styles>
 
-    <!-- Every message, newest first; the picked one in full below, to select and copy. -->
-    <Grid RowDefinitions="*,Auto,*,Auto">
-        <Border Grid.Row="0" Classes="frame" Margin="12,12,12,8">
+    <!-- Every message the search matches, newest first; the picked one in full below, to select and copy. -->
+    <Grid RowDefinitions="Auto,*,Auto,*,Auto">
+        <!-- The title bar, as the Settings window's is: the icon, the title and the search box. Dragging anywhere but the
+             search box moves the window. The search box narrows with the window rather than running under the caption
+             buttons. -->
+        <ui:TitleBar x:Name="WindowTitleBar"
+                     Grid.Row="0"
+                     Height="31"
+                     BorderThickness="0,0,0,1"
+                     BorderBrush="{DynamicResource SubtleBorderBrush}">
+            <Grid ColumnSpacing="12" VerticalAlignment="Center">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" MaxWidth="300" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0"
+                           Margin="8,0,0,0"
+                           FontSize="12"
+                           VerticalAlignment="Center"
+                           Text="{x:Static res:Strings.MessagesTitle}" />
+                <TextBox Grid.Column="1"
+                         Classes="clearButton title-search"
+                         chrome:WindowDecorationProperties.ElementRole="User"
+                         Width="NaN"
+                         HorizontalAlignment="Stretch"
+                         VerticalContentAlignment="Center"
+                         Text="{Binding SearchText}"
+                         PlaceholderText="{x:Static res:Strings.MessagesSearchWatermark}"
+                         AutomationProperties.Name="{x:Static res:Strings.MessagesSearchWatermark}">
+                    <TextBox.InnerLeftContent>
+                        <ui:LineIcon Data="{StaticResource SearchStroke}" Margin="8,0,0,0" Opacity="0.6" />
+                    </TextBox.InnerLeftContent>
+                    <TextBox.KeyBindings>
+                        <KeyBinding Gesture="Escape" Command="{Binding ClearSearchCommand}" />
+                    </TextBox.KeyBindings>
+                </TextBox>
+            </Grid>
+        </ui:TitleBar>
+
+        <Border Grid.Row="1" Classes="frame" Margin="12,12,12,8">
             <Panel>
                 <ListBox Classes="messages"
-                         ItemsSource="{Binding Entries}"
+                         ItemsSource="{Binding Shown}"
                          SelectedItem="{Binding Selected}"
                          AutomationProperties.Name="{x:Static res:Strings.MessagesTitle}">
                     <ListBox.ItemTemplate>
@@ -92,10 +134,17 @@
                            IsHitTestVisible="False"
                            Text="{x:Static res:Strings.MessagesNone}"
                            IsVisible="{Binding !HasEntries}" />
+                <TextBlock Classes="muted centered"
+                           VerticalAlignment="Center"
+                           Margin="16"
+                           TextWrapping="Wrap"
+                           IsHitTestVisible="False"
+                           Text="{Binding NoMatchesText}"
+                           IsVisible="{Binding ShowNoMatches}" />
             </Panel>
         </Border>
 
-        <StackPanel Grid.Row="1"
+        <StackPanel Grid.Row="2"
                     Orientation="Horizontal"
                     Spacing="10"
                     Margin="12,0,12,6"
@@ -108,7 +157,7 @@
         </StackPanel>
 
         <!-- Read-only, but selectable, with Ctrl+C and the right-click menu to copy. -->
-        <TextBox Grid.Row="2"
+        <TextBox Grid.Row="3"
                  Margin="12,0,12,12"
                  IsReadOnly="True"
                  AcceptsReturn="True"
@@ -118,7 +167,7 @@
                  Text="{Binding Selected.Text, Mode=OneWay, FallbackValue=''}"
                  AutomationProperties.Name="{x:Static res:Strings.MessagesTitle}" />
 
-        <Border Grid.Row="3" Classes="toolbar" BorderThickness="0,1,0,0">
+        <Border Grid.Row="4" Classes="toolbar" BorderThickness="0,1,0,0">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
                 <Button MinWidth="80"
                         HorizontalContentAlignment="Center"

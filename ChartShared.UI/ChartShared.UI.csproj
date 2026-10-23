@@ -23,6 +23,11 @@
     <ProjectReference Include="..\ChartShared.Video\ChartShared.Video.csproj" />
   </ItemGroup>
 
+  <!-- The Reduce preview and change strip moved here from Chart Builder; its tests still cover their helpers. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="ChartBuilder.Tests" />
+  </ItemGroup>
+
   <ItemGroup>
     <EmbeddedResource Update="Resources\SharedStrings.resx">
       <StronglyTypedLanguage>CSharp</StronglyTypedLanguage>

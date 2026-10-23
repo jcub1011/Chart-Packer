@@ -12,7 +12,6 @@ public enum EditorTool
     Select,
     Place,
     Erase,
-    Sustain,
     Phrase,
     Tempo,
 
@@ -98,6 +97,7 @@ public sealed class EditorSession
         Selection = new EditorSelection(Chart, VocalContentOf);
         Tools = new EditorTools(this);
         Fills = new FillProposals(this);
+        StarPower = new StarPowerProposals(this);
         TempoProposal = new TempoProposals(this);
         Reduce = new ReduceProposals(this);
         Sync = new SyncRegion(this);
@@ -147,6 +147,7 @@ public sealed class EditorSession
         _game.Clear();
         ForgetDiscoFlips();
         Fills.OnChanged();
+        StarPower.OnChanged();
         SongSettingsChanged?.Invoke(this, EventArgs.Empty);
         PlaceSongEvents();
         RaiseState();
@@ -217,6 +218,12 @@ public sealed class EditorSession
     /// <summary>The run of Generate fills going on, if there's one (charter-spec C6 item 5).</summary>
     public FillProposals Fills { get; }
 
+    /// <summary>The run of Generate star power going on, if there's one (charter-spec C8 item 1).</summary>
+    public StarPowerProposals StarPower { get; }
+
+    /// <summary>The run of proposed phrases going on, Generate fills' or Generate star power's; null for none.</summary>
+    public PhraseProposals? Proposals => Fills.IsActive ? Fills : StarPower.IsActive ? StarPower : null;
+
     /// <summary>The proposed tempo map being looked at, if there's one (charter-spec C14 item 4).</summary>
     public TempoProposals TempoProposal { get; }
 
@@ -227,11 +234,11 @@ public sealed class EditorSession
     public SyncRegion Sync { get; }
 
     /// <summary>
-    /// The notes drawn faintly over <paramref name="key"/>'s lane as a draft not yet added: a Reduce run's, or null for
-    /// none.
+    /// The notes drawn faintly over <paramref name="key"/>'s lane as a draft not yet added: a recording pass's, a Reduce
+    /// run's, or null for none.
     /// </summary>
     public EditableTrack? GhostTrack(ChartTrackKey key) =>
-        Recording?.Track == key ? Recording.Ghost : Reduce.Target == key ? Reduce.Ghost : null;
+        Recording?.Track == key ? Recording.Ghost : Reduce.DraftFor(key)?.Ghost;
 
     /// <summary>The pass of record mode going on, if there's one (charter-spec C15 item 5).</summary>
     public RecordPass? Recording { get; private set; }
@@ -310,6 +317,20 @@ public sealed class EditorSession
             RaiseState();
         }
     }
+
+    /// <summary>What the Place tool makes of a note it puts down: the chord's type, an open note, a sustain, a tom and so on.</summary>
+    public PlaceOptions Placing
+    {
+        get;
+        set
+        {
+            ArgumentNullException.ThrowIfNull(value);
+            if (field == value)
+                return;
+            field = value;
+            RaiseState();
+        }
+    } = PlaceOptions.Default;
 
     /// <summary>Whether notes keep their times rather than their ticks when the tempo changes (charter-spec C4 item 3).</summary>
     public bool KeepTimes { get; set; }
@@ -706,6 +727,7 @@ public sealed class EditorSession
             Selection.Reconcile();
             KeepPhraseKindOffered();
             Fills.OnChanged();
+            StarPower.OnChanged();
             Reduce.OnChanged();
             Sync.OnChanged();
             PlaceSongEvents();

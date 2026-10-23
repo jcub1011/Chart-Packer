@@ -129,6 +129,7 @@
                         <MenuItem Header="{x:Static res:Strings.MenuOverwrite}"
                                   ItemsSource="{Binding Library.OverwriteOptions}"
                                   ToolTip.Tip="{x:Static res:Strings.OverwriteToolTip}">
+                            <MenuItem.Icon><ctl:LineIcon Data="{StaticResource OverwriteStroke}" /></MenuItem.Icon>
                             <MenuItem.ItemContainerTheme>
                                 <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:DataType="vm:OverwriteOption">
                                     <Setter Property="Header" Value="{Binding MenuLabel}" />
@@ -168,6 +169,12 @@
                                   ToolTip.Tip="{x:Static res:Strings.ValidateToolTip}"
                                   ToolTip.ShowOnDisabled="True">
                             <MenuItem.Icon><ctl:LineIcon Data="{StaticResource CheckStroke}" /></MenuItem.Icon>
+                        </MenuItem>
+                        <MenuItem Header="{x:Static res:Strings.MenuGenerateLowerDifficulties}"
+                                  Command="{Binding Library.GenerateLowerDifficultiesCommand}"
+                                  ToolTip.Tip="{x:Static res:Strings.GenerateLowerDifficultiesToolTip}"
+                                  ToolTip.ShowOnDisabled="True">
+                            <MenuItem.Icon><ctl:LineIcon Data="{StaticResource SortDescendingStroke}" /></MenuItem.Icon>
                         </MenuItem>
                         <MenuItem Header="{x:Static res:Strings.MenuDeduplicate}"
                                   Command="{Binding Library.DeduplicateCommand}"

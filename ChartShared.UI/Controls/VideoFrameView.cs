@@ -4,6 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
+using Avalonia.VisualTree;
 using ChartShared.Core.Metadata;
 using ChartShared.Video;
 
@@ -32,12 +33,24 @@ namespace ChartShared.UI.Controls
         private bool _isFrameRequested;
         private Rect? _viewport;
 
+        // While attached, watches for it or a parent being shown or hidden, as hidden, frames aren't asked for.
+        private IDisposable? _visibilityWatch;
+
         static VideoFrameView()
         {
             AffectsRender<VideoFrameView>(PlaybackProperty);
         }
 
-        public VideoFrameView() => EffectiveViewportChanged += (_, e) => _viewport = e.EffectiveViewport;
+        public VideoFrameView()
+        {
+            // Out of sight, frames aren't asked for (OnFrame); scrolled back into view, they are again.
+            EffectiveViewportChanged += (_, e) =>
+            {
+                _viewport = e.EffectiveViewport;
+                if (IsInViewport)
+                    RequestFrame();
+            };
+        }
 
         // Whether any of the control is in view: scrolled out of sight, it isn't drawn as the clock moves. Not yet laid
         // out (hidden, say), it has no size to check, so it's taken to be, lest it's left undrawn once shown in place.
@@ -81,15 +94,21 @@ namespace ChartShared.UI.Controls
         protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
         {
             base.OnAttachedToVisualTree(e);
+            _visibilityWatch ??= IsVisibleProperty.Changed.AddClassHandler<Visual>(OnVisibleChanged);
             RequestFrame();
         }
 
         protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
         {
             base.OnDetachedFromVisualTree(e);
+            _visibilityWatch?.Dispose();
+            _visibilityWatch = null;
             _bitmap?.Dispose();
             _bitmap = null;
             _version = 0;
+
+            // Where it was scrolled to says nothing of where it's attached next, which might keep it from being drawn there.
+            _viewport = null;
         }
 
         public override void Render(DrawingContext context)
@@ -114,18 +133,24 @@ namespace ChartShared.UI.Controls
             topLevel.RequestAnimationFrame(OnFrame);
         }
 
+        // It or a parent shown, say a collapsed section expanded: frames are asked for again. Whether it's now seen is
+        // left to the frame, by when its effective visibility has caught up.
+        private void OnVisibleChanged(Visual visual, AvaloniaPropertyChangedEventArgs e)
+        {
+            if (e.GetNewValue<bool>() && (visual == this || visual.IsVisualAncestorOf(this)))
+                RequestFrame();
+        }
+
         private void OnFrame(TimeSpan _)
         {
             _isFrameRequested = false;
             if (Playback is not { } playback || TopLevel.GetTopLevel(this) is null)
                 return;
 
-            // Out of sight, the video isn't asked to keep up, so it isn't decoded; it seeks when it's seen again.
+            // Out of sight, the video isn't asked to keep up, so it isn't decoded, and no more frames are asked for until
+            // it's seen again (the constructor's handlers), when it seeks.
             if (!IsEffectivelyVisible || !IsInViewport)
-            {
-                RequestFrame();
                 return;
-            }
 
             var clock = Clock?.Invoke() ?? TimeSpan.Zero;
             playback.RequestTime((Timeline ?? VideoTimeline.Default).Map(clock, playback.Duration));

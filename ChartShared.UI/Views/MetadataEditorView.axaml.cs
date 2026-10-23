@@ -1,3 +1,4 @@
+using System;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -21,6 +22,8 @@ namespace ChartShared.UI.Views
         private const double CompactBelow = 380;
         private const double WideFrom = 400;
 
+        private MetadataEditorViewModel? _editor;
+
         public MetadataEditorView()
         {
             InitializeComponent();
@@ -34,6 +37,16 @@ namespace ChartShared.UI.Views
             };
             NewKeyBox.AddHandler(PointerReleasedEvent, OnKeyBoxPointerReleased, RoutingStrategies.Bubble, handledEventsToo: true);
             NewKeyBox.AddHandler(KeyDownEvent, OnKeyBoxKeyDown, RoutingStrategies.Tunnel);
+        }
+
+        protected override void OnDataContextChanged(EventArgs e)
+        {
+            base.OnDataContextChanged(e);
+            if (_editor is not null)
+                _editor.NewKeyFocusRequested -= OnNewKeyFocusRequested;
+            _editor = DataContext as MetadataEditorViewModel;
+            if (_editor is not null)
+                _editor.NewKeyFocusRequested += OnNewKeyFocusRequested;
         }
 
         /// <summary>Puts each row's value on a second line under its key while the panel is too narrow for one.</summary>
@@ -52,6 +65,39 @@ namespace ChartShared.UI.Views
         {
             if (sender is Control { DataContext: MetadataRowViewModel row })
                 row.CommitCommand.Execute(null);
+        }
+
+        /// <summary>
+        /// Back to the new row's key: after a key is added, empty for the next with the known keys dropped down, or with
+        /// the key that was refused.
+        /// </summary>
+        private void OnNewKeyFocusRequested(object? sender, EventArgs e)
+        {
+            NewKeyBox.Focus();
+            if (string.IsNullOrEmpty(NewKeyBox.Text))
+                Dispatcher.UIThread.Post(OpenKeyDropDown, DispatcherPriority.Loaded);
+        }
+
+        /// <summary>
+        /// Leaving the new row with nothing typed closes it, as there's nothing to lose; with a key or value typed it stays
+        /// open. Checked once the focus has landed, as it moves between the row's own boxes too, and not while the key's
+        /// dropdown is open, as picking from it takes the focus for a moment. Background priority leaves a pick time to
+        /// write its key and give the focus back before then.
+        /// </summary>
+        private void OnDraftRowLostFocus(object? sender, RoutedEventArgs e)
+        {
+            Dispatcher.UIThread.Post(() =>
+            {
+                if (DataContext is not MetadataEditorViewModel { IsAdding: true } vm
+                    || DraftRow.IsKeyboardFocusWithin
+                    || NewKeyBox.IsDropDownOpen)
+                    return;
+
+                if (string.IsNullOrWhiteSpace(vm.NewKey)
+                    && string.IsNullOrWhiteSpace(vm.NewValue)
+                    && string.IsNullOrWhiteSpace(NewKeyBox.Text))
+                    vm.CancelAddCommand.Execute(null);
+            }, DispatcherPriority.Background);
         }
 
         private void OpenKeyDropDown()

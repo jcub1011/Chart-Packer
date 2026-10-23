@@ -11,8 +11,10 @@ namespace ChartShared.UI.Services
         public async Task<bool> ConfirmAsync(string title, string message, string confirmLabel) =>
             await ShowAsync(new ConfirmDialog(title, message, confirmLabel)) == ConfirmChoice.First;
 
-        public Task<ConfirmChoice> ChooseAsync(string title, string message, string firstLabel, string secondLabel) =>
-            ShowAsync(new ConfirmDialog(title, message, firstLabel, secondLabel));
+        public Task<ConfirmChoice> ChooseAsync(string title, string message, string firstLabel, string secondLabel, string? firstIcon = null, string? secondIcon = null) =>
+            ShowAsync(new ConfirmDialog(title, message, firstLabel, secondLabel, firstIcon, secondIcon));
+
+        public Task AlertAsync(string title, string message) => ShowAsync(ConfirmDialog.Alert(title, message));
 
         private async Task<ConfirmChoice> ShowAsync(ConfirmDialog dialog)
         {

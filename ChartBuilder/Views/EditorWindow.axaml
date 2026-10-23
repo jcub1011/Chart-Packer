@@ -20,7 +20,8 @@
         ExtendClientAreaToDecorationsHint="True"
         ExtendClientAreaTitleBarHeightHint="30"
         WindowDecorationsTheme="{StaticResource TitleBarDecorations}"
-        WindowStartupLocation="CenterScreen">
+        WindowStartupLocation="CenterScreen"
+        bctl:PanelLayout.Store="{Binding PanelLayout}">
 
     <Window.KeyBindings>
         <KeyBinding Gesture="Ctrl+N" Command="{Binding NewChartCommand}" />
@@ -31,10 +32,6 @@
         <KeyBinding Gesture="Ctrl+Y" Command="{Binding RedoCommand}" />
         <KeyBinding Gesture="Ctrl+Shift+Z" Command="{Binding RedoCommand}" />
     </Window.KeyBindings>
-
-    <Window.Resources>
-        <bctl:LaneMenuConverter x:Key="LaneMenu" Check="{StaticResource CheckStroke}" />
-    </Window.Resources>
 
     <Window.Styles>
         <!-- Centred messages standing in for content that isn't built yet. -->
@@ -87,100 +84,163 @@
              the window narrows. -->
         <StackPanel x:Name="TopBand" Grid.Row="0">
             <!-- The window draws its own title bar (TitleBar): the icon, the File and Edit menus, and the window's title and
-                 the program version. Dragging anywhere but the menus, the title and the version moves the window. -->
-            <ctl:TitleBar Icon="/Assets/ChartBuilder.ico" AppName="{x:Static res:Strings.AppName}">
-                <ctl:TitleBar.Menu>
-                    <Menu chrome:WindowDecorationProperties.ElementRole="User">
-                        <MenuItem Header="{x:Static res:Strings.MenuFile}">
-                            <MenuItem Header="{x:Static res:Strings.MenuNewChart}" Command="{Binding NewChartCommand}" InputGesture="Ctrl+N" />
-                            <MenuItem Header="{x:Static res:Strings.MenuOpen}" Command="{Binding OpenChartCommand}" InputGesture="Ctrl+O" />
-                            <!-- The songs opened lately, the latest first. Each opens with the menu's OpenRecentCommand, found up
-                                 the logical tree ($parent), as the submenu's popup isn't under the menu in the visual tree. -->
-                            <MenuItem Header="{x:Static res:Strings.MenuOpenRecent}" ItemsSource="{Binding Recent}" IsEnabled="{Binding HasRecent}">
-                                <MenuItem.ItemTemplate>
-                                    <DataTemplate x:DataType="vm:RecentSongItem">
-                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24" MinWidth="240">
-                                            <TextBlock Grid.Column="0" MaxWidth="360" TextTrimming="CharacterEllipsis" Text="{Binding Title}" />
-                                            <TextBlock Grid.Column="1" Classes="muted" Text="{Binding OpenedText}" />
-                                        </Grid>
-                                    </DataTemplate>
-                                </MenuItem.ItemTemplate>
-                                <MenuItem.ItemContainerTheme>
-                                    <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:DataType="vm:RecentSongItem">
-                                        <Setter Property="ToolTip.Tip" Value="{Binding ToolTip}" />
-                                        <Setter Property="Command" Value="{Binding $parent[Menu].((vm:EditorWindowViewModel)DataContext).OpenRecentCommand}" />
-                                        <Setter Property="CommandParameter" Value="{Binding}" />
-                                    </ControlTheme>
-                                </MenuItem.ItemContainerTheme>
+                 the program version. Dragging anywhere but the menus, the title and the version moves the window. Layered
+                 over the progress of a song being opened, see-through so it shows. -->
+            <Panel x:Name="TitleBand">
+                <ctl:BusyBar Foreground="{DynamicResource AccentTintBrush}"
+                             IsActive="{Binding IsLoading}"
+                             AutomationProperties.Name="{Binding LoadingText}" />
+                <ctl:TitleBar Icon="/Assets/ChartBuilder.ico" AppName="{x:Static res:Strings.AppName}" Background="Transparent">
+                    <ctl:TitleBar.Menu>
+                        <!-- Off while a song opens, as what's chosen would act on the Editor being left. -->
+                        <Menu chrome:WindowDecorationProperties.ElementRole="User" IsEnabled="{Binding !IsOpening}">
+                            <MenuItem Header="{x:Static res:Strings.MenuFile}">
+                                <MenuItem Header="{x:Static res:Strings.MenuNewChart}" Command="{Binding NewChartCommand}" InputGesture="Ctrl+N">
+                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource NewChartStroke}" /></MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="{x:Static res:Strings.MenuOpen}" Command="{Binding OpenChartCommand}" InputGesture="Ctrl+O">
+                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource InputFolderStroke}" /></MenuItem.Icon>
+                                </MenuItem>
+                                <!-- The songs opened lately, the latest first. Each opens with the menu's OpenRecentCommand, found up
+                                     the logical tree ($parent), as the submenu's popup isn't under the menu in the visual tree. -->
+                                <MenuItem Header="{x:Static res:Strings.MenuOpenRecent}" ItemsSource="{Binding Recent}" IsEnabled="{Binding HasRecent}">
+                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource RecentStroke}" /></MenuItem.Icon>
+                                    <MenuItem.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:RecentSongItem">
+                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24" MinWidth="240">
+                                                <TextBlock Grid.Column="0" MaxWidth="360" TextTrimming="CharacterEllipsis" Text="{Binding Title}" />
+                                                <TextBlock Grid.Column="1" Classes="muted" Text="{Binding OpenedText}" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </MenuItem.ItemTemplate>
+                                    <MenuItem.ItemContainerTheme>
+                                        <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:DataType="vm:RecentSongItem">
+                                            <Setter Property="ToolTip.Tip" Value="{Binding ToolTip}" />
+                                            <Setter Property="Command" Value="{Binding $parent[Menu].((vm:EditorWindowViewModel)DataContext).OpenRecentCommand}" />
+                                            <Setter Property="CommandParameter" Value="{Binding}" />
+                                        </ControlTheme>
+                                    </MenuItem.ItemContainerTheme>
+                                </MenuItem>
+                                <Separator />
+                                <MenuItem Header="{x:Static res:Strings.MenuSave}" Command="{Binding SaveCommand}" InputGesture="Ctrl+S">
+                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource SaveStroke}" /></MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="{x:Static res:Strings.MenuSaveAndPack}"
+                                          Command="{Binding SaveAndPackCommand}"
+                                          ToolTip.Tip="{Binding SaveAndPackToolTip}"
+                                          ToolTip.ShowOnDisabled="True">
+                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource PackStroke}" /></MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="{x:Static res:Strings.MenuExportCopy}"
+                                          Command="{Binding ExportCopyCommand}"
+                                          ToolTip.Tip="{Binding ExportCopyToolTip}"
+                                          ToolTip.ShowOnDisabled="True">
+                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource OutputFolderStroke}" /></MenuItem.Icon>
+                                </MenuItem>
+                                <Separator />
+                                <!-- Settings is the program's, last under File as in Chart Packer; the chart's are a tab in the
+                                     left panel. Its Ctrl+, isn't shown, as Avalonia would print it as Ctrl+OemComma. -->
+                                <MenuItem Header="{x:Static res:Strings.MenuSettings}" Command="{Binding OpenProgramSettingsCommand}">
+                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource SettingsStroke}" /></MenuItem.Icon>
+                                </MenuItem>
                             </MenuItem>
-                            <Separator />
-                            <MenuItem Header="{x:Static res:Strings.MenuSave}" Command="{Binding SaveCommand}" InputGesture="Ctrl+S" />
-                            <MenuItem Header="{x:Static res:Strings.MenuSaveAndPack}"
-                                      Command="{Binding SaveAndPackCommand}"
-                                      ToolTip.Tip="{Binding SaveAndPackToolTip}"
-                                      ToolTip.ShowOnDisabled="True" />
-                            <MenuItem Header="{x:Static res:Strings.MenuExportCopy}"
-                                      Command="{Binding ExportCopyCommand}"
-                                      ToolTip.Tip="{Binding ExportCopyToolTip}"
-                                      ToolTip.ShowOnDisabled="True" />
-                            <Separator />
-                            <!-- Settings is the program's, last under File as in Chart Packer; the chart's are a tab in the
-                                 left panel. Its Ctrl+, isn't shown, as Avalonia would print it as Ctrl+OemComma. -->
-                            <MenuItem Header="{x:Static res:Strings.MenuSettings}" Command="{Binding OpenProgramSettingsCommand}" />
-                        </MenuItem>
-                        <MenuItem Header="{x:Static res:Strings.MenuEdit}">
-                            <MenuItem Header="{x:Static res:Strings.MenuUndo}" Command="{Binding UndoCommand}" InputGesture="Ctrl+Z" />
-                            <MenuItem Header="{x:Static res:Strings.MenuRedo}" Command="{Binding RedoCommand}" InputGesture="Ctrl+Y" />
-                        </MenuItem>
-                    </Menu>
-                </ctl:TitleBar.Menu>
-                <!-- Left-aligned, so the version follows the title, and the title is trimmed when they don't fit. The title
-                     is a button (title-link, in Theme.axaml) that shows the song in the file manager; a new chart's, with
-                     nowhere to show, is plain text. The version opens the releases page. -->
-                <Grid ColumnDefinitions="*,Auto"
-                      ColumnSpacing="8"
-                      Margin="6,0,0,0"
-                      HorizontalAlignment="Left"
-                      VerticalAlignment="Center">
-                    <Button Grid.Column="0"
-                            Classes="title-link"
-                            chrome:WindowDecorationProperties.ElementRole="User"
-                            Command="{Binding ShowSongCommand}"
-                            ToolTip.Tip="{Binding ShowSongToolTip}"
-                            AutomationProperties.Name="{Binding ShowSongToolTip}">
-                        <TextBlock FontSize="12" TextTrimming="CharacterEllipsis" Text="{Binding Title}" />
-                    </Button>
-                    <ctl:VersionLink Grid.Column="1" chrome:WindowDecorationProperties.ElementRole="User" />
-                </Grid>
-            </ctl:TitleBar>
+                            <MenuItem Header="{x:Static res:Strings.MenuEdit}">
+                                <MenuItem Header="{x:Static res:Strings.MenuUndo}" Command="{Binding UndoCommand}" InputGesture="Ctrl+Z">
+                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource UndoStroke}" /></MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="{x:Static res:Strings.MenuRedo}" Command="{Binding RedoCommand}" InputGesture="Ctrl+Y">
+                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource UndoStroke}" RenderTransform="scaleX(-1)" /></MenuItem.Icon>
+                                </MenuItem>
+                            </MenuItem>
+                        </Menu>
+                    </ctl:TitleBar.Menu>
+                    <!-- Left-aligned, so the version follows the title, and the title is trimmed when they don't fit. The title
+                         is a button (title-link, in Theme.axaml) that shows the song in the file manager; a new chart's, with
+                         nowhere to show, is plain text. The version opens the releases page. -->
+                    <Grid ColumnDefinitions="*,Auto"
+                          ColumnSpacing="8"
+                          Margin="6,0,0,0"
+                          HorizontalAlignment="Left"
+                          VerticalAlignment="Center">
+                        <Button Grid.Column="0"
+                                Classes="title-link"
+                                chrome:WindowDecorationProperties.ElementRole="User"
+                                Command="{Binding ShowSongCommand}"
+                                ToolTip.Tip="{Binding ShowSongToolTip}"
+                                AutomationProperties.Name="{Binding ShowSongToolTip}">
+                            <TextBlock FontSize="12" TextTrimming="CharacterEllipsis" Text="{Binding Title}" />
+                        </Button>
+                        <ctl:VersionLink Grid.Column="1" chrome:WindowDecorationProperties.ElementRole="User" />
+                    </Grid>
+                </ctl:TitleBar>
+            </Panel>
 
             <!-- The toolbar's groups wrap onto more rows as the window narrows, rather than scrolling. -->
             <Border Classes="toolbar">
                 <WrapPanel ItemSpacing="8" LineSpacing="6">
-                    <!-- The editing tools (charter-spec §4.5: EditorTools), one picked at a time. Beside the Phrase tool is
-                         the kind of phrase it adds, of those the part in focus can have (C8), and Generate fills (C6
-                         item 5), whose options are in its flyout. -->
+                    <WrapPanel.Styles>
+                        <Style Selector="ToggleButton.labelled">
+                            <Setter Property="Height" Value="28" />
+                            <Setter Property="Padding" Value="10,0" />
+                            <Setter Property="CornerRadius" Value="6" />
+                            <Setter Property="BorderThickness" Value="0" />
+                            <Setter Property="Background" Value="Transparent" />
+                            <Setter Property="VerticalContentAlignment" Value="Center" />
+                        </Style>
+                        <Style Selector="ToggleButton.labelled:checked /template/ ContentPresenter#PART_ContentPresenter">
+                            <Setter Property="Background" Value="{DynamicResource AccentTintBrush}" />
+                            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+                        </Style>
+                        <!-- Between the rows of choices of the place tool's options. -->
+                        <Style Selector="Border.choice-divider">
+                            <Setter Property="Width" Value="1" />
+                            <Setter Property="Margin" Value="4,5" />
+                            <Setter Property="Background" Value="{DynamicResource SubtleBorderBrush}" />
+                        </Style>
+                    </WrapPanel.Styles>
+
+                    <!-- The editing tools (charter-spec §4.5: EditorTools), one picked at a time, as icons whose tips name
+                         them. Beside the Phrase tool is the kind of phrase it adds, of those the part in focus can have
+                         (C8). Generate fills and Generate star power are in each lane's Edit menu, as they work on the
+                         lane's part. -->
                     <Border Classes="toolbar-group">
                         <StackPanel Orientation="Horizontal" Spacing="2">
-                            <StackPanel.Styles>
-                                <Style Selector="ToggleButton.labelled">
-                                    <Setter Property="Height" Value="28" />
-                                    <Setter Property="Padding" Value="10,0" />
-                                    <Setter Property="CornerRadius" Value="6" />
-                                    <Setter Property="BorderThickness" Value="0" />
-                                    <Setter Property="Background" Value="Transparent" />
-                                    <Setter Property="VerticalContentAlignment" Value="Center" />
-                                </Style>
-                                <Style Selector="ToggleButton.labelled:checked /template/ ContentPresenter#PART_ContentPresenter">
-                                    <Setter Property="Background" Value="{DynamicResource AccentTintBrush}" />
-                                    <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
-                                </Style>
-                            </StackPanel.Styles>
-                            <ToggleButton Classes="labelled" Content="{x:Static res:Strings.ToolSelect}" IsChecked="{Binding Editor.IsSelectTool}" ToolTip.Tip="{x:Static res:Strings.ToolSelectToolTip}" />
-                            <ToggleButton Classes="labelled" Content="{x:Static res:Strings.ToolPlace}" IsChecked="{Binding Editor.IsPlaceTool}" ToolTip.Tip="{x:Static res:Strings.ToolPlaceToolTip}" />
-                            <ToggleButton Classes="labelled" Content="{x:Static res:Strings.ToolErase}" IsChecked="{Binding Editor.IsEraseTool}" ToolTip.Tip="{x:Static res:Strings.ToolEraseToolTip}" />
-                            <ToggleButton Classes="labelled" Content="{x:Static res:Strings.ToolSustain}" IsChecked="{Binding Editor.IsSustainTool}" ToolTip.Tip="{x:Static res:Strings.ToolSustainToolTip}" />
-                            <ToggleButton Classes="labelled" Content="{x:Static res:Strings.ToolPhrase}" IsChecked="{Binding Editor.IsPhraseTool}" ToolTip.Tip="{x:Static res:Strings.ToolPhraseToolTip}" />
+                            <ToggleButton Classes="tool" IsChecked="{Binding Editor.IsSelectTool}" AutomationProperties.Name="{x:Static res:Strings.ToolSelect}">
+                                <ToolTip.Tip>
+                                    <StackPanel MaxWidth="320" Spacing="4">
+                                        <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.ToolSelect}" />
+                                        <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.ToolSelectToolTip}" />
+                                    </StackPanel>
+                                </ToolTip.Tip>
+                                <ctl:LineIcon Data="{StaticResource PointerStroke}" />
+                            </ToggleButton>
+                            <ToggleButton Classes="tool" IsChecked="{Binding Editor.IsPlaceTool}" AutomationProperties.Name="{x:Static res:Strings.ToolPlace}">
+                                <ToolTip.Tip>
+                                    <StackPanel MaxWidth="320" Spacing="4">
+                                        <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.ToolPlace}" />
+                                        <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.ToolPlaceToolTip}" />
+                                    </StackPanel>
+                                </ToolTip.Tip>
+                                <ctl:LineIcon Data="{StaticResource PencilStroke}" />
+                            </ToggleButton>
+                            <ToggleButton Classes="tool" IsChecked="{Binding Editor.IsEraseTool}" AutomationProperties.Name="{x:Static res:Strings.ToolErase}">
+                                <ToolTip.Tip>
+                                    <StackPanel MaxWidth="320" Spacing="4">
+                                        <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.ToolErase}" />
+                                        <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.ToolEraseToolTip}" />
+                                    </StackPanel>
+                                </ToolTip.Tip>
+                                <ctl:LineIcon Data="{StaticResource EraserStroke}" />
+                            </ToggleButton>
+                            <ToggleButton Classes="tool" IsChecked="{Binding Editor.IsPhraseTool}" AutomationProperties.Name="{x:Static res:Strings.ToolPhrase}">
+                                <ToolTip.Tip>
+                                    <StackPanel MaxWidth="320" Spacing="4">
+                                        <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.ToolPhrase}" />
+                                        <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.ToolPhraseToolTip}" />
+                                    </StackPanel>
+                                </ToolTip.Tip>
+                                <ctl:LineIcon Data="{StaticResource HighlighterStroke}" />
+                            </ToggleButton>
                             <ComboBox VerticalAlignment="Center"
                                       Height="28"
                                       MinWidth="124"
@@ -189,74 +249,74 @@
                                       DisplayMemberBinding="{Binding Label, x:DataType=vm:PhraseKindChoice}"
                                       ToolTip.Tip="{x:Static res:Strings.ToolPhraseKindToolTip}"
                                       AutomationProperties.Name="{x:Static res:Strings.ToolPhraseKindName}" />
-                            <Button x:Name="GenerateFillsButton"
-                                    Classes="labelled"
-                                    Background="Transparent"
-                                    BorderThickness="0"
-                                    Content="{x:Static res:Strings.GenerateFillsButton}"
-                                    IsEnabled="{Binding Editor.CanGenerateFills}"
-                                    ToolTip.Tip="{x:Static res:Strings.GenerateFillsToolTip}"
-                                    ToolTip.ShowOnDisabled="True">
-                                <Button.Flyout>
-                                    <Flyout Placement="BottomEdgeAlignedLeft">
-                                        <StackPanel Spacing="10" MinWidth="260">
-                                            <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.GenerateFillsHeading}" />
-                                            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
-                                                <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.GenerateFillsSpacingLabel}" />
-                                                <NumericUpDown Grid.Row="0"
-                                                               Grid.Column="1"
-                                                               Value="{Binding Editor.FillSpacing}"
-                                                               Minimum="1"
-                                                               Maximum="64"
-                                                               Increment="1"
-                                                               FormatString="0"
-                                                               ParsingNumberStyle="Integer"
-                                                               ToolTip.Tip="{x:Static res:Strings.GenerateFillsSpacingToolTip}"
-                                                               AutomationProperties.Name="{x:Static res:Strings.GenerateFillsSpacingLabel}" />
-                                                <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.GenerateFillsLengthLabel}" />
-                                                <NumericUpDown Grid.Row="1"
-                                                               Grid.Column="1"
-                                                               Value="{Binding Editor.FillLength}"
-                                                               Minimum="1"
-                                                               Maximum="16"
-                                                               Increment="1"
-                                                               FormatString="0"
-                                                               ParsingNumberStyle="Integer"
-                                                               ToolTip.Tip="{x:Static res:Strings.GenerateFillsLengthToolTip}"
-                                                               AutomationProperties.Name="{x:Static res:Strings.GenerateFillsLengthLabel}" />
-                                                <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.GenerateFillsEndLabel}" />
-                                                <ComboBox Grid.Row="2"
-                                                          Grid.Column="1"
-                                                          HorizontalAlignment="Stretch"
-                                                          ItemsSource="{Binding Editor.FillEndChoices}"
-                                                          SelectedItem="{Binding Editor.SelectedFillEnd}"
-                                                          DisplayMemberBinding="{Binding Label, x:DataType=vm:FillEndChoice}"
-                                                          ToolTip.Tip="{x:Static res:Strings.GenerateFillsEndToolTip}"
-                                                          AutomationProperties.Name="{x:Static res:Strings.GenerateFillsEndLabel}" />
-                                                <TextBlock Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.GenerateFillsScopeLabel}" />
-                                                <TextBlock Grid.Row="3" Grid.Column="1" VerticalAlignment="Center" Text="{Binding Editor.FillScopeText}" />
-                                            </Grid>
-                                            <Button Classes="accent"
-                                                    HorizontalAlignment="Right"
-                                                    Content="{x:Static res:Strings.GenerateFillsGenerate}"
-                                                    Command="{Binding Editor.GenerateFillsCommand}"
-                                                    Click="OnGenerateFillsClick" />
-                                        </StackPanel>
-                                    </Flyout>
-                                </Button.Flyout>
-                            </Button>
-                            <ToggleButton Classes="labelled" Content="{x:Static res:Strings.ToolTempo}" IsChecked="{Binding Editor.IsTempoTool}" ToolTip.Tip="{x:Static res:Strings.ToolTempoToolTip}" />
-                            <ToggleButton Classes="labelled" Content="{x:Static res:Strings.ToolSync}" IsChecked="{Binding Editor.IsSyncTool}" ToolTip.Tip="{x:Static res:Strings.ToolSyncToolTip}" />
+                            <ToggleButton Classes="tool" IsChecked="{Binding Editor.IsTempoTool}" AutomationProperties.Name="{x:Static res:Strings.ToolTempo}">
+                                <ToolTip.Tip>
+                                    <StackPanel MaxWidth="320" Spacing="4">
+                                        <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.ToolTempo}" />
+                                        <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.ToolTempoToolTip}" />
+                                    </StackPanel>
+                                </ToolTip.Tip>
+                                <ctl:LineIcon Data="{StaticResource MetronomeStroke}" />
+                            </ToggleButton>
+                            <ToggleButton Classes="tool" IsChecked="{Binding Editor.IsSyncTool}" AutomationProperties.Name="{x:Static res:Strings.ToolSync}">
+                                <ToolTip.Tip>
+                                    <StackPanel MaxWidth="320" Spacing="4">
+                                        <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.ToolSync}" />
+                                        <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.ToolSyncToolTip}" />
+                                    </StackPanel>
+                                </ToolTip.Tip>
+                                <ctl:LineIcon Data="{StaticResource LinkStroke}" />
+                            </ToggleButton>
                         </StackPanel>
                     </Border>
 
-                    <!-- The grid notes snap to (charter-spec C4 item 4): [ and ] step through it. -->
+                    <!-- The place tool's options on a 5-fret or GHL lane, while the place tool is picked: what the chord a
+                         note goes in is made, whether it's an open note, and what a drag does. -->
+                    <Border Classes="toolbar-group" IsVisible="{Binding Editor.ShowsFretPlaceOptions}">
+                        <StackPanel Orientation="Horizontal" Spacing="2">
+                            <ToggleButton Classes="labelled" Content="{x:Static res:Strings.PlaceNatural}" IsChecked="{Binding Editor.IsNaturalPlace}" ToolTip.Tip="{x:Static res:Strings.PlaceNaturalToolTip}" />
+                            <ToggleButton Classes="labelled" Content="{x:Static res:Strings.PlaceHopo}" IsChecked="{Binding Editor.IsHopoPlace}" ToolTip.Tip="{x:Static res:Strings.PlaceHopoToolTip}" />
+                            <ToggleButton Classes="labelled" Content="{x:Static res:Strings.PlaceStrum}" IsChecked="{Binding Editor.IsStrumPlace}" ToolTip.Tip="{x:Static res:Strings.PlaceStrumToolTip}" />
+                            <ToggleButton Classes="labelled" Content="{x:Static res:Strings.PlaceTap}" IsChecked="{Binding Editor.IsTapPlace}" ToolTip.Tip="{x:Static res:Strings.PlaceTapToolTip}" />
+                            <Border Classes="choice-divider" />
+                            <ToggleButton Classes="labelled" Content="{x:Static res:Strings.PlaceOpen}" IsChecked="{Binding Editor.PlaceOpen}" ToolTip.Tip="{x:Static res:Strings.PlaceOpenToolTip}" />
+                            <Border Classes="choice-divider" />
+                            <ToggleButton Classes="labelled" Content="{x:Static res:Strings.PlaceDragRun}" IsChecked="{Binding Editor.IsRunDrag}" ToolTip.Tip="{x:Static res:Strings.PlaceDragRunToolTip}" />
+                            <ToggleButton Classes="labelled" Content="{x:Static res:Strings.PlaceDragSustain}" IsChecked="{Binding Editor.IsSustainDrag}" ToolTip.Tip="{x:Static res:Strings.PlaceDragSustainToolTip}" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- The place tool's options on a drums lane, while the place tool is picked: cymbal or tom on Pro
+                         drums, the pad's dynamics, and a 2× kick on Expert. -->
+                    <Border Classes="toolbar-group" IsVisible="{Binding Editor.ShowsDrumPlaceOptions}">
+                        <StackPanel Orientation="Horizontal" Spacing="2">
+                            <StackPanel Orientation="Horizontal" Spacing="2" IsVisible="{Binding Editor.ShowsTomChoice}">
+                                <ToggleButton Classes="labelled" Content="{x:Static res:Strings.PlaceCymbal}" IsChecked="{Binding Editor.IsCymbalPlace}" ToolTip.Tip="{x:Static res:Strings.PlaceCymbalToolTip}" />
+                                <ToggleButton Classes="labelled" Content="{x:Static res:Strings.PlaceTom}" IsChecked="{Binding Editor.IsTomPlace}" ToolTip.Tip="{x:Static res:Strings.PlaceTomToolTip}" />
+                                <Border Classes="choice-divider" />
+                            </StackPanel>
+                            <ToggleButton Classes="labelled" Content="{x:Static res:Strings.PlaceNormal}" IsChecked="{Binding Editor.IsNormalPlace}" ToolTip.Tip="{x:Static res:Strings.PlaceNormalToolTip}" />
+                            <ToggleButton Classes="labelled" Content="{x:Static res:Strings.PlaceAccent}" IsChecked="{Binding Editor.IsAccentPlace}" ToolTip.Tip="{x:Static res:Strings.PlaceAccentToolTip}" />
+                            <ToggleButton Classes="labelled" Content="{x:Static res:Strings.PlaceGhost}" IsChecked="{Binding Editor.IsGhostPlace}" ToolTip.Tip="{x:Static res:Strings.PlaceGhostToolTip}" />
+                            <StackPanel Orientation="Horizontal" Spacing="2" IsVisible="{Binding Editor.ShowsDoubleKickChoice}">
+                                <Border Classes="choice-divider" />
+                                <ToggleButton Classes="labelled" Content="{x:Static res:Strings.PlaceDoubleKick}" IsChecked="{Binding Editor.PlaceDoubleKick}" ToolTip.Tip="{x:Static res:Strings.PlaceDoubleKickToolTip}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- The grid notes snap to (charter-spec C4 item 4), on while the magnet is lit: [ and ] step through it. -->
                     <Border Classes="toolbar-group">
-                        <StackPanel Orientation="Horizontal" Spacing="6" Height="28">
-                            <CheckBox VerticalAlignment="Center"
-                                      Content="{x:Static res:Strings.SnapLabel}"
-                                      IsChecked="{Binding Editor.IsSnapOn}"
-                                      ToolTip.Tip="{x:Static res:Strings.SnapToolTip}" />
+                        <StackPanel Orientation="Horizontal" Spacing="2" Height="28">
+                            <ToggleButton Classes="tool" IsChecked="{Binding Editor.IsSnapOn}" AutomationProperties.Name="{x:Static res:Strings.SnapLabel}">
+                                <ToolTip.Tip>
+                                    <StackPanel MaxWidth="320" Spacing="4">
+                                        <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.SnapLabel}" />
+                                        <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.SnapButtonToolTip}" />
+                                    </StackPanel>
+                                </ToolTip.Tip>
+                                <ctl:LineIcon Data="{StaticResource QuantizeStroke}" />
+                            </ToggleButton>
                             <ComboBox VerticalAlignment="Center"
                                       MinWidth="76"
                                       ItemsSource="{Binding Editor.SnapChoices}"
@@ -267,14 +327,19 @@
                         </StackPanel>
                     </Border>
 
-                    <!-- Audio assist (charter-spec C14): snap to onset (O) and Nudge to onsets (Shift+O). A proposed tempo
-                         map and Find first downbeat are in the Tempo map tab. -->
+                    <!-- Audio assist (charter-spec C14): snap to onset (O), on while the phi is lit, and Nudge to onsets
+                         (Shift+O). A proposed tempo map and Find first downbeat are in the Tempo map tab. -->
                     <Border Classes="toolbar-group" IsVisible="{Binding Editor.AudioAssist.HasAudio}">
-                        <StackPanel Orientation="Horizontal" Spacing="6" Height="28">
-                            <CheckBox VerticalAlignment="Center"
-                                      Content="{x:Static res:Strings.SnapToOnsetLabel}"
-                                      IsChecked="{Binding Editor.AudioAssist.IsSnapToOnset}"
-                                      ToolTip.Tip="{x:Static res:Strings.SnapToOnsetToolTip}" />
+                        <StackPanel Orientation="Horizontal" Spacing="2" Height="28">
+                            <ToggleButton Classes="tool" IsChecked="{Binding Editor.AudioAssist.IsSnapToOnset}" AutomationProperties.Name="{x:Static res:Strings.SnapToOnsetLabel}">
+                                <ToolTip.Tip>
+                                    <StackPanel MaxWidth="320" Spacing="4">
+                                        <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.SnapToOnsetLabel}" />
+                                        <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.SnapToOnsetToolTip}" />
+                                    </StackPanel>
+                                </ToolTip.Tip>
+                                <ctl:LineIcon Data="{StaticResource OnsetStroke}" />
+                            </ToggleButton>
                             <Button Classes="labelled"
                                     Background="Transparent"
                                     BorderThickness="0"
@@ -316,23 +381,27 @@
                 <ColumnDefinition Width="280" MinWidth="180" />
             </Grid.ColumnDefinitions>
 
-            <!-- Left panel: Chart settings (the timing, parts, metadata and tracks), the Art, the sections and other text
-                 events, and the tempo and time signature changes (charter-spec C1; C8 items 3, 5 and 6; C4). Their order is
-                 EditorWindowViewModel's tab indices. -->
-            <bctl:EditorSidePanel Grid.Column="0"
-                                  IsCollapsed="{Binding IsLeftPanelCollapsed}"
-                                  ToggleCommand="{Binding ToggleLeftPanelCommand}"
-                                  SelectedIndex="{Binding LeftPanelTab, Mode=TwoWay}">
-                <TabItem Header="{x:Static res:Strings.ChartSettingsTab}">
+            <!-- Left panel: Chart settings (the parts, metadata and tracks), the Art, the sections and other text events, and
+                 the timing and the tempo and time signature changes (charter-spec C1; C8 items 3, 5 and 6; C4). Each tab's key
+                 is EditorWindowViewModel's, and keeps its place wherever it's dragged. Pinned, it's in its column;
+                 auto-hiding, EditorWindow.axaml.cs lays it over the chart. -->
+            <bctl:EditorSidePanel x:Name="LeftPanel"
+                                  Grid.Column="0"
+                                  LayoutKey="left"
+                                  IsAutoHide="{Binding IsLeftPanelAutoHide}"
+                                  IsOpen="{Binding IsLeftPanelOpen}"
+                                  PanelWidth="{Binding LeftPanelWidth}"
+                                  SelectedKey="{Binding LeftPanelTab}">
+                <TabItem bctl:EditorSidePanel.Key="chart-settings" Header="{x:Static res:Strings.ChartSettingsTab}">
                     <views:ChartSettingsView />
                 </TabItem>
-                <TabItem Header="{x:Static res:Strings.ArtTab}">
+                <TabItem bctl:EditorSidePanel.Key="art" Header="{x:Static res:Strings.ArtTab}">
                     <views:ArtView DataContext="{Binding Art}" />
                 </TabItem>
-                <TabItem Header="{x:Static res:Strings.SectionsTab}">
+                <TabItem bctl:EditorSidePanel.Key="sections" Header="{x:Static res:Strings.SectionsTab}">
                     <views:SectionsView DataContext="{Binding Sections}" />
                 </TabItem>
-                <TabItem Header="{x:Static res:Strings.TempoMapTab}">
+                <TabItem bctl:EditorSidePanel.Key="tempo-map" Header="{x:Static res:Strings.TempoMapTab}">
                     <views:TempoMapView DataContext="{Binding TempoMap}" />
                 </TabItem>
             </bctl:EditorSidePanel>
@@ -341,33 +410,42 @@
                           ResizeDirection="Columns"
                           Width="4"
                           Background="{DynamicResource SubtleBorderBrush}"
-                          IsVisible="{Binding !IsLeftPanelCollapsed}" />
+                          IsVisible="{Binding !IsLeftPanelAutoHide}" />
 
             <!-- The chart: its lanes, each a part's highway or a vocal part, docked as the user arranges them. Over them,
-                 while Generate fills runs (charter-spec C6 item 5), a bar to keep, drop, add or cancel its proposals. -->
+                 while Generate fills or Generate star power runs (charter-spec C6 item 5, C8 item 1), a bar to keep, drop,
+                 add or cancel its proposals. -->
             <DockPanel Grid.Column="2">
                 <Border DockPanel.Dock="Top"
-                        IsVisible="{Binding Editor.IsFillRunActive}"
+                        IsVisible="{Binding Editor.IsProposalRunActive}"
                         Background="{DynamicResource ToolbarBrush}"
                         BorderBrush="{DynamicResource SubtleBorderBrush}"
                         BorderThickness="0,0,0,1"
                         Padding="12,4">
                     <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
-                        <TextBlock Grid.Column="0" VerticalAlignment="Center" FontWeight="SemiBold" Text="{Binding Editor.FillRunText}" />
+                        <TextBlock Grid.Column="0" VerticalAlignment="Center" FontWeight="SemiBold" Text="{Binding Editor.ProposalRunText}" />
                         <TextBlock Grid.Column="1"
                                    Classes="muted"
                                    FontSize="12"
                                    VerticalAlignment="Center"
                                    TextTrimming="CharacterEllipsis"
-                                   Text="{x:Static res:Strings.FillRunHint}" />
+                                   Text="{Binding Editor.ProposalRunHint}" />
                         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6">
-                            <Button Classes="labelled" Content="{x:Static res:Strings.FillRunKeepAll}" Command="{Binding Editor.KeepAllFillsCommand}" />
-                            <Button Classes="labelled" Content="{x:Static res:Strings.FillRunDropAll}" Command="{Binding Editor.DropAllFillsCommand}" />
+                            <Button Classes="labelled"
+                                    Content="{x:Static res:Strings.ProposalRunPrevious}"
+                                    Command="{Binding Editor.PreviousProposalCommand}"
+                                    ToolTip.Tip="{x:Static res:Strings.ProposalRunPreviousToolTip}" />
+                            <Button Classes="labelled"
+                                    Content="{x:Static res:Strings.ProposalRunNext}"
+                                    Command="{Binding Editor.NextProposalCommand}"
+                                    ToolTip.Tip="{x:Static res:Strings.ProposalRunNextToolTip}" />
+                            <Button Classes="labelled" Content="{x:Static res:Strings.FillRunKeepAll}" Command="{Binding Editor.KeepAllProposalsCommand}" />
+                            <Button Classes="labelled" Content="{x:Static res:Strings.FillRunDropAll}" Command="{Binding Editor.DropAllProposalsCommand}" />
                             <Button Classes="labelled accent"
-                                    Content="{x:Static res:Strings.FillRunAdd}"
-                                    Command="{Binding Editor.AddFillsCommand}"
-                                    ToolTip.Tip="{x:Static res:Strings.FillRunAddToolTip}" />
-                            <Button Classes="labelled" Content="{x:Static res:Strings.FillRunCancel}" Command="{Binding Editor.CancelFillsCommand}" />
+                                    Content="{Binding Editor.ProposalRunAdd}"
+                                    Command="{Binding Editor.AddProposalsCommand}"
+                                    ToolTip.Tip="{Binding Editor.ProposalRunAddToolTip}" />
+                            <Button Classes="labelled" Content="{x:Static res:Strings.FillRunCancel}" Command="{Binding Editor.CancelProposalsCommand}" />
                         </StackPanel>
                     </Grid>
                 </Border>
@@ -437,14 +515,14 @@
                         <Button Classes="labelled"
                                 Margin="0,8,0,0"
                                 HorizontalAlignment="Center"
+                                bctl:LaneMenu.Items="{Binding Lanes.AddMenu}"
                                 AutomationProperties.Name="{x:Static res:Strings.AddLaneButton}">
                             <StackPanel Orientation="Horizontal" Spacing="6">
                                 <ctl:LineIcon Data="{StaticResource AddStroke}" />
                                 <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.AddLaneButton}" />
                             </StackPanel>
                             <Button.Flyout>
-                                <MenuFlyout Placement="BottomEdgeAlignedLeft"
-                                            ItemsSource="{Binding Lanes.AddMenu, Converter={StaticResource LaneMenu}}" />
+                                <MenuFlyout Placement="BottomEdgeAlignedLeft" />
                             </Button.Flyout>
                         </Button>
                     </StackPanel>
@@ -455,15 +533,18 @@
                           ResizeDirection="Columns"
                           Width="4"
                           Background="{DynamicResource SubtleBorderBrush}"
-                          IsVisible="{Binding !IsRightPanelCollapsed}" />
+                          IsVisible="{Binding !IsRightPanelAutoHide}" />
 
             <!-- Right panel: Properties, which shows what's selected (charter-spec C3 item 4), and the song.ini changes
                  waiting to be saved (C17 item 2), each of which can be reverted. -->
-            <bctl:EditorSidePanel Grid.Column="4"
-                                  IsCollapsed="{Binding IsRightPanelCollapsed}"
-                                  ToggleCommand="{Binding ToggleRightPanelCommand}"
+            <bctl:EditorSidePanel x:Name="RightPanel"
+                                  Grid.Column="4"
+                                  LayoutKey="right"
+                                  IsAutoHide="{Binding IsRightPanelAutoHide}"
+                                  IsOpen="{Binding IsRightPanelOpen}"
+                                  PanelWidth="{Binding RightPanelWidth}"
                                   IsRightEdge="True">
-                <TabItem Header="{x:Static res:Strings.PropertiesTab}">
+                <TabItem bctl:EditorSidePanel.Key="properties" Header="{x:Static res:Strings.PropertiesTab}">
                     <Panel>
                         <StackPanel Classes="placeholder" IsVisible="{Binding Editor.Properties.IsEmpty}">
                             <TextBlock Classes="centered" FontWeight="SemiBold" Text="{x:Static res:Strings.PropertiesNothingSelected}" />
@@ -472,79 +553,88 @@
                                        TextWrapping="Wrap"
                                        Text="{x:Static res:Strings.PropertiesNothingSelectedHint}" />
                         </StackPanel>
-                        <ScrollViewer IsVisible="{Binding !Editor.Properties.IsEmpty}">
+                        <ScrollViewer HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding !Editor.Properties.IsEmpty}">
                             <views:PropertiesView DataContext="{Binding Editor.Properties}" />
                         </ScrollViewer>
                     </Panel>
                 </TabItem>
-                <TabItem Header="{x:Static res:Strings.FindingsTab}">
-                    <DockPanel>
-                        <TextBlock DockPanel.Dock="Top"
-                                   Classes="muted"
-                                   FontSize="12"
-                                   Margin="12,8,12,4"
-                                   Text="{Binding Findings.Issues.Summary}" />
-                        <uiviews:ChartIssuesView DataContext="{Binding Findings.Issues}" />
-                    </DockPanel>
+                <!-- The chart's findings, searched and filtered as Chart Packer's chart issues window has them. -->
+                <TabItem bctl:EditorSidePanel.Key="findings" Header="{x:Static res:Strings.FindingsTab}">
+                    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                        <bctl:PanelSectionStack TabKey="findings">
+                            <bctl:PanelSection Key="findings" Header="{x:Static res:Strings.FindingsTab}" Fills="True" FillMinHeight="240">
+                                <uiviews:ChartIssuesPanel DataContext="{Binding Findings.Issues}" />
+                            </bctl:PanelSection>
+                        </bctl:PanelSectionStack>
+                    </ScrollViewer>
                 </TabItem>
-                <TabItem Header="{x:Static res:Strings.PendingChangesTab}">
-                    <!-- The list virtualizes, in its own scroller, with the heading above it and the hint below. -->
-                    <DockPanel Margin="12,8">
-                        <TextBlock DockPanel.Dock="Top" Classes="caption" Text="{x:Static res:Strings.PendingChangesHeading}" />
-                        <TextBlock DockPanel.Dock="Top"
-                                   Classes="muted"
-                                   FontSize="12"
-                                   Margin="0,6,0,0"
-                                   TextWrapping="Wrap"
-                                   Text="{x:Static res:Strings.PendingChangesNone}"
-                                   IsVisible="{Binding !HasPendingChanges}" />
-                        <TextBlock DockPanel.Dock="Bottom"
-                                   Classes="muted"
-                                   FontSize="12"
-                                   Margin="0,6,0,0"
-                                   TextWrapping="Wrap"
-                                   Text="{x:Static res:Strings.PendingChangesHint}"
-                                   IsVisible="{Binding HasPendingChanges}" />
-                        <ScrollViewer Margin="0,6,0,0" HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding HasPendingChanges}">
-                            <ItemsControl ItemsSource="{Binding PendingChanges}">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <VirtualizingStackPanel />
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate x:DataType="vm:PendingChangeItem">
-                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" Margin="0,0,0,2" ToolTip.Tip="{Binding Reason}">
-                                            <SelectableTextBlock Grid.Column="0"
-                                                                 FontSize="12"
-                                                                 VerticalAlignment="Center"
-                                                                 Text="{Binding Text}"
-                                                                 TextWrapping="Wrap"
-                                                                 Classes.reverted="{Binding IsReverted}" />
-                                            <Button Grid.Column="1"
-                                                    Classes="labelled"
-                                                    FontSize="12"
-                                                    Content="{x:Static res:Strings.PendingChangeRevertButton}"
-                                                    Command="{Binding RevertCommand}"
-                                                    IsVisible="{Binding IsApplied}"
-                                                    ToolTip.Tip="{Binding NotRevertableReason}"
-                                                    ToolTip.ShowOnDisabled="True" />
-                                            <Button Grid.Column="1"
-                                                    Classes="labelled"
-                                                    FontSize="12"
-                                                    Content="{x:Static res:Strings.PendingChangeRestoreButton}"
-                                                    Command="{Binding RestoreCommand}"
-                                                    IsVisible="{Binding IsReverted}" />
-                                        </Grid>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </ScrollViewer>
-                    </DockPanel>
+                <TabItem bctl:EditorSidePanel.Key="pending-changes" Header="{x:Static res:Strings.PendingChangesTab}">
+                    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                        <bctl:PanelSectionStack TabKey="pending-changes">
+                            <bctl:PanelSection Key="pending-changes" Header="{x:Static res:Strings.PendingChangesHeading}" Fills="True" FillMinHeight="200">
+                                <!-- The list virtualizes, in its own scroller, with the hint below it. -->
+                                <DockPanel Margin="12,8">
+                                    <TextBlock DockPanel.Dock="Top"
+                                               Classes="muted"
+                                               FontSize="12"
+                                               Margin="0,6,0,0"
+                                               TextWrapping="Wrap"
+                                               Text="{x:Static res:Strings.PendingChangesNone}"
+                                               IsVisible="{Binding !HasPendingChanges}" />
+                                    <TextBlock DockPanel.Dock="Bottom"
+                                               Classes="muted"
+                                               FontSize="12"
+                                               Margin="0,6,0,0"
+                                               TextWrapping="Wrap"
+                                               Text="{x:Static res:Strings.PendingChangesHint}"
+                                               IsVisible="{Binding HasPendingChanges}" />
+                                    <ScrollViewer Margin="0,6,0,0" HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding HasPendingChanges}">
+                                        <ItemsControl ItemsSource="{Binding PendingChanges}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <VirtualizingStackPanel />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:PendingChangeItem">
+                                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" Margin="0,0,0,2" ToolTip.Tip="{Binding Reason}">
+                                                        <SelectableTextBlock Grid.Column="0"
+                                                                             FontSize="12"
+                                                                             VerticalAlignment="Center"
+                                                                             Text="{Binding Text}"
+                                                                             TextWrapping="Wrap"
+                                                                             Classes.reverted="{Binding IsReverted}" />
+                                                        <Button Grid.Column="1"
+                                                                Classes="labelled"
+                                                                FontSize="12"
+                                                                Content="{x:Static res:Strings.PendingChangeRevertButton}"
+                                                                Command="{Binding RevertCommand}"
+                                                                IsVisible="{Binding IsApplied}"
+                                                                ToolTip.Tip="{Binding NotRevertableReason}"
+                                                                ToolTip.ShowOnDisabled="True" />
+                                                        <Button Grid.Column="1"
+                                                                Classes="labelled"
+                                                                FontSize="12"
+                                                                Content="{x:Static res:Strings.PendingChangeRestoreButton}"
+                                                                Command="{Binding RestoreCommand}"
+                                                                IsVisible="{Binding IsReverted}" />
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </DockPanel>
+                            </bctl:PanelSection>
+                        </bctl:PanelSectionStack>
+                    </ScrollViewer>
                 </TabItem>
                 <!-- The highway preview (charter-spec C18), docked; it also opens in a window of its own. -->
-                <TabItem Header="{x:Static res:Strings.PreviewTab}">
+                <TabItem bctl:EditorSidePanel.Key="preview" Header="{x:Static res:Strings.PreviewTab}">
                     <views:PreviewView DataContext="{Binding Editor.Preview}" />
+                </TabItem>
+                <!-- The difficulty analysis of a five-fret lane, docked; it also opens in a window of its own. -->
+                <TabItem bctl:EditorSidePanel.Key="difficulty" Header="{x:Static res:Strings.DifficultyTab}">
+                    <views:DifficultyView DataContext="{Binding Editor.Difficulty}" />
                 </TabItem>
             </bctl:EditorSidePanel>
         </Grid>
@@ -570,8 +660,8 @@
                                 ToolTip.Tip="{Binding Playback.PlayPauseToolTip}"
                                 AutomationProperties.Name="{x:Static res:Strings.PlayPauseButton}">
                             <Panel>
-                                <PathIcon Width="12" Height="12" Data="{StaticResource PlayIconGeometry}" IsVisible="{Binding !Playback.IsPlaying}" />
-                                <PathIcon Width="12" Height="12" Data="{StaticResource PauseIconGeometry}" IsVisible="{Binding Playback.IsPlaying}" />
+                                <ctl:LineIcon Width="12" Height="12" Data="{StaticResource PlayStroke}" IsVisible="{Binding !Playback.IsPlaying}" />
+                                <ctl:LineIcon Width="12" Height="12" Data="{StaticResource PauseStroke}" IsVisible="{Binding Playback.IsPlaying}" />
                             </Panel>
                         </Button>
                         <ToggleButton Classes="tool"
@@ -590,19 +680,33 @@
                                       AutomationProperties.Name="{x:Static res:Strings.PlaytestButton}">
                             <PathIcon Width="16" Height="16" Data="{StaticResource PlaytestIconGeometry}" />
                         </ToggleButton>
-                        <ComboBox ItemsSource="{Binding Editor.RecordModeChoices}"
+                        <!-- The drop-downs are centred on the row, as Fluent puts a ComboBox at the top of it. -->
+                        <ComboBox VerticalAlignment="Center"
+                                  VerticalContentAlignment="Center"
+                                  Height="28"
+                                  ItemsSource="{Binding Editor.RecordModeChoices}"
                                   SelectedItem="{Binding Editor.SelectedRecordMode}"
                                   DisplayMemberBinding="{Binding Label, x:DataType=vm:RecordModeChoice}"
                                   MinWidth="100"
                                   ToolTip.Tip="{x:Static res:Strings.RecordModeToolTip}"
                                   AutomationProperties.Name="{x:Static res:Strings.RecordModeToolTip}" />
-                        <!-- Quantize: on, record mode puts what's played on the grid beside it; off, it's kept as played. The
-                             grid is also what Quantize in the note menu uses. -->
-                        <CheckBox VerticalAlignment="Center"
-                                  Content="{x:Static res:Strings.QuantizeLabel}"
-                                  IsChecked="{Binding Editor.IsRecordQuantized}"
-                                  ToolTip.Tip="{x:Static res:Strings.QuantizeToolTip}" />
-                        <ComboBox ItemsSource="{Binding Editor.SnapChoices}"
+                        <!-- Quantize, lit while on: record mode puts what's played on the grid beside it; off, it's kept as
+                             played. The grid is also what Quantize in the note menu uses. -->
+                        <ToggleButton Classes="tool"
+                                      IsChecked="{Binding Editor.IsRecordQuantized}"
+                                      AutomationProperties.Name="{x:Static res:Strings.QuantizeLabel}">
+                            <ToolTip.Tip>
+                                <StackPanel MaxWidth="320" Spacing="4">
+                                    <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.QuantizeLabel}" />
+                                    <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.QuantizeToolTip}" />
+                                </StackPanel>
+                            </ToolTip.Tip>
+                            <ctl:LineIcon Data="{StaticResource QuantizeRecordStroke}" />
+                        </ToggleButton>
+                        <ComboBox VerticalAlignment="Center"
+                                  VerticalContentAlignment="Center"
+                                  Height="28"
+                                  ItemsSource="{Binding Editor.SnapChoices}"
                                   SelectedItem="{Binding Editor.SelectedQuantize}"
                                   DisplayMemberBinding="{Binding Label, x:DataType=vm:SnapChoice}"
                                   MinWidth="80"
@@ -651,7 +755,10 @@
                                 IsVisible="{Binding Editor.Playtest.HasFeedback}"
                                 ToolTip.Tip="{x:Static res:Strings.PlaytestClearToolTip}"
                                 AutomationProperties.Name="{x:Static res:Strings.PlaytestClearToolTip}" />
-                        <ComboBox ItemsSource="{Binding Playback.SpeedPercents}"
+                        <ComboBox VerticalAlignment="Center"
+                                  VerticalContentAlignment="Center"
+                                  Height="28"
+                                  ItemsSource="{Binding Playback.SpeedPercents}"
                                   SelectedItem="{Binding Playback.SpeedPercent}"
                                   IsEnabled="{Binding Playback.IsReady}"
                                   MinWidth="80"
@@ -663,23 +770,76 @@
                                 </DataTemplate>
                             </ComboBox.ItemTemplate>
                         </ComboBox>
-                        <CheckBox Content="{x:Static res:Strings.PitchCorrectionLabel}"
-                                  IsChecked="{Binding Playback.PitchCorrection}"
-                                  IsEnabled="{Binding Playback.IsReady}"
-                                  ToolTip.Tip="{x:Static res:Strings.PitchCorrectionToolTip}" />
-                        <CheckBox Content="{x:Static res:Strings.LoopLabel}"
-                                  IsChecked="{Binding Playback.IsLooping}"
-                                  IsEnabled="{Binding Playback.HasLoop}"
-                                  ToolTip.Tip="{Binding Playback.LoopToolTip}"
-                                  ToolTip.ShowOnDisabled="True" />
-                        <CheckBox Content="{x:Static res:Strings.MetronomeLabel}"
-                                  IsChecked="{Binding Playback.IsMetronomeOn}"
-                                  IsEnabled="{Binding Playback.IsReady}"
-                                  ToolTip.Tip="{x:Static res:Strings.MetronomeToolTip}" />
-                        <CheckBox Content="{x:Static res:Strings.HitSoundsLabel}"
-                                  IsChecked="{Binding Playback.IsHitSoundsOn}"
-                                  IsEnabled="{Binding Playback.IsReady}"
-                                  ToolTip.Tip="{x:Static res:Strings.HitSoundsToolTip}" />
+                        <!-- Keep pitch (Chart Packer's pitch icon), loop, metronome and hit sounds, each lit while on. -->
+                        <ToggleButton Classes="tool"
+                                      IsChecked="{Binding Playback.PitchCorrection}"
+                                      IsEnabled="{Binding Playback.IsReady}"
+                                      AutomationProperties.Name="{x:Static res:Strings.PitchCorrectionLabel}">
+                            <ToolTip.Tip>
+                                <StackPanel MaxWidth="320" Spacing="4">
+                                    <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.PitchCorrectionLabel}" />
+                                    <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.PitchCorrectionToolTip}" />
+                                </StackPanel>
+                            </ToolTip.Tip>
+                            <PathIcon Width="14" Height="14" Data="{StaticResource PitchCorrectionIconGeometry}" />
+                        </ToggleButton>
+                        <ToggleButton Classes="tool"
+                                      IsChecked="{Binding Playback.IsLooping}"
+                                      IsEnabled="{Binding Playback.HasLoop}"
+                                      ToolTip.ShowOnDisabled="True"
+                                      AutomationProperties.Name="{x:Static res:Strings.LoopLabel}">
+                            <ToolTip.Tip>
+                                <StackPanel MaxWidth="320" Spacing="4">
+                                    <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.LoopLabel}" />
+                                    <TextBlock TextWrapping="Wrap" Text="{Binding Playback.LoopToolTip}" />
+                                </StackPanel>
+                            </ToolTip.Tip>
+                            <ctl:LineIcon Data="{StaticResource LoopStroke}" />
+                        </ToggleButton>
+                        <ToggleButton Classes="tool"
+                                      IsChecked="{Binding Playback.IsMetronomeOn}"
+                                      IsEnabled="{Binding Playback.IsReady}"
+                                      AutomationProperties.Name="{x:Static res:Strings.MetronomeLabel}">
+                            <ToolTip.Tip>
+                                <StackPanel MaxWidth="320" Spacing="4">
+                                    <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.MetronomeLabel}" />
+                                    <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.MetronomeToolTip}" />
+                                </StackPanel>
+                            </ToolTip.Tip>
+                            <ctl:LineIcon Data="{StaticResource MetronomeStroke}" />
+                        </ToggleButton>
+                        <ToggleButton Classes="tool"
+                                      IsChecked="{Binding Playback.IsHitSoundsOn}"
+                                      IsEnabled="{Binding Playback.IsReady}"
+                                      AutomationProperties.Name="{x:Static res:Strings.HitSoundsLabel}">
+                            <ToolTip.Tip>
+                                <StackPanel MaxWidth="320" Spacing="4">
+                                    <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.HitSoundsLabel}" />
+                                    <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.HitSoundsToolTip}" />
+                                </StackPanel>
+                            </ToolTip.Tip>
+                            <ctl:LineIcon Data="{StaticResource HitSoundsStroke}" />
+                        </ToggleButton>
+                        <Button Classes="tool"
+                                ToolTip.Tip="{x:Static res:Strings.VolumeToolTip}"
+                                AutomationProperties.Name="{x:Static res:Strings.VolumeToolTip}">
+                            <Button.Flyout>
+                                <Flyout Placement="Top">
+                                    <StackPanel Spacing="8" MinWidth="220">
+                                        <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.MasterVolumeLabel}" />
+                                        <Slider Minimum="0"
+                                                Maximum="1"
+                                                SmallChange="0.05"
+                                                LargeChange="0.1"
+                                                Value="{Binding Playback.Volume, Mode=TwoWay}"
+                                                ToolTip.Tip="{x:Static res:Strings.MasterVolumeLabel}"
+                                                AutomationProperties.Name="{x:Static res:Strings.MasterVolumeLabel}" />
+                                        <TextBlock Classes="muted" Text="{Binding Playback.VolumeText}" />
+                                    </StackPanel>
+                                </Flyout>
+                            </Button.Flyout>
+                            <ctl:LineIcon Data="{StaticResource VolumeStroke}" />
+                        </Button>
                         <Button Classes="labelled"
                                 Command="{Binding Playback.OpenCalibrationCommand}"
                                 ToolTip.Tip="{x:Static res:Strings.LatencyToolTip}"
@@ -690,16 +850,21 @@
                             </StackPanel>
                         </Button>
                     </WrapPanel>
-                    <!-- Figures all one width, so the bar isn't laid out again each time the position changes while it plays. -->
-                    <TextBlock Grid.Column="1" FontSize="12" FontFeatures="tnum" VerticalAlignment="Center" Text="{Binding Playback.PositionText}" />
+                    <!-- The playhead's tick, then its time. Figures all one width, and the tick room for seven digits, so the
+                         bar isn't laid out again each time the position changes while it plays. -->
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                        <TextBlock Classes="muted" FontSize="12" FontFeatures="tnum" MinWidth="88" TextAlignment="Right" VerticalAlignment="Center" Text="{Binding Editor.PlayheadTickText}" />
+                        <TextBlock FontSize="12" FontFeatures="tnum" VerticalAlignment="Center" Text="{Binding Playback.PositionText}" />
+                    </StackPanel>
                 </Grid>
             </Border>
             <bctl:TimelineView Margin="8,4,8,8"
-                               Cursor="Hand"
+                               Cursor="SizeWestEast"
                                Position="{Binding Playback.PositionSeconds}"
                                Length="{Binding Playback.LengthSeconds}"
                                IsPlaying="{Binding Playback.IsPlaying}"
                                Clock="{Binding Playback.Clock}"
+                               WheelUpIsLater="{Binding Editor.WheelUpIsLater}"
                                Waveform="{Binding Playback.Waveform}"
                                Beats="{Binding Playback.Beats}"
                                Overview="{Binding Editor.Overview}"
@@ -759,5 +924,31 @@
                            IsVisible="{Binding !Messages.HasLatest}" />
             </Grid>
         </Button>
+
+        <!-- While a song opens, the window under the title bar takes the pointer, so the song being left isn't edited
+             meanwhile; the code-behind keeps it below the title bar, whatever its height, and holds the keys. While it's
+             read and its Editor made, rather than asking the user, it's dimmed, with a spinner and what's opening, as the
+             title bar's progress runs. Both are moved on the render thread (Spinner, BusyBar), as the Editor is made on
+             the UI thread. -->
+        <Panel x:Name="LoadingOverlay"
+               Grid.Row="0"
+               Grid.RowSpan="5"
+               Background="Transparent"
+               IsVisible="{Binding IsOpening}">
+            <Border Background="{DynamicResource AppBackgroundBrush}" Opacity="0.85" IsVisible="{Binding IsLoading}" />
+            <StackPanel HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Spacing="12"
+                        IsVisible="{Binding IsLoading}">
+                <ctl:Spinner Classes="spinner"
+                             IsActive="{Binding IsLoading}"
+                             Width="36" Height="36" StrokeThickness="3"
+                             HorizontalAlignment="Center" />
+                <TextBlock Classes="muted centered"
+                           MaxWidth="480"
+                           TextWrapping="Wrap"
+                           Text="{Binding LoadingText}" />
+            </StackPanel>
+        </Panel>
     </Grid>
 </Window>

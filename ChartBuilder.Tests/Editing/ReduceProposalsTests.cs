@@ -3,6 +3,7 @@ using ChartShared.Core.Charting.Authoring;
 using ChartShared.Core.Charting.Commands;
 using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charts;
+using ChartShared.Core.Validation;
 using static ChartBuilder.Tests.Charting.CommandChecks;
 using static ChartBuilder.Tests.Editing.EditorSessions;
 
@@ -13,13 +14,15 @@ namespace ChartBuilder.Tests.Editing;
 public sealed class ReduceProposalsTests
 {
     private const ChartDifficulty Expert = ChartDifficulty.Expert;
+    private const ChartDifficulty Hard = ChartDifficulty.Hard;
+    private const ChartDifficulty Medium = ChartDifficulty.Medium;
     private const ChartDifficulty Easy = ChartDifficulty.Easy;
 
     [TestMethod]
     [DataRow(1)]
     [DataRow(2)]
     [DataRow(3)]
-    public void ReducingExpertToEasyMakesNoChordOrNoteCloserThanTheEasyGridAndIsUndoneInOneStep(int seed)
+    public void ReducingExpertToEasyKeepsTheEasySpacingAndIsUndoneInOneStep(int seed)
     {
         // AC C9.1, on a dense chart: 1/32 runs, triplets, chords of up to five, opens, forcing, taps and sustains, and a
         // change to 3/4 part way.
@@ -42,9 +45,8 @@ public sealed class ReduceProposalsTests
             Assert.IsTrue(chord.All(n => n.Lane is ChartNote.OpenLane or >= 0 and <= 2), $"The chord at {chord.Key} is past yellow.");
         }
 
-        for (int i = 1; i < chords.Count; i++)
-            Assert.IsGreaterThanOrEqualTo(480L, chords[i].Key - chords[i - 1].Key, $"Chords at {chords[i - 1].Key} and {chords[i].Key}.");
-        Assert.DoesNotContain(f => (f.Flags & (ChordFlags.ForceHopo | ChordFlags.Tap)) != 0, easy.FlaggedChords);
+        AssertEasySpacing([.. chords.Select(c => c.Key)]);
+        AssertPlayedAsTheSource(chart, session.ReadOptions, Expert, Easy);
         Assert.DoesNotContain(n => n.Length > EditableNote.PlainLength && n.Length < 480, easy.Notes);
         Assert.IsFalse(session.Reduce.IsActive);
 
@@ -70,12 +72,41 @@ public sealed class ReduceProposalsTests
         Assert.IsNotEmpty(hits);
         foreach (var hit in hits)
             Assert.IsLessThanOrEqualTo(1, hit.Count(n => n.Lane > 0), $"The hit at {hit.Key} has more than one pad.");
-        for (int i = 1; i < hits.Count; i++)
-            Assert.IsGreaterThanOrEqualTo(480L, hits[i].Key - hits[i - 1].Key);
+        AssertEasySpacing([.. hits.Select(h => h.Key)]);
         Assert.DoesNotContain(n => n.DoubleKick, easy.Notes);
 
         session.Undo();
         AssertSame(start, chart, "after one undo");
+    }
+
+    // Every chord of to played as from's at its tick is, as the games read them: a strum, a HOPO or a tap. A HOPO on the
+    // fret before it plays as a strum whatever forces it, so a chord on the same frets as the one before is left out.
+    private static void AssertPlayedAsTheSource(EditableChart chart, ChartReadOptions options, ChartDifficulty from, ChartDifficulty to)
+    {
+        static Dictionary<long, NoteFlags> States(IEnumerable<ChartNote> notes) =>
+            notes.GroupBy(n => n.Tick).ToDictionary(g => g.Key, g => g.Select(n => n.Flags & (NoteFlags.Hopo | NoteFlags.Tap)).Max());
+        var source = States(GameView.Project(chart, new ChartTrackKey(ChartInstrument.Guitar, from), options).Notes);
+        var drafted = GameView.Project(chart, new ChartTrackKey(ChartInstrument.Guitar, to), options).Notes.ToList();
+        var lanes = drafted.GroupBy(n => n.Tick).Select(g => (g.Key, Lanes: string.Join(",", g.Select(n => n.Lane).Order()))).ToList();
+        var played = States(drafted);
+        for (int i = 0; i < lanes.Count; i++)
+        {
+            long tick = lanes[i].Key;
+            if (i > 0 && lanes[i].Lanes == lanes[i - 1].Lanes)
+                continue;
+            Assert.AreEqual(source[tick], played[tick], $"The chord at {tick}.");
+        }
+    }
+
+    // Easy's spacing (AC C9.1) at a beat of 480 ticks: no two chords closer than its burst's grid (1/8), and any one more
+    // than its longest burst in a row span that many of its grid's steps (1/4).
+    private static void AssertEasySpacing(IReadOnlyList<long> ticks)
+    {
+        int burst = FretReductionRules.Default(ChartInstrumentKind.FiveFret, Easy).MaxBurst ?? 1;
+        for (int i = 1; i < ticks.Count; i++)
+            Assert.IsGreaterThanOrEqualTo(240L, ticks[i] - ticks[i - 1], $"Chords at {ticks[i - 1]} and {ticks[i]}.");
+        for (int i = burst; i < ticks.Count; i++)
+            Assert.IsGreaterThanOrEqualTo(480L * burst, ticks[i] - ticks[i - burst], $"Chords from {ticks[i - burst]} to {ticks[i]}.");
     }
 
     [TestMethod]
@@ -110,6 +141,229 @@ public sealed class ReduceProposalsTests
     }
 
     [TestMethod]
+    [DataRow(1)]
+    [DataRow(2)]
+    public void ReduceAllFillsEachFromTheOneAboveItAndIsUndoneInOneStep(int seed)
+    {
+        // AC C9.2: Hard from Expert, Medium from Hard's draft, Easy from Medium's, so each rhythm is the one above's, thinned.
+        var chart = Guitar();
+        DenseGuitar(chart, new Random(seed));
+        var start = chart.Clone();
+        var session = Of(chart);
+
+        Assert.IsTrue(session.Reduce.StartAll(ChartInstrument.Guitar, FretTargets(Hard, Medium, Easy)));
+        Assert.AreSequenceEqual([(Expert, Hard), (Hard, Medium), (Medium, Easy)], session.Reduce.Drafts.Select(d => (d.Source, d.Target.Difficulty)).ToList());
+        foreach (var difficulty in new[] { Hard, Medium, Easy })
+            Assert.IsNotNull(session.GhostTrack(new ChartTrackKey(ChartInstrument.Guitar, difficulty)), $"No ghost over {difficulty}.");
+        Assert.IsEmpty(session.Reduce.Overwrites);
+        AssertSame(start, chart, "while the drafts are shown");
+        Assert.IsTrue(session.Reduce.Accept());
+
+        var part = chart.PartOf(ChartInstrument.Guitar)!;
+        Assert.IsNotEmpty(part[Easy].Notes);
+        CollectionAssert.IsSubsetOf(Ticks(part[Hard]), Ticks(part[Expert]));
+        CollectionAssert.IsSubsetOf(Ticks(part[Medium]), Ticks(part[Hard]));
+        CollectionAssert.IsSubsetOf(Ticks(part[Easy]), Ticks(part[Medium]));
+
+        session.Undo();
+        AssertSame(start, chart, "after one undo");
+    }
+
+    [TestMethod]
+    public void AHandChartedHardFeedsMedium()
+    {
+        // Hard is charted on beats Expert's sixteenths don't have, and isn't in the run: Medium is made from it.
+        var chart = Guitar();
+        new AddNotes(ChartInstrument.Guitar, Expert, [.. Enumerable.Range(0, 64).Select(i => new EditableNote(i * 120L, 1, i % 5))]).Apply(chart);
+        new AddNotes(ChartInstrument.Guitar, Hard, [.. Enumerable.Range(0, 8).Select(i => new EditableNote((i * 960L) + 60, 1, i % 4))]).Apply(chart);
+        var session = Of(chart);
+
+        Assert.IsTrue(session.Reduce.StartAll(ChartInstrument.Guitar, FretTargets(Medium, Easy)));
+        Assert.IsTrue(session.Reduce.Accept());
+
+        var part = chart.PartOf(ChartInstrument.Guitar)!;
+        Assert.IsNotEmpty(part[Medium].Notes);
+        CollectionAssert.IsSubsetOf(Ticks(part[Medium]), Ticks(part[Hard]));
+    }
+
+    [TestMethod]
+    public void ReduceAllSaysWhichTargetsItReplaces()
+    {
+        var chart = Guitar();
+        new AddNotes(ChartInstrument.Guitar, Expert, [.. Enumerable.Range(0, 16).Select(i => new EditableNote(i * 240L, 1, i % 5))]).Apply(chart);
+        new AddNotes(ChartInstrument.Guitar, Hard, [new EditableNote(0, 1, 0)]).Apply(chart);
+        var session = Of(chart);
+
+        Assert.IsTrue(session.Reduce.StartAll(ChartInstrument.Guitar, FretTargets(Hard, Medium)));
+
+        Assert.AreSequenceEqual([Hard], session.Reduce.Overwrites.ToList());
+    }
+
+    [TestMethod]
+    public void ReducingDrumsAllFillsEachFromTheOneAboveIt()
+    {
+        var chart = Drums(DrumsVariant.Pro);
+        DenseDrums(chart, DrumsVariant.Pro, new Random(3));
+        var session = Of(chart, focused: DrumsExpert);
+        var targets = new[] { Hard, Medium, Easy }.ToDictionary(d => d, DrumReductionRules.Default);
+
+        Assert.IsTrue(session.Reduce.StartAll(targets));
+        Assert.IsTrue(session.Reduce.Accept());
+
+        var part = chart.PartOf(ChartInstrument.Drums)!;
+        CollectionAssert.IsSubsetOf(Ticks(part[Medium]), Ticks(part[Hard]));
+        CollectionAssert.IsSubsetOf(Ticks(part[Easy]), Ticks(part[Medium]));
+    }
+
+    [TestMethod]
+    public async Task TheCheckShowsTheDraftsFindingsAndRatings()
+    {
+        // Sixteenths held under the sustain cutoff, which Medium keeps: CHR021 on the draft, as well as on Expert.
+        var chart = Guitar();
+        new AddNotes(ChartInstrument.Guitar, Expert, [.. Enumerable.Range(0, 64).Select(i => new EditableNote(i * 120L, 150, i % 5))]).Apply(chart);
+        var session = Of(chart);
+        session.Reduce.Start(ChartInstrument.Guitar, Expert, Medium, FretReductionRules.Default(ChartInstrumentKind.FiveFret, Medium));
+
+        var check = (await session.Reduce.CheckAsync())!;
+
+        Assert.Contains(f => f.RuleId == ChrRules.Chr021, check.Findings);
+        Assert.IsTrue(check.Findings.All(f => f.Location!.Difficulty == Medium || (f.RuleId == ChrRules.Chr081 && f.Location.Difficulty == Easy)));
+        Assert.IsTrue(check.Estimates.ContainsKey(Expert));
+        Assert.IsTrue(check.Estimates.ContainsKey(Medium));
+        Assert.IsLessThan(check.Estimates[Expert].Basis.PeakNps, check.Estimates[Medium].Basis.PeakNps);
+        Assert.IsEmpty(check.OutOfOrder);
+    }
+
+    [TestMethod]
+    public async Task TheCheckSaysWhereADifficultyIsNoEasierThanTheOneAbove()
+    {
+        // Hard is charted denser than Expert; the Easy draft is in order, but Hard isn't.
+        var chart = Guitar();
+        new AddNotes(ChartInstrument.Guitar, Expert, [.. Enumerable.Range(0, 16).Select(i => new EditableNote(i * 480L, 1, i % 5))]).Apply(chart);
+        new AddNotes(ChartInstrument.Guitar, Hard, [.. Enumerable.Range(0, 64).Select(i => new EditableNote(i * 120L, 1, i % 5))]).Apply(chart);
+        var session = Of(chart);
+        session.Reduce.Start(ChartInstrument.Guitar, Expert, Easy, FretReductionRules.Default(ChartInstrumentKind.FiveFret, Easy));
+
+        var check = (await session.Reduce.CheckAsync())!;
+
+        Assert.Contains(Hard, check.OutOfOrder);
+    }
+
+    [TestMethod]
+    public void ReducingTheSelectionKeepsEditsElsewhere()
+    {
+        var chart = Guitar();
+        new AddNotes(ChartInstrument.Guitar, Expert, [.. Enumerable.Range(0, 32).Select(i => new EditableNote(i * 240L, 1, i % 5))]).Apply(chart);
+        new AddNotes(ChartInstrument.Guitar, Easy, [new EditableNote(0, 1, 2), new EditableNote(7200, 1, 1)]).Apply(chart);
+        var session = Of(chart);
+
+        Assert.IsTrue(session.Reduce.Start(ChartInstrument.Guitar, Expert, Easy, FretReductionRules.Default(ChartInstrumentKind.FiveFret, Easy), (1920, 3840)));
+        Assert.AreEqual((1920L, 3840L), session.Reduce.Range);
+        Assert.IsTrue(session.Reduce.Accept());
+
+        var easy = chart.PartOf(ChartInstrument.Guitar)![Easy].Notes.AsSpan().ToArray();
+        Assert.AreSequenceEqual([new EditableNote(0, 1, 2), new EditableNote(7200, 1, 1)], easy.Where(n => n.Tick is < 1920 or > 3840).ToList());
+        Assert.IsNotEmpty(easy.Where(n => n.Tick is >= 1920 and <= 3840));
+    }
+
+    [TestMethod]
+    [DataRow(1)]
+    [DataRow(2)]
+    public async Task TheDiffMarksEachNoteTheDraftLostAndEachChordItChanged(int seed)
+    {
+        var chart = Guitar();
+        DenseGuitar(chart, new Random(seed));
+        var session = Of(chart);
+        session.Reduce.Start(ChartInstrument.Guitar, Expert, Easy, FretReductionRules.Default(ChartInstrumentKind.FiveFret, Easy));
+
+        var diff = (await session.Reduce.DiffAsync()).Single();
+
+        Assert.AreEqual((Expert, Easy), (diff.Source, diff.Target));
+        var kept = diff.DraftTrack.Notes.Select(n => (n.Tick, n.Lane)).ToHashSet();
+        for (int i = 0; i < diff.SourceTrack.Notes.Count; i++)
+        {
+            var note = diff.SourceTrack.Notes[i];
+            bool lost = (diff.SourceMarks[i] & (ReductionChanges.Removed | ReductionChanges.Reshaped)) != 0;
+            Assert.AreEqual(!kept.Contains((note.Tick, note.Lane)), lost, $"The note at {note.Tick} on {note.Lane}.");
+        }
+
+        var changed = diff.Changes.Where(c => (c.Kinds & (ReductionChanges.Reshaped | ReductionChanges.HopoFlipped | ReductionChanges.ForcingChanged)) != 0).Select(c => c.Tick).ToHashSet();
+        for (int i = 0; i < diff.DraftTrack.Notes.Count; i++)
+            Assert.AreEqual(changed.Contains(diff.DraftTrack.Notes[i].Tick), (diff.DraftMarks[i] & ~ReductionChanges.SustainTrimmed) != 0);
+        Assert.IsGreaterThan(0, diff.CountOf(ReductionChanges.Removed));
+    }
+
+    [TestMethod]
+    public async Task InReduceAllEachDiffIsFromTheDraftAboveIt()
+    {
+        var chart = Guitar();
+        DenseGuitar(chart, new Random(4));
+        var session = Of(chart);
+        session.Reduce.StartAll(ChartInstrument.Guitar, FretTargets(Hard, Medium, Easy));
+
+        var diffs = await session.Reduce.DiffAsync();
+
+        Assert.AreSequenceEqual([(Expert, Hard), (Hard, Medium), (Medium, Easy)], diffs.Select(d => (d.Source, d.Target)).ToList());
+        Assert.AreSame(diffs[0].DraftTrack, diffs[1].SourceTrack);
+        Assert.AreSequenceEqual(
+            GameView.Project(session.Reduce.Drafted!, new ChartTrackKey(ChartInstrument.Guitar, Hard), session.ReadOptions).Notes.ToList(),
+            diffs[1].SourceTrack.Notes.ToList());
+    }
+
+    [TestMethod]
+    public async Task LeavingOutTheNoteBeforeAHopoTurnsItToAStrum()
+    {
+        // Green on the downbeat, green, then red a sixteenth later, a natural HOPO; Easy keeps the beats alone.
+        var chart = Guitar();
+        new AddNotes(ChartInstrument.Guitar, Expert, [new EditableNote(0, 1, 0), new EditableNote(360, 1, 0), new EditableNote(480, 1, 1)]).Apply(chart);
+        var session = Of(chart);
+        session.Reduce.Start(ChartInstrument.Guitar, Expert, Easy, FretReductionRules.Default(ChartInstrumentKind.FiveFret, Easy) with { KeepForcedHopoAndTap = false });
+
+        var diff = (await session.Reduce.DiffAsync()).Single();
+
+        Assert.IsTrue(diff.SourceTrack.Notes.Single(n => n.Tick == 480).Flags.HasFlag(NoteFlags.Hopo));
+        Assert.AreEqual(ReductionChanges.HopoFlipped, diff.Changes.Single(c => c.Tick == 480).Kinds);
+        Assert.AreEqual(ReductionChanges.Removed, diff.Changes.Single(c => c.Tick == 360).Kinds);
+    }
+
+    [TestMethod]
+    public async Task ReducingDrumsBelowExpertDropsThe2xKicks()
+    {
+        var chart = Drums(DrumsVariant.Pro);
+        DenseDrums(chart, DrumsVariant.Pro, new Random(6));
+        var session = Of(chart, focused: DrumsExpert);
+        session.Reduce.Start(Expert, Hard, DrumReductionRules.Default(Hard));
+
+        var diff = (await session.Reduce.DiffAsync()).Single();
+
+        Assert.IsGreaterThan(0, diff.CountOf(ReductionChanges.DoubleKickDropped));
+        for (int i = 0; i < diff.SourceTrack.Notes.Count; i++)
+        {
+            if (diff.SourceTrack.Notes[i].Flags.HasFlag(NoteFlags.DoubleKick))
+                Assert.AreEqual(ReductionChanges.DoubleKickDropped, diff.SourceMarks[i]);
+        }
+    }
+
+    [TestMethod]
+    public async Task TheDiffOfARangeComparesOutsideItWithTheTargetAsCharted()
+    {
+        var chart = Guitar();
+        new AddNotes(ChartInstrument.Guitar, Expert, [.. Enumerable.Range(0, 32).Select(i => new EditableNote(i * 240L, 1, i % 5))]).Apply(chart);
+        new AddNotes(ChartInstrument.Guitar, Easy, [new EditableNote(0, 1, 2), new EditableNote(7200, 1, 1)]).Apply(chart);
+        var session = Of(chart);
+        session.Reduce.Start(ChartInstrument.Guitar, Expert, Easy, FretReductionRules.Default(ChartInstrumentKind.FiveFret, Easy), (1920, 3840));
+
+        var diff = (await session.Reduce.DiffAsync()).Single();
+
+        Assert.IsNotEmpty(diff.Changes);
+        Assert.IsTrue(diff.Changes.All(c => c.Tick is >= 1920 and <= 3840 || c.IsBoundary));
+        Assert.DoesNotContain(c => c.IsBoundary, diff.Changes);
+    }
+
+    [TestMethod]
+    public async Task WithoutARunThereIsNoDiff() => Assert.IsEmpty(await Of(Guitar()).Reduce.DiffAsync());
+
+    [TestMethod]
     public void NothingToReduceSaysSo()
     {
         var session = Of(Guitar());
@@ -117,6 +371,28 @@ public sealed class ReduceProposalsTests
         Assert.IsFalse(session.Reduce.Start(ChartInstrument.Guitar, Expert, Easy, FretReductionRules.Default(ChartInstrumentKind.FiveFret, Easy)));
         Assert.IsNotNull(session.Status);
     }
+
+    [TestMethod]
+    public void ARangeWithoutTheSourcesNotesReducesNothing()
+    {
+        // Expert's notes are all after the range, and Easy's in it are left as they are.
+        var chart = Guitar();
+        new AddNotes(ChartInstrument.Guitar, Expert, [.. Enumerable.Range(8, 8).Select(i => new EditableNote(i * 480L, 1, i % 5))]).Apply(chart);
+        new AddNotes(ChartInstrument.Guitar, Easy, [new EditableNote(480, 1, 0), new EditableNote(1440, 1, 1)]).Apply(chart);
+        var start = chart.Clone();
+        var session = Of(chart);
+
+        Assert.IsFalse(session.Reduce.Start(ChartInstrument.Guitar, Expert, Easy, FretReductionRules.Default(ChartInstrumentKind.FiveFret, Easy), (0, 1920)));
+        Assert.IsFalse(session.Reduce.StartAll(ChartInstrument.Guitar, FretTargets(Easy), (0, 1920)));
+        Assert.IsNotNull(session.Status);
+        Assert.IsFalse(session.Reduce.IsActive);
+        AssertSame(start, chart, "after reducing nothing");
+    }
+
+    private static Dictionary<ChartDifficulty, FretReductionRules> FretTargets(params ChartDifficulty[] targets) =>
+        targets.ToDictionary(t => t, t => FretReductionRules.Default(ChartInstrumentKind.FiveFret, t));
+
+    private static List<long> Ticks(EditableTrack track) => [.. track.Notes.AsSpan().ToArray().Select(n => n.Tick).Distinct()];
 
     private static void DenseGuitar(EditableChart chart, Random random)
     {

@@ -2,45 +2,14 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <!-- Filled icons on a 24×24 grid, for PathIcon. -->
-    <StreamGeometry x:Key="SngIconGeometry">M12,2 A10,10 0 1 0 12,22 A10,10 0 1 0 12,2 Z M12,9.5 A2.5,2.5 0 1 1 12,14.5 A2.5,2.5 0 1 1 12,9.5 Z</StreamGeometry>
-    <StreamGeometry x:Key="InfoIconGeometry">M12,2 A10,10 0 1 0 12,22 A10,10 0 1 0 12,2 Z M11,10 L13,10 L13,17 L11,17 Z M12,6 A1.25,1.25 0 1 1 12,8.5 A1.25,1.25 0 1 1 12,6 Z</StreamGeometry>
-    <StreamGeometry x:Key="FolderIconGeometry">M2,6 A2,2 0 0 1 4,4 L9.2,4 L11.2,6 L20,6 A2,2 0 0 1 22,8 L22,18 A2,2 0 0 1 20,20 L4,20 A2,2 0 0 1 2,18 Z</StreamGeometry>
-    <StreamGeometry x:Key="RevertIconGeometry">M4,9 L9,4 L9,7.5 L13,7.5 A6.5,6.5 0 0 1 13,20.5 L8,20.5 L8,18.5 L13,18.5 A4.5,4.5 0 0 0 13,9.5 L9,9.5 L9,14 Z</StreamGeometry>
-    <StreamGeometry x:Key="RemoveIconGeometry">M5.3,4 L12,10.7 L18.7,4 L20,5.3 L13.3,12 L20,18.7 L18.7,20 L12,13.3 L5.3,20 L4,18.7 L10.7,12 L4,5.3 Z</StreamGeometry>
-    <!-- A lid with a handle, and a can with two slots cut out. -->
-    <StreamGeometry x:Key="TrashIconGeometry">M9,3 L15,3 L15,5 L20,5 L20,7 L4,7 L4,5 L9,5 Z M5.5,8 L18.5,8 L17.4,21 L6.6,21 Z M9,10.5 L10.5,10.5 L10.5,18.5 L9,18.5 Z M13.5,10.5 L15,10.5 L15,18.5 L13.5,18.5 Z</StreamGeometry>
-    <!-- A picture frame with a sun and hills: an image. -->
-    <StreamGeometry x:Key="ImageIconGeometry">M3,4 L21,4 L21,20 L3,20 Z M5,6 L5,18 L19,18 L19,6 Z M6,17 L10,11.5 L13,15.5 L15,13 L18,17 Z M15.5,7.5 A1.5,1.5 0 1 0 15.5,10.5 A1.5,1.5 0 1 0 15.5,7.5 Z</StreamGeometry>
-    <!-- A camera body with its lens hood to the right: a video. -->
-    <StreamGeometry x:Key="VideoIconGeometry">M2,6 L16,6 L16,18 L2,18 Z M17,10.5 L22,7 L22,17 L17,13.5 Z</StreamGeometry>
     <!-- Two rails with notes falling between them onto a strike line: the note highway. -->
     <StreamGeometry x:Key="HighwayIconGeometry">M3,2 L5,2 L5,22 L3,22 Z M19,2 L21,2 L21,22 L19,22 Z M7,4 L11,4 L11,7 L7,7 Z M13,9 L17,9 L17,12 L13,12 Z M7,13 L11,13 L11,16 L7,16 Z M5,18.5 L19,18.5 L19,20 L5,20 Z</StreamGeometry>
     <!-- "sound-waves" by Skoll, game-icons.net, CC BY 3.0: a waveform drawn behind a lane's notes. -->
     <StreamGeometry x:Key="WaveformIconGeometry">F1 M 468.53 236.03 H 486 v 39.94 h -17.47 v -39.94 z m -34.426 51.634 h 17.47 v -63.328 h -17.47 v 63.328 z m -33.848 32.756 h 17.47 V 191.58 h -17.47 v 128.84 z m -32.177 25.276 h 17.47 V 167.483 h -17.47 v 178.17 z m -34.448 -43.521 h 17.47 v -92.35 h -17.47 v 92.35 z m -34.994 69.879 h 17.47 v -236.06 h -17.525 v 236.06 z M 264.2 405.9 h 17.47 V 106.1 H 264.2 V 405.9 z m -33.848 -46.284 h 17.47 V 152.383 h -17.47 v 207.234 z m -35.016 -58.85 h 17.47 v -87.35 h -17.47 v 87.35 z m -33.847 -20.823 h 17.47 V 231.98 h -17.47 v 48.042 z m -33.848 25.66 h 17.47 v -99.24 h -17.47 v 99.272 z m -33.302 48.04 h 17.47 V 152.678 H 94.34 v 201 z m -33.847 -30.702 h 17.47 V 187.333 h -17.47 v 135.642 z M 26 287.664 h 17.47 v -63.328 H 26 v 63.328 z</StreamGeometry>
-    <!-- "stopwatch" by Lorc, game-icons.net, CC BY 3.0: an offset, lining audio or video up with the song. -->
-    <StreamGeometry x:Key="OffsetIconGeometry">F1 M 179.594 20.688 v 41.406 h 143.25 V 20.687 h -143.25 z M 256.03 82 C 143.04 82 51.25 173.727 51.25 286.656 c 0 112.93 91.788 204.656 204.78 204.656 c 112.994 0 204.75 -91.728 204.75 -204.656 C 460.78 173.73 369.025 82 256.03 82 z m 0 35.625 c 93.42 0 169.126 75.665 169.126 169.03 c 0 93.368 -75.706 169.564 -169.125 169.564 c -93.417 0 -169.155 -76.197 -169.155 -169.564 c 0 -93.366 75.736 -169.03 169.156 -169.03 z m 76.19 20.28 l -72.47 107.5 c 10.67 1.036 20.516 6.045 27.625 13.814 l 44.844 -121.314 z m -85.533 1.064 v 45.31 c 3.077 -0.275 6.196 -0.405 9.344 -0.405 c 3.155 0 6.263 0.13 9.345 0.406 v -45.31 h -18.688 z m -88.53 36.655 l -13.22 13.22 L 177 220.874 c 3.992 -4.784 8.432 -9.198 13.22 -13.188 l -32.064 -32.062 z m 195.75 0 l -32.063 32.063 c 4.786 3.99 9.196 8.403 13.187 13.187 l 32.064 -32.03 l -13.188 -13.22 z m -98.344 81.22 c -2.08 0.01 -4.195 0.243 -6.313 0.686 c -16.948 3.544 -27.7 20.005 -24.156 36.94 c 3.544 16.932 20.02 27.698 36.97 24.155 c 16.946 -3.543 27.7 -20.004 24.155 -36.938 c -3.102 -14.816 -16.104 -24.925 -30.658 -24.843 z M 108.28 277.31 V 296 h 45.314 c -0.278 -3.08 -0.406 -6.192 -0.406 -9.344 c 0 -3.146 0.13 -6.27 0.406 -9.344 H 108.28 z m 250.157 0 c 0.277 3.075 0.438 6.197 0.438 9.344 c 0 3.153 -0.16 6.264 -0.438 9.344 h 45.344 v -18.688 H 358.44 z m -60.062 6.72 c 0.993 10.522 -1.968 20.742 -7.813 28.937 l 124 19.092 l -116.187 -48.03 z M 176.97 352.405 l -32.032 32.03 l 13.218 13.22 l 32.063 -32.03 c -4.798 -4 -9.253 -8.424 -13.25 -13.22 z m 158.093 0 c -4 4.796 -8.423 9.22 -13.22 13.22 l 32.063 32.03 l 13.188 -13.22 l -32.03 -32.03 z M 246.688 389 v 45.313 h 18.687 V 389 c -3.082 0.278 -6.19 0.438 -9.344 0.438 c -3.147 0 -6.266 -0.16 -9.342 -0.438 z</StreamGeometry>
     <!-- "tune-pitch" by Lorc, game-icons.net, CC BY 3.0: pitch correction, keeping the pitch as the speed changes. -->
     <StreamGeometry x:Key="PitchCorrectionIconGeometry">F1 M 228.47 47.906 v 42.908 H 19.53 V 109.5 h 208.94 v 21.875 H 19.53 v 18.688 h 208.94 V 343.03 c -16.86 -14.274 -43.56 -23.457 -73.626 -23.405 c -50.982 0.088 -92.313 26.714 -92.313 59.5 s 41.332 59.307 92.314 59.22 c 26.19 -0.047 49.822 -7.113 66.625 -18.408 h 277.467 V 401.25 H 240.344 c 4.22 -6.653 6.627 -13.906 6.812 -21.5 c 0.006 -0.25 0.03 -0.5 0.03 -0.75 h 251.75 l 0.002 -18.688 H 247.155 V 182.25 c 24.89 40.517 45.422 63.12 64.5 74.656 c 23.127 13.983 44.285 9.79 60.688 3.28 c 16.403 -6.508 29.112 -13.624 42.406 -11.655 c 13.294 1.97 30.884 13.118 55.594 50.595 l 16.5 25 c -11.733 -45.096 -41.555 -105.8 -75.72 -121.28 c 27.93 -4.62 53.664 11.71 76.376 29.718 l -1.53 -2.313 c -13.05 -20.11 -24.207 -33.715 -34.658 -42.75 c -10.45 -9.035 -20.606 -13.596 -30.343 -14.125 c -19.477 -1.058 -32.544 12.03 -44.595 18.656 c -6.025 3.314 -11.596 5.395 -17.813 5.44 c -6.216 0.043 -13.607 -1.854 -23.562 -8.47 c -19.91 -13.232 -48.717 -45.747 -89.188 -112.5 L 228.47 47.906 z</StreamGeometry>
     <!-- "gamepad" by Delapouite, game-icons.net, CC BY 3.0: playtest, playing the chart with a controller. -->
     <StreamGeometry x:Key="PlaytestIconGeometry">F1 M 155.084 125.945 c -0.46 0 -0.926 0.01 -1.397 0.034 c -5.646 0.285 -12.097 2.464 -20.707 8.204 c -21.824 14.55 -51.912 60.395 -67.834 110.005 c -15.92 49.61 -18.046 102.25 5.936 132.966 c 4.142 5.306 13.387 8.93 23.756 8.846 c 10.216 -0.084 20.682 -3.838 26.482 -9.44 c 1.022 -1.47 9.296 -13.336 21.39 -27.404 c 12.863 -14.96 28.716 -31.686 45.835 -38.777 c 41.863 -17.34 93.024 -17.34 134.887 0 c 17.118 7.092 32.97 23.818 45.834 38.778 c 12.095 14.068 20.37 25.933 21.39 27.404 c 5.8 5.602 16.267 9.356 26.483 9.44 c 10.368 0.085 19.612 -3.54 23.755 -8.846 c 23.973 -30.704 21.885 -83.575 5.978 -133.287 c -15.907 -49.713 -46.054 -95.526 -67.783 -109.624 c -11.498 -7.46 -19.198 -8.73 -26.285 -7.64 c -7.088 1.093 -14.347 5.197 -22.866 11.07 c -17.038 11.746 -38.898 30.02 -73.952 30.02 c -35.212 0 -57.115 -18.514 -74.13 -30.356 c -8.505 -5.92 -15.73 -10.025 -22.743 -11.078 c -1.315 -0.198 -2.65 -0.312 -4.03 -0.317 z m 212.904 48.75 a 16 16 0 0 1 16 16 a 16 16 0 0 1 -16 16 a 16 16 0 0 1 -16 -16 a 16 16 0 0 1 16 -16 z M 135 183 h 18 v 32 h 32 v 18 h -32 v 32 h -18 v -32 h -32 v -18 h 32 v -32 z m 200.988 23.695 a 16 16 0 0 1 16 16 a 16 16 0 0 1 -16 16 a 16 16 0 0 1 -16 -16 a 16 16 0 0 1 16 -16 z m 64 0 a 16 16 0 0 1 16 16 a 16 16 0 0 1 -16 16 a 16 16 0 0 1 -16 -16 a 16 16 0 0 1 16 -16 z m -32 32 a 16 16 0 0 1 16 16 a 16 16 0 0 1 -16 16 a 16 16 0 0 1 -16 -16 a 16 16 0 0 1 16 -16 z m -160 7 h 32 v 18 h -32 v -18 z m 64 0 h 27.897 v 18 h -27.897 v -18 z</StreamGeometry>
-    <!-- A wide frame with a sun and hills: a background. -->
-    <StreamGeometry x:Key="BackgroundIconGeometry">M1,5 L23,5 L23,19 L1,19 Z M3,7 L3,17 L21,17 L21,7 Z M4,16 L9,10 L12.5,14 L15,11.5 L20,16 Z M16.5,8 A1.5,1.5 0 1 0 16.5,11 A1.5,1.5 0 1 0 16.5,8 Z</StreamGeometry>
-    <!-- A square frame with a music note inside: album art. -->
-    <StreamGeometry x:Key="AlbumArtIconGeometry">M3,3 L21,3 L21,21 L3,21 Z M5,5 L5,19 L19,19 L19,5 Z M11.5,7 L13,7 L16.5,8.5 L16.5,10.5 L13,9 L13,15.5 A2.5,2.5 0 1 1 11.5,13.21 Z</StreamGeometry>
-    <!-- Two arrows passing each other, right along the top and left along the bottom: swap one file for another. -->
-    <StreamGeometry x:Key="ReplaceIconGeometry">M3,6 L15,6 L15,3 L21,7.25 L15,11.5 L15,8.5 L3,8.5 Z M21,15.5 L9,15.5 L9,12.5 L3,16.75 L9,21 L9,18 L21,18 Z</StreamGeometry>
-    <!-- A stopwatch: a ring with a crown on top and one hand. Work out a length. -->
-    <StreamGeometry x:Key="AutoLengthIconGeometry">M12,5 A8,8 0 1 0 12,21 A8,8 0 1 0 12,5 Z M12,7 A6,6 0 1 1 12,19 A6,6 0 1 1 12,7 Z M10,1.5 L14,1.5 L14,4 L10,4 Z M11,9 L13,9 L13,13.5 L11,13.5 Z</StreamGeometry>
-    <StreamGeometry x:Key="AddIconGeometry">M11,4 L13,4 L13,11 L20,11 L20,13 L13,13 L13,20 L11,20 L11,13 L4,13 L4,11 L11,11 Z</StreamGeometry>
-    <StreamGeometry x:Key="PlayIconGeometry">M7,4 L20,12 L7,20 Z</StreamGeometry>
-    <StreamGeometry x:Key="PauseIconGeometry">M6,4 L10,4 L10,20 L6,20 Z M14,4 L18,4 L18,20 L14,20 Z</StreamGeometry>
-    <StreamGeometry x:Key="StopIconGeometry">M6,6 L18,6 L18,18 L6,18 Z</StreamGeometry>
-    <!-- A play triangle after a marker line: play from the preview start. -->
-    <StreamGeometry x:Key="PreviewIconGeometry">M5,4 L7.5,4 L7.5,20 L5,20 Z M10,4 L21,12 L10,20 Z</StreamGeometry>
-    <!-- A speaker cone and one sound wave. -->
-    <StreamGeometry x:Key="VolumeIconGeometry">M3,9 L7,9 L12,5 L12,19 L7,15 L3,15 Z M16,8 A5,5 0 0 1 16,16 L15,14 A3,3 0 0 0 15,10 Z</StreamGeometry>
-    <!-- A MIDI plug: a half-disc body with five pins below it. -->
-    <StreamGeometry x:Key="MidiIconGeometry">M4,13 A8,8 0 0 1 20,13 Z M5.7,14 L7.3,14 L7.3,18 L5.7,18 Z M8.45,14 L10.05,14 L10.05,18 L8.45,18 Z M11.2,14 L12.8,14 L12.8,18 L11.2,18 Z M13.95,14 L15.55,14 L15.55,18 L13.95,18 Z M16.7,14 L18.3,14 L18.3,18 L16.7,18 Z</StreamGeometry>
 
     <!-- Instruments, for the difficulty icons: filled on a 512×512 grid, from game-icons.net under CC BY 3.0
          (https://creativecommons.org/licenses/by/3.0/); see THIRD-PARTY-NOTICES.md. -->
@@ -67,47 +36,182 @@
     <!-- "three-friends" by Delapouite, game-icons.net, CC BY 3.0. -->
     <StreamGeometry x:Key="InstrumentBandGeometry">F1 M 389 40.84 c 18.5 0 35 18.79 35 44.03 c 0 25.33 -16.5 44.03 -35 44.03 s -35 -18.7 -35 -44.03 c 0 -25.24 16.5 -44.03 35 -44.03 z m -132.9 0 c 18.4 0 35 18.79 35 44.03 c 0 25.33 -16.6 44.03 -35 44.03 c -18.5 0 -35.1 -18.7 -35.1 -44.03 c 0 -25.24 16.6 -44.03 35.1 -44.03 z m -133 0 c 18.5 0 35 18.79 35 44.03 c 0 25.33 -16.5 44.03 -35 44.03 s -35.09 -18.7 -35.09 -44.03 c 0 -25.24 16.59 -44.03 35.09 -44.03 z m 133 109.06 c 64 2 118 2 182.8 4.2 c 30.9 17.8 45.2 109 44.3 140.7 l -17.6 17.7 c -7.7 -42.8 -17.4 -99.9 -33.5 -112.6 v 87.6 l 4.1 183.7 H 414 l -16.7 -184.7 h -18 l -16.7 184.7 h -22.3 l 4.2 -183.7 l -8 -88.5 h -29.3 l -7.2 88.2 l 4.2 183.7 h -22.3 l -16.8 -184.7 h -18 l -16.8 184.7 h -22.2 l 4.2 -183.7 L 205 199 h -29.3 l -8 88.5 l 4.2 183.7 h -22.3 l -16.7 -184.7 h -18 L 98.01 471.2 h -22.2 l 4.2 -183.7 v -87.6 c -16.2 12.7 -25.9 69.8 -33.6 112.6 l -17.6 -17.7 c -0.9 -31.7 13.5 -122.9 44.3 -140.7 c 64.99 -2.2 118.99 -2.2 182.99 -4.2 z</StreamGeometry>
 
-    <!-- Line icons on a 16×16 grid, for LineIcon (stroked, not filled). -->
-    <StreamGeometry x:Key="InputFolderStroke">M1.5,12.5 V3.5 A1,1 0 0 1 2.5,2.5 H6 L7.5,4 H12 A1,1 0 0 1 13,5 V6.5 M1.5,12.5 L3.4,7.2 A1,1 0 0 1 4.3,6.5 H14 A0.75,0.75 0 0 1 14.7,7.5 L12.9,12 A1,1 0 0 1 12,12.5 Z</StreamGeometry>
-    <StreamGeometry x:Key="ScanStroke">M13.5,8 A5.5,5.5 0 1 1 11.9,4.1 M11.9,1.1 V4.1 H8.9</StreamGeometry>
-    <StreamGeometry x:Key="OutputFolderStroke">M1.5,4 A1,1 0 0 1 2.5,3 H6 L7.5,4.5 H13.5 A1,1 0 0 1 14.5,5.5 V12.5 A1,1 0 0 1 13.5,13.5 H2.5 A1,1 0 0 1 1.5,12.5 Z M5.5,9 H10.5 M8.5,7 L10.5,9 L8.5,11</StreamGeometry>
-    <StreamGeometry x:Key="ClearStroke">M4.5,4.5 L11.5,11.5 M11.5,4.5 L4.5,11.5</StreamGeometry>
-    <StreamGeometry x:Key="CheckStroke">M3.5,8.5 L6.5,11.5 L12.5,4.5</StreamGeometry>
-    <!-- A triangle with an exclamation mark: something to check. The dot is a line too short to see as one, which the
-         round caps draw as a dot. -->
-    <StreamGeometry x:Key="WarningStroke">M8,2 L14.5,13.5 H1.5 Z M8,6.25 V9.25 M8,11.4 V11.5</StreamGeometry>
-    <StreamGeometry x:Key="PackStroke">M1.5,9.5 V13.5 H14.5 V9.5 M8,1.5 V9 M5,6 L8,9 L11,6</StreamGeometry>
-    <StreamGeometry x:Key="UnpackStroke">M1.5,9.5 V13.5 H14.5 V9.5 M8,9.5 V2 M5,5 L8,2 L11,5</StreamGeometry>
-    <!-- Two lines joining into one: songs merged. -->
-    <StreamGeometry x:Key="MergeStroke">M3,2 V5 C3,8 8,8 8,11 V14 M13,2 V5 C13,8 8,8 8,11 M5.5,11.5 L8,14 L10.5,11.5</StreamGeometry>
-    <!-- Two overlapping pages, the front one struck through: a copy removed. -->
-    <StreamGeometry x:Key="DedupStroke">M5.5,4.5 V1.5 H14.5 V10.5 H11.5 M1.5,5.5 H10.5 V14.5 H1.5 Z M4,10 H8</StreamGeometry>
-    <StreamGeometry x:Key="FlatStroke">M8,1.5 V5.5 M5.5,3 L8,5.5 L10.5,3 M1.5,8 H14.5 M8,14.5 V10.5 M5.5,13 L8,10.5 L10.5,13</StreamGeometry>
-    <StreamGeometry x:Key="UndoStroke">M3,6.5 H10 A3.5,3.5 0 0 1 10,13.5 H6 M6,3.5 L3,6.5 L6,9.5</StreamGeometry>
-    <!-- A chevron pointing at an edge: tuck a side panel away against it. Mirror it for the right-hand edge. -->
-    <StreamGeometry x:Key="PanelCollapseStroke">M3,2.5 V13.5 M12,3.5 L7.5,8 L12,12.5</StreamGeometry>
-    <!-- A cog: eight teeth around a hub. -->
-    <StreamGeometry x:Key="SettingsStroke">M6.9,1 H9.1 L9.5,2.8 L10.7,3.3 L12.2,2.3 L13.7,3.8 L12.7,5.3 L13.2,6.5 L15,6.9 V9.1 L13.2,9.5 L12.7,10.7 L13.7,12.2 L12.2,13.7 L10.7,12.7 L9.5,13.2 L9.1,15 H6.9 L6.5,13.2 L5.3,12.7 L3.8,13.7 L2.3,12.2 L3.3,10.7 L2.8,9.5 L1,9.1 V6.9 L2.8,6.5 L3.3,5.3 L2.3,3.8 L3.8,2.3 L5.3,3.3 L6.5,2.8 Z M10.25,8 A2.25,2.25 0 1 1 5.75,8 A2.25,2.25 0 1 1 10.25,8 Z</StreamGeometry>
-    <!-- An eye: what's shown. -->
-    <StreamGeometry x:Key="ViewStroke">M1.5,8 C3.5,4.5 12.5,4.5 14.5,8 C12.5,11.5 3.5,11.5 1.5,8 Z M10,8 A2,2 0 1 1 6,8 A2,2 0 1 1 10,8 Z</StreamGeometry>
-    <!-- An arrow pointing right: from one thing to the next, such as the songs folder to the output folder. -->
-    <StreamGeometry x:Key="ArrowRightStroke">M2.5,8 H13.5 M9.5,4 L13.5,8 L9.5,12</StreamGeometry>
-    <!-- A small chevron pointing down, beside a button's text: it opens a menu. -->
-    <StreamGeometry x:Key="ChevronDownStroke">M4.5,6.5 L8,10 L11.5,6.5</StreamGeometry>
-    <StreamGeometry x:Key="AddStroke">M8,3.5 V12.5 M3.5,8 H12.5</StreamGeometry>
-    <!-- AddStroke's bar alone: less, e.g. zooming out. -->
-    <StreamGeometry x:Key="SubtractStroke">M3.5,8 H12.5</StreamGeometry>
-    <!-- Three dots in a row: more tools, in a menu. -->
-    <StreamGeometry x:Key="MoreStroke">M3.25,8 A0.75,0.75 0 1 1 1.75,8 A0.75,0.75 0 1 1 3.25,8 Z M8.75,8 A0.75,0.75 0 1 1 7.25,8 A0.75,0.75 0 1 1 8.75,8 Z M14.25,8 A0.75,0.75 0 1 1 12.75,8 A0.75,0.75 0 1 1 14.25,8 Z</StreamGeometry>
-    <!-- A magnifying glass. -->
-    <StreamGeometry x:Key="SearchStroke">M11,6.5 A4.5,4.5 0 1 1 2,6.5 A4.5,4.5 0 1 1 11,6.5 Z M9.8,9.8 L14,14</StreamGeometry>
-    <StreamGeometry x:Key="FilterStroke">M1.5,2.5 H14.5 L9.5,8.5 V13.5 L6.5,12 V8.5 Z</StreamGeometry>
-    <!-- An arrow beside bars; up for first to last, down for last to first. -->
-    <StreamGeometry x:Key="SortAscendingStroke">M4.5,13.5 V2.5 M1.5,5.5 L4.5,2.5 L7.5,5.5 M9.5,4.5 H14.5 M9.5,8 H13 M9.5,11.5 H11.5</StreamGeometry>
-    <StreamGeometry x:Key="SortDescendingStroke">M4.5,2.5 V13.5 M1.5,10.5 L4.5,13.5 L7.5,10.5 M9.5,4.5 H14.5 M9.5,8 H13 M9.5,11.5 H11.5</StreamGeometry>
-    <!-- A page with its corner folded, and a pencil: edit a chart. -->
-    <StreamGeometry x:Key="EditChartStroke">M6.5,14.5 H3.5 A1,1 0 0 1 2.5,13.5 V2.5 A1,1 0 0 1 3.5,1.5 H9 L12.5,5 V6.5 M9,1.5 V5 H12.5 M8.5,14.5 L9,12 L13,8 L15,10 L11,14 Z M12,9 L14,11</StreamGeometry>
-    <!-- A page with its corner folded, and a plus: a new chart. -->
-    <StreamGeometry x:Key="NewChartStroke">M8,14.5 H3.5 A1,1 0 0 1 2.5,13.5 V2.5 A1,1 0 0 1 3.5,1.5 H9 L12.5,5 V8 M9,1.5 V5 H12.5 M12,10 V15 M9.5,12.5 H14.5</StreamGeometry>
-    <StreamGeometry x:Key="SaveStroke">M2.5,1.5 H11 L14.5,5 V13.5 A1,1 0 0 1 13.5,14.5 H2.5 A1,1 0 0 1 1.5,13.5 V2.5 A1,1 0 0 1 2.5,1.5 Z M4.5,1.5 V5 H10 V1.5 M4.5,14.5 V9.5 H11.5 V14.5</StreamGeometry>
+    <!-- Line icons on a 16×16 grid, for LineIcon (stroked, not filled): from Lucide 1.61.0 (https://lucide.dev),
+         under the ISC license; see THIRD-PARTY-NOTICES.md. Each is Lucide's 24×24 icon at two thirds of its size,
+         its shapes joined into one path. A line too short to see, such as Lucide's "h0.01", is drawn by the round
+         caps as a dot. -->
+    <!-- "folder-open": a folder to read from, such as the songs folder or a song to open. -->
+    <StreamGeometry x:Key="InputFolderStroke">M4,9.333 l1,-1.933 A1.333,1.333 0 0 1 6.16,6.667 H13.333 a1.333,1.333 0 0 1 1.293,1.667 l-1.027,4 a1.333,1.333 0 0 1 -1.3,1 H2.667 a1.333,1.333 0 0 1 -1.333,-1.333 V3.333 a1.333,1.333 0 0 1 1.333,-1.333 h2.6 a1.333,1.333 0 0 1 1.127,0.6 l0.54,0.8 a1.333,1.333 0 0 0 1.113,0.6 H12 a1.333,1.333 0 0 1 1.333,1.333 v1.333</StreamGeometry>
+    <!-- "refresh-cw": scan again. -->
+    <StreamGeometry x:Key="ScanStroke">M2,8 a6,6 0 0 1 6,-6 a6.5,6.5 0 0 1 4.493,1.827 L14,5.333 M14,2 v3.333 h-3.333 M14,8 a6,6 0 0 1 -6,6 a6.5,6.5 0 0 1 -4.493,-1.827 L2,10.667 M5.333,10.667 H2 v3.333</StreamGeometry>
+    <!-- "folder-output": a folder to write to, or a copy exported. -->
+    <StreamGeometry x:Key="OutputFolderStroke">M1.333,5 V3.333 a1.333,1.333 0 0 1 1.333,-1.333 h2.6 a1.333,1.333 0 0 1 1.127,0.6 l0.54,0.8 a1.333,1.333 0 0 0 1.113,0.6 H13.333 a1.333,1.333 0 0 1 1.333,1.333 v6.667 a1.333,1.333 0 0 1 -1.333,1.333 H2.667 a1.333,1.333 0 0 1 -1.333,-1 M1.333,8.667 h6.667 M3.333,6.667 l-2,2 l2,2</StreamGeometry>
+    <!-- "x": clear, close or remove. -->
+    <StreamGeometry x:Key="ClearStroke">M12,4 L4,12 M4,4 l8,8</StreamGeometry>
+    <!-- "check": a tick, or validate. -->
+    <StreamGeometry x:Key="CheckStroke">M13.333,4 L6,11.333 l-3.333,-3.333</StreamGeometry>
+    <!-- "triangle-alert": something to check. -->
+    <StreamGeometry x:Key="WarningStroke">M14.487,12 l-5.333,-9.333 a1.333,1.333 0 0 0 -2.32,0 l-5.333,9.333 A1.333,1.333 0 0 0 2.667,14 h10.667 a1.333,1.333 0 0 0 1.153,-2 M8,6 v2.667 M8,11.333 h0.007</StreamGeometry>
+    <!-- "package": pack into a .sng. -->
+    <StreamGeometry x:Key="PackStroke">M7.333,14.487 a1.333,1.333 0 0 0 1.333,0 l4.667,-2.667 A1.333,1.333 0 0 0 14,10.667 V5.333 a1.333,1.333 0 0 0 -0.667,-1.153 l-4.667,-2.667 a1.333,1.333 0 0 0 -1.333,0 l-4.667,2.667 A1.333,1.333 0 0 0 2,5.333 v5.333 a1.333,1.333 0 0 0 0.667,1.153 z M8,14.667 V8 M2.193,4.667 L8,8 L13.807,4.667 M5,2.847 l6,3.433</StreamGeometry>
+    <!-- "package-open": unpack a .sng. -->
+    <StreamGeometry x:Key="UnpackStroke">M8,14.667 v-6 M10.113,1.473 a1.113,1.113 0 0 1 1.087,0 L14,3.047 a1.287,1.287 0 0 1 0,2.24 L5.88,9.86 a1.103,1.103 0 0 1 -1.093,0 L2,8.287 a1.287,1.287 0 0 1 0,-2.24 z M13.333,8.667 v2.58 a1.373,1.373 0 0 1 -0.74,1.22 l-4,2.053 a1.287,1.287 0 0 1 -1.187,0 l-4,-2.053 A1.373,1.373 0 0 1 2.667,11.247 V8.667 M14,8.287 a1.287,1.287 0 0 0 0,-2.24 L5.887,1.467 a1.093,1.093 0 0 0 -1.087,0 L2,3.047 a1.287,1.287 0 0 0 0,2.24 l8.12,4.573 a1.091,1.091 0 0 0 1.087,0 z</StreamGeometry>
+    <!-- "merge": songs merged. -->
+    <StreamGeometry x:Key="MergeStroke">M5.333,4 l2.667,-2.667 l2.667,2.667 M8,1.333 v6.867 a2.667,2.667 0 0 1 -0.781,1.885 L2.667,14.667 M13.333,14.667 l-3.333,-3.333</StreamGeometry>
+    <!-- "copy-x": a copy removed. -->
+    <StreamGeometry x:Key="DedupStroke">M2.667,10.667 a1.333,1.333 0 0 1 -1.333,-1.333 V2.667 a1.333,1.333 0 0 1 1.333,-1.333 h6.667 a1.333,1.333 0 0 1 1.333,1.333 M6.667,5.333 H13.333 A1.333,1.333 0 0 1 14.667,6.667 V13.333 A1.333,1.333 0 0 1 13.333,14.667 H6.667 A1.333,1.333 0 0 1 5.333,13.333 V6.667 A1.333,1.333 0 0 1 6.667,5.333 Z M8.333,8.333 l3.333,3.333 M8.333,11.667 l3.333,-3.333</StreamGeometry>
+    <!-- "fold-vertical": everything into one folder. -->
+    <StreamGeometry x:Key="FlatStroke">M8,14.667 v-4 M8,5.333 V1.333 M2.667,8 H1.333 M6.667,8 H5.333 M10.667,8 h-1.333 M14.667,8 h-1.333 M10,12.667 l-2,-2 l-2,2 M10,3.333 l-2,2 l-2,-2</StreamGeometry>
+    <!-- "undo-2": undo; mirrored, redo. -->
+    <StreamGeometry x:Key="UndoStroke">M6,9.333 L2.667,6 l3.333,-3.333 M2.667,6 h7 a3.667,3.667 0 0 1 3.667,3.667 a3.667,3.667 0 0 1 -3.667,3.667 H7.333</StreamGeometry>
+    <!-- "panel-left-close": tuck a side panel away against its edge; mirrored for the right-hand edge. -->
+    <StreamGeometry x:Key="PanelCollapseStroke">M3.333,2 H12.667 A1.333,1.333 0 0 1 14,3.333 V12.667 A1.333,1.333 0 0 1 12.667,14 H3.333 A1.333,1.333 0 0 1 2,12.667 V3.333 A1.333,1.333 0 0 1 3.333,2 Z M6,2 v12 M10.667,10 l-2,-2 l2,-2</StreamGeometry>
+    <!-- "settings": settings. -->
+    <StreamGeometry x:Key="SettingsStroke">M6.447,2.757 a1.56,1.56 0 0 1 3.106,0 a1.56,1.56 0 0 0 2.213,1.277 a1.56,1.56 0 0 1 1.553,2.689 a1.56,1.56 0 0 0 0,2.554 a1.56,1.56 0 0 1 -1.553,2.689 a1.56,1.56 0 0 0 -2.213,1.277 a1.56,1.56 0 0 1 -3.106,0 a1.56,1.56 0 0 0 -2.213,-1.277 a1.56,1.56 0 0 1 -1.553,-2.689 a1.56,1.56 0 0 0 0,-2.554 A1.56,1.56 0 0 1 4.233,4.034 a1.56,1.56 0 0 0 2.213,-1.277 M6,8 A2,2 0 1 0 10,8 A2,2 0 1 0 6,8 Z</StreamGeometry>
+    <!-- "eye": what's shown. -->
+    <StreamGeometry x:Key="ViewStroke">M1.375,8.232 a0.667,0.667 0 0 1 0,-0.464 a7.167,7.167 0 0 1 13.251,0 a0.667,0.667 0 0 1 0,0.464 a7.167,7.167 0 0 1 -13.251,0 M6,8 A2,2 0 1 0 10,8 A2,2 0 1 0 6,8 Z</StreamGeometry>
+    <!-- "arrow-right": from one thing to the next, or a lane to the right. -->
+    <StreamGeometry x:Key="ArrowRightStroke">M3.333,8 h9.333 M8,3.333 l4.667,4.667 l-4.667,4.667</StreamGeometry>
+    <!-- "arrow-left": a lane to the left. -->
+    <StreamGeometry x:Key="ArrowLeftStroke">M8,12.667 l-4.667,-4.667 l4.667,-4.667 M12.667,8 H3.333</StreamGeometry>
+    <!-- "chevron-down": beside a button's text: it opens a menu. -->
+    <StreamGeometry x:Key="ChevronDownStroke">M4,6 l4,4 l4,-4</StreamGeometry>
+    <!-- "plus": add. -->
+    <StreamGeometry x:Key="AddStroke">M3.333,8 h9.333 M8,3.333 v9.333</StreamGeometry>
+    <!-- "minus": less, e.g. zooming out. -->
+    <StreamGeometry x:Key="SubtractStroke">M3.333,8 h9.333</StreamGeometry>
+    <!-- "ellipsis": more tools, in a menu. -->
+    <StreamGeometry x:Key="MoreStroke">M7.333,8 A0.667,0.667 0 1 0 8.667,8 A0.667,0.667 0 1 0 7.333,8 Z M12,8 A0.667,0.667 0 1 0 13.333,8 A0.667,0.667 0 1 0 12,8 Z M2.667,8 A0.667,0.667 0 1 0 4,8 A0.667,0.667 0 1 0 2.667,8 Z</StreamGeometry>
+    <!-- "search": search. -->
+    <StreamGeometry x:Key="SearchStroke">M14,14 l-2.893,-2.893 M2,7.333 A5.333,5.333 0 1 0 12.667,7.333 A5.333,5.333 0 1 0 2,7.333 Z</StreamGeometry>
+    <!-- "funnel": filter. -->
+    <StreamGeometry x:Key="FilterStroke">M6.667,13.333 a0.667,0.667 0 0 0 0.369,0.597 l1.333,0.667 A0.667,0.667 0 0 0 9.333,14 v-4.667 a1.333,1.333 0 0 1 0.345,-0.894 L14.493,3.113 A0.667,0.667 0 0 0 14,2 H2 a0.667,0.667 0 0 0 -0.495,1.113 l4.817,5.326 A1.333,1.333 0 0 1 6.667,9.333 z</StreamGeometry>
+    <!-- "arrow-up-narrow-wide": first to last. -->
+    <StreamGeometry x:Key="SortAscendingStroke">M2,5.333 l2.667,-2.667 l2.667,2.667 M4.667,2.667 v10.667 M7.333,8 h2.667 M7.333,10.667 h4.667 M7.333,13.333 h6.667</StreamGeometry>
+    <!-- "arrow-down-wide-narrow": last to first, or lower difficulties made from a higher one. -->
+    <StreamGeometry x:Key="SortDescendingStroke">M2,10.667 l2.667,2.667 l2.667,-2.667 M4.667,13.333 V2.667 M7.333,2.667 h6.667 M7.333,5.333 h4.667 M7.333,8 h2.667</StreamGeometry>
+    <!-- "file-pen-line": edit a chart. -->
+    <StreamGeometry x:Key="EditChartStroke">M9.576,9.089 a1.333,1.333 0 0 0 -0.337,0.569 l-0.558,1.913 a0.333,0.333 0 0 0 0.413,0.413 l1.913,-0.558 a1.333,1.333 0 0 0 0.569,-0.337 l2.675,-2.673 a0.667,0.667 0 0 0 -2.003,-2.003 z M9.658,5.239 A0.667,0.667 0 0 1 9.333,4.667 V1.333 M13.333,13.097 V13.333 a1.333,1.333 0 0 1 -1.333,1.333 H4 a1.333,1.333 0 0 1 -1.333,-1.333 V2.667 a1.333,1.333 0 0 1 1.333,-1.333 h5.333 a1.6,1.6 0 0 1 1.136,0.471 l1.677,1.677 M5.333,12 h0.667</StreamGeometry>
+    <!-- "file-plus": a new chart. -->
+    <StreamGeometry x:Key="NewChartStroke">M4,14.667 a1.333,1.333 0 0 1 -1.333,-1.333 V2.667 a1.333,1.333 0 0 1 1.333,-1.333 h5.333 a1.6,1.6 0 0 1 1.136,0.471 l2.392,2.392 A1.6,1.6 0 0 1 13.333,5.333 v8 a1.333,1.333 0 0 1 -1.333,1.333 z M9.333,1.333 v3.333 a0.667,0.667 0 0 0 0.667,0.667 h3.333 M6,10 h4 M8,12 v-4</StreamGeometry>
+    <!-- "save": save. -->
+    <StreamGeometry x:Key="SaveStroke">M10.133,2 a1.333,1.333 0 0 1 0.933,0.4 l2.533,2.533 a1.333,1.333 0 0 1 0.4,0.933 V12.667 a1.333,1.333 0 0 1 -1.333,1.333 H3.333 a1.333,1.333 0 0 1 -1.333,-1.333 V3.333 a1.333,1.333 0 0 1 1.333,-1.333 z M11.333,14 v-4.667 a0.667,0.667 0 0 0 -0.667,-0.667 H5.333 a0.667,0.667 0 0 0 -0.667,0.667 v4.667 M4.667,2 v2.667 a0.667,0.667 0 0 0 0.667,0.667 h4.667</StreamGeometry>
+    <!-- "disc-3": a .sng file. -->
+    <StreamGeometry x:Key="SngStroke">M1.333,8 A6.667,6.667 0 1 0 14.667,8 A6.667,6.667 0 1 0 1.333,8 Z M4,8 c0,-1.133 0.467,-2.133 1.2,-2.8 M6.667,8 A1.333,1.333 0 1 0 9.333,8 A1.333,1.333 0 1 0 6.667,8 Z M12,8 c0,1.133 -0.467,2.133 -1.2,2.8</StreamGeometry>
+    <!-- "folder": a song folder. -->
+    <StreamGeometry x:Key="FolderStroke">M13.333,13.333 a1.333,1.333 0 0 0 1.333,-1.333 V5.333 a1.333,1.333 0 0 0 -1.333,-1.333 h-5.267 a1.333,1.333 0 0 1 -1.127,-0.6 L6.4,2.6 A1.333,1.333 0 0 0 5.287,2 H2.667 a1.333,1.333 0 0 0 -1.333,1.333 v8.667 a1.333,1.333 0 0 0 1.333,1.333 Z</StreamGeometry>
+    <!-- "info": more about something. -->
+    <StreamGeometry x:Key="InfoStroke">M1.333,8 A6.667,6.667 0 1 0 14.667,8 A6.667,6.667 0 1 0 1.333,8 Z M8,10.667 v-2.667 M8,5.333 h0.007</StreamGeometry>
+    <!-- "rotate-ccw": put back as it was. -->
+    <StreamGeometry x:Key="RevertStroke">M2,8 a6,6 0 1 0 6,-6 a6.5,6.5 0 0 0 -4.493,1.827 L2,5.333 M2,2 v3.333 h3.333</StreamGeometry>
+    <!-- "trash": remove a file. -->
+    <StreamGeometry x:Key="TrashStroke">M6.667,7.333 v4 M9.333,7.333 v4 M12.667,4 v9.333 a1.333,1.333 0 0 1 -1.333,1.333 H4.667 a1.333,1.333 0 0 1 -1.333,-1.333 V4 M2,4 h12 M5.333,4 V2.667 a1.333,1.333 0 0 1 1.333,-1.333 h2.667 a1.333,1.333 0 0 1 1.333,1.333 v1.333</StreamGeometry>
+    <!-- "image": an image. -->
+    <StreamGeometry x:Key="ImageStroke">M3.333,2 H12.667 A1.333,1.333 0 0 1 14,3.333 V12.667 A1.333,1.333 0 0 1 12.667,14 H3.333 A1.333,1.333 0 0 1 2,12.667 V3.333 A1.333,1.333 0 0 1 3.333,2 Z M4.667,6 A1.333,1.333 0 1 0 7.333,6 A1.333,1.333 0 1 0 4.667,6 Z M14,10 l-2.057,-2.057 a1.333,1.333 0 0 0 -1.885,0 L4,14</StreamGeometry>
+    <!-- "wallpaper": a background. -->
+    <StreamGeometry x:Key="BackgroundStroke">M8,11.333 v2.667 M5.333,14 h5.333 M6,11.333 l4.067,-4.067 a1.333,1.333 0 0 1 1.873,0.007 L14.667,10 M4,6 A1.333,1.333 0 1 0 6.667,6 A1.333,1.333 0 1 0 4,6 Z M2.667,2 H13.333 A1.333,1.333 0 0 1 14.667,3.333 V10 A1.333,1.333 0 0 1 13.333,11.333 H2.667 A1.333,1.333 0 0 1 1.333,10 V3.333 A1.333,1.333 0 0 1 2.667,2 Z</StreamGeometry>
+    <!-- "video": a video. -->
+    <StreamGeometry x:Key="VideoStroke">M10.667,8.667 l3.482,2.321 a0.333,0.333 0 0 0 0.518,-0.277 V5.247 a0.333,0.333 0 0 0 -0.501,-0.288 L10.667,7 M2.667,4 H9.333 A1.333,1.333 0 0 1 10.667,5.333 V10.667 A1.333,1.333 0 0 1 9.333,12 H2.667 A1.333,1.333 0 0 1 1.333,10.667 V5.333 A1.333,1.333 0 0 1 2.667,4 Z</StreamGeometry>
+    <!-- "disc-album": album art. -->
+    <StreamGeometry x:Key="AlbumArtStroke">M3.333,2 H12.667 A1.333,1.333 0 0 1 14,3.333 V12.667 A1.333,1.333 0 0 1 12.667,14 H3.333 A1.333,1.333 0 0 1 2,12.667 V3.333 A1.333,1.333 0 0 1 3.333,2 Z M4.667,8 A3.333,3.333 0 1 0 11.333,8 A3.333,3.333 0 1 0 4.667,8 Z M8,8 h0.007</StreamGeometry>
+    <!-- "midi-port": a MIDI chart. -->
+    <StreamGeometry x:Key="MidiStroke">M8,12 h0.007 M10,1.639 V3.333 a0.667,0.667 0 0 1 -0.667,0.667 h-2.667 a0.667,0.667 0 0 1 -0.667,-0.667 V1.639 M10.667,10.667 h0.007 M12,8 h0.007 M4,8 h0.007 M5.333,10.667 h0.007 M1.333,8 A6.667,6.667 0 1 0 14.667,8 A6.667,6.667 0 1 0 1.333,8 Z</StreamGeometry>
+    <!-- "audio-lines": audio. -->
+    <StreamGeometry x:Key="AudioStroke">M1.333,6.667 v2 M4,4 v7.333 M6.667,2 v12 M9.333,5.333 v4.667 M12,3.333 v8.667 M14.667,6.667 v2</StreamGeometry>
+    <!-- "arrow-right-left": swap one file for another. -->
+    <StreamGeometry x:Key="ReplaceStroke">M10.667,2 l2.667,2.667 l-2.667,2.667 M13.333,4.667 H2.667 M5.333,14 l-2.667,-2.667 l2.667,-2.667 M2.667,11.333 h10.667</StreamGeometry>
+    <!-- "play": play. -->
+    <StreamGeometry x:Key="PlayStroke">M3.333,3.333 a1.333,1.333 0 0 1 2.005,-1.152 l7.998,4.665 a1.333,1.333 0 0 1 0.002,2.305 l-8,4.667 A1.333,1.333 0 0 1 3.333,12.667 z</StreamGeometry>
+    <!-- "pause": pause. -->
+    <StreamGeometry x:Key="PauseStroke">M10,2 H12 A0.667,0.667 0 0 1 12.667,2.667 V13.333 A0.667,0.667 0 0 1 12,14 H10 A0.667,0.667 0 0 1 9.333,13.333 V2.667 A0.667,0.667 0 0 1 10,2 Z M4,2 H6 A0.667,0.667 0 0 1 6.667,2.667 V13.333 A0.667,0.667 0 0 1 6,14 H4 A0.667,0.667 0 0 1 3.333,13.333 V2.667 A0.667,0.667 0 0 1 4,2 Z</StreamGeometry>
+    <!-- "square": stop. -->
+    <StreamGeometry x:Key="StopStroke">M3.333,2 H12.667 A1.333,1.333 0 0 1 14,3.333 V12.667 A1.333,1.333 0 0 1 12.667,14 H3.333 A1.333,1.333 0 0 1 2,12.667 V3.333 A1.333,1.333 0 0 1 3.333,2 Z</StreamGeometry>
+    <!-- "skip-forward": go to the next one. -->
+    <StreamGeometry x:Key="SkipNextStroke">M14,2.667 v10.667 M4.019,2.857 A1.333,1.333 0 0 0 2,4 v8 a1.333,1.333 0 0 0 2.019,1.143 l6.665,-3.999 a1.333,1.333 0 0 0 0.002,-2.288 z</StreamGeometry>
+    <!-- "skip-back": go to the one before. -->
+    <StreamGeometry x:Key="SkipPreviousStroke">M11.981,2.857 A1.333,1.333 0 0 1 14,4 v8 a1.333,1.333 0 0 1 -2.019,1.143 l-6.665,-3.999 a1.333,1.333 0 0 1 -0.002,-2.288 z M2,13.333 V2.667</StreamGeometry>
+    <!-- "step-forward": play from the preview start. -->
+    <StreamGeometry x:Key="PreviewStroke">M6.686,2.857 A1.333,1.333 0 0 0 4.667,4 v8 a1.333,1.333 0 0 0 2.019,1.143 l6.665,-3.999 a1.333,1.333 0 0 0 0.002,-2.288 z M2,2.667 v10.667</StreamGeometry>
+    <!-- "volume-2": sound. -->
+    <StreamGeometry x:Key="VolumeStroke">M7.333,3.135 a0.47,0.47 0 0 0 -0.802,-0.332 L4.275,5.058 A0.933,0.933 0 0 1 3.611,5.333 H2 a0.667,0.667 0 0 0 -0.667,0.667 v4 a0.667,0.667 0 0 0 0.667,0.667 h1.611 a0.933,0.933 0 0 1 0.665,0.275 l2.255,2.256 A0.47,0.47 0 0 0 7.333,12.865 z M10.667,6 a3.333,3.333 0 0 1 0,4 M12.909,12.243 a6,6 0 0 0 0,-8.485</StreamGeometry>
+    <!-- "timer": an offset, lining audio or video up with the song, or a song's length. -->
+    <StreamGeometry x:Key="OffsetStroke">M6.667,1.333 L9.333,1.333 M8,9.333 L10,7.333 M2.667,9.333 A5.333,5.333 0 1 0 13.333,9.333 A5.333,5.333 0 1 0 2.667,9.333 Z</StreamGeometry>
+    <!-- "download": save a copy of a file. -->
+    <StreamGeometry x:Key="DownloadStroke">M8,10 V2 M14,10 v2.667 a1.333,1.333 0 0 1 -1.333,1.333 H3.333 a1.333,1.333 0 0 1 -1.333,-1.333 v-2.667 M4.667,6.667 l3.333,3.333 l3.333,-3.333</StreamGeometry>
+    <!-- "scissors": cut. -->
+    <StreamGeometry x:Key="CutStroke">M2,4 A2,2 0 1 0 6,4 A2,2 0 1 0 2,4 Z M5.413,5.413 L8,8 M13.333,2.667 L5.413,10.587 M2,12 A2,2 0 1 0 6,12 A2,2 0 1 0 2,12 Z M9.867,9.867 L13.333,13.333</StreamGeometry>
+    <!-- "copy": copy. -->
+    <StreamGeometry x:Key="CopyStroke">M6.667,5.333 H13.333 A1.333,1.333 0 0 1 14.667,6.667 V13.333 A1.333,1.333 0 0 1 13.333,14.667 H6.667 A1.333,1.333 0 0 1 5.333,13.333 V6.667 A1.333,1.333 0 0 1 6.667,5.333 Z M2.667,10.667 c-0.733,0 -1.333,-0.6 -1.333,-1.333 V2.667 c0,-0.733 0.6,-1.333 1.333,-1.333 h6.667 c0.733,0 1.333,0.6 1.333,1.333</StreamGeometry>
+    <!-- "clipboard-paste": paste. -->
+    <StreamGeometry x:Key="PasteStroke">M7.333,9.333 h6.667 M10.667,2.667 h1.333 a1.333,1.333 0 0 1 1.333,1.333 v0.896 M11.333,12 l2.667,-2.667 l-2.667,-2.667 M5.333,2.667 H4 a1.333,1.333 0 0 0 -1.333,1.333 v9.333 a1.333,1.333 0 0 0 1.333,1.333 h8 a1.333,1.333 0 0 0 1.195,-0.742 M6,1.333 H10 A0.667,0.667 0 0 1 10.667,2 V3.333 A0.667,0.667 0 0 1 10,4 H6 A0.667,0.667 0 0 1 5.333,3.333 V2 A0.667,0.667 0 0 1 6,1.333 Z</StreamGeometry>
+    <!-- "clipboard-plus": paste among what is there. -->
+    <StreamGeometry x:Key="PasteMergeStroke">M6,1.333 H10 A0.667,0.667 0 0 1 10.667,2 V3.333 A0.667,0.667 0 0 1 10,4 H6 A0.667,0.667 0 0 1 5.333,3.333 V2 A0.667,0.667 0 0 1 6,1.333 Z M10.667,2.667 h1.333 a1.333,1.333 0 0 1 1.333,1.333 v9.333 a1.333,1.333 0 0 1 -1.333,1.333 H4 a1.333,1.333 0 0 1 -1.333,-1.333 V4 a1.333,1.333 0 0 1 1.333,-1.333 h1.333 M6,9.333 h4 M8,11.333 v-4</StreamGeometry>
+    <!-- "square-dashed": select. -->
+    <StreamGeometry x:Key="SelectStroke">M3.333,2 a1.333,1.333 0 0 0 -1.333,1.333 M12.667,2 a1.333,1.333 0 0 1 1.333,1.333 M14,12.667 a1.333,1.333 0 0 1 -1.333,1.333 M3.333,14 a1.333,1.333 0 0 1 -1.333,-1.333 M6,2 h0.667 M6,14 h0.667 M9.333,2 h0.667 M9.333,14 h0.667 M2,6 v0.667 M14,6 v0.667 M2,9.333 v0.667 M14,9.333 v0.667</StreamGeometry>
+    <!-- "wand-sparkles": change the selected notes, or propose a tempo map. -->
+    <StreamGeometry x:Key="TransformStroke">M14.427,2.427 l-0.853,-0.853 a0.807,0.807 0 0 0 -1.147,0 L1.573,12.427 a0.807,0.807 0 0 0 0,1.147 l0.853,0.853 a0.8,0.8 0 0 0 1.147,0 L14.427,3.573 a0.8,0.8 0 0 0 0,-1.147 M9.333,4.667 l2,2 M3.333,4 v2.667 M12.667,9.333 v2.667 M6.667,1.333 v1.333 M4.667,5.333 H2 M14,10.667 h-2.667 M7.333,2 H6</StreamGeometry>
+    <!-- "arrow-left-right": flip left for right. -->
+    <StreamGeometry x:Key="FlipStroke">M5.333,2 L2.667,4.667 l2.667,2.667 M2.667,4.667 h10.667 M10.667,14 l2.667,-2.667 l-2.667,-2.667 M13.333,11.333 H2.667</StreamGeometry>
+    <!-- "unfold-horizontal": make longer. -->
+    <StreamGeometry x:Key="StretchStroke">M10.667,8 h4 M5.333,8 H1.333 M8,1.333 v1.333 M8,5.333 v1.333 M8,9.333 v1.333 M8,13.333 v1.333 M12.667,10 l2,-2 l-2,-2 M3.333,6 l-2,2 l2,2</StreamGeometry>
+    <!-- "fold-horizontal": make shorter. -->
+    <StreamGeometry x:Key="SqueezeStroke">M1.333,8 h4 M14.667,8 h-4 M8,1.333 v1.333 M8,5.333 v1.333 M8,9.333 v1.333 M8,13.333 v1.333 M12.667,6 l-2,2 l2,2 M3.333,10 l2,-2 l-2,-2</StreamGeometry>
+    <!-- "text-cursor": up to the cursor. -->
+    <StreamGeometry x:Key="StretchToCursorStroke">M11.333,14.667 h-0.667 a2.667,2.667 0 0 1 -2.667,-2.667 V4 a2.667,2.667 0 0 1 2.667,-2.667 h0.667 M4.667,14.667 h0.667 a2.667,2.667 0 0 0 2.667,-2.667 M4.667,1.333 h0.667 a2.667,2.667 0 0 1 2.667,2.667</StreamGeometry>
+    <!-- "move-right": a sustain. -->
+    <StreamGeometry x:Key="SustainStroke">M12,5.333 L14.667,8 L12,10.667 M1.333,8 H14.667</StreamGeometry>
+    <!-- "arrow-right-to-line": a sustain up to the next note. -->
+    <StreamGeometry x:Key="SustainToNextStroke">M11.333,8 H2 M7.333,12 l4,-4 l-4,-4 M14,3.333 v9.333</StreamGeometry>
+    <!-- "file-clock": opened lately. -->
+    <StreamGeometry x:Key="RecentStroke">M10.667,14.667 h1.333 a1.333,1.333 0 0 0 1.333,-1.333 V5.333 a1.6,1.6 0 0 0 -0.471,-1.137 l-2.392,-2.392 A1.6,1.6 0 0 0 9.333,1.333 H4 a1.333,1.333 0 0 0 -1.333,1.333 v1.9 M9.333,1.333 v3.333 a0.667,0.667 0 0 0 0.667,0.667 h3.333 M5.333,9.333 v1.467 l1.067,0.667 M1.333,10.667 A4,4 0 1 0 9.333,10.667 A4,4 0 1 0 1.333,10.667 Z</StreamGeometry>
+    <!-- "wrench": fix a problem. -->
+    <StreamGeometry x:Key="QuickFixStroke">M9.8,4.2 a0.667,0.667 0 0 0 0,0.933 l1.067,1.067 a0.667,0.667 0 0 0 0.933,0 l2.071,-2.07 c0.213,-0.215 0.575,-0.147 0.655,0.145 a4,4 0 0 1 -5.506,4.705 l-5.273,5.273 a0.667,0.667 0 0 1 -1.999,-2 l5.273,-5.273 a4,4 0 0 1 4.705,-5.506 c0.292,0.08 0.36,0.441 0.146,0.656 z</StreamGeometry>
+    <!-- "list-checks": fix every finding like it in a part. -->
+    <StreamGeometry x:Key="FixAllInPartStroke">M8.667,3.333 h5.333 M8.667,8 h5.333 M8.667,12.667 h5.333 M2,11.333 l1.333,1.333 l2.667,-2.667 M2,4.667 l1.333,1.333 l2.667,-2.667</StreamGeometry>
+    <!-- "check-check": fix every finding like it. -->
+    <StreamGeometry x:Key="FixAllStroke">M12,4 L4.667,11.333 l-3.333,-3.333 M14.667,6.667 l-5,5 L8.667,10.667</StreamGeometry>
+    <!-- "type": a text event. -->
+    <StreamGeometry x:Key="TextEventStroke">M8,2.667 v10.667 M2.667,4.667 V3.333 a0.667,0.667 0 0 1 0.667,-0.667 h9.333 a0.667,0.667 0 0 1 0.667,0.667 v1.333 M6,13.333 h4</StreamGeometry>
+    <!-- "flag": the coda, or the first downbeat. -->
+    <StreamGeometry x:Key="CodaStroke">M2.667,14.667 V2.667 a0.667,0.667 0 0 1 0.267,-0.533 A4,4 0 0 1 5.333,1.333 c2,0 3.333,1.333 4.889,1.333 q1.333,0 2.045,-0.533 A0.667,0.667 0 0 1 13.333,2.667 v6.667 a0.667,0.667 0 0 1 -0.267,0.533 A4,4 0 0 1 10.667,10.667 c-2,0 -3.333,-1.333 -5.333,-1.333 a4,4 0 0 0 -2.667,1.019</StreamGeometry>
+    <!-- "replace": when the output already exists. -->
+    <StreamGeometry x:Key="OverwriteStroke">M9.333,2.667 a0.667,0.667 0 0 1 0.667,-0.667 M10,6.667 a0.667,0.667 0 0 1 -0.667,-0.667 M14,2.667 a0.667,0.667 0 0 0 -0.667,-0.667 M14,6 a0.667,0.667 0 0 1 -0.667,0.667 M2,4.667 l2,2 l2,-2 M4,6.667 V3.333 a1.333,1.333 0 0 1 1.333,-1.333 h1.333 M2.667,9.333 H6 A0.667,0.667 0 0 1 6.667,10 V13.333 A0.667,0.667 0 0 1 6,14 H2.667 A0.667,0.667 0 0 1 2,13.333 V10 A0.667,0.667 0 0 1 2.667,9.333 Z</StreamGeometry>
+    <!-- "magnet": snap to the grid. -->
+    <StreamGeometry x:Key="QuantizeStroke">M8,10 l2.667,2.667 M1.568,7.099 a0.803,0.803 0 0 0 0,1.136 l1.531,1.531 a0.803,0.803 0 0 0 1.136,0 l4.019,-4.019 a0.667,0.667 0 1 1 2,2 l-4.019,4.019 a0.803,0.803 0 0 0 0,1.136 l1.531,1.531 a0.803,0.803 0 0 0 1.136,0 l4.243,-4.245 A0.667,0.667 0 0 0 5.811,2.855 z M3.333,5.333 l2.667,2.667</StreamGeometry>
+    <!-- "pin": a side panel kept open beside the chart; turned on its side, it auto-hides. -->
+    <StreamGeometry x:Key="PinStroke">M8,11.333 v3.333 M6,7.173 a1.333,1.333 0 0 1 -0.74,1.193 l-1.187,0.6 A1.333,1.333 0 0 0 3.333,10.16 V10.667 a0.667,0.667 0 0 0 0.667,0.667 h8 a0.667,0.667 0 0 0 0.667,-0.667 v-0.507 a1.333,1.333 0 0 0 -0.74,-1.193 l-1.187,-0.6 A1.333,1.333 0 0 1 10,7.173 V4.667 a0.667,0.667 0 0 1 0.667,-0.667 a1.333,1.333 0 0 0 0,-2.667 H5.333 a1.333,1.333 0 0 0 0,2.667 a0.667,0.667 0 0 1 0.667,0.667 z</StreamGeometry>
+    <!-- "grip-vertical": something that can be dragged into another place. -->
+    <StreamGeometry x:Key="GripStroke">M5.333,8 A0.667,0.667 0 1 0 6.667,8 A0.667,0.667 0 1 0 5.333,8 Z M5.333,3.333 A0.667,0.667 0 1 0 6.667,3.333 A0.667,0.667 0 1 0 5.333,3.333 Z M5.333,12.667 A0.667,0.667 0 1 0 6.667,12.667 A0.667,0.667 0 1 0 5.333,12.667 Z M9.333,8 A0.667,0.667 0 1 0 10.667,8 A0.667,0.667 0 1 0 9.333,8 Z M9.333,3.333 A0.667,0.667 0 1 0 10.667,3.333 A0.667,0.667 0 1 0 9.333,3.333 Z M9.333,12.667 A0.667,0.667 0 1 0 10.667,12.667 A0.667,0.667 0 1 0 9.333,12.667 Z</StreamGeometry>
+    <!-- "anchor": a tempo marker anchored to its time in the audio. -->
+    <StreamGeometry x:Key="AnchorStroke">M8,14.667 V5.333 M3.333,8 H1.333 a6.667,6.667 0 0 0 13.333,0 h-2 M6,3.333 A2,2 0 1 0 10,3.333 A2,2 0 1 0 6,3.333 Z</StreamGeometry>
+    <!-- "square-arrow-out-up-right": open in a window of its own. -->
+    <StreamGeometry x:Key="PopOutStroke">M14,8.667 v4 a1.333,1.333 0 0 1 -1.333,1.333 H3.333 a1.333,1.333 0 0 1 -1.333,-1.333 V3.333 a1.333,1.333 0 0 1 1.333,-1.333 h4 M14,2 l-6,6 M10,2 h4 v4</StreamGeometry>
+    <!-- "audio-waveform": find something in the audio. -->
+    <StreamGeometry x:Key="AudioWaveStroke">M1.333,8.667 a1.333,1.333 0 0 0 1.333,-1.333 V4.667 a1.333,1.333 0 0 1 2.667,0 v8.667 a1.333,1.333 0 0 0 2.667,0 V2.667 a1.333,1.333 0 0 1 2.667,0 v8.667 a1.333,1.333 0 0 0 2.667,0 v-2.667 a1.333,1.333 0 0 1 1.333,-1.333</StreamGeometry>
+    <!-- "locate-fixed": to where the playhead is. -->
+    <StreamGeometry x:Key="PlayheadStroke">M1.333,8 h2 M12.667,8 h2 M8,1.333 v2 M8,12.667 v2 M3.333,8 A4.667,4.667 0 1 0 12.667,8 A4.667,4.667 0 1 0 3.333,8 Z M6,8 A2,2 0 1 0 10,8 A2,2 0 1 0 6,8 Z</StreamGeometry>
+    <!-- "mouse-pointer-2": the Select tool. -->
+    <StreamGeometry x:Key="PointerStroke">M2.691,3.125 a0.33,0.33 0 0 1 0.434,-0.434 l10.667,4.333 a0.333,0.333 0 0 1 -0.042,0.631 l-4.083,1.053 a1.333,1.333 0 0 0 -0.959,0.957 l-1.053,4.084 a0.333,0.333 0 0 1 -0.631,0.042 z</StreamGeometry>
+    <!-- "pencil": the Place tool. -->
+    <StreamGeometry x:Key="PencilStroke">M14.116,4.541 a0.667,0.667 0 0 0 -2.657,-2.658 L2.561,10.783 a1.333,1.333 0 0 0 -0.333,0.553 l-0.881,2.901 a0.333,0.333 0 0 0 0.415,0.415 l2.902,-0.88 a1.333,1.333 0 0 0 0.553,-0.331 z M10,3.333 l2.667,2.667</StreamGeometry>
+    <!-- "eraser": the Erase tool. -->
+    <StreamGeometry x:Key="EraserStroke">M14,14 H5.333 a1.333,1.333 0 0 1 -0.947,-0.391 l-2.663,-2.666 a1.333,1.333 0 0 1 0,-1.885 l6.667,-6.667 a1.333,1.333 0 0 1 1.886,0 l3.999,4 a1.333,1.333 0 0 1 0,1.885 L8.556,14 M3.388,7.393 l5.885,5.885</StreamGeometry>
+    <!-- "highlighter": the Phrase tool. -->
+    <StreamGeometry x:Key="HighlighterStroke">M6,7.333 l-4,4 v2 h6 l2,-2 M14.667,8 l-3.067,3.067 a1.333,1.333 0 0 1 -1.867,0 l-3.467,-3.467 a1.333,1.333 0 0 1 0,-1.867 L9.333,2.667</StreamGeometry>
+    <!-- "metronome": the Tempo tool. -->
+    <StreamGeometry x:Key="MetronomeStroke">M8,7.6 V6.067 M8,11.333 l4.393,-4.393 M10.033,3.8 l-0.145,-0.461 a2,2 0 0 0 -3.775,0 L2.945,13.13 A0.667,0.667 0 0 0 3.58,14 h8.835 a0.667,0.667 0 0 0 0.634,-0.873 L12.3,10.8 M12,6 A1.333,1.333 0 1 0 14.667,6 A1.333,1.333 0 1 0 12,6 Z</StreamGeometry>
+    <!-- "link": the Sync tool. -->
+    <StreamGeometry x:Key="LinkStroke">M6.667,8.667 a3.333,3.333 0 0 0 5.027,0.36 l2,-2 a3.333,3.333 0 0 0 -4.713,-4.713 l-1.147,1.14 M9.333,7.333 a3.333,3.333 0 0 0 -5.027,-0.36 l-2,2 a3.333,3.333 0 0 0 4.713,4.713 l1.14,-1.14</StreamGeometry>
+    <!-- "sparkles": generate star power or fills. -->
+    <StreamGeometry x:Key="GenerateStroke">M7.345,1.876 a0.667,0.667 0 0 1 1.311,0 l0.701,3.705 a1.333,1.333 0 0 0 1.063,1.063 l3.705,0.701 a0.667,0.667 0 0 1 0,1.311 l-3.705,0.701 a1.333,1.333 0 0 0 -1.063,1.063 l-0.701,3.705 a0.667,0.667 0 0 1 -1.311,0 l-0.701,-3.705 a1.333,1.333 0 0 0 -1.063,-1.063 l-3.705,-0.701 a0.667,0.667 0 0 1 0,-1.311 l3.705,-0.701 a1.333,1.333 0 0 0 1.063,-1.063 z M13.333,1.333 v2.667 M14.667,2.667 h-2.667 M1.333,13.333 A1.333,1.333 0 1 0 4,13.333 A1.333,1.333 0 1 0 1.333,13.333 Z</StreamGeometry>
+    <!-- "phi": snap to onset. -->
+    <StreamGeometry x:Key="OnsetStroke">M8,1.333 v13.333 M3.333,8 A4.667,4.667 0 1 0 12.667,8 A4.667,4.667 0 1 0 3.333,8 Z</StreamGeometry>
+    <!-- "chart-column-big": put what's recorded on the quantize grid. -->
+    <StreamGeometry x:Key="QuantizeRecordStroke">M2,2 v10.667 a1.333,1.333 0 0 0 1.333,1.333 h10.667 M10.667,3.333 H12 A0.667,0.667 0 0 1 12.667,4 V10.667 A0.667,0.667 0 0 1 12,11.333 H10.667 A0.667,0.667 0 0 1 10,10.667 V4 A0.667,0.667 0 0 1 10.667,3.333 Z M5.333,5.333 H6.667 A0.667,0.667 0 0 1 7.333,6 V10.667 A0.667,0.667 0 0 1 6.667,11.333 H5.333 A0.667,0.667 0 0 1 4.667,10.667 V6 A0.667,0.667 0 0 1 5.333,5.333 Z</StreamGeometry>
+    <!-- "repeat": play the loop region over and over. -->
+    <StreamGeometry x:Key="LoopStroke">M11.333,1.333 l2.667,2.667 l-2.667,2.667 M2,7.333 v-0.667 a2.667,2.667 0 0 1 2.667,-2.667 h9.333 M4.667,14.667 l-2.667,-2.667 l2.667,-2.667 M14,8.667 v0.667 a2.667,2.667 0 0 1 -2.667,2.667 H2</StreamGeometry>
+    <!-- "drum": hit sounds, each note sounding as it's reached. -->
+    <StreamGeometry x:Key="HitSoundsStroke">M1.333,1.333 l5.333,5.333 M14.667,1.333 l-5.333,5.333 M1.333,6 A6.667,3.333 0 1 0 14.667,6 A6.667,3.333 0 1 0 1.333,6 Z M4.667,8.933 v5.267 M8,9.333 v5.333 M11.333,8.933 v5.267 M1.333,6 v5.333 a6.667,3.333 0 0 0 13.333,0 V6</StreamGeometry>
+    <!-- "circle-arrow-up": a newer release is available on GitHub. -->
+    <StreamGeometry x:Key="UpdateAvailableStroke">M1.333,8 A6.667,6.667 0 1 0 14.667,8 A6.667,6.667 0 1 0 1.333,8 Z M10.667,8 L8,5.333 L5.333,8 M8,10.667 V5.333</StreamGeometry>
 </ResourceDictionary>

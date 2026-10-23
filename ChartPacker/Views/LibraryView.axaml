@@ -13,8 +13,8 @@
 
     <UserControl.Resources>
         <conv:EntryKindToIconConverter x:Key="EntryKindToIcon"
-                                       SngFile="{StaticResource SngIconGeometry}"
-                                       SongFolder="{StaticResource FolderIconGeometry}" />
+                                       SngFile="{StaticResource SngStroke}"
+                                       SongFolder="{StaticResource FolderStroke}" />
 
         <!-- A content filter chip: clicking it cycles Either, Includes and Excludes; right-clicking puts it back to Either. -->
         <DataTemplate x:Key="FilterChipTemplate" x:DataType="vm:FilterChipViewModel">
@@ -89,7 +89,7 @@
             <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
             <Setter Property="Foreground" Value="White" />
         </Style>
-        <Style Selector="Button.tilePlay PathIcon">
+        <Style Selector="Button.tilePlay ui|LineIcon">
             <Setter Property="Width" Value="10" />
             <Setter Property="Height" Value="10" />
         </Style>
@@ -346,10 +346,10 @@
                 Margin="6"
                 IsVisible="{Binding IsStale}">
             <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
-                <PathIcon Grid.Column="0"
-                          Width="12" Height="12"
-                          VerticalAlignment="Center"
-                          Data="{StaticResource InfoIconGeometry}" />
+                <ui:LineIcon Grid.Column="0"
+                             Width="12" Height="12"
+                             VerticalAlignment="Center"
+                             Data="{StaticResource InfoStroke}" />
                 <TextBlock Grid.Column="1"
                            FontSize="12"
                            Text="{x:Static res:Strings.StaleHint}"
@@ -366,15 +366,40 @@
                      SelectionMode="Multiple"
                      AutomationProperties.Name="{x:Static res:Strings.LibraryListName}">
                 <!-- Right-clicking a row selects it, or keeps the selection it's part of, so the menu acts on the selection.
-                     Edit Chart is there only with one song selected, the one it opens in Chart Builder. -->
+                     Edit Chart is there only with one song selected, the one it opens in Chart Builder;
+                     Merge only with several selected. Validate, Merge and Generate lower difficulties are the
+                     same as in the Tools menu, with the same icons. -->
                 <ListBox.ContextMenu>
                     <ContextMenu>
                         <MenuItem Header="{x:Static res:Strings.EditChartButton}"
                                   Command="{Binding EditChartCommand}"
-                                  IsVisible="{Binding IsSingleSelection}" />
-                        <Separator IsVisible="{Binding IsSingleSelection}" />
-                        <MenuItem Header="{x:Static vm:LibraryViewModel.RevealLabel}" Command="{Binding RevealCommand}" />
-                        <MenuItem Header="{x:Static res:Strings.MenuDownloadAllFiles}" Command="{Binding DownloadAllCommand}" />
+                                  IsVisible="{Binding IsSingleSelection}">
+                            <MenuItem.Icon><ui:LineIcon Data="{StaticResource EditChartStroke}" /></MenuItem.Icon>
+                        </MenuItem>
+                        <MenuItem Header="{x:Static res:Strings.MenuMerge}"
+                                  Command="{Binding MergeCommand}"
+                                  IsVisible="{Binding IsMultipleSelection}"
+                                  ToolTip.Tip="{x:Static res:Strings.MergeToolTip}"
+                                  ToolTip.ShowOnDisabled="True">
+                            <MenuItem.Icon><ui:LineIcon Data="{StaticResource MergeStroke}" /></MenuItem.Icon>
+                        </MenuItem>
+                        <MenuItem Header="{x:Static res:Strings.MenuValidate}"
+                                  Command="{Binding ValidateCommand}"
+                                  ToolTip.Tip="{x:Static res:Strings.ValidateToolTip}"
+                                  ToolTip.ShowOnDisabled="True">
+                            <MenuItem.Icon><ui:LineIcon Data="{StaticResource CheckStroke}" /></MenuItem.Icon>
+                        </MenuItem>
+                        <MenuItem Header="{x:Static res:Strings.MenuGenerateLowerDifficultiesContext}"
+                                  Command="{Binding GenerateLowerDifficultiesCommand}">
+                            <MenuItem.Icon><ui:LineIcon Data="{StaticResource SortDescendingStroke}" /></MenuItem.Icon>
+                        </MenuItem>
+                        <Separator />
+                        <MenuItem Header="{x:Static vm:LibraryViewModel.RevealLabel}" Command="{Binding RevealCommand}">
+                            <MenuItem.Icon><ui:LineIcon Data="{StaticResource InputFolderStroke}" /></MenuItem.Icon>
+                        </MenuItem>
+                        <MenuItem Header="{x:Static res:Strings.MenuDownloadAllFiles}" Command="{Binding DownloadAllCommand}">
+                            <MenuItem.Icon><ui:LineIcon Data="{StaticResource DownloadStroke}" /></MenuItem.Icon>
+                        </MenuItem>
                     </ContextMenu>
                 </ListBox.ContextMenu>
                 <ListBox.ItemTemplate>
@@ -384,10 +409,10 @@
                             <!-- Album art, or the kind glyph when there's none (or it hasn't loaded yet). -->
                             <Border Grid.Column="0" Classes="art-tile">
                                 <Panel>
-                                    <PathIcon Width="16" Height="16"
-                                              Opacity="0.8"
-                                              IsVisible="{Binding !HasAlbumArt}"
-                                              Data="{Binding Entry.Kind, Converter={StaticResource EntryKindToIcon}}" />
+                                    <ui:LineIcon Width="16" Height="16"
+                                                 Opacity="0.8"
+                                                 IsVisible="{Binding !HasAlbumArt}"
+                                                 Data="{Binding Entry.Kind, Converter={StaticResource EntryKindToIcon}}" />
                                     <Image Source="{Binding AlbumArt}"
                                            Stretch="UniformToFill"
                                            IsVisible="{Binding HasAlbumArt}" />
@@ -399,12 +424,12 @@
                                             CommandParameter="{Binding}"
                                             AutomationProperties.Name="{x:Static res:Strings.PlayToolTip}">
                                         <Panel>
-                                            <PathIcon Data="{StaticResource PlayIconGeometry}"
-                                                      IsVisible="{Binding !IsPreviewing}"
-                                                      ToolTip.Tip="{x:Static res:Strings.PlayToolTip}" />
-                                            <PathIcon Data="{StaticResource StopIconGeometry}"
-                                                      IsVisible="{Binding IsPreviewing}"
-                                                      ToolTip.Tip="{x:Static res:Strings.StopToolTip}" />
+                                            <ui:LineIcon Data="{StaticResource PlayStroke}"
+                                                         IsVisible="{Binding !IsPreviewing}"
+                                                         ToolTip.Tip="{x:Static res:Strings.PlayToolTip}" />
+                                            <ui:LineIcon Data="{StaticResource StopStroke}"
+                                                         IsVisible="{Binding IsPreviewing}"
+                                                         ToolTip.Tip="{x:Static res:Strings.StopToolTip}" />
                                         </Panel>
                                     </Button>
                                 </Panel>

@@ -2,6 +2,7 @@ using System.Globalization;
 using ChartShared.Core.Ini;
 using ChartShared.Core.Metadata;
 using ChartShared.Core.Resources;
+using ChartShared.Core.Scanning;
 using ChartShared.Core.Sng;
 using ChartShared.Core.Validation;
 using Microsoft.Win32.SafeHandles;
@@ -40,7 +41,10 @@ public static class Unpacker
     /// Whether an existing <paramref name="targetFolder"/> is written into, replacing files with the
     /// same names. Other files in it are left alone; the folder is never deleted.
     /// </param>
-    /// <param name="cancellationToken">Cancels the unpack; nothing is left behind.</param>
+    /// <param name="cancellationToken">
+    /// Cancels the unpack; nothing is left behind, unless it's cancelled while waiting for a file being replaced in an
+    /// existing <paramref name="targetFolder"/> to be let go of, which leaves it partly replaced, as a failed move does.
+    /// </param>
     /// <exception cref="IOException">A file can't be read or written, or the target exists and <paramref name="overwrite"/> is false.</exception>
     /// <exception cref="UnauthorizedAccessException">Access is denied.</exception>
     /// <exception cref="OperationCanceledException">The unpack was cancelled.</exception>
@@ -76,7 +80,7 @@ public static class Unpacker
             WriteSongIni(read.Metadata, Path.Combine(temp, SongIni.FileName), findings);
 
             cancellationToken.ThrowIfCancellationRequested();
-            Commit(temp, target);
+            Commit(temp, target, cancellationToken);
         }
         finally
         {
@@ -146,8 +150,11 @@ public static class Unpacker
         SongIni.Write(writer, pairs);
     }
 
-    /// <summary>Moves the extracted files from <paramref name="temp"/> to <paramref name="target"/>.</summary>
-    private static void Commit(string temp, string target)
+    /// <summary>
+    /// Moves the extracted files from <paramref name="temp"/> to <paramref name="target"/>, waiting a moment for a file
+    /// replaced that's in use elsewhere to be let go of (<see cref="SongFileCommit"/>).
+    /// </summary>
+    private static void Commit(string temp, string target, CancellationToken cancellationToken)
     {
         if (!Directory.Exists(target))
         {
@@ -159,7 +166,7 @@ public static class Unpacker
         {
             string destination = Path.Combine(target, Path.GetRelativePath(temp, file));
             Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
-            File.Move(file, destination, overwrite: true);
+            SongFileCommit.MoveOver(file, destination, cancellationToken);
         }
     }
 

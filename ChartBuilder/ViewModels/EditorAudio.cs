@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using ChartBuilder.Services;
+using ChartShared.Audio.Waveforms;
 using ChartShared.Core.Charting;
 using ChartShared.Core.Charting.Layout;
 using ChartShared.Core.Charts;
@@ -20,6 +21,7 @@ namespace ChartBuilder.ViewModels
     {
         private readonly EditorMessages? _messages;
         private long _budget;
+        private WaveformFidelity _fidelity;
         private TaskCompletionSource<AudibleRange?> _settled = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         // Whether the stems are let go of for a save (Release), until SetTracks starts on them again.
@@ -32,9 +34,10 @@ namespace ChartBuilder.ViewModels
             ArgumentNullException.ThrowIfNull(settings);
             _messages = messages;
             _budget = BudgetOf(settings);
+            _fidelity = Enum.IsDefined(settings.WaveformFidelity) ? settings.WaveformFidelity : BuilderSettings.DefaultWaveformFidelity;
             Entry = song.Entry;
             Tracks = song.Tracks;
-            (Waveforms, Analysis) = Open(Entry, Tracks);
+            (Waveforms, Analysis) = Open(Entry, Tracks, _fidelity);
         }
 
         /// <summary>Raised on the UI thread when something drawn from the audio may have changed.</summary>
@@ -81,11 +84,17 @@ namespace ChartBuilder.ViewModels
             RefreshAudible();
         }
 
-        /// <summary>Takes up what may have changed in Settings: the spectrogram memory budget.</summary>
+        /// <summary>Takes up what may have changed in Settings: the spectrogram memory budget and the waveform detail.</summary>
         public void ReloadSettings(BuilderSettings settings)
         {
             _budget = BudgetOf(settings);
             Analysis.SetBudget(_budget);
+            if (settings.WaveformFidelity != _fidelity && Enum.IsDefined(settings.WaveformFidelity))
+            {
+                // Every stem is read again at the new fidelity, or found in the cache if read at it before.
+                _fidelity = settings.WaveformFidelity;
+                ReplaceWaveforms();
+            }
         }
 
         /// <summary>The audio a lane showing <paramref name="instrument"/> is drawn over, as <paramref name="options"/> picks it.</summary>
@@ -119,7 +128,7 @@ namespace ChartBuilder.ViewModels
             Close();
             Entry = entry;
             Tracks = tracks;
-            (Waveforms, Analysis) = Open(entry, tracks);
+            (Waveforms, Analysis) = Open(entry, tracks, _fidelity);
             Waveforms.Start();
             if (_settled.Task.IsCompleted)
                 _settled = new TaskCompletionSource<AudibleRange?>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -128,11 +137,33 @@ namespace ChartBuilder.ViewModels
             Changed?.Invoke(this, EventArgs.Empty);
         }
 
+        /// <summary>
+        /// Reads every waveform again at the new fidelity, keeping the spectrograms: after the waveform
+        /// detail changed in Settings. The analysis is untouched, so nothing spectrogram-based is re-read.
+        /// </summary>
+        private void ReplaceWaveforms()
+        {
+            Waveforms.Changed -= OnPartChanged;
+            Waveforms.Dispose();
+            Waveforms = new StemWaveforms(Entry, Tracks, _fidelity);
+            Waveforms.Changed += OnPartChanged;
+            Waveforms.Start();
+
+            // What's drawn of these tracks was of the old fidelity's peaks.
+            LaneWaveformPainter.Clear();
+
+            if (_settled.Task.IsCompleted)
+                _settled = new TaskCompletionSource<AudibleRange?>(TaskCreationOptions.RunContinuationsAsynchronously);
+            SetAudible((false, null));
+            Changed?.Invoke(this, EventArgs.Empty);
+            RefreshAudible();
+        }
+
         public void Dispose() => Close();
 
-        private (StemWaveforms Waveforms, AudioAnalysis Analysis) Open(SongEntry? entry, IReadOnlyList<SongTrack> tracks)
+        private (StemWaveforms Waveforms, AudioAnalysis Analysis) Open(SongEntry? entry, IReadOnlyList<SongTrack> tracks, WaveformFidelity fidelity)
         {
-            var waveforms = new StemWaveforms(entry, tracks);
+            var waveforms = new StemWaveforms(entry, tracks, fidelity);
             var analysis = new AudioAnalysis(entry, tracks, _budget, _messages);
             waveforms.Changed += OnPartChanged;
             analysis.Changed += OnPartChanged;

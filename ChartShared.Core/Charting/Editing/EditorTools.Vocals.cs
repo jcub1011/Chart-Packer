@@ -49,7 +49,6 @@ public sealed partial class EditorTools
             EditorTool.Select => PressVocalSelect(point, content, shift),
             EditorTool.Place => PressVocalPlace(point, content, shift),
             EditorTool.Erase => new VocalEraseGesture(this, point, content),
-            EditorTool.Sustain => PressVocalSustain(point, content),
             EditorTool.Phrase => new VocalPhraseDrawGesture(this, point, content),
             EditorTool.Tempo => PressTempo(point.Tick, point.Tolerance),
             _ => null,
@@ -57,14 +56,17 @@ public sealed partial class EditorTools
     }
 
     /// <summary>
-    /// Starts erasing at <paramref name="point"/> in a vocal part's lane whatever the tool, as the middle button does: each
-    /// note the pointer passes over goes, with its lyrics, and in the phrase strip each phrase, as one step.
+    /// Starts erasing at <paramref name="point"/> in a vocal part's lane, as the middle button does: each note the pointer
+    /// passes over goes, with its lyrics, and in the phrase strip each phrase, as one step. With the Tempo tool, it removes
+    /// the tempo marker there instead.
     /// </summary>
     public void PressErase(VocalPoint point)
     {
         Cancel();
         _modifiers = EditorModifiers.None;
-        if (VocalContentOrSay(point.Track) is { } content)
+        if (_session.Tool == EditorTool.Tempo)
+            RemoveTempoNear(point.Tick, point.Tolerance);
+        else if (VocalContentOrSay(point.Track) is { } content)
             _gesture = new VocalEraseGesture(this, point, content);
     }
 
@@ -378,6 +380,9 @@ public sealed partial class EditorTools
     {
         if (HitTest(content, point) is { } hit)
         {
+            // A note's end is grabbed as the select tool grabs it, so its length is set here too.
+            if (hit.Grip == VocalNoteGrip.End)
+                return PressVocalSustain(point, content);
             if (!_session.Selection.Contains(point.Track, hit.Note.Place))
                 _session.Selection.SelectVocalNotes(point.Track, [hit.Note.Place]);
             return new VocalMoveGesture(this, point, content, hit.Note);

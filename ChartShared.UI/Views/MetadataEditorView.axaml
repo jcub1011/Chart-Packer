@@ -74,7 +74,7 @@
             <Setter Property="Grid.Row" Value="0" />
             <Setter Property="Grid.Column" Value="2" />
         </Style>
-        <Style Selector="StackPanel.metadataActions">
+        <Style Selector="Grid.metadataActions">
             <Setter Property="Grid.Row" Value="0" />
             <Setter Property="Grid.Column" Value="3" />
         </Style>
@@ -101,40 +101,63 @@
         <Style Selector="views|MetadataEditorView.compact StackPanel.metadataMessage">
             <Setter Property="Grid.Row" Value="2" />
         </Style>
-        <!-- Where the new row's key, value and buttons go: on one line, or, compact, the key on its own
-             line, the value under it, and Add/Cancel right-aligned below that. -->
-        <Style Selector="AutoCompleteBox.newKey">
-            <Setter Property="Grid.Row" Value="0" />
-            <Setter Property="Grid.Column" Value="0" />
-            <Setter Property="Width" Value="220" />
-        </Style>
-        <Style Selector="TextBox.newValue">
+        <!-- The new row goes in the rows' columns, its key box in the key's and its value box in the value's, and moves
+             as they do when compact. The key box is fixed at no wider than the key column's floor, so typing in it
+             never widens the column and moves every row's value. -->
+        <Style Selector="AutoCompleteBox.draftKey">
             <Setter Property="Grid.Row" Value="0" />
             <Setter Property="Grid.Column" Value="1" />
+            <Setter Property="Width" Value="124" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
         </Style>
-        <Style Selector="Button.newAdd">
+        <Style Selector="StackPanel.draftValue">
             <Setter Property="Grid.Row" Value="0" />
             <Setter Property="Grid.Column" Value="2" />
         </Style>
-        <Style Selector="Button.newCancel">
-            <Setter Property="Grid.Row" Value="0" />
-            <Setter Property="Grid.Column" Value="3" />
-        </Style>
-        <Style Selector="views|MetadataEditorView.compact AutoCompleteBox.newKey">
-            <Setter Property="Grid.ColumnSpan" Value="4" />
+        <Style Selector="views|MetadataEditorView.compact AutoCompleteBox.draftKey">
+            <Setter Property="Grid.ColumnSpan" Value="2" />
             <Setter Property="Width" Value="NaN" />
             <Setter Property="HorizontalAlignment" Value="Stretch" />
         </Style>
-        <Style Selector="views|MetadataEditorView.compact TextBox.newValue">
+        <Style Selector="views|MetadataEditorView.compact StackPanel.draftValue">
             <Setter Property="Grid.Row" Value="1" />
-            <Setter Property="Grid.Column" Value="0" />
-            <Setter Property="Grid.ColumnSpan" Value="4" />
+            <Setter Property="Grid.Column" Value="1" />
+            <Setter Property="Grid.ColumnSpan" Value="3" />
         </Style>
-        <Style Selector="views|MetadataEditorView.compact Button.newAdd">
-            <Setter Property="Grid.Row" Value="2" />
+        <!-- The key box reads like a value's edit box (TextBox.inline), so its text lands where a key's does. -->
+        <Style Selector="AutoCompleteBox.draftKey /template/ TextBox#PART_TextBox">
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="3,1" />
         </Style>
-        <Style Selector="views|MetadataEditorView.compact Button.newCancel">
-            <Setter Property="Grid.Row" Value="2" />
+
+        <!-- A row's Undo and Remove, in fixed slots at its right, so neither moves as the other comes and goes. Remove
+             shows while the row is hovered or has the focus, and can't be clicked or tapped while it's hidden; Undo stays
+             while there's a change to undo. Later rules win, so hovering the button itself, and a disabled one, come last. -->
+        <Style Selector="Button.captionAction.rowAction">
+            <Setter Property="Width" Value="22" />
+            <Setter Property="Height" Value="22" />
+            <Setter Property="VerticalAlignment" Value="Top" />
+        </Style>
+        <Style Selector="Button.captionAction.reveal">
+            <Setter Property="Opacity" Value="0" />
+            <Setter Property="IsHitTestVisible" Value="False" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.1" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Border.metadataRow:pointerover Button.captionAction.reveal, Border.metadataRow:focus-within Button.captionAction.reveal">
+            <Setter Property="Opacity" Value="0.75" />
+            <Setter Property="IsHitTestVisible" Value="True" />
+        </Style>
+        <Style Selector="Button.captionAction.reveal:pointerover, Button.captionAction.reveal:focus-visible">
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+        <Style Selector="Border.metadataRow:pointerover Button.captionAction.reveal:disabled, Border.metadataRow:focus-within Button.captionAction.reveal:disabled">
+            <Setter Property="Opacity" Value="0.3" />
         </Style>
     </UserControl.Styles>
 
@@ -233,12 +256,21 @@
                         <Border Classes="metadataRow invalid" Margin="0,1">
                             <Border.ContextMenu>
                                 <ContextMenu>
-                                    <MenuItem Header="{Binding QuickFixHeader}" Command="{Binding QuickFixCommand}" />
+                                    <MenuItem Header="{Binding QuickFixHeader}" Command="{Binding QuickFixCommand}">
+                                        <MenuItem.Icon><ui:LineIcon Data="{StaticResource QuickFixStroke}" /></MenuItem.Icon>
+                                    </MenuItem>
                                 </ContextMenu>
                             </Border.ContextMenu>
                             <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
                                 <TextBlock Grid.Column="0" Classes="issue" FontWeight="SemiBold" Text="{Binding Key}" />
-                                <TextBlock Grid.Column="1" Classes="issue" Text="{Binding Message}" />
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock Classes="issue" Text="{Binding Message}" />
+                                    <Button Classes="inlineAction"
+                                            Command="{Binding QuickFixCommand}"
+                                            AutomationProperties.Name="{Binding QuickFixHeader}">
+                                        <TextBlock Text="{Binding QuickFixHeader}" />
+                                    </Button>
+                                </StackPanel>
                             </Grid>
                         </Border>
                     </DataTemplate>
@@ -247,195 +279,252 @@
         </StackPanel>
 
         <TextBlock Classes="muted" Text="{Binding MetadataNote}" IsVisible="{Binding HasMetadataNote}" />
-        <ItemsControl ItemsSource="{Binding Metadata}"
-                      Grid.IsSharedSizeScope="True"
-                      AutomationProperties.Name="{x:Static res:SharedStrings.MetadataListName}">
-            <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="vm:MetadataRowViewModel">
-                    <!-- A value that fails validation is marked orange, with why under it. -->
-                    <Border Classes="metadataRow" Classes.invalid="{Binding HasIssue}" Margin="0,1">
-                        <!-- Quick Fix puts the key's fix in the drafts; it's there on every row, disabled where there's none.
-                             Where the editor asks for it, Revert and Remove are here too rather than buttons on the row. -->
-                        <Border.ContextMenu>
-                            <ContextMenu>
-                                <MenuItem Header="{x:Static res:SharedStrings.RevertRowToolTip}"
-                                          Command="{Binding RevertCommand}"
-                                          IsVisible="{Binding ShowMenuActions}" />
-                                <MenuItem Header="{x:Static res:SharedStrings.RemoveRowToolTip}"
-                                          Command="{Binding RemoveCommand}"
-                                          IsVisible="{Binding ShowMenuActions}" />
-                                <Separator IsVisible="{Binding ShowMenuActions}" />
-                                <MenuItem Header="{Binding QuickFixHeader}" Command="{Binding QuickFixCommand}" />
-                            </ContextMenu>
-                        </Border.ContextMenu>
-                        <Grid RowDefinitions="Auto,Auto,Auto">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="14" />
-                                <ColumnDefinition Width="Auto" SharedSizeGroup="MetadataKey" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" SharedSizeGroup="MetadataActions" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0"
-                                       Classes="marker"
-                                       Margin="0,2,0,0"
-                                       Text="{Binding Marker}" />
-                            <TextBlock Classes="muted metadataKey"
-                                       Classes.removed="{Binding IsRemoved}"
-                                       MaxWidth="220"
-                                       Margin="0,2,16,0"
-                                       TextTrimming="CharacterEllipsis"
-                                       Text="{Binding Key}">
-                                <!-- The key in full (it may be trimmed), and what it does when it's a known key. -->
-                                <ToolTip.Tip>
-                                    <StackPanel Spacing="2">
-                                        <TextBlock FontWeight="SemiBold" TextWrapping="Wrap" Text="{Binding Key}" />
-                                        <TextBlock TextWrapping="Wrap" Text="{Binding KeyDescription}" IsVisible="{Binding HasKeyDescription}" />
-                                    </StackPanel>
-                                </ToolTip.Tip>
-                            </TextBlock>
+        <!-- The rows and the new row share their columns, so a key being added sits where the keys do. -->
+        <StackPanel Grid.IsSharedSizeScope="True">
+            <ItemsControl ItemsSource="{Binding Metadata}"
+                          AutomationProperties.Name="{x:Static res:SharedStrings.MetadataListName}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:MetadataRowViewModel">
+                        <!-- A value that fails validation is marked orange, with why under it. -->
+                        <Border Classes="metadataRow" Classes.invalid="{Binding HasIssue}" Margin="0,1">
+                            <!-- The row's actions, as its buttons and links offer them. Quick Fix puts the key's fix in the
+                                 drafts; it's there on every row, disabled where there's none. -->
+                            <Border.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="{Binding UndoToolTip}"
+                                              Command="{Binding RevertCommand}"
+                                              IsVisible="{Binding ShowUndo}">
+                                        <MenuItem.Icon><ui:LineIcon Data="{StaticResource RevertStroke}" /></MenuItem.Icon>
+                                    </MenuItem>
+                                    <MenuItem Header="{x:Static res:SharedStrings.RemoveRowToolTip}"
+                                              Command="{Binding RemoveCommand}"
+                                              IsVisible="{Binding ShowRemove}">
+                                        <MenuItem.Icon><ui:LineIcon Data="{StaticResource TrashStroke}" /></MenuItem.Icon>
+                                    </MenuItem>
+                                    <Separator IsVisible="{Binding HasUndoOrRemove}" />
+                                    <MenuItem Header="{Binding QuickFixHeader}" Command="{Binding QuickFixCommand}">
+                                        <MenuItem.Icon><ui:LineIcon Data="{StaticResource QuickFixStroke}" /></MenuItem.Icon>
+                                    </MenuItem>
+                                    <MenuItem Header="{x:Static res:SharedStrings.AutoSetLengthButton}"
+                                              Command="{Binding AutoSetSongLengthCommand}"
+                                              IsVisible="{Binding ShowAutoSetLength}">
+                                        <MenuItem.Icon><ui:LineIcon Data="{StaticResource OffsetStroke}" /></MenuItem.Icon>
+                                    </MenuItem>
+                                </ContextMenu>
+                            </Border.ContextMenu>
+                            <Grid RowDefinitions="Auto,Auto,Auto">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="14" />
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="MetadataKey" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="MetadataActions" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0"
+                                           Classes="marker"
+                                           Margin="0,2,0,0"
+                                           Text="{Binding Marker}" />
+                                <!-- At least as wide as the new row's key box, so that box never widens the column. -->
+                                <TextBlock Classes="muted metadataKey"
+                                           Classes.removed="{Binding IsRemoved}"
+                                           MinWidth="120"
+                                           MaxWidth="220"
+                                           Margin="0,2,16,0"
+                                           TextTrimming="CharacterEllipsis"
+                                           Text="{Binding Key}">
+                                    <!-- The key in full (it may be trimmed), and what it does when it's a known key. -->
+                                    <ToolTip.Tip>
+                                        <StackPanel Spacing="2">
+                                            <TextBlock FontWeight="SemiBold" TextWrapping="Wrap" Text="{Binding Key}" />
+                                            <TextBlock TextWrapping="Wrap" Text="{Binding KeyDescription}" IsVisible="{Binding HasKeyDescription}" />
+                                        </StackPanel>
+                                    </ToolTip.Tip>
+                                </TextBlock>
 
-                            <!-- Tags like <color=#FDFD96FF> are rendered and times are formatted; the tooltip shows the value as stored. -->
-                            <Button Classes="value metadataValue"
-                                    Command="{Binding BeginEditCommand}"
-                                    IsVisible="{Binding !IsEditing}"
-                                    ToolTip.Tip="{Binding ToolTip}"
-                                    AutomationProperties.Name="{Binding Key}">
-                                <Panel>
-                                    <TextBlock TextWrapping="Wrap"
-                                               Classes.removed="{Binding IsRemoved}"
-                                               ui:RichTextMarkup.Text="{Binding DisplayValue}"
-                                               IsVisible="{Binding ShowRichValue}" />
-                                    <TextBlock TextWrapping="Wrap"
-                                               Classes="distinct"
-                                               Classes.removed="{Binding IsRemoved}"
-                                               Text="{Binding DisplayValue}"
-                                               IsVisible="{Binding ShowDistinct}" />
-                                </Panel>
-                            </Button>
-                            <StackPanel Classes="metadataEdit" IsVisible="{Binding IsEditing}">
-                                <!-- Enter or leaving the box keeps the text; Escape drops it. -->
-                                <TextBox Classes="inline"
-                                         Text="{Binding EditText}"
-                                         PlaceholderText="{Binding EditPlaceholder}"
-                                         IsVisible="{Binding IsEditing}"
-                                         ui:FocusWhenShown.IsEnabled="True"
-                                         LostFocus="OnEditLostFocus"
-                                         AutomationProperties.Name="{Binding Key}">
-                                    <TextBox.KeyBindings>
-                                        <KeyBinding Gesture="Enter" Command="{Binding CommitCommand}" />
-                                        <KeyBinding Gesture="Escape" Command="{Binding CancelCommand}" />
-                                    </TextBox.KeyBindings>
-                                </TextBox>
-                                <TextBlock Classes="error" Text="{Binding Error}" IsVisible="{Binding HasError}" />
-                            </StackPanel>
-
-                            <StackPanel Classes="metadataActions"
-                                        Orientation="Horizontal"
-                                        Margin="4,0,0,0"
-                                        IsVisible="{Binding ShowActions}">
-                                <Button Classes="icon"
-                                        Command="{Binding AutoSetSongLengthCommand}"
-                                        IsVisible="{Binding ShowAutoSetLength}"
-                                        ToolTip.Tip="{x:Static res:SharedStrings.AutoSetLengthToolTip}"
-                                        AutomationProperties.Name="{x:Static res:SharedStrings.AutoSetLengthButton}">
-                                    <PathIcon Width="12" Height="12" Data="{StaticResource AutoLengthIconGeometry}" />
+                                <!-- Tags like <color=#FDFD96FF> are rendered and times are formatted; the tooltip shows the value as stored. -->
+                                <Button Classes="value metadataValue"
+                                        Command="{Binding BeginEditCommand}"
+                                        IsVisible="{Binding !IsEditing}"
+                                        ToolTip.Tip="{Binding ToolTip}"
+                                        AutomationProperties.Name="{Binding Key}">
+                                    <Panel>
+                                        <TextBlock TextWrapping="Wrap"
+                                                   Classes.removed="{Binding IsRemoved}"
+                                                   ui:RichTextMarkup.Text="{Binding DisplayValue}"
+                                                   IsVisible="{Binding ShowRichValue}" />
+                                        <TextBlock TextWrapping="Wrap"
+                                                   Classes="distinct"
+                                                   Classes.removed="{Binding IsRemoved}"
+                                                   Text="{Binding DisplayValue}"
+                                                   IsVisible="{Binding ShowDistinct}" />
+                                    </Panel>
                                 </Button>
-                                <Button Classes="icon"
-                                        Command="{Binding RevertCommand}"
-                                        IsVisible="{Binding ShowRevertButton}"
-                                        ToolTip.Tip="{x:Static res:SharedStrings.RevertRowToolTip}"
-                                        AutomationProperties.Name="{x:Static res:SharedStrings.RevertRowToolTip}">
-                                    <PathIcon Width="12" Height="12" Data="{StaticResource RevertIconGeometry}" />
-                                </Button>
-                                <Button Classes="icon"
-                                        Command="{Binding RemoveCommand}"
-                                        IsVisible="{Binding ShowRemoveButton}"
-                                        ToolTip.Tip="{x:Static res:SharedStrings.RemoveRowToolTip}"
-                                        AutomationProperties.Name="{x:Static res:SharedStrings.RemoveRowToolTip}">
-                                    <PathIcon Width="12" Height="12" Data="{StaticResource RemoveIconGeometry}" />
-                                </Button>
-                            </StackPanel>
+                                <StackPanel Classes="metadataEdit" IsVisible="{Binding IsEditing}">
+                                    <!-- Enter or leaving the box keeps the text; Escape drops it. -->
+                                    <TextBox Classes="inline"
+                                             Text="{Binding EditText}"
+                                             PlaceholderText="{Binding EditPlaceholder}"
+                                             IsVisible="{Binding IsEditing}"
+                                             ui:FocusWhenShown.IsEnabled="True"
+                                             LostFocus="OnEditLostFocus"
+                                             AutomationProperties.Name="{Binding Key}">
+                                        <TextBox.KeyBindings>
+                                            <KeyBinding Gesture="Enter" Command="{Binding CommitCommand}" />
+                                            <KeyBinding Gesture="Escape" Command="{Binding CancelCommand}" />
+                                        </TextBox.KeyBindings>
+                                    </TextBox>
+                                    <TextBlock Classes="error" Text="{Binding Error}" IsVisible="{Binding HasError}" />
+                                </StackPanel>
 
-                            <StackPanel Classes="metadataMessage" IsVisible="{Binding !IsEditing}">
-                                <TextBlock Classes="issue" Text="{Binding Issue}" IsVisible="{Binding HasIssue}" />
-                                <TextBlock Classes="hint" Text="{Binding Hint}" IsVisible="{Binding HasHint}" />
-                            </StackPanel>
-                        </Grid>
-                    </Border>
-                </DataTemplate>
-            </ItemsControl.ItemTemplate>
-        </ItemsControl>
+                                <!-- Undo, then Remove, each in a slot of its own (styles above). -->
+                                <Grid Classes="metadataActions"
+                                      ColumnDefinitions="22,22"
+                                      Margin="4,0,0,0"
+                                      IsVisible="{Binding ShowActions}">
+                                    <Button Grid.Column="0"
+                                            Classes="captionAction rowAction"
+                                            Command="{Binding RevertCommand}"
+                                            IsVisible="{Binding ShowUndo}"
+                                            ToolTip.Tip="{Binding UndoToolTip}"
+                                            AutomationProperties.Name="{Binding UndoToolTip}">
+                                        <ui:LineIcon Data="{StaticResource RevertStroke}" />
+                                    </Button>
+                                    <Button Grid.Column="1"
+                                            Classes="captionAction rowAction reveal"
+                                            Command="{Binding RemoveCommand}"
+                                            IsVisible="{Binding ShowRemove}"
+                                            ToolTip.Tip="{x:Static res:SharedStrings.RemoveRowToolTip}"
+                                            AutomationProperties.Name="{x:Static res:SharedStrings.RemoveRowToolTip}">
+                                        <ui:LineIcon Data="{StaticResource TrashStroke}" />
+                                    </Button>
+                                </Grid>
 
-        <!-- New row: key and value, both checked before anything goes into the drafts.
-             The key box suggests the known keys not already in use, and takes any other key typed. -->
-        <StackPanel Margin="14,6,0,0" Spacing="4" IsVisible="{Binding IsAdding}">
-            <Grid ColumnDefinitions="Auto,*,Auto,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="8" RowSpacing="4">
-                <AutoCompleteBox x:Name="NewKeyBox"
-                                 Classes="newKey"
-                                 Text="{Binding NewKey}"
-                                 ItemsSource="{Binding AvailableKeys}"
-                                 ValueMemberBinding="{Binding Key, DataType=meta:KnownKey}"
-                                 FilterMode="Contains"
-                                 MinimumPrefixLength="0"
-                                 MaxDropDownHeight="320"
-                                 PlaceholderText="{x:Static res:SharedStrings.NewKeyWatermark}"
-                                 IsVisible="{Binding IsAdding}"
-                                 ui:FocusWhenShown.IsEnabled="True"
-                                 ToolTip.Tip="{x:Static res:SharedStrings.NewKeyToolTip}"
-                                 AutomationProperties.Name="{x:Static res:SharedStrings.NewKeyWatermark}">
-                    <AutoCompleteBox.ItemTemplate>
-                        <!-- A fixed width: the list is virtualised, so sizing to content would
-                             resize the dropdown to the widest visible item as it scrolls. -->
-                        <DataTemplate x:DataType="meta:KnownKey">
-                            <StackPanel Width="300" Margin="0,2" Spacing="1">
-                                <TextBlock FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Text="{Binding Key}" />
-                                <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap" Text="{Binding Description}" />
-                            </StackPanel>
-                        </DataTemplate>
-                    </AutoCompleteBox.ItemTemplate>
-                </AutoCompleteBox>
-                <TextBox x:Name="NewValueBox"
-                         Classes="newValue"
-                         Text="{Binding NewValue}"
-                         PlaceholderText="{x:Static res:SharedStrings.NewValueWatermark}"
-                         AutomationProperties.Name="{x:Static res:SharedStrings.NewValueWatermark}">
-                    <TextBox.KeyBindings>
-                        <KeyBinding Gesture="Enter" Command="{Binding CommitAddCommand}" />
-                        <KeyBinding Gesture="Escape" Command="{Binding CancelAddCommand}" />
-                    </TextBox.KeyBindings>
-                </TextBox>
-                <Button Classes="newAdd"
-                        Content="{x:Static res:SharedStrings.AddButton}"
-                        Command="{Binding CommitAddCommand}"
-                        AutomationProperties.Name="{x:Static res:SharedStrings.AddButton}" />
-                <Button Classes="newCancel"
-                        Content="{x:Static res:SharedStrings.CancelButton}"
-                        Command="{Binding CancelAddCommand}"
-                        AutomationProperties.Name="{x:Static res:SharedStrings.CancelButton}" />
-            </Grid>
-            <TextBlock Classes="error" Text="{Binding NewRowError}" IsVisible="{Binding HasNewRowError}" />
+                                <!-- Why the value fails, or a hint, then what can be done about it, said in words: the key's
+                                     Quick Fix (hidden by Button.inlineAction:disabled where there's none), and for song_length,
+                                     Auto Set. -->
+                                <StackPanel Classes="metadataMessage" IsVisible="{Binding !IsEditing}">
+                                    <TextBlock Classes="issue" Text="{Binding Issue}" IsVisible="{Binding HasIssue}" />
+                                    <TextBlock Classes="hint" Text="{Binding Hint}" IsVisible="{Binding HasHint}" />
+                                    <WrapPanel ItemSpacing="12">
+                                        <Button Classes="inlineAction"
+                                                Command="{Binding QuickFixCommand}"
+                                                AutomationProperties.Name="{Binding QuickFixHeader}">
+                                            <TextBlock Text="{Binding QuickFixHeader}" />
+                                        </Button>
+                                        <!-- Shown by the panel, so the button's own visibility is left to the
+                                             style, which hides it while Auto Set can't run. -->
+                                        <Panel IsVisible="{Binding ShowAutoSetLength}">
+                                            <Button Classes="inlineAction"
+                                                    Command="{Binding AutoSetSongLengthCommand}"
+                                                    ToolTip.Tip="{x:Static res:SharedStrings.AutoSetLengthToolTip}"
+                                                    AutomationProperties.Name="{x:Static res:SharedStrings.AutoSetLengthButton}">
+                                                <TextBlock Text="{x:Static res:SharedStrings.AutoSetLengthButton}" />
+                                            </Button>
+                                        </Panel>
+                                    </WrapPanel>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- The new row, at the end of the rows and in their columns: key and value, both checked before anything goes
+                 into the drafts. The key box suggests the known keys not already in use, and takes any other key typed. Enter
+                 adds the row and empties this one for the next key; Escape or the close button ends it, as does leaving it
+                 with nothing typed. -->
+            <Border x:Name="DraftRow"
+                    Classes="metadataRow"
+                    Margin="0,1"
+                    IsVisible="{Binding IsAdding}"
+                    LostFocus="OnDraftRowLostFocus">
+                <Grid RowDefinitions="Auto,Auto">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="14" />
+                        <ColumnDefinition Width="Auto" SharedSizeGroup="MetadataKey" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" SharedSizeGroup="MetadataActions" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Classes="marker" Margin="0,2,0,0" Text="+" />
+                    <AutoCompleteBox x:Name="NewKeyBox"
+                                     Classes="draftKey"
+                                     Margin="-4,0,12,0"
+                                     Text="{Binding NewKey}"
+                                     ItemsSource="{Binding AvailableKeys}"
+                                     ValueMemberBinding="{Binding Key, DataType=meta:KnownKey}"
+                                     FilterMode="Contains"
+                                     MinimumPrefixLength="0"
+                                     MaxDropDownHeight="320"
+                                     PlaceholderText="{x:Static res:SharedStrings.NewKeyWatermark}"
+                                     IsVisible="{Binding IsAdding}"
+                                     ui:FocusWhenShown.IsEnabled="True"
+                                     ToolTip.Tip="{x:Static res:SharedStrings.NewKeyToolTip}"
+                                     AutomationProperties.Name="{x:Static res:SharedStrings.NewKeyWatermark}">
+                        <AutoCompleteBox.ItemTemplate>
+                            <!-- A fixed width: the list is virtualised, so sizing to content would
+                                 resize the dropdown to the widest visible item as it scrolls. -->
+                            <DataTemplate x:DataType="meta:KnownKey">
+                                <StackPanel Width="300" Margin="0,2" Spacing="1">
+                                    <TextBlock FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Text="{Binding Key}" />
+                                    <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap" Text="{Binding Description}" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </AutoCompleteBox.ItemTemplate>
+                    </AutoCompleteBox>
+                    <!-- What's wrong with the row takes the place of the hint, so the row keeps its height. -->
+                    <StackPanel Classes="draftValue">
+                        <TextBox x:Name="NewValueBox"
+                                 Classes="inline"
+                                 Text="{Binding NewValue}"
+                                 PlaceholderText="{x:Static res:SharedStrings.NewValueWatermark}"
+                                 AutomationProperties.Name="{x:Static res:SharedStrings.NewValueWatermark}">
+                            <TextBox.KeyBindings>
+                                <KeyBinding Gesture="Enter" Command="{Binding CommitAddCommand}" />
+                                <KeyBinding Gesture="Escape" Command="{Binding CancelAddCommand}" />
+                            </TextBox.KeyBindings>
+                        </TextBox>
+                        <TextBlock Classes="error" Text="{Binding NewRowError}" IsVisible="{Binding HasNewRowError}" />
+                        <TextBlock Classes="hint"
+                                   Margin="0,2,0,2"
+                                   Text="{x:Static res:SharedStrings.AddRowHint}"
+                                   IsVisible="{Binding !HasNewRowError}" />
+                    </StackPanel>
+                    <!-- In Remove's slot, as it drops the row. -->
+                    <Grid Classes="metadataActions" ColumnDefinitions="22,22" Margin="4,0,0,0">
+                        <Button Grid.Column="1"
+                                Classes="captionAction rowAction"
+                                Command="{Binding CancelAddCommand}"
+                                ToolTip.Tip="{x:Static res:SharedStrings.StopAddingToolTip}"
+                                AutomationProperties.Name="{x:Static res:SharedStrings.StopAddingToolTip}">
+                            <ui:LineIcon Data="{StaticResource ClearStroke}" />
+                        </Button>
+                    </Grid>
+                </Grid>
+            </Border>
         </StackPanel>
-        <StackPanel Orientation="Horizontal" Margin="10,4,0,0" Spacing="8">
+
+        <!-- The Add row icon sits in the rows' marker column, its label in line with their keys. -->
+        <StackPanel Orientation="Horizontal" Margin="-5,4,0,0" Spacing="12">
             <Button Classes="icon"
                     Command="{Binding BeginAddCommand}"
                     IsVisible="{Binding ShowAddRow}"
                     AutomationProperties.Name="{x:Static res:SharedStrings.AddRowButton}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
-                    <PathIcon Width="12" Height="12" Data="{StaticResource AddIconGeometry}" />
+                    <ui:LineIcon Width="12" Height="12" Data="{StaticResource AddStroke}" />
                     <TextBlock Text="{x:Static res:SharedStrings.AddRowButton}" />
                 </StackPanel>
             </Button>
-            <!-- With no song_length row there's no row button, so Auto Set is offered here; it adds the row. -->
-            <Button Classes="icon"
-                    Command="{Binding AutoSetSongLengthCommand}"
-                    IsVisible="{Binding ShowAutoSetLengthFallback}"
-                    ToolTip.Tip="{x:Static res:SharedStrings.AutoSetLengthToolTip}"
-                    AutomationProperties.Name="{x:Static res:SharedStrings.AutoSetLengthButton}">
-                <StackPanel Orientation="Horizontal" Spacing="6">
-                    <PathIcon Width="12" Height="12" Data="{StaticResource AutoLengthIconGeometry}" />
+            <!-- With no song_length row there's no row to offer Auto Set under, so it's offered here; it adds the row. Shown
+                 by the panel, as the row's link is, so the style can hide it while Auto Set can't run. -->
+            <Panel VerticalAlignment="Center" IsVisible="{Binding ShowAutoSetLengthFallback}">
+                <Button Classes="inlineAction"
+                        Margin="0"
+                        VerticalAlignment="Center"
+                        Command="{Binding AutoSetSongLengthCommand}"
+                        ToolTip.Tip="{x:Static res:SharedStrings.AutoSetLengthToolTip}"
+                        AutomationProperties.Name="{x:Static res:SharedStrings.AutoSetLengthButton}">
                     <TextBlock Text="{x:Static res:SharedStrings.AutoSetLengthButton}" />
-                </StackPanel>
-            </Button>
+                </Button>
+            </Panel>
         </StackPanel>
     </StackPanel>
 </UserControl>

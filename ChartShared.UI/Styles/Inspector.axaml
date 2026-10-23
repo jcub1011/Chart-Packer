@@ -1,5 +1,6 @@
 <Styles xmlns="https://github.com/avaloniaui"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ctl="using:ChartShared.UI.Controls">
     <!-- The look of a song inspector, Chart Packer's and Chart Builder's: its sections, findings, metadata rows,
          instruments and media tiles. Each inspector view includes it in its own styles rather than the app's, as
          names such as .section and .icon would restyle other windows. -->
@@ -23,8 +24,11 @@
         <Setter Property="Margin" Value="0,2,0,0" />
     </Style>
 
-    <!-- A metadata row whose value fails validation: an orange bar at its left, a faint tint, and why under it. -->
+    <!-- A metadata row whose value fails validation: an orange bar at its left, a faint tint, and why under it. Every row
+         has a background, if a clear one, so the pointer is over the row across its gaps too, as its hidden Remove needs
+         to show; and right-clicking anywhere on it opens its menu. -->
     <Style Selector="Border.metadataRow">
+        <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderThickness" Value="2,0,0,0" />
         <Setter Property="BorderBrush" Value="Transparent" />
         <Setter Property="CornerRadius" Value="2" />
@@ -33,6 +37,11 @@
     <Style Selector="Border.metadataRow.invalid">
         <Setter Property="BorderBrush" Value="{DynamicResource InvalidBrush}" />
         <Setter Property="Background" Value="{DynamicResource InvalidTintBrush}" />
+    </Style>
+    <!-- A hovered row lights up as the library's do, so it's clear which row its Undo and Remove are; a failing row keeps
+         its orange bar. -->
+    <Style Selector="Border.metadataRow:pointerover">
+        <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
     </Style>
     <Style Selector="TextBlock.issue">
         <Setter Property="Foreground" Value="{DynamicResource InvalidBrush}" />
@@ -45,6 +54,34 @@
         <Setter Property="FontSize" Value="12" />
         <Setter Property="TextWrapping" Value="Wrap" />
         <Setter Property="Margin" Value="0,0,0,2" />
+    </Style>
+
+    <!-- An action in words under a metadata row, such as its Quick Fix: accent text with no chrome, underlined as it's
+         hovered. Hidden while it can't run, so a row only offers what it can do. Its text is a TextBlock, for the underline. -->
+    <Style Selector="Button.inlineAction">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="0,1" />
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+        <Setter Property="HorizontalAlignment" Value="Left" />
+        <Setter Property="Margin" Value="0,0,0,2" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button.inlineAction:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.inlineAction:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+    </Style>
+    <Style Selector="Button.inlineAction:pointerover TextBlock">
+        <Setter Property="TextDecorations" Value="Underline" />
+    </Style>
+    <Style Selector="Button.inlineAction:pressed">
+        <Setter Property="RenderTransform" Value="none" />
+    </Style>
+    <Style Selector="Button.inlineAction:disabled">
+        <Setter Property="IsVisible" Value="False" />
     </Style>
 
     <!-- Row markers: * edited, + added; removed rows are struck through. -->
@@ -152,7 +189,7 @@
     <Style Selector="Button.captionAction.revert:disabled">
         <Setter Property="IsVisible" Value="False" />
     </Style>
-    <Style Selector="Button.captionAction PathIcon">
+    <Style Selector="Button.captionAction ctl|LineIcon">
         <Setter Property="Width" Value="13" />
         <Setter Property="Height" Value="13" />
     </Style>

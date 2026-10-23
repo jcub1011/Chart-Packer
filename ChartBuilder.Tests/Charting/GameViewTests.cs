@@ -29,10 +29,31 @@ public sealed class GameViewTests
 
             var differences = ChartReadBack.Compare(view, read, GameView.Instruments);
             Assert.IsEmpty(differences, $"At a HOPO threshold of {threshold}: {Describe(differences)}");
-            Assert.AreSequenceEqual(read.Instruments.Where(i => i != ChartInstrument.Keys).ToList(), [.. view.Instruments]);
+            Assert.AreSequenceEqual(read.Instruments.ToList(), [.. view.Instruments]);
         }
 
         Assert.HasCount(2, thresholds);
+    }
+
+    [TestMethod]
+    [DynamicData(nameof(FixtureNames))]
+    public void APartProjectedAtOnceIsEachOfItsTracksProjectedAlone(string name)
+    {
+        var fixture = MidiFixtures.Named(name);
+        var chart = MidiChartLoader.Load(fixture.Midi, fixture.Options).Chart;
+
+        foreach (var instrument in GameView.Instruments)
+        {
+            var part = GameView.ProjectPart(chart, instrument, fixture.Options);
+
+            Assert.HasCount(4, part);
+            foreach (var (difficulty, track) in part)
+            {
+                var alone = GameView.Project(chart, new ChartTrackKey(instrument, difficulty), fixture.Options);
+                Assert.AreSequenceEqual(alone.Notes.ToList(), track.Notes.ToList(), $"{instrument} {difficulty}");
+                Assert.AreSequenceEqual(alone.StarPower.ToList(), track.StarPower.ToList(), $"{instrument} {difficulty}");
+            }
+        }
     }
 
     [TestMethod]
@@ -72,15 +93,15 @@ public sealed class GameViewTests
     }
 
     [TestMethod]
-    public void PartKeysIsLeftOutOfTheGameView()
+    public void PartKeysIsInTheGameViewAsAFiveFretPart()
     {
         var fixture = MidiFixtures.Named(nameof(MidiFixtures.Passthrough));
 
         var view = GameView.Project(MidiChartLoader.Load(fixture.Midi, fixture.Options).Chart, fixture.Options);
 
-        Assert.DoesNotContain(ChartInstrument.Keys, GameView.Instruments);
-        Assert.Contains(ChartInstrument.Keys, MidiChartReader.Read(fixture.Midi, fixture.Options).Instruments);
-        Assert.AreSequenceEqual([ChartInstrument.Guitar], view.Instruments.ToList());
+        Assert.Contains(ChartInstrument.Keys, GameView.Instruments);
+        Assert.AreSequenceEqual([ChartInstrument.Guitar, ChartInstrument.Keys], view.Instruments.ToList());
+        Assert.AreSequenceEqual([1, 2], view.Tracks[new ChartTrackKey(ChartInstrument.Keys, ChartDifficulty.Expert)].Notes.Select(static n => n.Lane).ToList());
     }
 
     [TestMethod]

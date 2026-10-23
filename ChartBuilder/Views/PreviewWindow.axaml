@@ -3,6 +3,7 @@
         xmlns:vm="using:ChartBuilder.ViewModels"
         xmlns:res="using:ChartBuilder.Resources"
         xmlns:views="using:ChartBuilder.Views"
+        xmlns:ui="using:ChartShared.UI.Controls"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="480" d:DesignHeight="720"
@@ -13,9 +14,29 @@
         Background="{DynamicResource AppBackgroundBrush}"
         WindowStartupLocation="CenterOwner"
         Width="480"
-        Height="720">
+        Height="720"
+        MinWidth="320"
+        MinHeight="400"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaTitleBarHeightHint="30"
+        WindowDecorationsTheme="{StaticResource TitleBarDecorations}">
 
     <!-- The highway preview in a window of its own (charter-spec C18 item 1): F11 for full screen, Esc to leave it, Space
          to play or pause. -->
-    <views:PreviewView />
+    <Grid RowDefinitions="Auto,*">
+        <!-- The title bar, as the Editor's is: the icon and the title. -->
+        <ui:TitleBar x:Name="WindowTitleBar"
+                     Grid.Row="0"
+                     Height="31"
+                     BorderThickness="0,0,0,1"
+                     BorderBrush="{DynamicResource SubtleBorderBrush}">
+            <TextBlock Margin="8,0,12,0"
+                       FontSize="12"
+                       VerticalAlignment="Center"
+                       TextTrimming="CharacterEllipsis"
+                       Text="{x:Static res:Strings.PreviewWindowTitle}" />
+        </ui:TitleBar>
+        <!-- Already in a window of its own, it doesn't offer to open one. -->
+        <views:PreviewView Grid.Row="1" CanPopOut="False" />
+    </Grid>
 </Window>

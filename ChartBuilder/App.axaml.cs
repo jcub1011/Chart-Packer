@@ -10,6 +10,7 @@ using ChartShared.Core.Charting.Saving;
 using ChartBuilder.Devices;
 using ChartShared.Core.Launching;
 using ChartShared.Core.Settings;
+using ChartShared.UI.Services;
 
 namespace ChartBuilder
 {
@@ -40,7 +41,7 @@ namespace ChartBuilder
                 // main thread, as SDL wants.
                 var input = new InputService(InputSettingsService.Load(UserConfigPaths.InputBindingsFile), InputBackends.Create());
                 var windows = new BuilderWindows(
-                    desktop, settings, audio.Open, latency, UserConfigPaths.LockFolder, UserConfigPaths.SettingsFile, new RecoveryStore(UserConfigPaths.RecoveryFolder), input);
+                    desktop, settings, audio.Open, latency, UserConfigPaths.SettingsFile, new RecoveryStore(UserConfigPaths.RecoveryFolder), input);
                 windows.StartWith(BuilderArgs.Parse(desktop.Args ?? []));
 
                 // Settings are saved as they change (the Settings window saves them, and the Editor saves its layout

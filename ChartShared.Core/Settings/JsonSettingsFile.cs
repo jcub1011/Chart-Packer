@@ -18,7 +18,8 @@ namespace ChartShared.Core.Settings;
 /// </para>
 /// <para>
 /// A save writes a temp file of its own beside the file and renames it into place, so a reader never sees
-/// half a file and two saves don't share a temp file.
+/// half a file and two saves don't share a temp file. It holds <c>{file}.lock</c> from its read to the rename,
+/// so two processes' saves can't interleave and lose one's changes.
 /// </para>
 /// <para>
 /// The path is always passed in, never defaulted, so only a composition root (which passes a
@@ -67,23 +68,53 @@ public sealed class JsonSettingsFile<T>
 
     /// <summary>
     /// Writes the settings this process changed since it last loaded or saved, onto what the file holds
-    /// now. Failures are traced and otherwise ignored; settings are never worth stopping the app for.
+    /// now. Failures are traced; settings are never worth stopping the app for.
     /// </summary>
-    public void Save(T settings)
+    /// <returns>Whether the file was written.</returns>
+    public bool Save(T settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
         var current = ToJson(settings);
 
-        // When the file is missing or can't be read now, the settings as last loaded or saved stand in for it.
-        var merged = Read(warn: false) ?? (JsonObject)_baseline.DeepClone();
-        foreach (var (name, value) in current)
+        bool saved = JsonFiles.Update(_path, file =>
         {
-            if (!_baseline.TryGetPropertyValue(name, out var before) || !JsonNode.DeepEquals(before, value))
-                merged[name] = value?.DeepClone();
-        }
+            // When the file is missing or can't be read now, the settings as last loaded or saved stand in for it.
+            var merged = file ?? (JsonObject)_baseline.DeepClone();
+            foreach (var (name, value) in current)
+            {
+                if (!_baseline.TryGetPropertyValue(name, out var before) || !JsonNode.DeepEquals(before, value))
+                    merged[name] = value?.DeepClone();
+            }
 
-        if (JsonFiles.WriteAtomically(_path, merged))
+            return merged;
+        });
+
+        if (saved)
             _baseline = current;
+        return saved;
+    }
+
+    /// <summary>
+    /// Writes every setting of <paramref name="settings"/> onto what the file holds now, those another process changed
+    /// meanwhile too, as a reset to defaults must. Properties this version doesn't know are kept. Failures are traced.
+    /// </summary>
+    /// <returns>Whether the file was written.</returns>
+    public bool Replace(T settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        var current = ToJson(settings);
+
+        bool saved = JsonFiles.Update(_path, file =>
+        {
+            var merged = file ?? [];
+            foreach (var (name, value) in current)
+                merged[name] = value?.DeepClone();
+            return merged;
+        });
+
+        if (saved)
+            _baseline = current;
+        return saved;
     }
 
     private JsonObject ToJson(T settings) => JsonSerializer.SerializeToNode(settings, _typeInfo) as JsonObject ?? [];

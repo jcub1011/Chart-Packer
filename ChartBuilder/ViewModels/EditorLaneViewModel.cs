@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using ChartBuilder.Resources;
 using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Authoring;
 using ChartShared.Core.Charting.Commands;
 using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charting.Layout;
@@ -301,35 +302,45 @@ namespace ChartBuilder.ViewModels
                 return [];
             bool hasNotes = part[track.Difficulty].Notes.Count > 0;
             var others = Enum.GetValues<ChartDifficulty>().Where(d => d != track.Difficulty).Reverse();
+
+            // The generators work on the whole part, so on whichever lane of it the menu is opened from, and only on the
+            // parts they can: star power on 5-fret and keys, fills on drums.
+            var generate = new List<LaneMenuItem>();
+            if (StarPowerGenerator.CanGenerate(part.Kind))
+                generate.Add(LaneMenuItem.Action(Strings.LaneGenerateStarPower, part.HasNotes, () => _ = editor.GenerateStarPowerAsync(track.Instrument), "GenerateStroke"));
+            if (part.Kind == ChartInstrumentKind.Drums)
+                generate.Add(LaneMenuItem.Action(Strings.LaneGenerateFills, part.HasNotes, () => _ = editor.GenerateFillsAsync(track.Instrument),"GenerateStroke"));
             return
             [
                 LaneMenuItem.Submenu(
                     string.Format(CultureInfo.CurrentCulture, Strings.LaneCopyToFormat, ChartLabels.DifficultyName(track.Difficulty)),
-                    [.. others.Select(d => LaneMenuItem.Action(ChartLabels.DifficultyName(d), hasNotes, () => _ = editor.CopyDifficultyAsync(track, d)))]),
-                LaneMenuItem.Action(Strings.LaneReduce, part.HasNotes, () => _ = editor.ReduceAsync(track)),
-                LaneMenuItem.Action(Strings.LaneSelectLane, hasNotes, () => editor.Session.Tools.SelectLane(track)),
-                LaneMenuItem.Action(Strings.LaneSelectSection, true, () => editor.Session.Tools.SelectSectionAtCursor()),
-                LaneMenuItem.Action(Strings.LaneCut, true, editor.Cut),
-                LaneMenuItem.Action(Strings.LaneCopy, true, editor.Copy),
-                LaneMenuItem.Action(Strings.LanePaste, true, () => _ = editor.PasteAsync(PasteMode.Overwrite)),
-                LaneMenuItem.Action(Strings.LanePasteMerge, true, () => _ = editor.PasteAsync(PasteMode.Merge)),
+                    [.. others.Select(d => LaneMenuItem.Action(ChartLabels.DifficultyName(d), hasNotes, () => _ = editor.CopyDifficultyAsync(track, d)))],
+                    "CopyStroke"),
+                LaneMenuItem.Action(Strings.LaneReduce, part.HasNotes, () => _ = editor.ReduceAsync(track), "SortDescendingStroke"),
+                .. generate,
+                LaneMenuItem.Action(Strings.LaneSelectLane, hasNotes, () => editor.Session.Tools.SelectLane(track), "SelectStroke"),
+                LaneMenuItem.Action(Strings.LaneSelectSection, true, () => editor.Session.Tools.SelectSectionAtCursor(), "SelectStroke"),
+                LaneMenuItem.Action(Strings.LaneCut, true, editor.Cut, "CutStroke"),
+                LaneMenuItem.Action(Strings.LaneCopy, true, editor.Copy, "CopyStroke"),
+                LaneMenuItem.Action(Strings.LanePaste, true, () => _ = editor.PasteAsync(PasteMode.Overwrite), "PasteStroke"),
+                LaneMenuItem.Action(Strings.LanePasteMerge, true, () => _ = editor.PasteAsync(PasteMode.Merge), "PasteMergeStroke"),
                 LaneMenuItem.Submenu(Strings.LaneTransform,
                 [
-                    LaneMenuItem.Action(Strings.TransformLeftyFlip, true, editor.Session.Tools.LeftyFlip),
-                    LaneMenuItem.Action(Strings.TransformShiftUp, true, () => editor.Session.Tools.ShiftLanes(1)),
-                    LaneMenuItem.Action(Strings.TransformShiftDown, true, () => editor.Session.Tools.ShiftLanes(-1)),
-                    LaneMenuItem.Action(Strings.TransformClearSustains, true, () => editor.Session.Tools.SetSustains(SustainChange.Clear)),
-                    LaneMenuItem.Action(Strings.TransformGridSustains, true, () => editor.Session.Tools.SetSustains(SustainChange.GridStep)),
-                    LaneMenuItem.Action(Strings.TransformSustainsUntilNext, true, () => editor.Session.Tools.SetSustains(SustainChange.UntilNextNote)),
-                ]),
+                    LaneMenuItem.Action(Strings.TransformLeftyFlip, true, editor.Session.Tools.LeftyFlip, "FlipStroke"),
+                    LaneMenuItem.Action(Strings.TransformShiftUp, true, () => editor.Session.Tools.ShiftLanes(1), "ArrowRightStroke"),
+                    LaneMenuItem.Action(Strings.TransformShiftDown, true, () => editor.Session.Tools.ShiftLanes(-1), "ArrowLeftStroke"),
+                    LaneMenuItem.Action(Strings.TransformClearSustains, true, () => editor.Session.Tools.SetSustains(SustainChange.Clear), "ClearStroke"),
+                    LaneMenuItem.Action(Strings.TransformGridSustains, true, () => editor.Session.Tools.SetSustains(SustainChange.GridStep), "SustainStroke"),
+                    LaneMenuItem.Action(Strings.TransformSustainsUntilNext, true, () => editor.Session.Tools.SetSustains(SustainChange.UntilNextNote), "SustainToNextStroke"),
+                ], "TransformStroke"),
                 LaneMenuItem.Submenu(Strings.LaneStretch,
                 [
-                    LaneMenuItem.Action(Strings.StretchDouble, true, () => editor.Session.Tools.StretchSelection(2)),
-                    LaneMenuItem.Action(Strings.StretchThreeHalves, true, () => editor.Session.Tools.StretchSelection(1.5)),
-                    LaneMenuItem.Action(Strings.StretchTwoThirds, true, () => editor.Session.Tools.StretchSelection(2.0 / 3)),
-                    LaneMenuItem.Action(Strings.StretchHalf, true, () => editor.Session.Tools.StretchSelection(0.5)),
-                    LaneMenuItem.Action(Strings.StretchToCursor, true, () => editor.Session.Tools.StretchSelection(null)),
-                ]),
+                    LaneMenuItem.Action(Strings.StretchDouble, true, () => editor.Session.Tools.StretchSelection(2), "StretchStroke"),
+                    LaneMenuItem.Action(Strings.StretchThreeHalves, true, () => editor.Session.Tools.StretchSelection(1.5), "StretchStroke"),
+                    LaneMenuItem.Action(Strings.StretchTwoThirds, true, () => editor.Session.Tools.StretchSelection(2.0 / 3), "SqueezeStroke"),
+                    LaneMenuItem.Action(Strings.StretchHalf, true, () => editor.Session.Tools.StretchSelection(0.5), "SqueezeStroke"),
+                    LaneMenuItem.Action(Strings.StretchToCursor, true, () => editor.Session.Tools.StretchSelection(null), "StretchToCursorStroke"),
+                ], "StretchStroke"),
             ];
         }
 

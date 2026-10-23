@@ -72,7 +72,9 @@ namespace ChartBuilder.ViewModels
                 Strings.CloseUnsavedTitle,
                 string.Format(CultureInfo.CurrentCulture, Strings.CloseUnsavedMessageFormat, Song.Title ?? Strings.EditorUntitledChart),
                 Strings.SaveButton,
-                Strings.DiscardButton);
+                Strings.DiscardButton,
+                "SaveStroke",
+                "TrashStroke");
             switch (choice)
             {
                 case ConfirmChoice.First:
@@ -233,6 +235,8 @@ namespace ChartBuilder.ViewModels
                 OpusBitrateKbps: dialog.TranscodeBitrateKbps);
             IPackTranscoder? transcoder = dialog.TranscodeToOpus ? new OpusPackTranscoder() : null;
 
+            // The .sng is held while it's written, so a song open elsewhere isn't written over (charter-spec §4.8).
+            var locks = new SongLockSet(SongLockHolder.ChartBuilder);
             JobItemResult? result = null;
             bool finished;
             if (_services.ExportProgress is { } progressService)
@@ -242,13 +246,13 @@ namespace ChartBuilder.ViewModels
                     progress,
                     (exportProgress, ct) => SongJob.RunAsync(
                         JobKind.Pack, [entry], scanRoot, dialog.ExportFolder, dialog.Policy,
-                        new Reporter(r => result = r), layout, options, transcoder, exportProgress, ct));
+                        new Reporter(r => result = r), layout, options, transcoder, exportProgress, locks, ct));
             }
             else
             {
                 await SongJob.RunAsync(
                     JobKind.Pack, [entry], scanRoot, dialog.ExportFolder, dialog.Policy,
-                    new Reporter(r => result = r), layout, options, transcoder, exportProgress: null);
+                    new Reporter(r => result = r), layout, options, transcoder, exportProgress: null, locks);
                 finished = true;
             }
 
@@ -278,12 +282,22 @@ namespace ChartBuilder.ViewModels
 
             try
             {
-                await Task.Run(async () =>
+                bool copied = await Task.Run(async () =>
                 {
                     Directory.CreateDirectory(dialog.ExportFolder);
+
+                    // Held while it's written, so a song open elsewhere isn't written over (charter-spec §4.8).
+                    using SongLock? held = SongLock.TryAcquire(resolved, SongLockHolder.ChartBuilder);
+                    if (held is null)
+                        return false;
                     await ExportCleanup.CopySngAsync(entry.FullPath, resolved);
+                    return true;
                 });
-                Messages.Info(string.Format(CultureInfo.CurrentCulture, Strings.ExportSngCopiedFormat, resolved));
+
+                if (copied)
+                    Messages.Info(string.Format(CultureInfo.CurrentCulture, Strings.ExportSngCopiedFormat, resolved));
+                else
+                    Messages.Post(Severity.Warning, string.Format(CultureInfo.CurrentCulture, Strings.ExportSngSkippedInUseFormat, resolved));
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
             {
@@ -479,10 +493,10 @@ namespace ChartBuilder.ViewModels
             string artist = Value("artist");
             if (name.Length == 0 || artist.Length == 0)
             {
-                // They're set in Chart settings' Metadata, which is brought up to set them in.
+                // They're set in Chart settings' Metadata, which is brought up, expanded, to set them in.
                 Messages.Error(Strings.FirstSaveNeedsNameAndArtist);
-                LeftPanelTab = ChartSettingsTab;
-                IsLeftPanelCollapsed = false;
+                PanelLayout.SetCollapsed(ChartSettingsTab, MetadataSection, false);
+                ShowLeftPanel(ChartSettingsTab);
                 return false;
             }
 
@@ -498,7 +512,7 @@ namespace ChartBuilder.ViewModels
             SongLock? songLock;
             try
             {
-                songLock = SongLock.TryAcquire(target.FullPath, _services.LockFolder);
+                songLock = SongLock.TryAcquire(target.FullPath, SongLockHolder.ChartBuilder);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
@@ -508,7 +522,9 @@ namespace ChartBuilder.ViewModels
 
             if (songLock is null)
             {
-                Messages.Error(string.Format(CultureInfo.CurrentCulture, Strings.FirstSaveLockedFormat, target.FullPath));
+                await _confirmations.AlertAsync(
+                    Strings.SongLockedTitle,
+                    LockedText(target.FullPath, Strings.FirstSaveLockedFormat, Strings.FirstSaveLockedInPackerFormat, Strings.FirstSaveLockedElsewhereFormat));
                 return false;
             }
 
@@ -668,6 +684,7 @@ namespace ChartBuilder.ViewModels
             null => (Severity.Warning, Strings.PackNoResult),
             { Status: JobItemStatus.Succeeded or JobItemStatus.SucceededWithWarnings } => (Severity.Info, string.Format(CultureInfo.CurrentCulture, Strings.PackedFormat, result.OutputPath)),
             { Status: JobItemStatus.Skipped, SkipReason: SkipReason.OutputExists } => (Severity.Warning, string.Format(CultureInfo.CurrentCulture, Strings.PackSkippedExistsFormat, result.OutputPath)),
+            { Status: JobItemStatus.Skipped, SkipReason: SkipReason.OutputInUse } => (Severity.Warning, string.Format(CultureInfo.CurrentCulture, Strings.PackSkippedInUseFormat, result.OutputPath)),
             _ => (Severity.Error, string.Format(CultureInfo.CurrentCulture, Strings.PackFailedFormat, result.ErrorMessage ?? FirstError(result.Findings) ?? result.Status.ToString())),
         };
 

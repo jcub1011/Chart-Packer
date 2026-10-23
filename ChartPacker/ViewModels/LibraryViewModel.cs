@@ -71,6 +71,7 @@ namespace ChartPacker.ViewModels
         private readonly IMergeWindowService _mergeWindow;
         private readonly IDedupWindowService _dedupWindow;
         private readonly IValidatorWindowService _validatorWindow;
+        private readonly ILowerDifficultiesWindowService? _lowerDifficultiesWindow;
         private readonly IFileRevealService _reveal;
         private readonly IDownloadService _downloads;
         private readonly IChartBuilderLauncher _chartBuilder;
@@ -136,6 +137,7 @@ namespace ChartPacker.ViewModels
         /// <param name="downloads">Saves copies of the selected songs as song folders.</param>
         /// <param name="chartBuilder">Starts Chart Builder to edit the selected song's chart.</param>
         /// <param name="notice">Says why Chart Builder couldn't be started.</param>
+        /// <param name="lowerDifficultiesWindow">Generates the selected songs' lower difficulties; none to offer it.</param>
         public LibraryViewModel(
             IFolderPickerService folderPicker,
             SettingsService settings,
@@ -148,7 +150,8 @@ namespace ChartPacker.ViewModels
             IFileRevealService reveal,
             IDownloadService downloads,
             IChartBuilderLauncher chartBuilder,
-            NoticeViewModel notice)
+            NoticeViewModel notice,
+            ILowerDifficultiesWindowService? lowerDifficultiesWindow = null)
         {
             _folderPicker = folderPicker;
             _settings = settings;
@@ -156,6 +159,7 @@ namespace ChartPacker.ViewModels
             _mergeWindow = mergeWindow;
             _dedupWindow = dedupWindow;
             _validatorWindow = validatorWindow;
+            _lowerDifficultiesWindow = lowerDifficultiesWindow;
             _reveal = reveal;
             _downloads = downloads;
             _chartBuilder = chartBuilder;
@@ -253,6 +257,7 @@ namespace ChartPacker.ViewModels
         [NotifyCanExecuteChangedFor(nameof(UnpackCommand))]
         [NotifyCanExecuteChangedFor(nameof(MergeCommand))]
         [NotifyCanExecuteChangedFor(nameof(ValidateCommand))]
+        [NotifyCanExecuteChangedFor(nameof(GenerateLowerDifficultiesCommand))]
         [NotifyCanExecuteChangedFor(nameof(CancelScanCommand))]
         public partial bool IsScanning { get; set; }
 
@@ -304,12 +309,17 @@ namespace ChartPacker.ViewModels
         [NotifyCanExecuteChangedFor(nameof(UnpackCommand))]
         [NotifyCanExecuteChangedFor(nameof(MergeCommand))]
         [NotifyCanExecuteChangedFor(nameof(ValidateCommand))]
+        [NotifyCanExecuteChangedFor(nameof(GenerateLowerDifficultiesCommand))]
         [NotifyCanExecuteChangedFor(nameof(EditChartCommand))]
         [NotifyPropertyChangedFor(nameof(IsSingleSelection))]
+        [NotifyPropertyChangedFor(nameof(IsMultipleSelection))]
         public partial int SelectedCount { get; set; }
 
         /// <summary>One song is selected: the right-click menu offers Edit Chart.</summary>
         public bool IsSingleSelection => SelectedCount == 1;
+
+        /// <summary>More than one song is selected: the right-click menu offers Merge.</summary>
+        public bool IsMultipleSelection => SelectedCount > 1;
 
         /// <summary>Max scan depth, set from the Settings window.</summary>
         [ObservableProperty]
@@ -560,6 +570,12 @@ namespace ChartPacker.ViewModels
         /// <summary>Opens the Validator window, which lists the selected songs whose metadata fails validation, to fix them.</summary>
         [RelayCommand(CanExecute = nameof(CanValidate))]
         private Task ValidateAsync() => _validatorWindow.ShowAsync(SelectedEntries);
+
+        private bool CanGenerateLowerDifficulties() => _lowerDifficultiesWindow is { IsAvailable: true } && CanValidate();
+
+        /// <summary>Opens the Generate lower difficulties window, which fills the selected songs' Hard, Medium and Easy.</summary>
+        [RelayCommand(CanExecute = nameof(CanGenerateLowerDifficulties))]
+        private Task GenerateLowerDifficultiesAsync() => _lowerDifficultiesWindow?.ShowAsync(SelectedEntries) ?? Task.CompletedTask;
 
         // One song at a time, and not while a job may be writing it.
         private bool CanEditChart() => SelectedCount == 1 && !Job.IsRunning;
@@ -1181,6 +1197,7 @@ namespace ChartPacker.ViewModels
             UnpackCommand.NotifyCanExecuteChanged();
             MergeCommand.NotifyCanExecuteChanged();
             ValidateCommand.NotifyCanExecuteChanged();
+            GenerateLowerDifficultiesCommand.NotifyCanExecuteChanged();
             DeduplicateCommand.NotifyCanExecuteChanged();
             EditChartCommand.NotifyCanExecuteChanged();
         }

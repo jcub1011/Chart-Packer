@@ -20,6 +20,14 @@ namespace ChartShared.UI.ViewModels
 
         bool HasNoteCounts { get; }
 
+        /// <summary>The difficulty model's suggested tier, "Suggested rating: 4"; null when there's none, or it isn't known yet.</summary>
+        string? SuggestionText { get; }
+
+        bool HasSuggestion { get; }
+
+        /// <summary>The flyout is opening: works out the suggested tier, where that's done only when it's looked at.</summary>
+        void RefreshSuggestion();
+
         /// <summary>The tiers offered as buttons: unset, then 0 to 6.</summary>
         IReadOnlyList<DifficultyPresetViewModel> Presets { get; }
 

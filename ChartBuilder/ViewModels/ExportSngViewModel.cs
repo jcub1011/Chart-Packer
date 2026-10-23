@@ -177,31 +177,32 @@ namespace ChartBuilder.ViewModels
             }
         }
 
-        public bool HasName => Name is not null;
-
-        public bool HasArtist => Artist is not null;
-
         public bool HasAlbum => Album is not null;
 
         public bool HasGenre => Genre is not null;
 
         public bool HasYear => Year is not null;
 
-        public bool HasCharter => Charter is not null;
-
         public bool HasSongLength => SongLength is not null;
 
-        public bool HasDetails => HasName || HasArtist || HasAlbum || HasGenre || HasYear || HasCharter || HasSongLength;
+        /// <summary>The header's title: the name the song is exported with, or its title when it has none.</summary>
+        public string Headline => Name ?? SongTitle;
 
-        private static readonly HashSet<string> HeadlineKeys = new(
-            ["name", "artist", "album", "genre", "year", "charter", "song_length"],
-            StringComparer.OrdinalIgnoreCase);
+        /// <summary>The artist under the headline, or null when there's none or the title it falls back to already has it.</summary>
+        public string? ArtistLine => Artist is { } artist
+            && (Name is not null || !SongTitle.Contains(artist, StringComparison.CurrentCultureIgnoreCase))
+            ? artist
+            : null;
 
-        /// <summary>The metadata beyond the headline fields, read-only.</summary>
-        public IReadOnlyList<ExportMetadataRow> OtherMetadata =>
-            [.. Metadata.Where(m => !HeadlineKeys.Contains(m.Key))];
+        /// <summary>"Charted by …", or null with no charter.</summary>
+        public string? CharterText => Charter is null
+            ? null
+            : string.Format(CultureInfo.CurrentCulture, Strings.ExportSngCharterFormat, Charter);
 
-        public bool HasOtherMetadata => OtherMetadata.Count > 0;
+        /// <summary>The full metadata list's heading, with how many pairs it holds.</summary>
+        public string MetadataHeading => string.Format(CultureInfo.CurrentCulture, Strings.ExportSngMetadataFormat, Metadata.Count);
+
+        public bool HasMetadata => Metadata.Count > 0;
 
         /// <summary>The album art, in words.</summary>
         public string ArtStatus { get; }
@@ -241,8 +242,6 @@ namespace ChartBuilder.ViewModels
 
         /// <summary>Whether this build can transcode to Opus at all.</summary>
         public bool IsTranscodeAvailable { get; }
-
-        public string TranscodeNote => IsSngSource ? Strings.ExportSngTranscodeSngNote : Strings.ExportSngTranscodeNote;
 
         /// <summary>Whether auto-transcode is on. Off by default; unavailable for <c>.sng</c> sources.</summary>
         [ObservableProperty]
@@ -295,19 +294,19 @@ namespace ChartBuilder.ViewModels
         [NotifyPropertyChangedFor(nameof(EffectiveTarget), nameof(HasTarget), nameof(RenameText))]
         public partial ExportPolicyChoice SelectedPolicy { get; set; }
 
-        /// <summary>Why Export can't run, or null when it can.</summary>
+        /// <summary>Why Export can't run, or null when it can: one line, shown beside Export.</summary>
         public string? Problem
         {
             get
             {
                 if (ErrorCount > 0)
-                    return ErrorsText;
+                    return Strings.ExportSngErrorsProblem;
                 if (string.IsNullOrWhiteSpace(ExportFolder))
                     return Strings.ExportSngNoFolder;
                 if (TargetPath.Length == 0)
                     return Strings.ExportSngNoFolder;
                 if (TranscodeBlocked)
-                    return Strings.ExportSngTranscodeUnavailable;
+                    return Strings.ExportSngTranscodeBlockedProblem;
                 return null;
             }
         }

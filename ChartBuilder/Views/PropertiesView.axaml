@@ -1,7 +1,9 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:ChartBuilder.ViewModels"
+             xmlns:svm="using:ChartShared.UI.ViewModels"
              xmlns:res="using:ChartBuilder.Resources"
+             xmlns:bctl="using:ChartBuilder.Controls"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d" d:DesignWidth="280" d:DesignHeight="600"
@@ -12,18 +14,9 @@
          vocal part's notes and phrases (C3 item 7). A field shows <<multiple>> when the items differ, and a value typed there
          is applied to every item when Enter is pressed or the field loses focus. -->
     <UserControl.Styles>
-        <Style Selector="TextBlock.section-heading">
-            <Setter Property="FontSize" Value="13" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
-            <Setter Property="Margin" Value="0,4,0,0" />
-        </Style>
+        <!-- What a section holds, under its header. -->
         <Style Selector="Border.section">
-            <Setter Property="Background" Value="{DynamicResource ToolbarGroupBrush}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="6" />
-            <Setter Property="Padding" Value="10" />
+            <Setter Property="Padding" Value="12,8,12,12" />
         </Style>
         <Style Selector="Grid.fields > TextBlock">
             <Setter Property="VerticalAlignment" Value="Center" />
@@ -31,10 +24,10 @@
         </Style>
     </UserControl.Styles>
 
-    <StackPanel Margin="12,10" Spacing="8">
+    <!-- Each kind of thing selected is a section of the Properties tab, collapsed or moved as the user leaves it. -->
+    <bctl:PanelSectionStack TabKey="properties">
         <!-- Notes. -->
-        <StackPanel Spacing="6" IsVisible="{Binding HasNotes}">
-            <TextBlock Classes="section-heading" Text="{Binding NotesHeading}" />
+        <bctl:PanelSection Key="notes" Header="{Binding NotesHeading}" IsVisible="{Binding HasNotes}">
             <Border Classes="section">
                 <Grid Classes="fields" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="6">
                     <TextBlock Grid.Row="0" Classes="muted" Text="{x:Static res:Strings.PropertiesTickLabel}" />
@@ -67,12 +60,11 @@
                     </WrapPanel>
                 </Grid>
             </Border>
-        </StackPanel>
+        </bctl:PanelSection>
 
         <!-- A vocal part's notes (charter-spec C3 item 7): where, the pitch, the length and the lyric, and Type lyrics, which
              gives a typed line's syllables to the selected notes in turn. -->
-        <StackPanel Spacing="6" IsVisible="{Binding HasVocalNotes}">
-            <TextBlock Classes="section-heading" Text="{Binding VocalNotesHeading}" />
+        <bctl:PanelSection Key="vocal-notes" Header="{Binding VocalNotesHeading}" IsVisible="{Binding HasVocalNotes}">
             <Border Classes="section">
                 <Grid Classes="fields" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="6">
                     <TextBlock Grid.Row="0" Classes="muted" Text="{x:Static res:Strings.PropertiesTickLabel}" />
@@ -130,11 +122,10 @@
                     </Button>
                 </Grid>
             </Border>
-        </StackPanel>
+        </bctl:PanelSection>
 
         <!-- Phrases: start and end, and for rolls and trills the lowest difficulty they reach (charter-spec C3 item 4). -->
-        <StackPanel Spacing="6" IsVisible="{Binding HasPhrases}">
-            <TextBlock Classes="section-heading" Text="{Binding PhrasesHeading}" />
+        <bctl:PanelSection Key="phrases" Header="{Binding PhrasesHeading}" IsVisible="{Binding HasPhrases}">
             <Border Classes="section">
                 <Grid Classes="fields" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="6">
                     <TextBlock Grid.Row="0" Classes="muted" Text="{x:Static res:Strings.PropertiesKindLabel}" />
@@ -155,15 +146,14 @@
                               IsVisible="{Binding HasLowestDifficulty}"
                               ItemsSource="{Binding LowestDifficultyChoices}"
                               SelectedItem="{Binding SelectedLowestDifficulty}"
-                              DisplayMemberBinding="{Binding Label, x:DataType=vm:DifficultyChoice}"
+                              DisplayMemberBinding="{Binding Label, x:DataType=svm:DifficultyChoice}"
                               AutomationProperties.Name="{x:Static res:Strings.PropertiesLowestDifficultyLabel}" />
                 </Grid>
             </Border>
-        </StackPanel>
+        </bctl:PanelSection>
 
         <!-- A vocal part's phrases: start and end (charter-spec C3 item 7). -->
-        <StackPanel Spacing="6" IsVisible="{Binding HasVocalPhrases}">
-            <TextBlock Classes="section-heading" Text="{Binding VocalPhrasesHeading}" />
+        <bctl:PanelSection Key="vocal-phrases" Header="{Binding VocalPhrasesHeading}" IsVisible="{Binding HasVocalPhrases}">
             <Border Classes="section">
                 <Grid Classes="fields" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="6">
                     <TextBlock Grid.Row="0" Classes="muted" Text="{x:Static res:Strings.PropertiesStartLabel}" />
@@ -178,11 +168,10 @@
                              AutomationProperties.Name="{x:Static res:Strings.PropertiesEndLabel}" />
                 </Grid>
             </Border>
-        </StackPanel>
+        </bctl:PanelSection>
 
         <!-- Disco flip sections: start and end, and the difficulty, which is only shown (charter-spec C6 item 7). -->
-        <StackPanel Spacing="6" IsVisible="{Binding HasDiscoFlips}">
-            <TextBlock Classes="section-heading" Text="{Binding DiscoFlipsHeading}" />
+        <bctl:PanelSection Key="disco-flips" Header="{Binding DiscoFlipsHeading}" IsVisible="{Binding HasDiscoFlips}">
             <Border Classes="section">
                 <Grid Classes="fields" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="6">
                     <TextBlock Grid.Row="0" Classes="muted" Text="{x:Static res:Strings.PropertiesDifficultyLabel}" />
@@ -198,11 +187,10 @@
                              AutomationProperties.Name="{x:Static res:Strings.PropertiesEndLabel}" />
                 </Grid>
             </Border>
-        </StackPanel>
+        </bctl:PanelSection>
 
         <!-- Tempo markers. -->
-        <StackPanel Spacing="6" IsVisible="{Binding HasTempos}">
-            <TextBlock Classes="section-heading" Text="{Binding TemposHeading}" />
+        <bctl:PanelSection Key="tempos" Header="{Binding TemposHeading}" IsVisible="{Binding HasTempos}">
             <Border Classes="section">
                 <Grid Classes="fields" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="6">
                     <TextBlock Grid.Row="0" Classes="muted" Text="{x:Static res:Strings.PropertiesBpmLabel}" />
@@ -224,11 +212,10 @@
                               IsChecked="{Binding IsAnchored}" />
                 </Grid>
             </Border>
-        </StackPanel>
+        </bctl:PanelSection>
 
         <!-- The span selected, which a tempo can be fitted to (charter-spec C4 item 6). -->
-        <StackPanel Spacing="6" IsVisible="{Binding HasSpan}">
-            <TextBlock Classes="section-heading" Text="{x:Static res:Strings.PropertiesSpanHeading}" />
+        <bctl:PanelSection Key="span" Header="{x:Static res:Strings.PropertiesSpanHeading}" IsVisible="{Binding HasSpan}">
             <Border Classes="section">
                 <StackPanel Spacing="8">
                     <SelectableTextBlock FontSize="12" Text="{Binding SpanText}" />
@@ -246,6 +233,6 @@
                     </Grid>
                 </StackPanel>
             </Border>
-        </StackPanel>
-    </StackPanel>
+        </bctl:PanelSection>
+    </bctl:PanelSectionStack>
 </UserControl>

@@ -25,15 +25,6 @@
          would have nothing to restore it from, leaving its owner disabled. -->
 
     <Window.Styles>
-        <!-- The search box in the title bar: shorter than a TextBox's usual 32, to fit the 30 high bar. -->
-        <Style Selector="TextBox.title-search">
-            <Setter Property="Width" Value="300" />
-            <Setter Property="Height" Value="24" />
-            <Setter Property="MinHeight" Value="0" />
-            <Setter Property="FontSize" Value="12" />
-            <Setter Property="Padding" Value="6,2" />
-            <Setter Property="VerticalAlignment" Value="Center" />
-        </Style>
         <Style Selector="TextBlock.settings-heading">
             <Setter Property="FontSize" Value="13" />
             <Setter Property="FontWeight" Value="SemiBold" />

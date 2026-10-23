@@ -17,6 +17,10 @@ namespace ChartShared.Core.Jobs;
 /// <see cref="OverwritePolicy.Rename"/>, and otherwise skipped as
 /// <see cref="SkipReason.DuplicateOutput"/>, so the job never overwrites its own output.
 /// </para>
+/// <para>
+/// Given <c>locks</c>, each output is held while it's written, and one another process holds is skipped as
+/// <see cref="SkipReason.OutputInUse"/> (charter-spec §4.8).
+/// </para>
 /// </remarks>
 public static class SongJob
 {
@@ -31,6 +35,7 @@ public static class SongJob
     /// <param name="options">Pack options; the defaults when <see langword="null"/>.</param>
     /// <param name="transcoder">Transcodes non-Opus stems when <see cref="PackOptions.TranscodeToOpus"/>; no transcoding when <see langword="null"/>.</param>
     /// <param name="exportProgress">Receives transcode and pack progress for the item in flight; may be <see langword="null"/>.</param>
+    /// <param name="locks">Holds each output while it's written; outputs aren't held when <see langword="null"/>.</param>
     /// <param name="cancellationToken">Stops the job.</param>
     /// <exception cref="OperationCanceledException">The job was cancelled.</exception>
     public static async Task RunAsync(
@@ -44,6 +49,7 @@ public static class SongJob
         PackOptions? options = null,
         IPackTranscoder? transcoder = null,
         IProgress<ExportProgress>? exportProgress = null,
+        SongLockSet? locks = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(entries);
@@ -51,7 +57,7 @@ public static class SongJob
         ArgumentException.ThrowIfNullOrWhiteSpace(destinationRoot);
         ArgumentNullException.ThrowIfNull(progress);
 
-        var job = new Job(kind, scanRoot, destinationRoot, policy, layout, options, transcoder, exportProgress);
+        var job = new Job(kind, scanRoot, destinationRoot, policy, layout, options, transcoder, exportProgress, locks);
         foreach (SongEntry entry in entries)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -68,7 +74,8 @@ public static class SongJob
         OutputLayout layout,
         PackOptions? options,
         IPackTranscoder? transcoder,
-        IProgress<ExportProgress>? exportProgress)
+        IProgress<ExportProgress>? exportProgress,
+        SongLockSet? locks)
     {
         // Outputs this job has written, preferred and actual paths both, and the item that wrote each.
         private readonly Dictionary<string, SongEntry> _claimed = new(OutputPaths.PathComparer);
@@ -101,6 +108,9 @@ public static class SongJob
             string preferred = OutputPaths.PackTarget(entry, scanRoot, destinationRoot, layout);
             if (CheckTarget(entry, preferred, isDirectory: false, out string? target) is { } skipped)
                 return skipped;
+            if (Hold(entry, target!, out IDisposable? hold) is { } inUse)
+                return inUse;
+            using var held = hold;
 
             PackOptions effective = options ?? PackOptions.Default;
             string? transcodeFolder = null;
@@ -151,6 +161,9 @@ public static class SongJob
             string preferred = OutputPaths.UnpackTarget(entry, scanRoot, destinationRoot, layout);
             if (CheckTarget(entry, preferred, isDirectory: true, out string? target) is { } skipped)
                 return skipped;
+            if (Hold(entry, target!, out IDisposable? hold) is { } inUse)
+                return inUse;
+            using var held = hold;
 
             UnpackResult result = await Unpacker.UnpackAsync(entry.FullPath, target!, policy == OverwritePolicy.Overwrite, cancellationToken).ConfigureAwait(false);
             if (!result.Extracted)
@@ -175,6 +188,20 @@ public static class SongJob
 
             target = OutputPaths.Resolve(preferred, policy, isDirectory);
             return target is null ? Skipped(entry, SkipReason.OutputExists, preferred) : null;
+        }
+
+        /// <summary>
+        /// Holds <paramref name="target"/> while it's written. Returns a skip result when another process holds it, or
+        /// <see langword="null"/> with the hold, if any, in <paramref name="hold"/>.
+        /// </summary>
+        private JobItemResult? Hold(SongEntry entry, string target, out IDisposable? hold)
+        {
+            hold = null;
+            if (locks is null)
+                return null;
+
+            hold = locks.TryHold(target);
+            return hold is null ? Skipped(entry, SkipReason.OutputInUse, target) : null;
         }
 
         private void Claim(SongEntry entry, string preferred, string target)

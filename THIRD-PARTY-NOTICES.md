@@ -84,10 +84,9 @@ specifications; no code from any implementation of them is used.
 - **Project:** [game-icons.net](https://game-icons.net) ([game-icons/icons](https://github.com/game-icons/icons))
 - **License:** [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/)
 - **Used for:** the instrument icons of the difficulties in the details panel, the lyrics
-  lane's waveform button, the audio and video offsets, the pitch correction button, and Chart
-  Builder's Playtest button (`ChartPacker/Styles/Icons.axaml`, the `Instrument*Geometry`,
-  `WaveformIconGeometry`, `OffsetIconGeometry`, `PitchCorrectionIconGeometry` and
-  `PlaytestIconGeometry` resources). The SVG paths are
+  lane's waveform button, the pitch correction button, and Chart Builder's Playtest button
+  (`ChartShared.UI/Styles/Icons.axaml`, the `Instrument*Geometry`, `WaveformIconGeometry`,
+  `PitchCorrectionIconGeometry` and `PlaytestIconGeometry` resources). The SVG paths are
   used unchanged, except that each command is written out in full so that Avalonia's path
   parser reads it. They're drawn at a smaller size, and recoloured.
 
@@ -105,9 +104,121 @@ specifications; no code from any implementation of them is used.
 | [Footsteps](https://game-icons.net/1x1/skoll/footsteps.html) | Skoll | Dance |
 | [Three friends](https://game-icons.net/1x1/delapouite/three-friends.html) | [Delapouite](https://delapouite.com) | Band |
 | [Sound waves](https://game-icons.net/1x1/skoll/sound-waves.html) | Skoll | Lane waveforms |
-| [Stopwatch](https://game-icons.net/1x1/lorc/stopwatch.html) | [Lorc](https://lorcblog.blogspot.com) | Audio and video offsets |
 | [Tune pitch](https://game-icons.net/1x1/lorc/tune-pitch.html) | [Lorc](https://lorcblog.blogspot.com) | Pitch correction |
 | [Gamepad](https://game-icons.net/1x1/delapouite/gamepad.html) | [Delapouite](https://delapouite.com) | Playtest |
+
+### Lucide
+
+- **Project:** [Lucide](https://lucide.dev) ([lucide-icons/lucide](https://github.com/lucide-icons/lucide)),
+  release [1.61.0](https://github.com/lucide-icons/lucide/tree/1.61.0)
+- **License:** ISC, below. The icons Lucide took from [Feather](https://github.com/feathericons/feather)
+  (arrow-left, arrow-right, check, chevron-down, download, info, minus, plus, search, square,
+  trash, type and x) are also under the [MIT](#mit-license) license © 2013-present Cole Bemis.
+- **Used for:** the line icons on the buttons, lists and menus of both apps
+  (`ChartShared.UI/Styles/Icons.axaml`, the `*Stroke` resources). Each SVG's shapes are joined
+  into one path and scaled from Lucide's 24×24 grid to the app's 16×16 one; nothing else is
+  changed. They're drawn in the text colour.
+
+| Icon | Used as |
+|---|---|
+| [arrow-down-wide-narrow](https://lucide.dev/icons/arrow-down-wide-narrow) | Sort last to first; generate lower difficulties; Reduce |
+| [arrow-left](https://lucide.dev/icons/arrow-left) | Shift notes down a lane |
+| [arrow-left-right](https://lucide.dev/icons/arrow-left-right) | Lefty flip |
+| [arrow-right](https://lucide.dev/icons/arrow-right) | Songs folder to output folder; shift notes up a lane |
+| [arrow-right-left](https://lucide.dev/icons/arrow-right-left) | Replace a file |
+| [arrow-right-to-line](https://lucide.dev/icons/arrow-right-to-line) | Sustain until the next note |
+| [arrow-up-narrow-wide](https://lucide.dev/icons/arrow-up-narrow-wide) | Sort first to last |
+| [audio-lines](https://lucide.dev/icons/audio-lines) | Audio, in the Merge window |
+| [chart-column-big](https://lucide.dev/icons/chart-column-big) | Quantize what's recorded |
+| [check](https://lucide.dev/icons/check) | Validate; ticks |
+| [check-check](https://lucide.dev/icons/check-check) | Fix all of a finding |
+| [chevron-down](https://lucide.dev/icons/chevron-down) | Opens a menu |
+| [clipboard-paste](https://lucide.dev/icons/clipboard-paste) | Paste |
+| [clipboard-plus](https://lucide.dev/icons/clipboard-plus) | Paste and merge |
+| [copy](https://lucide.dev/icons/copy) | Copy |
+| [copy-x](https://lucide.dev/icons/copy-x) | Deduplicate |
+| [disc-3](https://lucide.dev/icons/disc-3) | A `.sng` file |
+| [disc-album](https://lucide.dev/icons/disc-album) | Album art |
+| [download](https://lucide.dev/icons/download) | Download a file |
+| [drum](https://lucide.dev/icons/drum) | Hit sounds |
+| [ellipsis](https://lucide.dev/icons/ellipsis) | More tools |
+| [eraser](https://lucide.dev/icons/eraser) | The Erase tool |
+| [eye](https://lucide.dev/icons/eye) | Ghost difficulty; what's shown |
+| [file-clock](https://lucide.dev/icons/file-clock) | Open recent |
+| [file-pen-line](https://lucide.dev/icons/file-pen-line) | Edit chart |
+| [file-plus](https://lucide.dev/icons/file-plus) | New chart |
+| [flag](https://lucide.dev/icons/flag) | Coda |
+| [fold-horizontal](https://lucide.dev/icons/fold-horizontal) | Make notes shorter |
+| [fold-vertical](https://lucide.dev/icons/fold-vertical) | Pack into one folder |
+| [folder](https://lucide.dev/icons/folder) | A song folder |
+| [folder-open](https://lucide.dev/icons/folder-open) | Choose the songs folder; open; show in the file manager |
+| [folder-output](https://lucide.dev/icons/folder-output) | Choose the output folder; export |
+| [funnel](https://lucide.dev/icons/funnel) | Filter |
+| [highlighter](https://lucide.dev/icons/highlighter) | The Phrase tool |
+| [image](https://lucide.dev/icons/image) | An image |
+| [info](https://lucide.dev/icons/info) | More information |
+| [link](https://lucide.dev/icons/link) | The Sync tool |
+| [list-checks](https://lucide.dev/icons/list-checks) | Fix all of a finding in a part |
+| [magnet](https://lucide.dev/icons/magnet) | Quantize; snap to the grid |
+| [merge](https://lucide.dev/icons/merge) | Merge |
+| [metronome](https://lucide.dev/icons/metronome) | The Tempo tool; the metronome |
+| [midi-port](https://lucide.dev/icons/midi-port) | A MIDI chart |
+| [minus](https://lucide.dev/icons/minus) | Less, e.g. zoom out |
+| [mouse-pointer-2](https://lucide.dev/icons/mouse-pointer-2) | The Select tool |
+| [move-right](https://lucide.dev/icons/move-right) | Sustain for one grid step |
+| [package](https://lucide.dev/icons/package) | Pack |
+| [package-open](https://lucide.dev/icons/package-open) | Unpack |
+| [panel-left-close](https://lucide.dev/icons/panel-left-close) | Collapse a side panel |
+| [pause](https://lucide.dev/icons/pause) | Pause |
+| [pencil](https://lucide.dev/icons/pencil) | The Place tool |
+| [phi](https://lucide.dev/icons/phi) | Snap to onset |
+| [play](https://lucide.dev/icons/play) | Play |
+| [plus](https://lucide.dev/icons/plus) | Add |
+| [refresh-cw](https://lucide.dev/icons/refresh-cw) | Rescan |
+| [repeat](https://lucide.dev/icons/repeat) | Loop |
+| [replace](https://lucide.dev/icons/replace) | If the output exists |
+| [rotate-ccw](https://lucide.dev/icons/rotate-ccw) | Revert |
+| [save](https://lucide.dev/icons/save) | Save |
+| [scissors](https://lucide.dev/icons/scissors) | Cut |
+| [search](https://lucide.dev/icons/search) | Search |
+| [settings](https://lucide.dev/icons/settings) | Settings |
+| [skip-back](https://lucide.dev/icons/skip-back) | Previous |
+| [skip-forward](https://lucide.dev/icons/skip-forward) | Next |
+| [sparkles](https://lucide.dev/icons/sparkles) | Generate star power and fills |
+| [square](https://lucide.dev/icons/square) | Stop |
+| [square-dashed](https://lucide.dev/icons/square-dashed) | Select |
+| [step-forward](https://lucide.dev/icons/step-forward) | Play from the preview start |
+| [text-cursor](https://lucide.dev/icons/text-cursor) | Stretch notes to the cursor |
+| [timer](https://lucide.dev/icons/timer) | Audio, video and input offsets; auto-set song length |
+| [trash](https://lucide.dev/icons/trash) | Remove a file |
+| [triangle-alert](https://lucide.dev/icons/triangle-alert) | A warning |
+| [type](https://lucide.dev/icons/type) | Text event |
+| [undo-2](https://lucide.dev/icons/undo-2) | Undo; mirrored, redo |
+| [unfold-horizontal](https://lucide.dev/icons/unfold-horizontal) | Make notes longer |
+| [video](https://lucide.dev/icons/video) | A video |
+| [volume-2](https://lucide.dev/icons/volume-2) | Audio |
+| [wallpaper](https://lucide.dev/icons/wallpaper) | A background |
+| [wand-sparkles](https://lucide.dev/icons/wand-sparkles) | Transform notes |
+| [wrench](https://lucide.dev/icons/wrench) | Quick fix; fix a finding |
+| [x](https://lucide.dev/icons/x) | Close, clear or remove |
+
+```
+ISC License
+
+Copyright (c) 2026 Lucide Icons and Contributors
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+```
 
 ### Bootstrap Icons
 

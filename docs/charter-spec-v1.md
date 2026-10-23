@@ -55,7 +55,8 @@ This spec **supersedes** the "editing charts" non-goal in
   percussion notes (96, 97), overdrive (116), lyric and range shifts and any other events are kept
   as they are ([§4.2](#lossless-passthrough)), and a `.chart`'s lyrics are imported only. The
   existing vocals tools (`VocalsEditor`, lyrics lane) are unchanged.
-- **Pro keys, keys, pro guitar/bass, dance, Elite drums.** Their tracks are kept as they are.
+- **Pro keys, pro guitar/bass, dance, Elite drums.** Their tracks are kept as they are. (5-lane
+  `PART KEYS` is edited as a 5-fret part, *revised for #116*.)
 - **Venue, lighting, camera and crowd events.** Kept as they are.
 - **Writing `.chart`.** `.chart` is imported only ([C2](#c2-open-and-import)).
 - **Auto-charting.** No notes are generated from audio. Onsets and beats are shown as hints, and
@@ -93,7 +94,7 @@ saved as `pro_drums` and `five_lane_drums` in `song.ini`, as the games read it
 ```txt
 Chart-Packer.slnx
 ├── ChartPacker/                  Chart Packer app: library, inspector, packing. Launches Chart Builder (§4.8)
-├── ChartBuilder/                 Chart Builder app (new): launcher (home screen), Editor window, canvases, calibration tool
+├── ChartBuilder/                 Chart Builder app (new): launcher (home screen), Editor window, canvases
 ├── ChartBuilder.Devices/         Instrument devices (new, C19): SDL3 game controllers, and MIDI input on Windows (winmm)
 ├── ChartShared.UI/               Shared Avalonia library (new): theme, icons, WindowChrome, dialogs, pickers,
 │                                 settings window, shared controls, and the drawing of notes and waveforms
@@ -205,8 +206,8 @@ command.
 
 ### 4.2 Lossless passthrough
 
-When a chart is loaded, every MIDI track Chart Builder doesn't edit (vocals, harmonies, keys and pro
-keys, pro guitar, venue, unknown tracks) is kept as raw bytes, sliced from the file as
+When a chart is loaded, every MIDI track Chart Builder doesn't edit (vocals, harmonies, pro keys, pro
+guitar, venue, unknown tracks) is kept as raw bytes, sliced from the file as
 `MidiMerger` already does. On save they are written back **byte for byte**, in their original
 order.
 
@@ -231,7 +232,7 @@ lyrics, after the note-offs and before the note-ons.
 
 **When the tempo map changes in a way that keeps times.** Passthrough tracks hold ticks, so a tempo
 edit with *keep times* on ([C4](#c4-tempo-map-and-grid)), or a stretch
-([C15](#c15-editing-ergonomics)), would leave vocals, venue and keys at their old ticks while the
+([C15](#c15-editing-ergonomics)), would leave vocals, venue and pro keys at their old ticks while the
 charted notes move. Chart Builder therefore re-ticks the passthrough tracks too. It parses their
 events, moves each one to the tick that keeps its time, and writes them back with the same events
 in the same order. Byte-for-byte passthrough is promised only while the tempo map hasn't been
@@ -274,7 +275,7 @@ changed in this way. Keeping ticks (the default) never touches passthrough track
 | `SpectrogramBuilder` | STFT over a stem using the existing `Spectrum/Fft` and `Dsp/Windowing`, mapped to log-frequency bins and quantised to bytes. Runs off the UI thread, produces columns in chunks so the view can draw as they arrive, and is **held in memory only** ([C13](#c13-spectrogram)). |
 | `OnsetDetector` | Spectral-flux onset detection with an adaptive threshold: one envelope per stem, plus one per band for drums ([C14](#c14-onset-and-beat-assist)) |
 | `TempoEstimator` | Estimates a local tempo through the song from the onset envelope's windowed autocorrelation (a tempogram), with a preference for 60–200 BPM, then tracks beats with dynamic programming that follows that local tempo, so step changes are tracked rather than averaged. Gives a proposed list of beat times, a confidence per region, and a tempo map with anchors. |
-| `Synth` | Makes the metronome click, the note hit sounds and the calibration beep as PCM. They are mixed in **after** the time-stretcher, so they are never stretched, and share the stems' output clock and latency ([§4.4.1](#441-playback-changes)). |
+| `Synth` | Makes the metronome click and the note hit sounds as PCM. They are mixed in **after** the time-stretcher, so they are never stretched, and share the stems' output clock and latency ([§4.4.1](#441-playback-changes)). |
 
 Decoding reuses `AudioDecoder`/`IPcmSource` and `StemReader`, and waveforms reuse `StemPeaks` and
 `StemPeaksCache`, adding a stereo option for [C12](#c12-waveform). Playback builds on `StemPlayer`,
@@ -321,8 +322,11 @@ which already has speed, pitch correction (`Dsp/TimeStretcher`) and a heard `Pos
 **Latency and speed.** The calibrated latency ([C11](#c11-calibration-tool)) is in real time, and
 `Position` is in song time. Everything drawn against the audio is drawn at
 **`SmoothPosition` − latency × speed**, so at 50% speed a 40 ms latency is 20 ms of song.
-*Settled in CM2:* the latency is taken off only while playing. Paused, what is drawn is at the
-audio's own position.
+*Changed for issue #103:* starting and stopping never jumps (`StemPlayer.DrawnPosition`). Paused,
+what is drawn is at the audio's own position, and pausing (`PauseWhereDrawn`) puts the audio where
+it was drawn, so the audio still to be heard is heard again on playing. Played from a standstill, a
+seek or a region's start, what is drawn holds there until what's heard gets there. A negative
+latency still steps forward as playing starts.
 
 **Audio time and chart time.** The song's delay is how much later than its ticks say the chart plays
 against the audio. It comes from `SongChartSettings.DelayOf` (`delay`, then `delay_seconds`, then
@@ -370,8 +374,8 @@ the chart is in **chart time**, from `TempoMap.SecondsAt`. They are related by
     Chart Packer's `NoteHighwayView` into `ChartShared.UI`.
   - Chart Packer's player and highway view models stay in Chart Packer. They're built round the
     inspector's song, drafts and offsets, which the editor doesn't have.
-- **`CalibrationWindow`** ([C11](#c11-calibration-tool)) is a dialog. It uses the shared
-  `WindowChrome` for the dark title bar and icon, as the other dialogs do.
+- **`CalibrationWindow`** ([C11](#c11-calibration-tool)) is a dialog in `ChartShared.UI`, which both
+  apps open. It uses the shared `WindowChrome` for the dark title bar and its owner's icon.
 - **Drag and drop.** Chart Builder's launcher takes dropped audio files, which start a new chart
   with them as its stems ([C1](#c1-new-chart-and-chart-settings)), and a dropped song folder or
   `.sng`, which opens it
@@ -453,11 +457,25 @@ same song at once, and Chart Packer re-reads the songs Chart Builder may have ch
 | *(none)* | The home screen ([§4.5](#45-app-chartbuilder)) |
 | `[--] <song path>` | That song folder or `.sng` in the editor ([C2](#c2-open-and-import)) |
 | `--new [--] [<audio file>…]` | A new chart in the editor, with the audio files as its stems ([C1](#c1-new-chart-and-chart-settings)) |
-| `--calibrate` | The calibration tool ([C11](#c11-calibration-tool)) |
 
 `--` ends the options, so a path that starts with `-` is still a path. Paths are made absolute against
 the current folder as they're read (`BuilderArgs.Parse`). Arguments that can't be used (an unknown
 option, a second song path, an empty argument, a missing path) open the home screen and say why.
+
+**Difficulty report.** `--difficulty-report <songs folder> [--out <file.csv>] [--depth <levels>]`
+opens no window. It rates every song under the folder with the difficulty model
+([difficulty-model.md](difficulty-model.md)) and writes a CSV (`DifficultyReport`). The CSV has a
+row for each song, with its path and then, for guitar, bass, rhythm and guitar co-op:
+
+- the `diff_*` rating `song.ini` reports;
+- the model's rank for the part's highest charted difficulty;
+- each of the five attributes' scores.
+
+Values are to a tenth. A last column says why a song couldn't be read. Without `--out`, the CSV is
+`difficulty-report.csv` in the current folder; `--depth` defaults to 10 folder levels. Songs are only
+read, and neither the settings nor the log are touched. Progress goes to the console it was run from
+(`DifficultyReportArgs.Parse`; exit code 0 when written, 1 for bad arguments, 2 when the CSV can't be
+written).
 
 **Finding Chart Builder.** Chart Packer runs the `ChartBuilder` executable that sits next to its
 own (`Environment.ProcessPath`). If it isn't there, Chart Packer says Chart Builder isn't installed
@@ -468,18 +486,41 @@ which Chart Packer uses when Chart Builder isn't beside it. Release builds have 
 **One song per Chart Builder process.** Each Chart Builder window has at most one song open, and
 several can run at once on different songs.
 
-**Song lock (`ChartShared.Core/Scanning/SongLock`).**
+**Song lock (`ChartShared.Core/Scanning/SongLock`).** Whoever is editing a song holds its lock, and
+no other process of either app writes to it meanwhile, however many of each are running
+(GitHub issue #89).
 
-- While a song is open, Chart Builder holds a lock file for it in the per-user config folder
-  (`locks/<hash of the song's full path>`), opened with `FileShare.None`. .NET maps `FileShare` to
-  `flock` on Linux and macOS, so the lock works on every platform, and the OS releases it if the
-  process dies.
-- Opening a song that another Chart Builder has open says so, and doesn't open it a second time.
-  *Settled in CM2:* checking the lock opens its file for a moment, so taking the lock tries twice,
-  50 ms apart, before saying another Chart Builder has the song open.
-- Before Chart Packer writes to a song (a metadata save, delete, dedup, merge into it, or replacing
-  it with a download), it checks the lock. When Chart Builder has the song open, it warns that
-  Chart Builder may overwrite the change, and the user can go ahead or cancel.
+- The lock is an open handle on `{song}.lock` beside the song: `Foo.sng.lock` for `Foo.sng`, and
+  `Foo.lock` beside the song folder `Foo`, so it's never one of the song's files. Beside the song,
+  it also keeps out other users and other computers sharing the library. The handle is the lock,
+  never the file: a lock file nobody has open means nothing, and the next lock takes it.
+  - On Windows the file is opened delete-on-close, sharing reads only, so a second holder is
+    refused, and the OS deletes the file however the process ends. The holder writes which app it
+    is into the file, which the others read to say who has the song.
+  - On Linux and macOS it's opened with `FileShare.None`, which .NET maps to an exclusive `flock`
+    that the OS lets go of if the process dies. The file is deleted as the lock is let go (left
+    behind by a crash), and the holder can't be read, so messages don't name the app.
+  - A song whose folder can't be written to isn't locked: no one can write it there.
+  - *Settled in CM2:* checking the lock opens its file for a moment, so taking the lock tries a
+    few times, 50 ms apart, before saying another has the song.
+- **Chart Builder** holds the lock while the song is open, and takes it for a new chart's first
+  save. Opening a song another holds says who has it (another Chart Builder, or a Chart Packer with
+  unsaved changes to it) and doesn't open it. Opening the song a window already has reads it again
+  under the lock it holds. Save and pack holds the `.sng` it writes, and skips one another holds.
+- **Chart Packer** holds a song from its first unsaved change until the change is saved or
+  discarded (`SongLocks`, over a per-process `SongLockSet`, so its own holds don't refuse each
+  other), and holds every song it writes for as long as it writes it: a metadata save, Save all, a
+  dedup delete, a merge into it, a pack or unpack written over it, or a download replacing it. A
+  write to a song another holds is refused and says who has it; there's no going ahead. A change
+  made to a song just taken elsewhere is dropped, with a notice.
+- Chart Packer watches the songs its inspectors show, about once a second. While another holds
+  one, the inspector is read-only and says why, and its player and background video let go of the
+  song's files and don't open them again, so the holder can replace them; once it's let go, the
+  song is read again.
+- On Windows a file can't be replaced or deleted while another process has it open, even only to
+  read, so every save replaces and deletes a song's files through `SongFileCommit`, which tries again
+  for up to 5 s while one is in use. That outlasts Chart Packer's watch letting go, and brief
+  readers such as Explorer's thumbnails.
 - `SongFileGate` stays the gate between reads and writes within each process.
 
 **Refreshing Chart Packer.**
@@ -586,7 +627,8 @@ above it, as the panel can be narrow (mock-up in [§8](#8-ui-outline)). The pane
 
 **Metadata** is Chart Packer's inspector's metadata, shared with it (`MetadataEditorView`): a row per
 `song.ini` key, edited in place, and a row to add one. The ratings are left to Parts. A row's
-**Revert** (back to the song as saved) and **Remove** are on its right-click menu, with Quick Fix.
+**Undo** (back to the song as saved) and **Remove** show as it's hovered or focused, Undo staying
+while there's a change, and are on its right-click menu too; Quick Fix is a link under a failing value.
 
 **Tracks** is Chart Packer's inspector's track list, shared with it (`TrackListView`): a row per
 track with its mute, solo, volume and waveform, the tracks a pending change removes, and **Add
@@ -625,7 +667,7 @@ value at the playhead as it changes, and the value is set as one undo step once 
 
 **Parts.**
 
-- A row for each v1 part: 5-fret Lead, Bass, Rhythm and Co-op; GHL Guitar, Bass, Rhythm and Co-op;
+- A row for each v1 part: 5-fret Lead, Bass, Rhythm, Co-op and Keys; GHL Guitar, Bass, Rhythm and Co-op;
   Drums, with a choice of 4-lane, Pro or 5-lane. Each row has a tick box, ticked when the chart has
   the part, and the part's difficulty rating (`diff_<part>`), empty while it's unrated, with an ✕ that
   clears it to `-1`. Pro drums have a second rating, `diff_drums_real`. A rating typed is applied
@@ -814,6 +856,14 @@ Acceptance criteria:
    solos, lint marks and the current view, and clicking or dragging it jumps there. *Settled in
    CM2:* it's the timeline along the Editor's bottom, which already spans the song. It shows the
    lane in focus.
+   - *Settled:* it shows every phrase of the lane in focus, a thin band under the ruler for each
+     row of its phrase rail ([C8](#c8-phrases-and-events) item 1), in the rail's order and colours:
+     star power (as the games read it), solos and big rock endings on 5-fret and GHL; star power,
+     solos, fills (with a big rock ending), rolls, trills and the difficulty's disco flips on drums.
+     The sections' names are below the bands. While Generate fills or Generate star power runs, its
+     ghosts are drawn over everything, whichever lane is in focus, so they can be found: a kept one
+     as a faint amber column the height of the strip, capped in solid amber, a dropped one as a
+     faint outline; each at least 2 px wide.
 3. **Part and difficulty picker.** Every part with its four difficulties. The letters use the
    detail panel's difficulty colours from `Theme.axaml` (green, yellow, red, purple) where the
    difficulty has notes, and grey where it is empty. The detail panel shows only charted
@@ -1093,10 +1143,14 @@ Acceptance criteria:
      a note at or before its end.
    - *Settled in CM3:* **Generate fills…** is beside the Phrase tool's picker, for a drums lane with
      notes, and its options are in its flyout, kept while the editor is open. The proposals are
-     drawn as dashed ghosts in the rail's fills row, over the bars there, with a faint band across the
-     lanes; a dropped one is faint and struck through. A click on a ghost keeps or drops it, before
-     anything else under it. While they're shown, a bar over the lanes counts those kept, with
-     **Keep all**, **Drop all**, **Add fills** and **Cancel**; `Esc` cancels too, once nothing
+     drawn as ghosts in the rail's fills row, over the bars there, in amber, a colour no phrase is
+     drawn in, whatever their kind, so they stand out: a kept one is lit, a little taller than its
+     row, with a bold dashed edge, and a band across the lanes edged by dashed lines at its start
+     and end; a dropped one is a faint outline, struck through, with a fainter band. Hovering a ghost
+     names it, and a click on one keeps or drops it, before anything else under it. While they're
+     shown, a bar over the lanes counts those kept, with **◀ Previous** and **Next ▶** (the cursor
+     goes to the start of the ghost before or after it, and the status says when there's none that
+     way), **Keep all**, **Drop all**, **Add fills** and **Cancel**; `Esc` cancels too, once nothing
      focused has taken it (a drag is taken back first, and a field keeps its own `Esc`). Any change to the
      chart but the run's own, an undo included, or to the song's settings, ends the run and says so,
      as the proposals were worked out from the chart before it. When nothing fits, the message says
@@ -1228,6 +1282,69 @@ Acceptance criteria:
      sustain, so it covers every note as the games read markers. With no notes selected, it covers
      the span selected, in the focused lane's part. When a star power phrase already starts and ends
      exactly there, `S` removes it instead. With nothing selected, the status says so.
+   - **Generate star power** proposes star power phrases over the selection or the whole part of a
+     5-fret or keys lane, placed so a player has enough to activate going into the part's hardest
+     passages. The author picks, for each run, about how many **seconds apart** phrases are
+     (default 22, as the official charts are), and whether they're **charged for the hard passages**
+     (default on) or only spread
+     evenly. As with Generate fills, the proposals are ghosts the author keeps or drops, and the
+     accepted ones are added as one undoable command. CHR066's fix in Chart Builder starts a run with
+     the defaults over the whole part, whose ghosts the author keeps or drops as any other run's; it has
+     no Fix All. The library's adds what that run proposes, all at once.
+   - *Settled:* phrases are placed against the part's highest difficulty with notes, and each
+     covers a note on every difficulty with notes, so none is empty on one (CHR065). The count is
+     the part's playing, in seconds with its rests left out (a gap between notes of 4 measures or
+     8 s), over the spacing, and at least four, a full meter, for the whole part; over a selection,
+     at least one. Fewer are proposed where fewer fit, but one wherever any fits. Over a selection,
+     they're spaced from the star power just before and after it too, up to a spacing away.
+   - *Settled:* a phrase starts on a measure line, or on a run's first chord where it's on a beat,
+     and ends at a run's end or on the last chord before a measure line. A run is chords between
+     rests of a beat and sections, as Reduce splits them ([C9](#c9-difficulty-authoring)). As the
+     official charts end one, it runs on past its last chord's sustains to the measure line after
+     them, where that's within a beat, or else to the next beat line, but never over the next chord.
+     It has 4 to 40 chords, lasts no more than 10 s, and is best about a measure long (0.75 to 1.25),
+     as most official phrases are; up to 4 where the part is too sparse for shorter. It doesn't
+     cross a section, a solo's start or end (it can be inside a solo) or a big rock ending, and
+     keeps 4 measures clear of every other star power phrase, those already there too, which it
+     never removes; the official charts never have two closer than 2, and seldom closer than 5. It
+     completes at least 2 measures of playing before the part's last note, so its star power can be
+     used. Better spots start on a measure line on a chord, end a run, end on a sustain of a beat
+     or longer (to whammy), and have about 7 chords, the official charts' median on Expert.
+   - *Settled:* the meter is simulated as the games fill and drain it, for a player who hits every
+     note and never whammies: a phrase gives a quarter of the meter, activating needs a half and
+     spends it all, and a full meter lasts 8 measures, by the time signatures in force (a measure
+     of 6/8 counts as one, as YARG drains it); a phrase completed while star power is on adds 2
+     measures to it, up to a full meter's worth left.
+   - *Settled:* the hard passages are found from the difficulty model
+     ([C9](#c9-difficulty-authoring)): each stretch of 2 measures from each measure line is scored
+     on its own, so endurance built up before it doesn't rank later ones higher; stretches without a
+     note are left out; the scores are smoothed, and a peak is a hard passage when it rises above the
+     higher of the lowest points between it and a higher peak either side (with no higher peak after
+     it, the side before alone) by 15% of the part's range and 5 points at least, and is no easier
+     than the part's median. One at the very start rises from nothing, so it isn't one. It starts
+     where the scores rise halfway to its peak, and two less than 8 measures apart are one.
+   - *Settled:* passages are charged for most prominent first, each where the plan with it still
+     works, using at most three quarters of the phrases. For each, in time order, the meter is
+     simulated with a player activating at each passage planned before, and it's given the phrases
+     that bring the meter to a half: the last completing from half a measure to 4 measures of
+     playing before it (best 1), the first of two starting after the activation before has run out
+     and within 16 measures of playing before it. A passage still in the star power of the one
+     before isn't charged for. The rest are shared over the stretches of playing between the
+     phrases placed, one at a time to whichever would then have the most room, each at the best spot
+     near its even share of the stretch. The stretch the part starts with has its first phrase half
+     a share in, as the official charts give theirs early (about 10 s in). One that would put star
+     power on over a passage charged for, so it can't be activated there, is left for the next best
+     spot. Then a stretch longer than 45 s is given one more in its middle, up to two past the
+     count. Without any passage, or with
+     charging off, the phrases are spread evenly. The same chart always gets the same phrases.
+   - *Settled:* **Generate star power…** is beside Generate fills, for a 5-fret or keys lane with
+     notes, and its options are in its flyout, kept while the editor is open. Over the whole part
+     it's refused while the part has star power, as the author's phrases are theirs to keep; over a
+     selection it proposes beside them. The proposals are drawn and kept or dropped as Generate
+     fills' are, in the rail's star power row, with the same bar over the lanes (**Add star power**
+     adds them), and the same ways to end the run. One run, of fills or of star power, goes on at a
+     time: starting one ends the other. When nothing fits, the message says why: not a 5-fret or
+     keys part, no notes, star power already there, or no spot.
 2. **Solos** (pitch 103), drawn as a shaded band with a note count.
    - *Settled in CM3:* the count is drawn at the solo's start. It counts the notes the solo covers on
      the difficulty shown, a chord once.
@@ -1309,7 +1426,8 @@ Acceptance criteria:
    disco flip) to another, replacing it after a confirmation. It can be undone.
 2. **Reduce** makes a draft of a lower difficulty from a higher one, as a starting point to edit.
    - The **Reduce** dialog shows the rules for the part's family, prefilled from the defaults in
-     Settings ([§10](#10-settings)). Changes made in the dialog apply to that run only. Nothing is
+     Settings ([§10](#10-settings)). Keys is a 5-fret part and reduces by the 5-fret rules; every
+     part Chart Builder edits can be reduced (*revised for #116*). Changes made in the dialog apply to that run only. Nothing is
      stored with the song. The shipped defaults:
 
      | Rule | Hard | Medium | Easy |
@@ -1317,17 +1435,34 @@ Acceptance criteria:
      | Max chord size (5-fret / GHL) | 2 | 2 | 1 |
      | Frets used (5-fret) | all | G–B | G–Y |
      | Columns used (GHL) | all | 1–3 | 1–2 |
-     | Thinning grid (no closer than) | 1/16 | 1/8 | 1/4 |
-     | Forced HOPOs and taps | kept | removed | removed |
+     | Thinning grid (on average no closer than) | 1/16 | 1/8 | 1/4 |
+     | Bursts no closer than | 1/16 | 1/16 | 1/8 |
+     | Longest burst (chords or hits) | 3 | 3 | 3 |
+     | HOPOs and taps, as played | kept | kept | kept |
      | Sustains shorter than a beat | kept | kept | removed |
+     | Sustains held while other notes are played | removed | removed | removed |
+     | Open notes in phrases with pressed notes | fretted | fretted | fretted |
      | Drums: pads per hit (plus kick) | 2 | 2 | 1 |
      | Drums: kick | kept | thinned to 1/8 | thinned to 1/4 |
      | Drums: 2× kick | removed | removed | removed |
 
    - Chord reduction keeps the outermost frets. Reducing to a single note keeps the lowest fret.
-     Frets outside the allowed range are moved inward, with their shape kept as far as possible.
-     For GHL, a white and a black on one column count as one column.
-   - Thinning keeps notes on strong beats first.
+     Frets outside the allowed range are moved inward, with the melody's shape kept as far as
+     possible. For GHL, a white and a black on one column count as one column.
+   - Thinning keeps the chords that matter most first: strong beats, sustains, chords, the first
+     note after a rest, turns in the melody, and the ends of phrases. Chords are on average no
+     closer than the thinning grid, and only a short burst the source has comes closer, down to
+     the burst's grid. Every gap is a fraction of a beat, never a time, so a faster song is harder.
+     Every star power phrase and solo keeps at least one note.
+   - The lane limits apply only to what Reduce makes. The editor still lets the charter place notes
+     on any lane on any difficulty.
+   - **Reduce all** fills Hard, Medium and Easy in one run, each from the difficulty above it, so
+     each lower rhythm is a subset of the one above.
+   - Reduce can cover the whole part, the selection, or the section at the cursor, leaving the
+     target's notes elsewhere as they are.
+   - The dialog checks the draft: its lint findings, each difficulty's suggested rating and peak
+     notes per second ([C18](#c18-preview)), and a warning where a difficulty isn't easier
+     than the one above it.
    - The result is shown as a ghost over the target difficulty, then applied as one undoable
      command.
 3. **Difficulty letters** in the part picker show which difficulties have notes
@@ -1355,10 +1490,127 @@ Acceptance criteria:
 - **GHL's columns.** The table's Hard "all" and Medium "1–3" are the same, as GHL has three
   columns; the table ships as written.
 
+*Improved after v1 ([#90](https://github.com/jcub1011/Chart-Packer/issues/90)):*
+
+- **Phrases.** A phrase is a run of chords split at a rest of a beat or longer, from one chord's
+  end to the next chord, and at sections. Open notes split none and take no part in the melody.
+- **Thinning** scores each chord: −1 for each step down from a measure's first beat (a beat, then
+  each halving, triplets just after the halving they're nearest), +1.5 for a sustain of a beat or
+  longer, +0.5 for a chord of two columns or more (on drums, two notes or more), +1 for the first
+  chord after a rest, +0.5 for a turn of the melody (by each chord's lowest column; not drums),
+  and +1 for a phrase's first or last chord. So a long sustain on the "and" beats a plain note on
+  the beat. Chords are taken best first, the earlier on a tie, where no chord taken is closer
+  than the grid's step or the minimum gap in milliseconds, on either side (the milliseconds were
+  later removed: see below). Before them, each star
+  power phrase and solo takes its best chord, where that keeps the gap. The drums' kick pass keeps
+  its own grid only.
+- **Chords** keep their lowest and highest columns, then inner ones up to the limit, as before.
+  Then each phrase is fitted to the range as a whole:
+  - a phrase inside the range doesn't move;
+  - a phrase that fits the range moves down as a whole, so an orange–blue trill on Medium becomes
+    blue–yellow, not blue–blue;
+  - a phrase wider than the range is fitted to it with each step kept going up, down or the same
+    where it can be, near the phrase scaled into the range. So green to orange on Easy still rises
+    over green, red and yellow, rather than ending yellow–yellow–yellow.
+
+  Only notes a chord would push below green are pressed together, the longer sustain kept.
+- **Reduce all** is the last choice of **To**: Hard, Medium and Easy. Each one ticked is made from
+  the nearest difficulty above it with notes, as it will be: Medium from Hard's draft, or from
+  Hard as charted when Hard isn't ticked. Those with notes start unticked, and Apply asks before
+  replacing one. **Rules for** picks which difficulty's rules the fields show. The whole run is
+  one undo step.
+- **Over** picks what the run covers: the whole part, the selection, or the section at the cursor.
+  It starts on the selection when there's one. The target keeps its notes, forcing and mixes
+  outside the range, and the gap holds against its notes on either side.
+- **The check** under the summary lists each difficulty's suggested rating and peak notes per
+  second with the draft in place, where a difficulty is rated as hard as the one above it or
+  harder, and the draft's findings: the 5-fret, drum and phrase rules on its difficulties, and
+  CHR081 against the difficulty above. CHR065 flags a phrase a draft left empty.
+
+*Improved to keep a song's character:*
+
+A single gap between every two chords turned Medium and Easy into a steady pulse. It cut the
+syncopation, gallops and short runs that make a part fun to play. A lower difficulty may now be
+harder than another song's at the same level, as its rating says, so long as it keeps the song's
+rhythm.
+
+- **Fractions of a beat, not time.** The minimum gaps in milliseconds are gone, both the average
+  gap and the burst's. Every spacing rule is a grid, so it reads the same at any tempo and in any
+  time signature. A gap in time sat at a different place in each song's rhythm. At 154 BPM eighths
+  are 195 ms apart, just under Medium's old 200 ms, so a steady eighth chug became quarters, or
+  groups of three with bursts. A faster song now keeps as many notes a beat as a slower one, and
+  is harder, as its rating says. A charter who wants it easier picks a coarser grid. Settings saved
+  with a gap in milliseconds load as before, without it.
+- **Bursts.** The thinning grid is now what chords keep on average. Any one more than the longest
+  burst in a row span at least that many of its steps. Within that, a burst's chords can be as
+  close as the burst's grid, never closer. So on Easy two or three eighths with room around them
+  stay, while a run of sixteenths still thins to the beats. A longest burst of 1 keeps every two
+  chords a step apart, as before. Hard's bursts ship as close as its grid, so Hard is thinned
+  evenly. The drums' kick pass keeps its own grid only.
+  - Only the source's own bursts count. A burst is a run of two or more chords, each closer than
+    the grid's step to the next, with a step or more on either side, that fits within the longest
+    burst's steps. A longer run is a steady stream, which thins evenly. Allowing bursts in a stream
+    cut it into groups the chart never had.
+- **HOPOs and taps** are kept on every difficulty by default. Each chord plays as the source's
+  does: a strum, a HOPO or a tap, read with the song's HOPO threshold. Where leaving notes out
+  would change that, the chord is forced to a HOPO or a strum. A HOPO thinned past the threshold
+  stays a HOPO, and a strum thinned within it stays a strum. With the rule off, forced HOPOs and
+  taps are removed and forced strums kept, as before.
+  - A chord on the same frets as the chord before it is a strum, never a HOPO. Thinning and
+    fitting can press frets the source had apart into one, and a HOPO on the note just played is
+    awkward. Its forcing is left out, so it reads as a strum. A tap stays a tap.
+- **Anticipation.** A chord off the beat, with nothing charted on the next stronger position before
+  the next chord, anticipates that position. An example is the "and" of 4 held over an empty
+  downbeat. It scores as that position less 0.5, so it's kept over beat 4, but not over a chord on
+  the position itself. The next stronger position follows the time signature. A chord off every
+  grid anticipates nothing.
+- **Riffs.** Measures charted the same are thinned the same. That means the same chords at the
+  same places, each with the same notes and long sustain or not.
+  Each chord's score is its mean across them. After thinning, a chord most of those measures left
+  out is left out of the rest, unless that would leave a star power phrase or solo empty. A chord
+  most kept is then added to the rest where the spacing allows.
+- **Sustains.** On a difficulty that removes sustains shorter than a beat, a sustain a burst cuts
+  short of a beat is a plain note.
+- **Open notes in phrases with pressed notes.** Going between an open and a fret is hard to play,
+  so Hard, Medium and Easy fret the opens of a phrase that has opens played alone and pressed notes
+  both. Every open in the phrase becomes green, those before and after its frets as well as those
+  between them. An open in a chord with frets becomes green pressed with them, so `o+R` is `G R`,
+  and Easy keeps only the green. Each fret next to an open alone, with the same chord repeated
+  beside it, moves up one and is kept off green, so the change is still a move. An Expert
+  `R o R o G o G o` is `Y G Y G R G R G` on Hard. Frets further from an open keep their place, so a
+  fill in the same phrase keeps its orange. The phrase is then fitted to the range as a whole, its
+  steps judged on the source's frets. The lift follows the source, so Medium keeps it where its
+  opens are thinned out. A fret next to an open only once thinning has left them side by side
+  moves up one too. A phrase without an open alone keeps its opens, such as one of opens alone, or
+  of `o+R` chords and frets. So does every phrase where green is the highest fret, since no fret
+  can move off it. On GHL an open becomes the first white fret.
+- **A chord change over one fret.** A step of the melody goes the way the chord's lowest fret goes,
+  or, where that stays, the way its highest goes. Easy keeps a chord's lowest fret alone, so
+  green–red then green–yellow was green twice, and the change was lost. Where a phrase loses a
+  step like that, it's fitted again, keeping each step's way and as near its frets as it can. So
+  that change is green then red on Easy. Medium keeps the chords, which show the change, and
+  doesn't move.
+- **A chord as wide as the range.** Fitting a phrase may make a chord narrower, its top pressed
+  in, where its full width would lose a step. A chord as wide as the range has nowhere to go, so
+  green–blue then red–orange on Medium was green–blue twice. Now it's green–blue then red–blue,
+  and red–blue after that is red–yellow, so each change shows. A chord stays a chord, and is
+  moved before it's narrowed. A run of one chord repeated is one step of the melody, so a long run
+  counts no more than a short one.
+- **Sustains held over other notes.** A sustain the draft holds past the start of the next chord,
+  so held while other notes are played, is a plain note on every difficulty Reduce makes. Its chord
+  keeps its forcing, so a tap stays a tap. It's judged on the draft, so a sustain whose notes under
+  it are thinned away stays a sustain, and one that ends as the next chord starts is no extended
+  sustain. A set saved before the rule takes the shipped value.
+
 Acceptance criteria:
 
-- **AC C9.1** Reducing Expert to Easy never makes a chord or a note closer than the Easy thinning
-  grid, and is undone in one step.
+- **AC C9.1** Reducing Expert to Easy never makes two chords or notes closer than Easy's burst
+  grid, and any one more than its longest burst in a row span that many steps of its thinning grid.
+  It is undone in one step.
+- **AC C9.2** Reduce all fills Hard, Medium and Easy as one undo step, and each one's chords are on
+  ticks of the difficulty above it.
+- **AC C9.3** Every star power phrase and solo with notes on the source keeps at least one note on
+  the draft.
 
 ### C10. Playback
 
@@ -1382,9 +1634,18 @@ Acceptance criteria:
    - `Position` already allows for the audio waiting in SDL's stream queue.
    - The calibration covers everything after that: SDL's device buffer and the output device's
      own latency, which the app can't see.
+   - *Changed for issue #140:* the app reads what it can of that latency
+     (`DeviceLatency`): SDL's device buffer (`SDL_GetAudioDeviceFormat`'s sample frames at the
+     device's rate) and, on Windows, what WASAPI reports for the endpoint, the stream latency and
+     device period of a shared-mode stream (`WindowsAudioEndpoint`). It comes with the device
+     (`AudioDevice.DetectedLatencyMs`), and is **added** to the calibrated latency, so the
+     calibration is only what's left: a Bluetooth link's delay, the display's, and whatever else
+     the app can't see ([C11](#c11-calibration-tool) item 3). The latency drawn with is the two
+     added up (`LatencyLookup.Milliseconds`). `Position` is unchanged.
    - The latency is in real time, so it is scaled by the playback speed to give song time.
-   - *Settled in CM2:* it's taken off only while playing. Paused, what is drawn is at the audio's
-     own position.
+   - *Changed for issue #103:* pausing leaves the audio, the cursor and the playhead where they were
+     drawn, and playing holds there until it's heard, so neither jumps
+     ([§4.4.1](#441-playback-changes)).
 6. **Following.** While playing, the view keeps the cursor at a fixed place, a quarter of the way
    from the strike end. Scrolling pauses following until playback is restarted. *Restated in
    CM2:*
@@ -1411,78 +1672,132 @@ Acceptance criteria:
 A tool for measuring the audio/visual latency of the user's setup, so that what is seen and what is
 heard line up while charting. **The display is the ground truth.** The audio is adjusted (in
 practice, everything drawn is shifted against the audio, [C10](#c10-playback)) until it matches
-the display.
+the display. The same window also measures an instrument device's own lag (item 2), which the
+playtest takes off its inputs ([C19](#c19-playtest-and-instrument-input)).
 
 **Input:** none.
-**Output:** a latency in milliseconds for the current audio output device.
+**Output:** a latency in milliseconds for the current audio output device, or an input offset in
+milliseconds for an instrument device.
 
 **Opening:**
 
-The tool is part of Chart Builder. It opens:
+The tool is a window in `ChartShared.UI` (`CalibrationWindow`, opened through
+`CalibrationWindowService`), so it belongs to neither app. Both open it in their own process, and
+both read and write the one shared latency file ([§10](#10-settings)). It opens:
 
 - from Chart Builder's **Settings**;
 - from Chart Builder's transport bar;
-- from **Calibrate…** in Chart Packer's Settings, which runs `ChartBuilder --calibrate`
-  ([§4.8](#48-launching-and-coordination));
+- from **Calibrate…** in Chart Packer's Settings, which pauses the song and reads the latency again
+  when the tool closes. The tool starts on the device the song plays on, so it names that device and
+  shows its latency even when the tool's own output can't be opened;
 - **automatically, once**, the first time Chart Builder opens on a device that has no calibration.
   This can be skipped.
 
+Its input-device test opens from **Calibrate…** beside a device's offset in Chart Builder's Input
+devices window, over that window, pausing the Editor. A **Bind** still waiting for a control stops
+waiting first, so the test's taps never bind one. Chart Packer has no instrument input, so it has
+only the audio/visual test.
+
+Only one test is open at a time. Opening the tool again, for either test, brings the one open to
+the front; when that's from the Input devices window, it says the tool is already open, and the
+device isn't measured.
+
 **Behaviour:**
 
-1. **Manual test.** This is the main test.
-   - A loop at 100 BPM in 4/4. On every beat:
-     - a **light flashes**: a large tile goes bright for 60 ms;
-     - a **note scrolls down a small highway** and reaches the strike line;
-     - a **beep plays**: a 1 kHz tone of 30 ms with 2 ms fades, which has a sharp start.
-   - **The first beat of each bar is marked**: a 2 kHz beep, a differently coloured flash and a
-     wider note. One beat lasts 600 ms, so without the mark a latency of 400 ms would look and
-     sound the same as −200 ms. With it, the pattern repeats every 2.4 s, and the whole ±500 ms
-     range can't be mistaken for anything else.
-   - The beep is made by `Synth` and played through `StemPlayer`'s post-stretch stage and
-     `IAudioOutput` ([§4.4.1](#441-playback-changes)), the same output path as a chart's stems, so
-     it has exactly their queueing and device latency.
-   - **One schedule.** The beats are scheduled on the app's monotonic clock.
-     - The flash and the note are drawn at each beat's time.
-     - Each beep is written into the output at the frame that `SmoothPosition` says will leave
-       SDL's queue at the beat's time minus the current latency.
-     - Changing the latency therefore **moves the beep, never the flash**.
-   - The user adjusts the latency until the beep and the flash (or the note reaching the line)
-     happen together. Controls:
-     - a slider from −500 to +500 ms (Bluetooth output can be well over 200 ms late);
+1. **The test.** The window has the shared title bar (`TitleBar`), and two columns: the highway on
+   the left, and on the right the controls in sections, as the song inspector lays them out
+   (`Inspector.axaml`): the output device, the latency (with **Reset to 0**), Compare, and how to
+   calibrate. *Changed for issue #140:* the latency set here is what's beyond the latency
+   detected from the device. Under it, the tool shows the detected latency and the two added up
+   ("Plus 23 ms detected from the device: 35 ms in all."), or that nothing detected is added.
+   Cancel and Save are in a toolbar along the bottom.
+   - The highway is the real one (`NoteHighwayView`), as the song's preview draws it, not a
+     drawing of its own. What it draws, and when the frame reaches the screen, is what the user
+     will be judging against while charting.
+   - It plays an endless loop at **80 BPM in 4/4** (`CalibrationChart`): an **open note on every
+     beat**, struck at the strike line with the real hit animation (`StrikeGlow`).
+   - The **metronome** (`MetronomeSchedule`, `Synth.Click`) clicks on every beat, over a silent mix
+     played through `StemPlayer` and `IAudioOutput` ([§4.4.1](#441-playback-changes)), the same
+     output path as a chart's stems, so it has exactly their queueing and device latency.
+   - **The first beat of each bar is marked**: an accented click and a measure line. One beat
+     lasts 750 ms, so without the mark a latency of 400 ms would look and sound the same as
+     −350 ms. With it, the pattern repeats every 3 s, and the whole ±500 ms range can't be
+     mistaken for anything else.
+   - **As playback draws it.** The highway is drawn at `SmoothPosition` − latency
+     (`LatencyCompensation.Drawn`), exactly as a song's highway is ([C10](#c10-playback)), the
+     latency being the value plus what's detected from the device (*changed for issue #140*). The
+     clicks never move: changing the latency **moves the notes**, so the value found is the one
+     playback needs, through the same code.
+   - The user adjusts the latency until each click is heard as a note hits the line. Controls:
+     - a number box, dragged or typed in as the inspector's offsets are (`DragScrub`), with a
+       button back to the saved value;
      - buttons for −10, −5, −1, +1, +5 and +10 ms;
-     - the arrow keys (Shift for ×5);
-     - a number box.
+     - a slider from −500 to +500 ms (Bluetooth output can be well over 200 ms late);
+     - the arrow keys (Shift for ×5).
 
-     The change is heard from the next beat that hasn't yet been queued (the queue holds about
-     150 ms).
-   - **Why the highway note as well as the light.** A moving object reaching a line is easier to
-     judge than two instants. It is also what the user will be judging against while charting.
-     The light is kept as the user asked, and either can be hidden.
-2. **Tap test (optional).** This gives a measured starting value, which the manual test then fine
-   tunes.
-   - Both phases run at **60 BPM**, so a tap's nearest beat is unambiguous for any latency in the
-     ±500 ms range.
-   - **Visual phase.** The user taps in time with 16 flashes, with no sound.
-   - **Audio phase.** The user taps in time with 16 beeps, with the screen blank.
-   - Taps are mouse clicks or touches on the tile. (Not the Space key: see the timestamps below.)
-   - The first 4 taps of each phase are warm-up and are ignored.
-   - Each tap's error is measured against its nearest beat. Taps more than 1.5 interquartile
-     ranges from the median are dropped.
-   - **Latency = mean audio error − mean visual error**, over the taps kept. The user's reaction
-     time and the mouse's latency are the same in both phases, so they cancel out. What's left is
-     how much later the audio arrives than the display.
-   - The result shows the estimate, its spread (the larger of the two phases' interquartile
-     ranges), and how many taps were kept. **Use this value** puts it into the manual test to be
-     checked. A spread over 30 ms suggests trying again.
-   - **Tap times** come from the input events' own timestamps, not from when the UI thread handles
-     them.
-     - In Avalonia 12, pointer events carry a timestamp (`PointerEventArgs.Timestamp`) but key
-       events don't. The raw input events that do (`RawInputEventArgs.Timestamp`) can't be reached
-       from app code (`InputManager` and `RawKeyEventArgs`' members aren't public in 12.1), so the
-       tap test takes pointer taps only.
-     - A timestamp is on the OS input clock. It is moved onto the app's clock by subtracting, at
-       handling time, how long the event waited: the input clock's current time minus the event's
-       timestamp.
+     The notes move as soon as the value changes.
+   - **Compare.** While **Hold for no calibration** or Space is held down, the notes are drawn with
+     no latency but what's detected from the device (*changed for issue #140*), and the highway
+     says so. Let go, they're drawn with the value again, so the user
+     can see how much it moves them. The value itself doesn't change. Space never presses the
+     button with the focus, and the window losing focus lets it go.
+   - **Tap along** (*changed for issue #105*). **Start** hides the notes, so only the sound is
+     followed. The metronome gives way to the test's own clicks (`CalibrationViewModel.TapClicks`).
+     There is a quiet bar to get ready ("Get ready"), then a bar counted in on screen, 4, 3, 2, 1,
+     at the clicks' tempo, still with no sound. Then the user taps with each of the 16 clicks that
+     follow, the first on the beat after 1 ("Click n of 16"), and nothing clicks after. The metronome
+     comes back once the test ends. The count is timed to the clicks' beat with no latency, so the
+     value being measured never moves it.
+     - **What counts:** any key but Escape, and a press on the highway. In Chart Builder, any
+       instrument device counts too (`ICalibrationTaps`, `CalibrationTapInput`, over the Input
+       devices' hub, as item 2 counts presses).
+     - **Timing:** each tap is placed on the clicks' timeline (`SmoothPosition`, less how long ago
+       it came), less the device's own offset from item 2. That offset is the screen's lag, the
+       device's and the player's habit, so the device's lag and the habit drop out. What's left is
+       the audio's lag less the screen's: the latency. A key or a press with no offset counts as
+       is.
+     - **Scoring** (`AudioTapTest`): as item 2's, except that a tap counts against a click from
+       250 ms before it to 500 ms after it, so a Bluetooth latency isn't taken for the next beat.
+     - **The result** goes in the latency, clamped to ±500 ms, with the spread and the taps used. It
+       isn't saved, so the user can check it against the notes before **Save**. *Changed for issue
+       #140:* the taps measure the whole latency, so what's detected from the device is taken off
+       it first, and the status says so. A change of output
+       device stops a test that's running.
+   - The highway is only watched: it can't be scrubbed here, and Shift doesn't show its whole
+     chart.
+2. **Input devices.** The same window, with the device test's controls on the right
+   (`DeviceCalibrationViewModel`, `DeviceCalibrationPanel`): the device and its saved offset, a
+   **Start** button, and how to calibrate. Chart Builder hands it the device through
+   `ICalibrationInput` (`DeviceCalibrationInput`, over the Input devices' hub), since
+   `ChartShared.UI` can't see Chart Builder's input.
+   - **Seen, not heard.** Nothing plays until Start. Then two bars lead in, "Get ready" for the
+     first and a count-down of 4, 3, 2, 1 for the second, and **16 open notes** fall, one a beat at
+     80 BPM, with no sound. The user hits the device as each reaches the strike line. "Note n of 16"
+     shows where it is.
+   - **What counts** (`PressDetector`): any key, button or MIDI note pressed, or the hat pushed any
+     way, so a fret and a strum both count. Letting go doesn't, nor does a key repeating while it's
+     held, nor an axis or a MIDI control, so a whammy bar, a tilt or a pedal is no tap. A MIDI note
+     counts from the device's velocity floor.
+   - **One clock.** The highway is drawn at the time since Start on `InputClock`, and the presses
+     are timed by their own events on that clock, with no offset taken off. A press is measured
+     against the note as it was drawn, so what's measured is how much later than the screen shows a
+     note the device reports the hit: the device's lag, the display's and the renderer's, and the
+     player's habit. The playtest judges presses on the drawn timeline too
+     (`SmoothPosition` − latency), so the audio/visual latency drops out of both, and an offset
+     measured here stays right when the audio/visual latency is calibrated again.
+   - **Scoring** (`TapTest`): each tap is measured against its nearest note, ignoring taps more
+     than half a beat from any (as in the lead-in); only the closest tap to each note is kept; taps
+     more than 1.5 interquartile ranges from the median (and more than 5 ms) are dropped; with at
+     least 8 left, the offset is their mean. The result shows the offset, the spread and how many
+     taps were used. A spread over 30 ms suggests trying again. An offset beyond the ±250 ms an
+     input offset can be is saved as the nearest it can.
+   - **Try again** runs the test anew. **Save** stores the offset in the device's settings
+     (`input-bindings.json`), keeping the rest, and the playtest takes it up at once; the Input
+     devices window shows it. When the file can't be written, the tool says so and stays open, and
+     the device keeps the offset it had. **Cancel** stores nothing.
+   - **The keyboard** has an offset too. The window hands its keys on to the keyboard device, all
+     but Escape, which cancels, before any button has them, so Space or Enter never presses one.
+     Key events carry no timestamp, so a key is timed when it's handled, and its spread is wider.
 3. **Per device.**
    - Latency is stored **per audio output device**, because headphones, Bluetooth and speakers
      differ by hundreds of milliseconds.
@@ -1499,10 +1814,15 @@ The tool is part of Chart Builder. It opens:
      events only reach an SDL event loop, which the app doesn't run, and a silent move raises
      none. `SdlAudioOutput` therefore checks which device it is on when playback starts and once a
      second, and raises `DeviceChanged` when it differs. Chart Builder, the tool and Chart Packer
-     then load that device's latency.
+     then load that device's latency (`AudioLatencyService`, in `ChartShared.UI`).
    - **Lookup order:** the stored value for the device's ID, then for its name, then a **global
      fallback**. When a device is found by name, its value is also saved under its ID if it has
      one, so a later rename doesn't lose it.
+   - *Changed for issue #140:* the value found is what the device's latency is beyond what's
+     **detected** from it ([C10](#c10-playback) item 5). While the file's `detect` switch is on
+     (it is unless it's `false`), the detected latency is added to it; off, the value found is
+     the whole latency. **Detect output latency** in both apps' Settings turns it on and off. It
+     is kept in the shared file, so both apps and the tool always agree.
    - The tool always says which device it is calibrating.
 4. **Where it applies.**
    - Chart Builder ([C10](#c10-playback));
@@ -1514,39 +1834,56 @@ The tool is part of Chart Builder. It opens:
      played a column at a time, where tens of milliseconds don't show, and its position is the
      seek position. The merge window resumes from the audio's own position, not the drawn one.
 5. **Saving.** **Save** stores the value in the shared latency file. **Cancel** restores the
-   previous value. **Reset** sets 0.
+   previous value. **Reset** sets 0, leaving only what's detected from the device.
 
 *Settled in CM2:*
 
-- **The tap test's estimate is a mean, not a median.** Once the outliers are dropped, about ten
-  taps are left in each phase. With so few, the median's spread is too wide for AC C11.2: 92% of
-  estimates fell within ±20 ms in its test. The mean gives 96.5%.
-- **One schedule, re-anchored.** The beeps are a `CalibrationSchedule` over a silent mix. It ties
-  the monotonic clock to `SmoothPosition` at an anchor, and is replaced when the latency changes
-  and once a second, so the device's clock can't drift from the system's.
-  - The schedules share a record of the beats already given (`CalibrationBeepsGiven`), so a
-    re-anchor never plays a beep twice.
-  - A latency raised past what's already queued skips one beep.
 - **The first-use prompt** comes the first time a song plays in the Editor on a device with only
   the fallback. Each device is offered it once (`BuilderSettings.CalibrationPrompted`), whatever
   the answer.
 - **The Settings rows.** The latency is an action-only row (`ActionSetting`), with a
   **Calibrate…** button, in both apps' Settings.
 
+*Changed for issue #140:* the first-use prompt still comes on a device with only the fallback,
+with or without a detected latency added, as detecting can't see a Bluetooth link's delay or the
+display's. Below the latency row, both apps' Settings
+have a **Detect output latency** toggle (`audio.detectLatency` in Chart Builder,
+`playback.detectLatency` in Chart Packer), on by default, which sets the shared file's `detect`.
+
+*Changed for issue #49:* the flashing light, the hand-drawn highway, the beeps and the tap test are
+gone. The beeps were moved by the latency against a fixed flash (`CalibrationSchedule`), the
+opposite of playback, which never moves the audio. The tap test's estimator (`TapTest`) now scores
+the input-device test, in one phase.
+
 Acceptance criteria:
 
-- **AC C11.1** With the latency set to +100 ms, the frames handed to `IAudioOutput` have the beep
-  starting 100 ms earlier against the flash schedule than at 0 ms, to within one frame. The flash
-  schedule is unchanged.
-- **AC C11.2** The tap-test estimator is given simulated taps: a known audio offset, normal jitter
-  with σ = 20 ms, and 2 outliers of ±150 ms per phase. Over 1,000 seeded trials, the median
-  estimate is within ±2 ms of the offset, and 95% of estimates are within ±20 ms. (With 12 kept
-  taps per phase, ±20 ms is about two standard deviations of the estimate.)
+- **AC C11.1** With the latency set to +100 ms, the highway is drawn 100 ms of song earlier than at
+  0 ms (`LatencyCompensation.Drawn`), and the clicks are where they were.
+- **AC C11.2** The input-device test's estimator is given simulated taps on its 16 notes: a known
+  offset, normal jitter with σ = 20 ms, and 2 outliers of ±150 ms. Over 1,000 seeded trials, the
+  median estimate is within ±2 ms of the offset, and 95% of estimates are within ±20 ms. Taps in
+  the lead-in are ignored, and only the closest tap to a note counts.
 - **AC C11.3** When the output moves to another device (`DeviceChanged`), Chart Builder and the tool
-  load that device's stored latency, or the fallback.
-- **AC C11.4** With a latency of 400 ms, each marked (2 kHz) beep is written 400 ms before the
-  marked beat it belongs to, so it can only be lined up with a marked flash.
+  load that device's stored latency, or its detected latency, or the fallback.
+- **AC C11.4** The metronome clicks as each of the tool's notes is struck, accented on every fourth,
+  the first beat of each bar.
 - **AC C11.5** Cancel leaves the stored latency as it was before the tool opened.
+- **AC C11.6** A button, key or MIDI note pressed is one tap, and letting go is none; a key held and
+  repeating is one; a hat pushed any way is one; an axis, a MIDI control, a MIDI note under the
+  velocity floor, or another device is none.
+- **AC C11.7** Save stores the measured offset for the device, keeping its other settings, and has
+  the playtest take it up.
+- **AC C11.8** The audio tap test's estimator is given simulated taps on its 16 clicks: a known
+  latency from −100 to +400 ms, plus a device offset that the taps have taken off, normal jitter
+  with σ = 20 ms, and 2 outliers of ±150 ms. Over 1,000 seeded trials, the median estimate is
+  within ±2 ms of the latency, and 95% of estimates are within ±20 ms. Taps with the count-in are
+  ignored, the test's own clicks are only the 16, and a tap 450 ms late counts against its own click. Every device's presses count, each
+  with its own offset.
+- **AC C11.9** While detecting is on, a device's latency is its calibrated latency, or the
+  fallback, plus the latency detected from it; while it's off, nothing is added. The tool edits
+  and saves only the calibrated part, and its reset sets that to 0 (issue #140).
+- **AC C11.10** The detected latency is the device buffer's frames at the device's rate plus the
+  OS's latency, rounded to the millisecond and within 0 to 500 ms, and none when neither is known.
 
 ### C12. Waveform
 
@@ -1771,8 +2108,8 @@ Acceptance criteria:
 5. **Record mode.**
    - While the song plays, number keys place notes on lanes at the moment they're pressed. Holding
      a key holds a sustain (on 5-fret and GHL).
-   - Press times come from the input events' timestamps where they can be had, as in the tap test
-     ([C11](#c11-calibration-tool)), and otherwise from when the event is handled.
+   - Press times come from the input events' timestamps where they can be had, and otherwise from
+     when the event is handled.
    - Each press is converted to song time as **`SmoothPosition` − latency × speed** at the moment
      of the press ([§4.4.1](#441-playback-changes)). It is then quantised to the grid, or to
      onsets if snap to onset is on.
@@ -1798,7 +2135,7 @@ Acceptance criteria:
    - **How it is written** (`RecoveryStore`). The chart, then a JSON manifest, each to a temp file
      renamed into place. The manifest holds the chart's length and SHA-256, so a chart without a
      manifest that matches it, as a crash between the two would leave, is ignored. A song's files are
-     named by a hash of its full path, as its lock is. The manifest also holds the song's `song.ini`
+     named by a hash of its full path (`SongLock.KeyOf`). The manifest also holds the song's `song.ini`
      as the next save would leave it, which the chart is read back with, and the keys of the pending
      changes the user reverted, which stay reverted.
    - **A save** writes the recovery file from the bytes it's about to save, before it touches the
@@ -1933,8 +2270,15 @@ Acceptance criteria:
   isn't measured again when only `song.ini` changed. Nothing is written to disk.
 - **In the Validator,** a song's chart findings follow its metadata issues, one line per rule and
   key with how many and where the first is, coloured by severity, and filtered by six chart types,
-  one per group of the catalogue. They have no fix there. A song is listed for a chart Warning or
-  Error, not for Info alone, and counts as failing until both its metadata and its chart pass.
+  one per group of the catalogue. CHR083's and CHR066's have fixes there (a suggested rating, and
+  star power generated into the draft); the rest have none. A song's missing difficulties
+  (CHR087) are a note there, filled by Generate Lower Difficulties instead. A
+  song is listed for a chart Warning or Error, not for Info alone, and counts as failing until both
+  its metadata and its chart pass. A song whose only chart finding to fix is CHR066 is listed too,
+  so Fix selected can generate its star power, but doesn't count as failing. Ticking a song, or
+  every song, ticks its CHR066 fix only when it's the song's only fix; otherwise it's ticked on its
+  own, as it rewrites the chart though nothing fails. Fix selected generates a song's star power
+  with its defaults, with no dialog.
   Save all asks only about metadata that still fails. A drafted song is linted again a moment after
   its draft changes.
 - **In the detail panel,** the chart findings of the one song shown follow its own, with where
@@ -2036,11 +2380,18 @@ Acceptance criteria:
      Nothing is written to disk.
 2. **Practice preview**: the preview over the loop region at the chosen speed.
 3. **Suggested difficulty.**
-   - For each part and difficulty, a suggested `diff_*` tier from 0 to 6.
-   - It is based on peak and average notes per second, chord density, and HOPO/tap density
-     (and, for drums, independence between hands and kick).
+   - For each part and difficulty, a suggested `diff_*` tier: 0 to 6 for charts written to be
+     played, and 7 and up for overcharts.
+   - Every part is rated by the difficulty model ([difficulty-model.md](difficulty-model.md)), with
+     its instrument's costs. It measures strum (for drums, kick), note (hands), rhythm, pattern and
+     endurance difficulty moment by moment, and scores the chart by its hardest stretches.
+   - Pro drums are rated for each of their keys: `diff_drums` as 4-lane drums play them, and
+     `diff_drums_real` with the cymbals.
    - It is shown with what it was based on, and is only a suggestion.
-   - The weights are fixed in v1 and will be tuned against rated charts.
+   - The parameters are fixed in v1, fitted to the ratings of official charts (difficulty-model.md
+     §13 and §14.4).
+4. **Difficulty analysis.** For any part and difficulty, the model's rank, a spider graph of its
+   five attributes, and its difficulty over the song with the sections and the rank lines.
 
 *Settled in CM5:*
 
@@ -2057,7 +2408,19 @@ Acceptance criteria:
   whole part. It's shown in the preview's header, with what it was worked out from and each
   difficulty's own tier in its tooltip. **Use as diff_…** sets the part's keys that `song.ini`
   rates otherwise, as pending changes Revert takes back; it's never written otherwise. It's also
-  CHR083's fix. Peak density is over any two seconds; the weights are `DifficultyWeights`.
+  CHR083's fix. Every part is rated by `DifficultyAnalyzer`, with `DifficultyParameters.For` its
+  instrument, and an overchart is suggested as 7 or more. Each of Pro drums' keys is set to its own
+  tier. The suggestion is worked out off the UI thread.
+- **The difficulty analysis** is a **Difficulty** tab in the Editor's right panel, and a window of
+  its own. It follows the lane in focus, or a part and difficulty picked. It shows:
+  - the rank;
+  - a spider graph for the whole chart, the selection (in the song, or alone) or the playhead,
+    with the whole chart's shape behind;
+  - the peak envelope over the song, with lines for each attribute that can be shown;
+  - the rank lines, the sections and solos, and the windows that count most toward the score.
+
+  A click on the graph moves playback there. After an edit that touches the track, the whole track
+  is read again a moment later, off the UI thread, and only while the analysis is shown.
 
 Acceptance criteria:
 
@@ -2095,7 +2458,8 @@ item 5).
    - Presets: the keyboard defaults (the number keys, as record mode's, with Enter and the arrow keys
      to strum), a General MIDI drum map, and the usual layout of Xbox 360 guitars.
    - Each device has an input offset in milliseconds, for wireless controllers and drum modules that
-     add their own delay. A MIDI device also has a velocity floor (against crosstalk), a retrigger
+     add their own delay, typed in or measured with **Calibrate…** beside it
+     ([C11](#c11-calibration-tool) item 2). The keyboard has one too. A MIDI device also has a velocity floor (against crosstalk), a retrigger
      time (against double triggers), and the velocities taken as an accent and as a ghost.
    - Space, Esc, P and N are the editor's while playtesting, and can't be bound.
 3. **Timing.** Every input is timed by its own event's timestamp, on one monotonic clock, and turned
@@ -2247,6 +2611,8 @@ covers a note.
 | CHR062 | Warning | Two star power phrases, or two solos, overlap | Merge |
 | CHR063 | Warning | Notes inside a big rock ending, which the games skip | — |
 | CHR064 | — | *Retired in CM3.* A disco flip section that starts or ends between notes of a chord. A mix event applies to every note on its tick, so it can't. | — |
+| CHR065 | Warning | A star power phrase or solo with no notes in it on a charted difficulty, though another difficulty has some. A phrase empty on every difficulty is CHR060's or CHR061's. | — |
+| CHR066 | Info | A 5-fret or keys part has no star power phrases, so a player never earns star power on it. Only where a phrase fits, so generating it always proposes some; drums and GHL aren't checked. One finding per part. | Generate star power ([C8](#c8-phrases-and-events) item 1): a run to keep or drop in Chart Builder, added at once in the library |
 
 *Settled in CM3:* CHR062 gives one finding for each group of phrases that saving would merge into one, and its fix
 merges the group into its first phrase.
@@ -2255,13 +2621,14 @@ merges the group into its first phrase.
 
 | ID | Sev. | Rule | Fix |
 | --- | --- | --- | --- |
-| CHR080 | Warning | A part is in the chart but has no notes on any difficulty. A part charted on only some difficulties is fine. | — |
+| CHR080 | Warning | A part is in the chart but has no notes on any difficulty. A part charted on only some difficulties is CHR087's. | — |
 | CHR081 | Info | A lower difficulty has more chords per second than the one above it | — |
 | CHR082 | Info | The chart has no sections | — |
-| CHR083 | Warning | A part with notes has no `diff_*` value, or `-1` | Use suggested rating |
+| CHR083 | Warning | A part with notes has no `diff_*` value, or `-1` | Use suggested rating (Chart Builder and the library) |
 | CHR084 | Warning | `song_length` doesn't match the audio's length within 1 s. A charter save corrects it, so this mostly appears in the library. | Update `song_length` |
 | CHR085 | Info | `[end]` is missing or before the last note. Chart Builder places it on save, so it runs this rule only in the library, not in the editor | — |
 | CHR086 | Info | Something in the chart file couldn't be loaded as written, and was left out, as the games leave it out ([§4.1](#editable-model)). Saving writes the file without it. | — |
+| CHR087 | Info | A 5-fret, GHL or drum part has no notes on a difficulty below its highest charted one, so the games don't offer it. One finding per difficulty. | Generate with Reduce (Chart Builder); Generate Lower Difficulties (library) |
 
 ### Vocals
 
@@ -2358,14 +2725,11 @@ down to Easy, 31–40 down to Medium, 41–50 down to Hard. The writer uses 25, 
 ### 7.4 Tracks the writer creates
 
 The tempo track, each part (`PART GUITAR`, `PART BASS`, `PART RHYTHM`, `PART GUITAR COOP`,
-`PART DRUMS`, `PART GUITAR GHL`, `PART BASS GHL`, `PART RHYTHM GHL`, `PART GUITAR COOP GHL`),
-`EVENTS` and `BEAT` (pitch 12 on each measure's downbeat and 13 on other beats). Everything else is
-passed through ([§4.2](#lossless-passthrough)), including:
-
-- `PART KEYS`, which `MidiChartReader` reads as a 5-fret part, but which Chart Builder doesn't edit
-  in v1;
-- `PART DRUMS_2X`, which the app's reader doesn't recognise, and which doesn't follow edits to
-  `PART DRUMS` (CHR048).
+`PART KEYS`, `PART DRUMS`, `PART GUITAR GHL`, `PART BASS GHL`, `PART RHYTHM GHL`,
+`PART GUITAR COOP GHL`), `EVENTS` and `BEAT` (pitch 12 on each measure's downbeat and 13 on other
+beats). `PART KEYS` is read and written as a 5-fret part (*revised for #116*; it used to pass
+through). Everything else is passed through ([§4.2](#lossless-passthrough)), including `PART DRUMS_2X`,
+which the app's reader doesn't recognise, and which doesn't follow edits to `PART DRUMS` (CHR048).
 
 A legacy `T1 GEMS` or `PART REAL_DRUMS_PS` track is read as its part, and saved under the current
 name. If a file has two tracks for one part, the one `MidiChartReader` keeps is edited and the
@@ -2379,6 +2743,7 @@ convention `MetadataDifficulty` already uses.
 | Part | Key |
 | ---- | --- |
 | Lead, Bass, Rhythm, Co-op | `diff_guitar`, `diff_bass`, `diff_rhythm`, `diff_guitar_coop` |
+| Keys | `diff_keys` |
 | GHL Guitar, Bass, Rhythm, Co-op | `diff_guitarghl`, `diff_bassghl`, `diff_rhythm_ghl`, `diff_guitar_coop_ghl` |
 | Drums (4-lane, 5-lane) | `diff_drums` |
 | Drums (Pro) | `diff_drums` and `diff_drums_real` |
@@ -2557,20 +2922,27 @@ it is made):
 **Calibration tool:**
 
 ```txt
-┌ Audio/visual calibration ─────────────────────── Device: Headphones (USB) ┐
-│                                                                            │
-│      ┌────────────┐            │  │  │  │                                  │
-│      │            │            │  │▼ │  │     ← note scrolls down          │
-│      │   FLASH    │            │  │  │  │                                  │
-│      │            │          ══╪══╪══╪══╪══  strike line                    │
-│      └────────────┘                                                        │
-│                                                                            │
-│  Adjust until the beep lands on the flash.                                 │
-│  Latency  [−10][−5][−1] ━━━━━━━━━━━●━━━━━━━━━━ [+1][+5][+10]   [ 42 ] ms   │
-│                                                                            │
-│  [Tap test…]   Last tap test: 39 ms (spread 11 ms, 24/24 taps)             │
-│                                   [Reset]   [Cancel]   [Save]              │
-└────────────────────────────────────────────────────────────────────────────┘
+┌ ⊞ Calibrate Audio Latency ────────────────────────────────────── ─  □  ✕ ┐
+├───────────────────────┬──────────────────────────────────────────────────┤
+│ ┌───────────────────┐ │  Output device                                   │
+│ │  Calibration off  │ │  ┌────────────────────────────────────────────┐  │
+│ │ ═════════════════ │ │  │ ♪ Headphones (USB)                         │  │
+│ │ ───────────────── │ │  └────────────────────────────────────────────┘  │
+│ │ ═════════════════ │ │  Latency                                         │
+│ │ ━━━━━━━━━━━━━━━━━ │ │  ┌────────────────────────────────────────────┐  │
+│ │ ═════════════════ │ │  │ ◷ [ +42 ] ms ↶    [−10 −5 −1 +1 +5 +10]    │  │
+│ │                   │ │  │ ━━━━━━━━━━━━━━━━━━━●━━━━━━━━━━━━━━━━━━━━━  │  │
+│ │ ═════════════════ │ │  │ Plus 23 ms detected from the device: 65 ms…│  │
+│ │ [ ][ ][ ][ ][ ]   │ │  │ The arrow keys move it by 1 ms, …          │  │
+│ │                   │ │  └────────────────────────────────────────────┘  │
+│ │                   │ │  Compare                                         │
+│ │                   │ │  ┌────────────────────────────────────────────┐  │
+│ │                   │ │  │ [◉ Hold for no calibration]                │  │
+│ │                   │ │  │ While the button or Space is held, …       │  │
+│ └───────────────────┘ │  └────────────────────────────────────────────┘  │
+├───────────────────────┴──────────────────────────────────────────────────┤
+│ [Reset to 0]                                        [Cancel]   [Save]    │
+└──────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## 9. Keyboard shortcuts
@@ -2604,6 +2976,7 @@ These are the defaults. Rebinding is future work.
 | `Shift`+`O` | Nudge the selected notes to their onsets |
 | `B` | Tap tempo |
 | `Ctrl`+wheel, `+` / `−` | Zoom |
+| Wheel | Move the cursor one grid step later or earlier, the way the **Wheel scroll direction** setting says, in either view |
 | `Shift`+wheel | Move the cursor four grid steps later or earlier |
 | `Ctrl`+`1`–`4` | Easy to Expert |
 | `V` | Switch between Highway and Timeline |
@@ -2622,7 +2995,7 @@ These are the defaults. Rebinding is future work.
 | `Ctrl`+`X` / `C` / `V` | Cut, copy, paste over the span the passage covers |
 | `Ctrl`+`Shift`+`V` | Paste, merged with what's there |
 | `Delete` | Delete the selection |
-| `Esc` | Cancel a pass of record mode; else take back a drag; else end a run of Generate fills, adding nothing; else clear the selection |
+| `Esc` | Cancel a pass of record mode; else take back a drag; else end a run of Generate fills or Generate star power, adding nothing; else clear the selection |
 | `F11` | In the preview's window, full screen on or off; Esc leaves it |
 | `Ctrl`+`S` | Save |
 
@@ -2651,21 +3024,25 @@ Each app owns its settings file, and every file is in the per-user config folder
 `JsonSettingsFile<T>`. Several processes can share a file (several Chart Builders, say), so a save
 re-reads the file and replaces only the settings this process changed since it last loaded or saved.
 Other processes' changes to the other settings, and keys this version doesn't know, are kept. Each
-save writes its own temp file and renames it into place.
+save writes its own temp file and renames it into place. It holds `{file}.lock` from its read to the
+rename, so two processes' saves can't interleave and lose one's changes. The lock is the open handle,
+which the OS lets go of if a process dies. A save that can't get the lock within about a second
+isn't written.
 
 | File | Owner | Holds |
 | ---- | ----- | ----- |
 | `settings.json` | Chart Packer (`AppSettings`) | Chart Packer's settings, as now. Chart Builder reads the output folder and overwrite policy from it for **Save and pack** ([C17](#c17-save-and-export)), and never writes it. |
-| `builder-settings.json` | Chart Builder (`BuilderSettings`) | Every setting in the table below except the latency, plus the Editor window's layout (each side panel's width and whether it's collapsed, and the timeline's height), the recent songs, the last parent folder used for a new chart, and how far ahead the preview looks |
-| `audio-latency.json` | Chart Builder's calibration tool | The audio/visual latency. Chart Packer reads it for the inspector ([C11](#c11-calibration-tool)), and re-reads it when its window is activated ([§4.8](#48-launching-and-coordination)). |
+| `builder-settings.json` | Chart Builder (`BuilderSettings`) | Every setting in the table below except the latency and the reduction rules, plus the Editor window's layout (each side panel's width and whether it's collapsed, and the timeline's height), the recent songs, the last parent folder used for a new chart, and how far ahead the preview looks |
+| `audio-latency.json` | The calibration tool, which both apps open | The audio/visual latency. Chart Packer reads it for the inspector ([C11](#c11-calibration-tool)), and re-reads it when the tool closes and when its window is activated ([§4.8](#48-launching-and-coordination)). |
 | `input-bindings.json` | Chart Builder's Input devices window | Each instrument profile's bindings, and each device's input offset and MIDI settings ([C19](#c19-playtest-and-instrument-input)). Enums are saved by name. |
+| `reduction-rules.json` | Both apps | The default difficulty reduction rules ([C9](#c9-difficulty-authoring)): Chart Builder's Reduce dialog and Settings, and Chart Packer's Validator, which generates a song's missing difficulties by them ([C16](#c16-chart-lint)). Each saves only the sets it changed. Until it's first saved, they're read from `builder-settings.json`'s `ReductionRules`, where an older Chart Builder kept them. |
 
 Settings are edited in Chart Builder's own Settings window, which uses the shared settings window
 and the Core `SettingDefinition` catalog that Chart Packer's uses. The catalog can express Toggle,
 Integer, Range, Choice, Folder and Text rows. The latency map and the reduction rules aren't rows:
 they are edited in the calibration tool and the Reduce dialog, and Settings shows a button that
-opens each. Chart Packer's Settings shows a **Calibrate…** button that runs
-`ChartBuilder --calibrate`.
+opens each. Chart Packer's Settings shows a **Calibrate…** button that opens the same calibration
+tool.
 
 | Setting | Default |
 | ------- | ------- |
@@ -2673,11 +3050,13 @@ opens each. Chart Packer's Settings shows a **Calibrate…** button that runs
 | Default snap | 1/16 |
 | Default editor view | Highway |
 | Editor highway speed | The inspector's default `HighwayNoteSpeed` |
+| Wheel scroll direction | Wheel up moves later, in both lane views and on the timeline along the bottom |
 | Notes keep ticks or times when the tempo changes | Keep ticks |
 | Waveform or spectrogram behind the lanes (**Lanes show**, under Audio assist) | Waveform |
 | Spectrogram memory budget (under Audio assist) | 256 MB (64 to 4096) |
 | Metronome volume / hit-sound volume | 50% / 50%. At 50%, each sound plays at the level `Synth` makes it. A change applies from the next time playback starts. |
 | Audio/visual latency | Per output device, plus a global fallback of 0 ms ([C11](#c11-calibration-tool)) |
+| Detect output latency | On. The latency detected from the device is added to its calibrated latency. Kept in `audio-latency.json`, shared by both apps (issue #140) |
 | Prompt for calibration on first editor use | On |
 | Autosave interval | 2 minutes (1 to 60) |
 | Default charter name | Empty. Prefills `charter` for a new chart, and fills an empty `charter` on save |
@@ -2693,8 +3072,12 @@ stored in `audio-latency.json` as two maps, from device ID and from device name 
 milliseconds, plus the fallback (`{ "byId": { … }, "byName": { … }, "fallback": 0 }`). It is
 looked up in that order ([C11](#c11-calibration-tool)). Values are kept within ±500 ms, and a save
 changes only the device saved, keeping the rest of the file (`AudioLatencyFile`). The file is
-written to a temp file and renamed into place, as `settings.json` is, so a reader never sees half
-of it.
+written to a temp file and renamed into place, under the same lock as `settings.json`, so a reader
+never sees half of it and the two apps' saves don't overwrite each other.
+
+*Changed for issue #140:* the values are what each device's latency is beyond what's detected
+from it. The file also holds `"detect"`, whether the detected latency is added to the value found.
+It's on unless it's `false`.
 
 The new-chart settings (default charter name and default resolution) moved from `AppSettings` to
 `BuilderSettings` when new charts moved to Chart Builder, before any release included them, so
@@ -2722,21 +3105,22 @@ layout. It isn't a row in Settings.
 | Model ↔ MIDI | Round trips (load → save → load gives an equal model, AC C17.4) for golden `.mid` fixtures covering every part, variant and note kind in [§7](#midi-layout), with anchors, `RawEvent`s and velocities. Passthrough tracks stay byte-identical, and are re-ticked correctly after a keep-times tempo edit. The fixtures are written for these tests, not taken from community charts. |
 | Writer vs reader | Every saved chart is read by `ChartReader` and compared with the model's game view (AC C17.2), over all the fixtures and every HOPO-threshold setting |
 | Saving | The folder save's new order (move in, then delete), with a failure injected between the steps (AC C2.4) |
-| Playback | Clicks in the post-stretch mix against `PositionMap` at several speeds (AC C10.1); `SmoothPosition` against a fake output whose queue drains in steps; latency scaled by speed (AC C10.2, C15.3) |
+| Playback | Clicks in the post-stretch mix against `PositionMap` at several speeds (AC C10.1); `SmoothPosition` against a fake output whose queue drains in steps; latency scaled by speed (AC C10.2, C15.3); the drawn position held as playing starts and the audio paused where it's drawn (issue #103) |
 | `.chart` import | Every `.chart` fixture in the existing `ChartToMidi` tests imports with the same warnings |
 | Commands | Each command reverses exactly; random command sequences, undone, give back the start (AC C15.1) |
 | Tempo map | Tick ↔ seconds property tests against `TempoMap`; anchors stay put under edits (AC C4.1) |
 | Lint | At least one fixture per CHR rule, and a clean fixture triggers none (AC C16.1) |
 | Analysis | Synthetic click tracks at fixed and changing tempos for `TempoEstimator`; synthetic drum hits in separate bands for `OnsetDetector`; spectrogram bins checked against known sine frequencies |
-| Calibration | The tap-test estimator with simulated taps that have a known offset, jitter and outliers (AC C11.2); the beep's position in the mixed output for a given latency (AC C11.1) |
+| Calibration | The input-device test's estimator with simulated taps that have a known offset, jitter and outliers (AC C11.2); the drawn position for a given latency (AC C11.1); the tool's chart and its clicks (AC C11.4); what counts as a tap (AC C11.6); saving a device's offset (AC C11.7); the audio tap test's estimator and every device's taps with their offsets (AC C11.8); the detected latency, its lookup and its switch (AC C11.9, C11.10) |
 | Reduction | Each rule in [C9](#c9-difficulty-authoring), on fixtures |
 | View models | `ChartEditorViewModel`, the Editor window's and calibration view models against fake services. There are no automated UI tests, as in v1. |
 | Playtest and input | Each 5-fret and drums rule with synthetic timed inputs (AC C19.2); timestamps through the song clock at several speeds and across seeks (AC C19.1, C19.4); bindings routing keys, buttons, axes, hats and MIDI notes, and their file round trip (AC C19.3); recording from timed actions. Device backends are checked by hand. |
-| Two apps | `BuilderArgs` parsing of every form in [§4.8](#48-launching-and-coordination), including bad arguments; `SongLock` held and refused, with two `FileStream`s in one test process standing in for two processes, and released when the holder is disposed (AC C2.5); `JsonSettingsFile` keeping two processes' changes to different settings, and keys it doesn't know |
+| Two apps | `BuilderArgs` parsing of every form in [§4.8](#48-launching-and-coordination), including bad arguments; `SongLock` held and refused, with two locks in one test process standing in for two processes, released and its file gone when the holder is disposed, and a lock file left behind taken (AC C2.5); `SongLockSet`'s holds counted within a process; `SongFileCommit` waiting for a reader to let go; `JsonSettingsFile` keeping two processes' changes to different settings, and keys it doesn't know |
 
 **Test isolation** is as in [project-spec §10](project-spec-v1.md#10-testing-strategy). Tests use
-temp folders only. The recovery folder, the lock folder, the latency file and Chart Builder's
-settings file take explicit paths, which keep tests away from the real config folder. `UserConfigGuard`
+temp folders only. The recovery folder, the latency file and Chart Builder's settings file take
+explicit paths, and song locks sit beside the temp songs, which keep tests away from the real config
+folder. `UserConfigGuard`
 fails the run if anything there changes anyway.
 
 ## 13. Milestones
@@ -2755,7 +3139,7 @@ fails the run if anything there changes anyway.
 
 - Vocal percussion and overdrive, lyric and range shifts, and pitch detection from the vocals stem,
   building on the vocal lanes' editing ([C3](#c3-editor-layout) item 7).
-- Keys, pro keys, pro guitar/bass and Elite drums.
+- Pro keys, pro guitar/bass and Elite drums.
 - Venue, lighting and camera events.
 - `.chart` export.
 - Auto-charting drafts from audio. This would build on C14, and the result would always be
@@ -2764,10 +3148,10 @@ fails the run if anything there changes anyway.
   ([C19](#c19-playtest-and-instrument-input)).
 - MIDI devices on macOS and Linux.
 - Keeping and replaying a playtest performance, judged again against the chart as it changes.
-- Measuring a device's input offset by tapping along, as the tap test does.
 - Rebindable editor shortcuts (instrument bindings are in C19).
-- Suggested difficulty weights fitted to a set of rated charts, and the suggestion shown in the
-  library and inspector as well as Chart Builder.
+- The suggested rating shown in the library and inspector as well as Chart Builder.
+- The difficulty model's values used by other tools for drums and six-fret, such as finding solos
+  or placing star power.
 
 ## 15. Open questions
 
@@ -2808,13 +3192,14 @@ Decisions already made for v1, recorded here so they aren't reopened by accident
   ([§4.2](#lossless-passthrough)).
 - **Chart lint in the library:** shown as findings, never blocks packing
   ([C16](#c16-chart-lint)).
-- **Reduction rules:** set per run in the Reduce dialog, starting from defaults in Settings. Nothing
-  is stored per song ([C9](#c9-difficulty-authoring)).
+- **Reduction rules:** set per run in the Reduce dialog, or Chart Packer's Generate Lower
+  Difficulties window, starting from the defaults both apps share. Nothing is stored per song ([C9](#c9-difficulty-authoring)).
 - **Calibration device key:** a stable OS device ID where there is one, then the device name, then
-  the global fallback ([C11](#c11-calibration-tool)).
+  the global fallback, with the latency detected from the device added while detecting is on
+  ([C11](#c11-calibration-tool)).
 - **`.chart` after import:** removed on the first save, after a confirmation. No backup is kept
   ([C2](#c2-open-and-import)).
-- **Suggested difficulty:** shown in Chart Builder only, with fixed hand-set weights in v1. Tuning and
+- **Suggested difficulty:** shown in Chart Builder only, with fixed parameters in v1. Tuning and
   showing it in the library are future work ([C18](#c18-preview)).
 - **Generated drum fills:** the author picks the spacing, length and ending note on each run
   ([C6](#c6-drums-4-lane-pro-and-5-lane)).

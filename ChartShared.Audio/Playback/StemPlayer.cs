@@ -71,6 +71,10 @@ public sealed class StemPlayer : IDisposable
     private long _regionEnd = -1;
     private bool _regionLoops;
 
+    // Whether the mix has turned back to the loop's start since the last seek, so what's heard just after its start may
+    // still be its end.
+    private bool _looped;
+
     // Frames written to the output since it was opened: what's been played is this less what's still queued.
     private long _writtenFrames;
 
@@ -111,6 +115,10 @@ public sealed class StemPlayer : IDisposable
     private long _smoothAt;
     private long _smoothSeen;
     private double _smoothTrim = 1;
+
+    // The frame of the mix playing last started from, which DrawnPosition holds at until what's heard gets there; none
+    // once it has, or while paused. Under _lock.
+    private long? _holdFrame;
 
     /// <param name="mixer">What to play.</param>
     /// <param name="output">Where to play it, at <paramref name="mixer"/>'s rate. The player owns it.</param>
@@ -218,53 +226,49 @@ public sealed class StemPlayer : IDisposable
         get
         {
             lock (_lock)
+                return Smooth();
+        }
+    }
+
+    /// <summary>
+    /// Where to draw what's drawn against the audio, for a calibrated latency of <paramref name="latencyMilliseconds"/>
+    /// (charter-spec C10 item 5, C11): while playing, <see cref="SmoothPosition"/> less the latency times the speed
+    /// (<see cref="LatencyCompensation.Drawn"/>); while paused, <see cref="Position"/>.
+    /// </summary>
+    /// <remarks>
+    /// Played from a standstill, by <see cref="Play"/>, <see cref="PlayRegion"/> or a <see cref="Seek"/> while playing,
+    /// nothing from there is heard for the latency, so it's held where playing started until what's heard gets there,
+    /// rather than stepping back by the latency and coming on again. With <see cref="PauseWhereDrawn"/> it never jumps,
+    /// starting or stopping. A negative latency, where the screen is later than the audio, still steps forward as playing
+    /// starts, and back as it stops: what's to come can't be shown before it's played. A loop that has just turned back
+    /// to its start is drawn at its end until what's heard gets there.
+    /// </remarks>
+    public TimeSpan DrawnPosition(int latencyMilliseconds)
+    {
+        lock (_lock)
+        {
+            if (!_playing)
+                return Position;
+
+            var smooth = Smooth();
+            var drawn = LatencyCompensation.Drawn(smooth, latencyMilliseconds, _speed);
+            if (_holdFrame is { } hold)
             {
-                if (_pendingSeek is { } target)
-                {
-                    _smoothValid = false;
-                    return FramesToTime(target);
-                }
-
-                if (!_playing)
-                {
-                    _smoothValid = false;
-                    return FramesToTime(HeardSourceFrame());
-                }
-
-                long played = Math.Max(0, _writtenFrames - _output.QueuedFrames);
-                long now = _clock.GetTimestamp();
-                if (!_smoothValid)
-                {
-                    _smoothValid = true;
-                    _smoothOutput = _smoothSeen = played;
-                    _smoothAt = now;
-                    _smoothTrim = 1;
-                    return FramesToTime(_nominal.SourceAt(played));
-                }
-
-                // The device plays what's written at its own speed: 1 while the mix is stretched.
-                double framesPerSecond = _mixer.OutputRate * (double)_output.Speed;
-                double smooth = _smoothOutput + ((now - _smoothAt) * framesPerSecond * _smoothTrim / _clock.TimestampFrequency);
-                if (played != _smoothSeen)
-                {
-                    double error = played - smooth;
-                    if (Math.Abs(error) > framesPerSecond * SmoothSnapMilliseconds / 1000)
-                    {
-                        smooth = played;
-                        _smoothTrim = 1;
-                    }
-                    else
-                    {
-                        _smoothTrim = 1 + Math.Clamp(error / (framesPerSecond * SmoothSlewSeconds), -SmoothMaxTrim, SmoothMaxTrim);
-                    }
-
-                    _smoothOutput = smooth;
-                    _smoothAt = now;
-                    _smoothSeen = played;
-                }
-
-                return FramesToTime(_nominal.SourceAt(smooth));
+                var held = FramesToTime(hold);
+                if (drawn < held)
+                    return held;
+                _holdFrame = null;
             }
+
+            // Played back from the loop's start, what's heard is still the end of the loop, from before it turned.
+            if (_looped && _regionEnd >= 0 && _regionLoops)
+            {
+                var start = FramesToTime(_regionStart);
+                if (drawn < start && smooth >= start)
+                    return TimeSpan.FromTicks(Math.Max(start.Ticks, (FramesToTime(_regionEnd) - (start - drawn)).Ticks));
+            }
+
+            return drawn;
         }
     }
 
@@ -277,7 +281,7 @@ public sealed class StemPlayer : IDisposable
     /// <summary>
     /// The sounds laid over the mix, such as the metronome's clicks; none if <see langword="null"/>. A new schedule is
     /// taken up from the next chunk mixed: sounds already playing play out, and the new one's sounds start from where the
-    /// last one's were asked up to.
+    /// mix has got to, even after a while with none.
     /// </summary>
     public ISoundSchedule? Sounds
     {
@@ -420,6 +424,7 @@ public sealed class StemPlayer : IDisposable
 
             (_regionStart, _regionEnd, _regionLoops) = (from, to, loops);
             _pendingSeek = from;
+            _holdFrame = from;
             _ended = false;
             _playing = true;
             _smoothValid = false;
@@ -449,6 +454,8 @@ public sealed class StemPlayer : IDisposable
                 _ended = false;
             }
 
+            if (!_playing)
+                _holdFrame = _pendingSeek ?? HeardSourceFrame();
             _playing = true;
             _smoothValid = false;
             _output.Resume();
@@ -464,8 +471,39 @@ public sealed class StemPlayer : IDisposable
                 return;
 
             _playing = false;
+            _holdFrame = null;
             _smoothValid = false;
             _output.Pause();
+            Monitor.PulseAll(_lock);
+        }
+    }
+
+    /// <summary>
+    /// Pauses where <see cref="DrawnPosition"/> is, for a latency of <paramref name="latencyMilliseconds"/>, rather than
+    /// where the audio is: what's seen stays where it was, and playing again starts from there, so the audio that was
+    /// still to be heard is heard again. A region goes on as with <see cref="Pause"/>. With a latency of 0 or less, what's
+    /// drawn is no later than what's heard, so it pauses where the audio is, as <see cref="Pause"/> does, rather than
+    /// skipping audio that was never heard.
+    /// </summary>
+    public void PauseWhereDrawn(int latencyMilliseconds)
+    {
+        lock (_lock)
+        {
+            if (_disposed)
+                return;
+
+            bool seeks = _playing && _error is null && latencyMilliseconds > 0;
+            var drawn = DrawnPosition(latencyMilliseconds);
+            _playing = false;
+            _holdFrame = null;
+            _smoothValid = false;
+            _output.Pause();
+            if (seeks)
+            {
+                _pendingSeek = Math.Max(0, (long)(drawn.TotalSeconds * _mixer.OutputRate));
+                _ended = false;
+            }
+
             Monitor.PulseAll(_lock);
         }
     }
@@ -484,6 +522,8 @@ public sealed class StemPlayer : IDisposable
             if (!_regionLoops)
                 _regionEnd = -1;
             _pendingSeek = frame;
+            if (_playing)
+                _holdFrame = frame;
             _ended = false;
             Monitor.PulseAll(_lock);
         }
@@ -507,6 +547,56 @@ public sealed class StemPlayer : IDisposable
     }
 
     private TimeSpan FramesToTime(double frames) => TimeSpan.FromSeconds(frames / _mixer.OutputRate);
+
+    /// <summary><see cref="SmoothPosition"/>. Under <see cref="_lock"/>.</summary>
+    private TimeSpan Smooth()
+    {
+        if (_pendingSeek is { } target)
+        {
+            _smoothValid = false;
+            return FramesToTime(target);
+        }
+
+        if (!_playing)
+        {
+            _smoothValid = false;
+            return FramesToTime(HeardSourceFrame());
+        }
+
+        long played = Math.Max(0, _writtenFrames - _output.QueuedFrames);
+        long now = _clock.GetTimestamp();
+        if (!_smoothValid)
+        {
+            _smoothValid = true;
+            _smoothOutput = _smoothSeen = played;
+            _smoothAt = now;
+            _smoothTrim = 1;
+            return FramesToTime(_nominal.SourceAt(played));
+        }
+
+        // The device plays what's written at its own speed: 1 while the mix is stretched.
+        double framesPerSecond = _mixer.OutputRate * (double)_output.Speed;
+        double smooth = _smoothOutput + ((now - _smoothAt) * framesPerSecond * _smoothTrim / _clock.TimestampFrequency);
+        if (played != _smoothSeen)
+        {
+            double error = played - smooth;
+            if (Math.Abs(error) > framesPerSecond * SmoothSnapMilliseconds / 1000)
+            {
+                smooth = played;
+                _smoothTrim = 1;
+            }
+            else
+            {
+                _smoothTrim = 1 + Math.Clamp(error / (framesPerSecond * SmoothSlewSeconds), -SmoothMaxTrim, SmoothMaxTrim);
+            }
+
+            _smoothOutput = smooth;
+            _smoothAt = now;
+            _smoothSeen = played;
+        }
+
+        return FramesToTime(_nominal.SourceAt(smooth));
+    }
 
     /// <summary>The frame of the mix being heard now. Under <see cref="_lock"/>.</summary>
     private long HeardSourceFrame() => (long)Math.Round(_map.SourceAt(Math.Max(0, _writtenFrames - _output.QueuedFrames)));
@@ -605,6 +695,7 @@ public sealed class StemPlayer : IDisposable
                         _nominal.Reset(_writtenFrames, _mixer.PositionFrames);
                         _tap.Clear();
                         _retune = false;
+                        _looped = false;
                         if (_pendingSeek == seek)
                             _pendingSeek = null;
 
@@ -739,6 +830,8 @@ public sealed class StemPlayer : IDisposable
         if (_stretching)
             _stretcher.Reset(_mixer.PositionFrames);
         _soundsFrom = start;
+        lock (_lock)
+            _looped = true;
         return RegionEnd.Wrapped;
     }
 
@@ -784,19 +877,20 @@ public sealed class StemPlayer : IDisposable
     /// <returns>Whether any sound plays in them.</returns>
     private bool MixSounds(int frames)
     {
-        if (Sounds is { } schedule)
-        {
-            // Stretched, the frames played can step back a little; a sound starts once they first reach it.
-            double reached = double.MinValue;
-            foreach (var piece in _pieces)
-                reached = Math.Max(reached, Math.Max(piece.From, piece.To));
+        // Stretched, the frames played can step back a little; a sound starts once they first reach it.
+        double reached = double.MinValue;
+        foreach (var piece in _pieces)
+            reached = Math.Max(reached, Math.Max(piece.From, piece.To));
 
-            long to = (long)Math.Floor(reached) + 1;
-            if (to > _soundsFrom)
+        // Moved on with no schedule too, so one given later starts from here rather than playing every sound since the
+        // last seek at once.
+        long to = (long)Math.Floor(reached) + 1;
+        if (to > _soundsFrom)
+        {
+            if (Sounds is { } schedule)
             {
                 _found.Clear();
                 schedule.SoundsBetween(_soundsFrom, to, _found);
-                _soundsFrom = to;
 
                 // Played as mixed, the device plays it at the speed, so each sound is read that much faster or slower
                 // to be heard at its own pitch and length.
@@ -807,6 +901,8 @@ public sealed class StemPlayer : IDisposable
                         _voices.Add(new Voice(sound.Sound, sound.Gain, OffsetOf(sound.SourceFrame), sound.Sound.SampleRate / (_mixer.OutputRate * speed)));
                 }
             }
+
+            _soundsFrom = to;
         }
 
         if (_voices.Count == 0)
@@ -897,6 +993,7 @@ public sealed class StemPlayer : IDisposable
                 return;
 
             _playing = false;
+            _holdFrame = null;
             _ended = ended;
             _error = error;
             _smoothValid = false;

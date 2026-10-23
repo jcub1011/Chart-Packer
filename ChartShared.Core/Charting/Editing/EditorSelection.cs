@@ -160,6 +160,22 @@ public sealed class EditorSelection
     }
 
     /// <summary>
+    /// The <see cref="Span"/> when what it's taken from is of <paramref name="part"/>, for a generator run over that part:
+    /// a span across its lanes, its notes, or its phrases (or disco flip sections, on drums). Null when it's of another
+    /// part, a vocal part's or the tempo markers', so the run takes the whole part.
+    /// </summary>
+    public (long From, long To)? SpanIn(ChartInstrument part)
+    {
+        bool ofPart = Range is { } range && range.To > range.From
+            ? (_rangeTracks.Count > 0 ? _rangeTracks.Any(t => t.Instrument == part) : Track?.Instrument == part)
+            : _notes.Count > 0 ? Track?.Instrument == part
+            : _vocalNotes.Count == 0
+                && ((_phrases.Count > 0 && PhrasePart == part)
+                    || (_phrases.Count == 0 && _discoFlips.Count > 0 && ChartInstruments.KindOf(part) == ChartInstrumentKind.Drums));
+        return ofPart ? Span : null;
+    }
+
+    /// <summary>
     /// The span of ticks the selection covers, for playing it, looping it or fitting a tempo to it: the span selected,
     /// or else from the first selected note to where the last is let go, or else from the first selected phrase's or
     /// disco flip section's start to the last one's end (a section without one adding only its start), or else from the

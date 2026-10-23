@@ -8,20 +8,22 @@ using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Media.Immutable;
+using Avalonia.Threading;
+using ChartBuilder.Controls.Editing;
 using ChartBuilder.ViewModels;
 using ChartShared.Audio.Waveforms;
 using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Validation;
+using ChartShared.UI.Controls;
+using ChartShared.UI.Controls.Highway;
 
 namespace ChartBuilder.Controls
 {
-    /// <summary>A beat line on the timeline, in audio time (charter-spec §4.4.1).</summary>
-    public readonly record struct TimelineBeat(double Seconds, bool IsMeasure);
-
     /// <summary>
     /// The editor's timeline: second marks, the whole mix's waveform, the chart's beat and measure lines, and a playhead
-    /// that clicking or dragging moves (scrubbing). It's also the overview strip (charter-spec C3 item 2): the sections,
-    /// the note density, star power and solos of the lane in focus, and a box round the span the lanes show.
+    /// that clicking or dragging moves (scrubbing), and the wheel moves a bar at a time. It's also the overview strip (charter-spec C3 item 2): the sections,
+    /// the notes, faded, star power and solos of the lane in focus, and a box round the span the lanes show.
     /// </summary>
     /// <remarks>
     /// <para>The playhead is drawn by a layer of its own over the rest, so it moves without the ruler, waveform and beat
@@ -40,18 +42,48 @@ namespace ChartBuilder.Controls
         private const double MinBeatSpacing = 6;
         private const double MinMeasureSpacing = 3;
 
-        // The overview's marks: star power and solo bands under the ruler, and the note density along the bottom.
+        // The beat and measure lines, see-through, so the waveform and notes show through them.
+        private const double BeatOpacity = 0.5;
+
+        // Under the ruler, a row of its own for the sections' names, so nothing is drawn behind them; everything else is
+        // drawn from under it (BodyTop).
+        private const double SectionRowHeight = 14;
+        private const double BodyTop = RulerHeight + SectionRowHeight;
+
+        // A section's name is drawn this far right of its line and stops this far short of the next one; with less room
+        // than this, it isn't drawn.
+        private const double SectionLabelPadding = 3;
+        private const double MinSectionLabelWidth = 10;
+
+        // The overview's marks: a band at the top for each row of the phrase rail, in the rail's colours, and under them the
+        // lane's notes, faded, in its rows and colours: a short gem each, a fainter bar for a sustain, and a faint line down
+        // every row for a kick or an open note.
         private const double BandHeight = 3;
-        private const double DensityFraction = 0.3;
-        private static readonly IBrush StarPowerBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xC0, 0x7F, 0xE9, 0xFF));
-        private static readonly IBrush SoloBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xC0, 0xC0, 0x84, 0xFC));
-        private static readonly IBrush DensityBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x90, 0xFF, 0xB0, 0x40));
+        private const double BandGap = 1;
+        private const byte BandAlpha = 0xC0;
+        private const double NoteWidth = 2;
+        private const double NoteOpacity = 0.75;
+        private const double SustainOpacity = 0.35;
+        private const double AcrossOpacity = 0.4;
+
+        // Each phrase rail row's band, and each note colour at each opacity, made the first time it's drawn: rendering is on
+        // the UI thread only.
+        private static readonly Dictionary<RailKind, IBrush> BandBrushes = [];
+        private static readonly Dictionary<(uint Color, double Opacity), IBrush> NoteBrushes = [];
         private static readonly IPen SectionPen = new ImmutablePen(Color.FromArgb(0x90, 0xFF, 0xFF, 0xFF).ToUInt32(), 1);
 
         // The synchronized region, outlined, and the passages synced with it, filled, behind the other marks.
         private static readonly IBrush SyncedBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x60, 0xFF, 0x7A, 0x1A));
         private static readonly IBrush SyncRegionBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x30, 0xFF, 0x7A, 0x1A));
         private static readonly IPen SyncRegionPen = new ImmutablePen(Color.FromArgb(0xE0, 0xFF, 0x7A, 0x1A).ToUInt32(), 1);
+
+        // The ghosts of a run of Generate fills or Generate star power, over everything else, so they're easy to find: a kept
+        // one's a faint amber column the height of the overview, capped solid; a dropped one's only a faint outline.
+        private const double ProposalCap = 4;
+        private const double ProposalMinWidth = 2;
+        private static readonly IBrush KeptProposalBrush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(PhraseColors.Proposal, 0x40));
+        private static readonly IBrush ProposalCapBrush = new ImmutableSolidColorBrush(PhraseColors.Proposal);
+        private static readonly IPen DroppedProposalPen = new ImmutablePen(HighwayPalette.WithAlpha(PhraseColors.Proposal, 0x60).ToUInt32(), 1);
 
         // The lint marks: a short tick up from the ruler's foot, coloured by severity, errors drawn last so they show.
         private const double MarkHeight = 6;
@@ -65,6 +97,20 @@ namespace ChartBuilder.Controls
         private Pen? _measurePen;
         private Pen? _waveformPen;
         private bool _frameRequested;
+
+        // The wheel turn not yet taken as a notch.
+        private double _wheel;
+
+        // Each section's stretch of the row under the ruler, from its line to the next, as last drawn; the section whose
+        // name is the tip now, null for none; the tip the timeline was given, shown again off a section; whether the tip
+        // open now was opened by Avalonia for that tip, so is left open off a section; and whether the timeline is setting
+        // the tip itself, so its own change isn't taken for a new tip.
+        private readonly List<(double Left, double Right, string Name)> _sectionSpans = [];
+        private string? _tipSection;
+        private object? _ownTip;
+        private bool _ownTipOpen;
+        private bool _settingTip;
+        private DispatcherTimer? _tipTimer;
 
         // The picture of everything but the playhead, the size and scaling it was drawn at, and whether what it shows has
         // changed since.
@@ -84,6 +130,9 @@ namespace ChartBuilder.Controls
 
         public static readonly StyledProperty<Func<TimeSpan>?> ClockProperty =
             AvaloniaProperty.Register<TimelineView, Func<TimeSpan>?>(nameof(Clock));
+
+        public static readonly StyledProperty<bool> WheelUpIsLaterProperty =
+            AvaloniaProperty.Register<TimelineView, bool>(nameof(WheelUpIsLater), true);
 
         public static readonly StyledProperty<Waveform?> WaveformProperty =
             AvaloniaProperty.Register<TimelineView, Waveform?>(nameof(Waveform));
@@ -166,6 +215,13 @@ namespace ChartBuilder.Controls
         {
             get => GetValue(ClockProperty);
             set => SetValue(ClockProperty, value);
+        }
+
+        /// <summary>Whether the wheel turned up moves the playhead later, as along the lanes; otherwise turned down does.</summary>
+        public bool WheelUpIsLater
+        {
+            get => GetValue(WheelUpIsLaterProperty);
+            set => SetValue(WheelUpIsLaterProperty, value);
         }
 
         /// <summary>The mix's waveform, as much as has been read; none until there's audio.</summary>
@@ -254,6 +310,13 @@ namespace ChartBuilder.Controls
             else if (change.Property == WaveformBrushProperty)
                 _waveformPen = null;
 
+            // A tip given while a section's name is showing is the one to show again off it; the name stays for now.
+            if (change.Property == ToolTip.TipProperty && _tipSection is not null && !_settingTip)
+            {
+                _ownTip = change.NewValue;
+                SetTip(_tipSection);
+            }
+
             if (Array.IndexOf(ContentProperties, change.Property) >= 0)
                 _isContentStale = true;
 
@@ -315,6 +378,7 @@ namespace ChartBuilder.Controls
             _contentSize = bounds.Size;
             _contentScaling = scaling;
             _isContentStale = false;
+            _sectionSpans.Clear();
 
             using var context = _content.CreateDrawingContext();
             using (context.PushTransform(Matrix.CreateScale(scaling, scaling)))
@@ -362,8 +426,9 @@ namespace ChartBuilder.Controls
         }
 
         /// <summary>
-        /// The lane in focus over the whole song: its note density, star power and solos, and the song's sections; and the
-        /// synchronized region and the passages synced with it.
+        /// The lane in focus over the whole song: its notes, a band of its phrases for each row of its phrase rail, and the
+        /// song's sections; the synchronized region and the passages synced with it; and over them all, the ghosts of a run
+        /// of Generate fills or Generate star power.
         /// </summary>
         private void DrawOverview(DrawingContext context, Rect bounds)
         {
@@ -371,8 +436,7 @@ namespace ChartBuilder.Controls
                 return;
 
             double width = bounds.Width;
-            double top = RulerHeight;
-            double densityHeight = (bounds.Height - top) * DensityFraction;
+            double top = BodyTop;
             foreach (var (start, end, isRegion) in overview.Synced)
             {
                 var band = new Rect(XOf(start, width), top, Math.Max(1, XOf(end, width) - XOf(start, width)), bounds.Bottom - top);
@@ -382,34 +446,157 @@ namespace ChartBuilder.Controls
                     context.FillRectangle(SyncedBrush, band);
             }
 
-            int columns = overview.Density.Count;
-            for (int i = 0; i < columns; i++)
+            DrawNotes(context, overview, width, top + (overview.Rows.Count * (BandHeight + BandGap)), bounds.Bottom);
+
+            foreach (var phrase in overview.Phrases)
             {
-                float density = overview.Density[i];
-                if (density <= 0)
+                int row = IndexOf(overview.Rows, phrase.Row);
+                if (row < 0)
                     continue;
-                double x = (double)i / columns * width;
-                double height = Math.Max(1, density * densityHeight);
-                context.FillRectangle(DensityBrush, new Rect(x, bounds.Bottom - height, Math.Max(1, width / columns), height));
+                double y = top + (row * (BandHeight + BandGap));
+                context.FillRectangle(BandBrush(phrase.Row), new Rect(XOf(phrase.Start, width), y, Math.Max(1, XOf(phrase.End, width) - XOf(phrase.Start, width)), BandHeight));
             }
 
-            foreach (var (start, end) in overview.StarPower)
-                context.FillRectangle(StarPowerBrush, new Rect(XOf(start, width), top, Math.Max(1, XOf(end, width) - XOf(start, width)), BandHeight));
-            foreach (var (start, end) in overview.Solos)
-                context.FillRectangle(SoloBrush, new Rect(XOf(start, width), top + BandHeight + 1, Math.Max(1, XOf(end, width) - XOf(start, width)), BandHeight));
-
+            // Each section's line, from the row under the ruler down through the rest, and its name in that row, cut short
+            // with an ellipsis before the next section's line; its whole name is the tip over its stretch of the row.
             var labelBrush = TickBrush ?? Brushes.Gray;
-            double lastLabelEnd = double.MinValue;
-            foreach (var section in overview.Sections)
+            var sections = overview.Sections;
+            for (int i = 0; i < sections.Count; i++)
             {
-                double x = Math.Round(XOf(section.Seconds, width)) + 0.5;
-                context.DrawLine(SectionPen, new Point(x, top), new Point(x, bounds.Bottom));
-                if (x < lastLabelEnd)
+                double x = Math.Round(XOf(sections[i].Seconds, width)) + 0.5;
+                double next = i + 1 < sections.Count ? Math.Round(XOf(sections[i + 1].Seconds, width)) + 0.5 : width;
+                context.DrawLine(SectionPen, new Point(x, RulerHeight), new Point(x, bounds.Bottom));
+                _sectionSpans.Add((x, next, sections[i].Name));
+
+                double room = next - x - (2 * SectionLabelPadding);
+                if (room < MinSectionLabelWidth)
                     continue;
-                var text = new FormattedText(section.Name, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, Typeface.Default, 10, labelBrush);
-                context.DrawText(text, new Point(x + 3, top + (2 * BandHeight) + 2));
-                lastLabelEnd = x + text.Width + 6;
+                var text = new FormattedText(sections[i].Name, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, Typeface.Default, 10, labelBrush)
+                {
+                    MaxTextWidth = room,
+                    MaxLineCount = 1,
+                    Trimming = TextTrimming.CharacterEllipsis,
+                };
+                context.DrawText(text, new Point(x + SectionLabelPadding, RulerHeight + ((SectionRowHeight - text.Height) / 2)));
             }
+
+            // The ghosts last, kept ones over the dropped, each wide enough to see on a long song.
+            foreach (bool kept in new[] { false, true })
+            {
+                foreach (var proposal in overview.Proposals)
+                {
+                    if (proposal.Kept != kept)
+                        continue;
+                    double x = XOf(proposal.Start, width);
+                    double w = Math.Max(ProposalMinWidth, XOf(proposal.End, width) - x);
+                    var column = new Rect(x, top, w, bounds.Bottom - top);
+                    if (kept)
+                    {
+                        context.FillRectangle(KeptProposalBrush, column);
+                        context.FillRectangle(ProposalCapBrush, new Rect(x, top, w, ProposalCap));
+                    }
+                    else
+                    {
+                        context.DrawRectangle(null, DroppedProposalPen, column.Deflate(0.5));
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// The lane's notes, faded, between <paramref name="top"/> and <paramref name="bottom"/> in a row each for its frets,
+        /// pads or columns; those across every row behind the rest. On a long song only the first gem at each pixel of a
+        /// row is drawn, and of a half-height one (a six-fret black fret played with a white one) of its top half, as the
+        /// rest would cover it; and a sustain only where the row's sustains before it didn't reach, so faded ones don't
+        /// pile up.
+        /// </summary>
+        private void DrawNotes(DrawingContext context, OverviewData overview, double width, double top, double bottom)
+        {
+            int rows = overview.NoteRows;
+            if (rows <= 0 || overview.Notes.Count == 0 || bottom - top < rows)
+                return;
+
+            double rowHeight = (bottom - top) / rows;
+            double inset = Math.Min(1, rowHeight / 4);
+            double gemHeight = rowHeight - (2 * inset);
+
+            // Where a gem was last drawn in each row, and across them all at the end; where a top-half gem was last drawn
+            // in each row; and how far right each row's sustains reach.
+            var lastX = new double[rows + 1];
+            var lastTopX = new double[rows];
+            var tailEnd = new double[rows];
+            foreach (bool across in (ReadOnlySpan<bool>)[true, false])
+            {
+                Array.Fill(lastX, double.MinValue);
+                Array.Fill(lastTopX, double.MinValue);
+                Array.Fill(tailEnd, double.MinValue);
+                foreach (var note in overview.Notes)
+                {
+                    if ((note.Row < 0) != across || note.Row >= rows)
+                        continue;
+
+                    double x = Math.Round(XOf(note.Start, width));
+                    if (across)
+                    {
+                        if (x != lastX[rows])
+                            context.FillRectangle(BrushOf(note.Color, AcrossOpacity), new Rect(x, top, 1, bottom - top));
+                        lastX[rows] = x;
+                        continue;
+                    }
+
+                    double y = top + (note.Row * rowHeight) + inset;
+                    double end = XOf(note.End, width);
+                    if (end - x >= NoteWidth)
+                    {
+                        double from = Math.Max(x, tailEnd[note.Row]);
+                        if (end - from >= 1)
+                        {
+                            context.FillRectangle(BrushOf(note.Color, SustainOpacity), new Rect(from, y + (gemHeight / 4), end - from, gemHeight / 2));
+                            tailEnd[note.Row] = end;
+                        }
+                    }
+
+                    var last = note.Top ? lastTopX : lastX;
+                    if (x != last[note.Row])
+                    {
+                        double height = note.Top ? gemHeight / 2 : gemHeight;
+                        context.FillRectangle(BrushOf(note.Color, NoteOpacity), new Rect(x - (NoteWidth / 2), y, NoteWidth, height));
+                    }
+
+                    last[note.Row] = x;
+                }
+            }
+        }
+
+        /// <summary>A brush of <paramref name="color"/> at <paramref name="opacity"/>, made once for each, as a lane has only a few.</summary>
+        private static IBrush BrushOf(Color color, double opacity)
+        {
+            var key = (color.ToUInt32(), opacity);
+            if (!NoteBrushes.TryGetValue(key, out var brush))
+                NoteBrushes[key] = brush = new ImmutableSolidColorBrush(color, opacity);
+            return brush;
+        }
+
+        private static IBrush BandBrush(RailKind row)
+        {
+            if (!BandBrushes.TryGetValue(row, out var brush))
+            {
+                brush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(PhraseColors.Of(row), BandAlpha));
+                BandBrushes[row] = brush;
+            }
+
+            return brush;
+        }
+
+        private static int IndexOf(IReadOnlyList<RailKind> rows, RailKind row)
+        {
+            for (int i = 0; i < rows.Count; i++)
+            {
+                if (rows[i] == row)
+                    return i;
+            }
+
+            return -1;
         }
 
         /// <summary>Each pixel column's lowest and highest level, and how loud it is, scaled so the loudest fills the height.</summary>
@@ -418,7 +605,7 @@ namespace ChartBuilder.Controls
             if (WaveformBrush is not { } brush || Waveform is not { ReadCount: > 0 } waveform)
                 return;
 
-            double top = RulerHeight;
+            double top = BodyTop;
             double height = bounds.Height - top;
             if (height <= 4)
                 return;
@@ -477,14 +664,17 @@ namespace ChartBuilder.Controls
             if (showMeasures)
                 _measurePen ??= new Pen(MeasureBrush!, 1);
 
-            foreach (var beat in beats)
+            using (context.PushOpacity(BeatOpacity))
             {
-                var pen = beat.IsMeasure ? (showMeasures ? _measurePen : null) : (showBeats ? _beatPen : null);
-                if (pen is null)
-                    continue;
+                foreach (var beat in beats)
+                {
+                    var pen = beat.IsMeasure ? (showMeasures ? _measurePen : null) : (showBeats ? _beatPen : null);
+                    if (pen is null)
+                        continue;
 
-                double x = Math.Round(XOf(beat.Seconds, bounds.Width)) + 0.5;
-                context.DrawLine(pen, new Point(x, RulerHeight), new Point(x, bounds.Height));
+                    double x = Math.Round(XOf(beat.Seconds, bounds.Width)) + 0.5;
+                    context.DrawLine(pen, new Point(x, BodyTop), new Point(x, bounds.Height));
+                }
             }
         }
 
@@ -547,6 +737,7 @@ namespace ChartBuilder.Controls
         protected override void OnPointerPressed(PointerPressedEventArgs e)
         {
             base.OnPointerPressed(e);
+            ShowSectionTip(null); // Scrubbing, the name's tip goes, and comes again as the pointer next moves over a section.
             if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
                 return;
 
@@ -560,6 +751,93 @@ namespace ChartBuilder.Controls
             base.OnPointerMoved(e);
             if (ReferenceEquals(e.Pointer.Captured, this))
                 Scrub(e);
+            else
+                ShowSectionTip(SectionAt(e.GetPosition(this)));
+        }
+
+        protected override void OnPointerExited(PointerEventArgs e)
+        {
+            base.OnPointerExited(e);
+            ShowSectionTip(null);
+        }
+
+        /// <summary>The name of the section whose stretch of the row under the ruler <paramref name="at"/> is in, or null.</summary>
+        private string? SectionAt(Point at)
+        {
+            if (at.Y < RulerHeight || at.Y >= BodyTop)
+                return null;
+            foreach (var (left, right, name) in _sectionSpans)
+            {
+                if (at.X >= left && at.X < right)
+                    return name;
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Has the tip show <paramref name="section"/>'s whole name, or the timeline's own tip again for null.
+        /// </summary>
+        /// <remarks>
+        /// Avalonia's tooltip service only times a tip in as the pointer comes onto a control with one, and a click puts it
+        /// away until the pointer leaves, so the timeline, always being clicked, opens the name's tip itself, after the
+        /// usual delay. An open tip just shows the new name. Off the sections, a tip it opened is put away, and one Avalonia
+        /// opened for the timeline's own tip shows that again, as Avalonia wouldn't open it again until the pointer leaves.
+        /// </remarks>
+        private void ShowSectionTip(string? section)
+        {
+            if (section == _tipSection)
+                return;
+            if (_tipSection is null)
+            {
+                _ownTip = ToolTip.GetTip(this);
+                _ownTipOpen = ToolTip.GetIsOpen(this);
+            }
+
+            _tipSection = section;
+            SetTip(section ?? _ownTip);
+
+            _tipTimer?.Stop();
+            if (section is null)
+            {
+                if (!_ownTipOpen)
+                    ToolTip.SetIsOpen(this, false);
+                return;
+            }
+
+            if (ToolTip.GetIsOpen(this))
+                return;
+            if (_tipTimer is null)
+            {
+                _tipTimer = new DispatcherTimer();
+                _tipTimer.Tick += OnTipTimer;
+            }
+
+            _tipTimer.Interval = TimeSpan.FromMilliseconds(Math.Max(0, ToolTip.GetShowDelay(this)));
+            _tipTimer.Start();
+        }
+
+        private void OnTipTimer(object? sender, EventArgs e)
+        {
+            _tipTimer?.Stop();
+            if (_tipSection is not null && IsPointerOver)
+            {
+                _ownTipOpen = false;
+                ToolTip.SetIsOpen(this, true);
+            }
+        }
+
+        private void SetTip(object? tip)
+        {
+            _settingTip = true;
+            try
+            {
+                ToolTip.SetTip(this, tip);
+            }
+            finally
+            {
+                _settingTip = false;
+            }
         }
 
         protected override void OnPointerReleased(PointerReleasedEventArgs e)
@@ -573,6 +851,21 @@ namespace ChartBuilder.Controls
         {
             if (Bounds.Width > 0)
                 Position = Math.Clamp(TimeOf(e.GetPosition(this).X, Bounds.Width), 0, Length);
+        }
+
+        protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
+        {
+            base.OnPointerWheelChanged(e);
+
+            // A bar a notch, later the way WheelUpIsLater says, as along the lanes; four with Shift held, which some
+            // platforms report as a sideways scroll. At most one notch per wheel event.
+            bool fast = (e.KeyModifiers & KeyModifiers.Shift) != 0;
+            double raw = e.Delta.Y != 0 ? e.Delta.Y : (fast ? e.Delta.X : 0);
+            int bars = WheelSteps.TakeScrollStep(ref _wheel, WheelSteps.TowardLater(raw, WheelUpIsLater), fast);
+            if (bars != 0 && Beats is { } beats && TimelineBeats.StepBars(beats, Position, bars) is { } seconds)
+                Position = Math.Clamp(seconds, 0, Length);
+
+            e.Handled = true;
         }
 
         /// <summary>Where the playhead is drawn: at the clock while playing, otherwise at <see cref="Position"/>.</summary>

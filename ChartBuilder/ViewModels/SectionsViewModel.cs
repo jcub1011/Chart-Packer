@@ -37,6 +37,7 @@ namespace ChartBuilder.ViewModels
             _where = where;
             GoToCommand = new RelayCommand(() => owner.GoTo(this));
             DeleteCommand = new RelayCommand(() => owner.Delete(this));
+            MoveToPlayheadCommand = new RelayCommand(() => owner.MoveToPlayhead(this));
         }
 
         /// <summary>The event, the track it's on, and what it is.</summary>
@@ -104,6 +105,9 @@ namespace ChartBuilder.ViewModels
         public IRelayCommand GoToCommand { get; }
 
         public IRelayCommand DeleteCommand { get; }
+
+        /// <summary>Moves the event to the playhead, on the grid, as Insert section places one there.</summary>
+        public IRelayCommand MoveToPlayheadCommand { get; }
 
         /// <summary>Takes up the event as an edit of its own has made it, so the next refresh finds this row for it.</summary>
         internal void Rekey(TextEvent now) => Row = Row with { Event = now };
@@ -258,6 +262,16 @@ namespace ChartBuilder.ViewModels
             _ => Strings.SongEventEnd,
         };
 
+        /// <summary>The key of a song event's line icon, for the insert menu; null for one without.</summary>
+        internal static string? SongEventIcon(SongEvent songEvent) => songEvent switch
+        {
+            SongEvent.Coda => "CodaStroke",
+            SongEvent.MusicStart => "PlayStroke",
+            SongEvent.MusicEnd => "StopStroke",
+            SongEvent.End => "SkipNextStroke",
+            _ => null,
+        };
+
         public void Dispose()
         {
             _disposed = true;
@@ -297,6 +311,18 @@ namespace ChartBuilder.ViewModels
             Edited(item, now);
         }
 
+        /// <summary>
+        /// Moves <paramref name="item"/>'s event to the playhead, on the grid: the tick Insert section would place a section
+        /// at. A song event the editor places stays where it is.
+        /// </summary>
+        internal void MoveToPlayhead(EventItem item)
+        {
+            long tick = Session.CursorTick;
+            if (item.Row.IsPlaced || tick == item.Row.Event.Tick)
+                return;
+            Edited(item, Session.Tools.MoveEvent(item.Row.Part, item.Row.Event, tick));
+        }
+
         // Done or not, the row shows the event as it then is.
         private void Edited(EventItem item, TextEvent? now)
         {
@@ -321,13 +347,17 @@ namespace ChartBuilder.ViewModels
         private IReadOnlyList<LaneMenuItem> EventMenuOf(ChartInstrument? part)
         {
             var items = SongEvents.Insertable
-                .Select(kind => LaneMenuItem.Choice(SongEventName(kind), false, () => Session.Tools.InsertEvent(null, SongEvents.TextOf(kind))))
+                .Select(kind => LaneMenuItem.Action(
+                    SongEventName(kind),
+                    isEnabled: true,
+                    () => Session.Tools.InsertEvent(null, SongEvents.TextOf(kind)),
+                    SongEventIcon(kind)))
                 .ToList();
-            items.Add(LaneMenuItem.Choice(Strings.SectionsTextEvent, false, () => InsertTextEvent(null)));
+            items.Add(LaneMenuItem.Action(Strings.SectionsTextEvent, true, () => InsertTextEvent(null), "TextEventStroke"));
             if (part is { } instrument)
             {
                 string header = string.Format(CultureInfo.CurrentCulture, Strings.SectionsPartTextEventFormat, ChartLabels.InstrumentName(instrument));
-                items.Add(LaneMenuItem.Choice(header, false, () => InsertTextEvent(instrument)));
+                items.Add(LaneMenuItem.Action(header, true, () => InsertTextEvent(instrument), "TextEventStroke"));
             }
 
             return items;

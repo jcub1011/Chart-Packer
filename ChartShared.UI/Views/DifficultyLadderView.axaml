@@ -1,0 +1,95 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:ChartShared.UI.ViewModels"
+             xmlns:res="using:ChartShared.UI.Resources"
+             mc:Ignorable="d" d:DesignWidth="320" d:DesignHeight="160"
+             x:Class="ChartShared.UI.Views.DifficultyLadderView"
+             x:DataType="vm:DifficultyLadder">
+    <!-- The difficulty estimator's ladder (DifficultyLadder): Expert down to Easy, each a little easier than the one above
+         it, if all's well. Chart Builder's Reduce dialog and Chart Packer's Generate difficulties dialog show it; Chart
+         Packer's Generate lower difficulties window shows it compact (class "compact"), without the peak bars. -->
+    <UserControl.Styles>
+        <!-- A difficulty on the ladder: a draft marked as the library marks its selection, with the accent's bar at its
+             left; one no easier than the one above it marked as a failing row is. -->
+        <Style Selector="Border.rung">
+            <Setter Property="BorderThickness" Value="3,0,0,0" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="CornerRadius" Value="2" />
+            <Setter Property="Padding" Value="10,6,8,6" />
+        </Style>
+        <Style Selector="Border.rung.draft">
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+            <Setter Property="Background" Value="{DynamicResource AccentTintFaintBrush}" />
+        </Style>
+        <Style Selector="Border.rung.outOfOrder">
+            <Setter Property="BorderBrush" Value="{DynamicResource InvalidBrush}" />
+            <Setter Property="Background" Value="{DynamicResource InvalidTintBrush}" />
+        </Style>
+        <Style Selector="Border.rung TextBlock.name">
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Border.rung.draft TextBlock.name">
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <!-- Its peak notes a second, as a bar against the part's highest: in the accent for a draft, faint for the rest. -->
+        <Style Selector="ProgressBar.peak">
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="Height" Value="6" />
+            <Setter Property="CornerRadius" Value="3" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource SubtleBorderBrush}" />
+        </Style>
+        <Style Selector="Border.rung.draft ProgressBar.peak">
+            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+        </Style>
+        <Style Selector="Border.rung.outOfOrder ProgressBar.peak">
+            <Setter Property="Foreground" Value="{DynamicResource InvalidBrush}" />
+        </Style>
+        <!-- Compact, where room is short: no peak bars, and closer rungs. -->
+        <Style Selector=":is(UserControl).compact ProgressBar.peak">
+            <Setter Property="IsVisible" Value="False" />
+        </Style>
+        <Style Selector=":is(UserControl).compact Border.rung">
+            <Setter Property="Padding" Value="8,3,6,3" />
+        </Style>
+        <Style Selector="TextBlock.warning">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}" />
+        </Style>
+    </UserControl.Styles>
+
+    <StackPanel Spacing="8">
+        <ItemsControl ItemsSource="{Binding Rows}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <StackPanel Spacing="2" />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:DifficultyLadderRow">
+                    <Border Classes="rung" Classes.draft="{Binding IsDraft}" Classes.outOfOrder="{Binding IsOutOfOrder}">
+                        <Grid ColumnDefinitions="72,*,76,Auto" ColumnSpacing="12">
+                            <TextBlock Grid.Column="0" Classes="name" Text="{Binding Difficulty}" />
+                            <ProgressBar Grid.Column="1" Classes="peak"
+                                         Minimum="0" Maximum="1" Value="{Binding Share}"
+                                         ToolTip.Tip="{x:Static res:SharedStrings.DifficultyLadderPeakToolTip}" />
+                            <TextBlock Grid.Column="2" FontSize="12" Opacity="0.7" VerticalAlignment="Center"
+                                       TextAlignment="Right" Text="{Binding Peak}"
+                                       ToolTip.Tip="{x:Static res:SharedStrings.DifficultyLadderPeakToolTip}" />
+                            <Border Grid.Column="3" Classes="chip large" MinWidth="22"
+                                    ToolTip.Tip="{x:Static res:SharedStrings.DifficultyLadderTierToolTip}">
+                                <TextBlock HorizontalAlignment="Center" Text="{Binding Tier}" />
+                            </Border>
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <TextBlock Classes="warning" Text="{Binding OrderWarning}" IsVisible="{Binding HasOrderWarning}" />
+    </StackPanel>
+</UserControl>

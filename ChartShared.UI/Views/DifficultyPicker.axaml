@@ -5,10 +5,11 @@
              xmlns:vm="using:ChartShared.UI.ViewModels"
              xmlns:res="using:ChartShared.UI.Resources"
              xmlns:conv="using:ChartShared.UI.Converters"
+             xmlns:ui="using:ChartShared.UI.Controls"
              mc:Ignorable="d" d:DesignWidth="320" d:DesignHeight="160"
              x:Class="ChartShared.UI.Views.DifficultyPicker"
              x:DataType="vm:IDifficultyPicker">
-    <!-- A difficulty's flyout: the part's name and key, its note counts, a button for each tier, and a box for any other.
+    <!-- A difficulty's flyout: the part's name and key, the suggested tier, its note counts, a button for each tier, and a box for any other.
          Chart Packer's inspector's instrument icons and Chart Builder's Chart settings' ratings open it. The view hosting
          it includes Inspector.axaml, whose preset and nudge styles it uses. -->
 
@@ -40,6 +41,7 @@
         <StackPanel>
             <TextBlock Classes="highwayHeader" Text="{Binding Name}" />
             <TextBlock Classes="muted" FontSize="12" Text="{Binding Key}" />
+            <TextBlock Classes="muted" FontSize="12" Text="{Binding SuggestionText}" IsVisible="{Binding HasSuggestion}" />
         </StackPanel>
         <ItemsControl Grid.IsSharedSizeScope="True"
                       ItemsSource="{Binding NoteCounts}"
@@ -94,7 +96,7 @@
                     Click="OnChosen"
                     ToolTip.Tip="{x:Static res:SharedStrings.DifficultyRevertButton}"
                     AutomationProperties.Name="{x:Static res:SharedStrings.DifficultyRevertButton}">
-                <PathIcon Width="12" Height="12" Data="{StaticResource RevertIconGeometry}" />
+                <ui:LineIcon Width="12" Height="12" Data="{StaticResource RevertStroke}" />
             </Button>
         </StackPanel>
     </StackPanel>

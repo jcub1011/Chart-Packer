@@ -29,6 +29,12 @@ public static class UserConfigPaths
     public static string BuilderSettingsFile => Path.Combine(ConfigFolder, "builder-settings.json");
 
     /// <summary>
+    /// The default reduction rules (charter-spec C9 item 2, §10), read and written by both apps: Chart Builder's Reduce,
+    /// and Chart Packer's Generate Lower Difficulties.
+    /// </summary>
+    public static string ReductionRulesFile => Path.Combine(ConfigFolder, "reduction-rules.json");
+
+    /// <summary>
     /// The audio/visual latency per output device, written by Chart Builder's calibration tool and read
     /// by both apps (charter-spec C11, §10).
     /// </summary>
@@ -40,8 +46,11 @@ public static class UserConfigPaths
     /// </summary>
     public static string InputBindingsFile => Path.Combine(ConfigFolder, "input-bindings.json");
 
-    /// <summary>Where Chart Builder holds a lock file for each song it has open (charter-spec §4.8, <c>SongLock</c>).</summary>
-    public static string LockFolder => Path.Combine(ConfigFolder, "locks");
+    /// <summary>
+    /// Shared update preferences: whether pre-releases count as available updates, plus the last check
+    /// and its cached result, so the title bar's version badge shows instantly. Read and written by both apps.
+    /// </summary>
+    public static string UpdateSettingsFile => Path.Combine(ConfigFolder, "update-settings.json");
 
     /// <summary>
     /// Where Chart Builder autosaves the chart open, for recovery after a crash (charter-spec C15 item 6,

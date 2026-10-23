@@ -1,84 +1,92 @@
 namespace ChartShared.Core.Calibration;
 
-/// <summary>One phase of the tap test: where its beats are, and when the user tapped, in seconds on one clock.</summary>
-/// <param name="FirstBeat">When the phase's first beat is, on the taps' clock.</param>
-/// <param name="BeatPeriod">The time between beats.</param>
-/// <param name="Taps">When each tap was, in the order tapped.</param>
-public sealed record TapPhase(double FirstBeat, double BeatPeriod, IReadOnlyList<double> Taps);
-
 /// <summary>What the tap test measured.</summary>
-/// <param name="LatencyMilliseconds">How much later the audio arrives than the display.</param>
-/// <param name="SpreadMilliseconds">How scattered the taps were: the larger of the two phases' interquartile ranges.</param>
-/// <param name="VisualKept">How many of the visual phase's taps were used.</param>
-/// <param name="AudioKept">How many of the audio phase's taps were used.</param>
-public sealed record TapEstimate(double LatencyMilliseconds, double SpreadMilliseconds, int VisualKept, int AudioKept);
+/// <param name="OffsetMilliseconds">How much later than the notes the taps came, on average: positive when the device reports late.</param>
+/// <param name="SpreadMilliseconds">How scattered the taps were: their interquartile range.</param>
+/// <param name="Kept">How many of the taps were used.</param>
+public sealed record TapEstimate(double OffsetMilliseconds, double SpreadMilliseconds, int Kept);
 
 /// <summary>
-/// The calibration tool's tap test (charter-spec C11 item 2): the user taps along with flashes and no
-/// sound, then with beeps and a blank screen. Their reaction time is the same in both phases, so the
-/// difference between the two phases' errors is the audio's latency against the display.
+/// The calibration tool's input-device test (charter-spec C11 item 2): the user hits a device's buttons in time with notes
+/// reaching the strike line, with no sound. The taps are timed on the clock the notes are drawn on, so what's left is how
+/// much later than the screen shows a note the device reports the hit: its own lag, the display's, and the player's habit.
 /// </summary>
 public static class TapTest
 {
-    /// <summary>How many taps at the start of each phase are ignored while the user finds the beat.</summary>
-    public const int WarmUpTaps = 4;
-
-    /// <summary>How many taps each phase must keep for an estimate.</summary>
-    public const int MinimumKept = 4;
+    /// <summary>How many taps must be kept for an estimate.</summary>
+    public const int MinimumKept = 8;
 
     /// <summary>A spread over this suggests trying again.</summary>
     public const double WideSpreadMilliseconds = 30;
 
-    // Taps further than this many interquartile ranges from the median are dropped.
+    // Taps further than this many interquartile ranges from the median are dropped, but never those within 5 ms of it, as
+    // when the taps are so even their range is all but 0.
     private const double OutlierRanges = 1.5;
+    private const double OutlierFloor = 0.005;
 
     /// <summary>
-    /// The latency the taps show, or null when either phase has too few taps left to tell. Each tap's
-    /// error is measured against its nearest beat; the warm-up taps and the taps far from the rest are
-    /// dropped; the latency is the mean audio error less the mean visual error.
+    /// The offset the taps show, or null when too few are left to tell. Each tap is measured against its nearest note, and
+    /// taps more than half the gap between notes from any (as in the lead-in) are ignored. Only the closest tap to each
+    /// note is used, then the taps far from the rest are dropped; the offset is the mean of what's left.
     /// </summary>
+    /// <param name="notes">When the notes reach the strike line, in order, in seconds.</param>
+    /// <param name="taps">When the device reported each tap, on the same clock.</param>
     /// <remarks>
-    /// The mean of the taps kept, not their median as the spec first had it: with the outliers already
-    /// dropped, about ten taps are left per phase, too few for a median to be within 20 ms 95% of the time
-    /// at σ = 20 ms (92% in AC C11.2's test), where the mean is (96.5%).
+    /// The mean of the taps kept, not their median: with the outliers dropped, about a dozen are left, too few for a median
+    /// to be within 20 ms 95% of the time at σ = 20 ms, where the mean is (AC C11.2).
     /// </remarks>
-    public static TapEstimate? Estimate(TapPhase visual, TapPhase audio)
+    public static TapEstimate? Estimate(IReadOnlyList<double> notes, IReadOnlyList<double> taps)
     {
-        ArgumentNullException.ThrowIfNull(visual);
-        ArgumentNullException.ThrowIfNull(audio);
-
-        var visualErrors = KeptErrors(visual);
-        var audioErrors = KeptErrors(audio);
-        if (visualErrors.Length < MinimumKept || audioErrors.Length < MinimumKept)
+        ArgumentNullException.ThrowIfNull(notes);
+        ArgumentNullException.ThrowIfNull(taps);
+        if (notes.Count == 0)
             return null;
 
-        double latency = audioErrors.Average() - visualErrors.Average();
-        double spread = Math.Max(InterquartileRange(visualErrors), InterquartileRange(audioErrors));
-        return new TapEstimate(latency * 1000, spread * 1000, visualErrors.Length, audioErrors.Length);
-    }
+        double reach = ReachOf(notes);
+        var closest = new double?[notes.Count];
+        foreach (double tap in taps)
+        {
+            if (!double.IsFinite(tap))
+                continue;
 
-    // The errors of the taps after the warm-up, against their nearest beats, without the outliers; sorted.
-    private static double[] KeptErrors(TapPhase phase)
-    {
-        if (!(phase.BeatPeriod > 0) || !double.IsFinite(phase.BeatPeriod) || !double.IsFinite(phase.FirstBeat))
-            throw new ArgumentOutOfRangeException(nameof(phase), "A phase needs a finite first beat and a positive beat period.");
+            int note = NearestNote(notes, tap);
+            double error = tap - notes[note];
+            if (Math.Abs(error) <= reach && (closest[note] is not { } kept || Math.Abs(error) < Math.Abs(kept)))
+                closest[note] = error;
+        }
 
-        var errors = phase.Taps
-            .Skip(WarmUpTaps)
-            .Where(double.IsFinite)
-            .Select(tap =>
-            {
-                double beat = phase.FirstBeat + (Math.Round((tap - phase.FirstBeat) / phase.BeatPeriod) * phase.BeatPeriod);
-                return tap - beat;
-            })
-            .Order()
-            .ToArray();
+        double[] errors = [.. closest.OfType<double>().Order()];
         if (errors.Length == 0)
-            return errors;
+            return null;
 
         double median = Quantile(errors, 0.5);
-        double limit = OutlierRanges * InterquartileRange(errors);
-        return [.. errors.Where(e => Math.Abs(e - median) <= limit)];
+        double limit = Math.Max(OutlierFloor, OutlierRanges * InterquartileRange(errors));
+        errors = [.. errors.Where(e => Math.Abs(e - median) <= limit)];
+        if (errors.Length < MinimumKept)
+            return null;
+
+        return new TapEstimate(errors.Average() * 1000, InterquartileRange(errors) * 1000, errors.Length);
+    }
+
+    // Half the smallest gap between notes, so a tap is only ever counted against one; half a second for a lone note.
+    private static double ReachOf(IReadOnlyList<double> notes)
+    {
+        double gap = double.PositiveInfinity;
+        for (int i = 1; i < notes.Count; i++)
+            gap = Math.Min(gap, notes[i] - notes[i - 1]);
+        return double.IsFinite(gap) && gap > 0 ? gap / 2 : 0.5;
+    }
+
+    private static int NearestNote(IReadOnlyList<double> notes, double tap)
+    {
+        int nearest = 0;
+        for (int i = 1; i < notes.Count; i++)
+        {
+            if (Math.Abs(tap - notes[i]) < Math.Abs(tap - notes[nearest]))
+                nearest = i;
+        }
+
+        return nearest;
     }
 
     private static double InterquartileRange(double[] sorted) => Quantile(sorted, 0.75) - Quantile(sorted, 0.25);

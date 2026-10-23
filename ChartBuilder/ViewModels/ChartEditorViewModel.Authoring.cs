@@ -1,9 +1,12 @@
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using ChartBuilder.Resources;
 using ChartBuilder.Services;
+using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Authoring;
 using ChartShared.Core.Charting.Commands;
 using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charting.Layout;
@@ -28,6 +31,14 @@ namespace ChartBuilder.ViewModels
         // mode.
         private InputPlayer? _devices;
         private RecordInput? _recordSink;
+
+        // How many dialogs have the playback lent to them (BorrowPlayback), and whether it looped before the first.
+        private int _playbackBorrows;
+        private bool _loopedBeforeBorrow;
+
+        // Generate fills' and Generate star power's options, as last picked.
+        private FillOptions _fillOptions = FillOptions.Default;
+        private StarPowerOptions _starPowerOptions = StarPowerOptions.Default;
 
         /// <summary>The ways record mode can put a pass in: merged with what's there, or over it.</summary>
         public IReadOnlyList<RecordModeChoice> RecordModeChoices { get; } =
@@ -55,7 +66,7 @@ namespace ChartBuilder.ViewModels
         public partial SnapChoice? SelectedQuantize { get; set; }
 
         /// <summary>The quantize grid, as <see cref="SelectedQuantize"/> picks it.</summary>
-        public SnapGrid QuantizeGrid => SnapGrid.Of(SelectedQuantize?.Division ?? SnapGrid.Default.Division);
+        public SnapGrid QuantizeGrid => SnapGrid.Of(SelectedQuantize?.Division ?? BuilderSettings.DefaultQuantizeDivision);
 
         partial void OnIsRecordQuantizedChanged(bool value)
         {
@@ -172,9 +183,38 @@ namespace ChartBuilder.ViewModels
                 : Strings.PlaytestOnNoLane, RecordMessageKey);
         }
 
+        /// <summary>
+        /// Lends the song's playback to a dialog over the Editor, as the Reduce dialog's preview has it: until it's given back,
+        /// playing starts no pass of record mode or playtest, which would change the chart under the dialog, the loop is off
+        /// and the hit sounds are quiet. Given back, it's paused and they're as they were.
+        /// </summary>
+        public IDisposable BorrowPlayback()
+        {
+            if (_playbackBorrows++ == 0)
+            {
+                Playback.Pause();
+                _loopedBeforeBorrow = Playback.IsLooping;
+                Playback.IsLooping = false;
+                Playback.SetHits([]);
+            }
+
+            return new PlaybackBorrow(this);
+        }
+
+        private void GiveBackPlayback()
+        {
+            if (--_playbackBorrows > 0)
+                return;
+            Playback.Pause();
+            Playback.IsLooping = _loopedBeforeBorrow;
+            ScheduleRefresh();
+        }
+
         /// <summary>The song started playing: a pass of record mode, or a playtest of the focused lane, if either is on.</summary>
         private void StartPlaying()
         {
+            if (_playbackBorrows > 0)
+                return;
             if (IsRecordArmed)
                 StartRecordingPass();
             else if (Playtest.IsArmed && !Playtest.Begin())
@@ -317,17 +357,58 @@ namespace ChartBuilder.ViewModels
         /// Opens the Reduce dialog over <paramref name="lane"/>'s part (charter-spec C9 item 2): its draft is drawn over the
         /// target difficulty as the rules change, and Apply adds it as one undoable step.
         /// </summary>
-        public async Task ReduceAsync(ChartTrackKey lane)
+        /// <param name="all">Whether it opens on Reduce all, over the whole part, as CHR087's fix opens it.</param>
+        public async Task ReduceAsync(ChartTrackKey lane, bool all = false)
         {
             if (_dialogs is null || Session.Chart.PartOf(lane.Instrument) is null)
                 return;
             Session.Tools.Cancel();
-            var reduce = ReduceViewModel.ForRun(this, _settings, lane);
+            var reduce = ReduceViewModel.ForRun(this, _settings, lane, all);
             await _dialogs.ShowReduceAsync(reduce);
+        }
+
+        /// <summary>
+        /// Opens Generate fills' options (charter-spec C6 item 5), from the Edit menu of a lane of the drums
+        /// <paramref name="part"/>, and proposes fills with the options picked, over the span of a selection of the part or
+        /// the whole part. The options are kept while the editor is open, so the next run starts from the last one's.
+        /// </summary>
+        public async Task GenerateFillsAsync(ChartInstrument part)
+        {
+            if (_dialogs is null)
+                return;
+            Session.Tools.Cancel();
+            var span = Session.Selection.SpanIn(part);
+            var options = new GenerateFillsViewModel(_fillOptions, overSelection: span is not null);
+            if (!await _dialogs.AskGenerateFillsAsync(options))
+                return;
+            _fillOptions = options.Options;
+            Session.Fills.Start(_fillOptions, span);
+        }
+
+        /// <summary>
+        /// Opens Generate star power's options (charter-spec C8 item 1), from the Edit menu of a lane of
+        /// <paramref name="part"/>, and proposes star power for it with the options picked, over the span of a selection of
+        /// the part or the whole part. The options are kept while the editor is open, so the next run starts from the last
+        /// one's.
+        /// </summary>
+        public async Task GenerateStarPowerAsync(ChartInstrument part)
+        {
+            if (_dialogs is null)
+                return;
+            Session.Tools.Cancel();
+            var span = Session.Selection.SpanIn(part);
+            var options = new GenerateStarPowerViewModel(part, _starPowerOptions, overSelection: span is not null);
+            if (!await _dialogs.AskGenerateStarPowerAsync(options))
+                return;
+            _starPowerOptions = options.Options;
+            Session.StarPower.Start(part, _starPowerOptions, span);
         }
 
         /// <summary>Opens the highway preview in a window of its own (charter-spec C18).</summary>
         public void ShowPreviewWindow(PreviewViewModel preview) => _dialogs?.ShowPreview(preview);
+
+        /// <summary>Opens the difficulty analysis in a window of its own.</summary>
+        public void ShowDifficultyWindow(DifficultyViewModel difficulty) => _dialogs?.ShowDifficulty(difficulty);
 
         /// <summary>Copies the selected notes, or the range selected across lanes, to the clipboard (Ctrl+C, charter-spec C15 item 3).</summary>
         public void Copy()
@@ -408,6 +489,18 @@ namespace ChartBuilder.ViewModels
                 Session.Selection.SelectRange(at, at + paste.Placed.Max(p => p.Notes.Count == 0 ? 0 : p.Notes.Max(n => n.Tick + n.Length) - at), paste.Placed.Select(p => p.Track));
             if (paste.DroppedDoubleKicks > 0)
                 Messages.Info(string.Format(CultureInfo.CurrentCulture, Strings.PasteDroppedKicksFormat, paste.DroppedDoubleKicks));
+        }
+
+        /// <summary>The playback lent by <see cref="BorrowPlayback"/>, given back once when disposed.</summary>
+        private sealed class PlaybackBorrow(ChartEditorViewModel owner) : IDisposable
+        {
+            private ChartEditorViewModel? _owner = owner;
+
+            public void Dispose()
+            {
+                _owner?.GiveBackPlayback();
+                _owner = null;
+            }
         }
     }
 }

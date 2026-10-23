@@ -43,19 +43,19 @@
   </resheader>
   <data name="SizeBytesFormat" xml:space="preserve">
     <value>{0:N0} B</value>
-    <comment>{0} is a size in bytes.</comment>
+    <comment>{0} is the size in bytes.</comment>
   </data>
   <data name="SizeKilobytesFormat" xml:space="preserve">
     <value>{0:0.#} KB</value>
-    <comment>{0} is a size in kilobytes (1024 bytes).</comment>
+    <comment>{0} is the size in KB (1024 bytes).</comment>
   </data>
   <data name="SizeMegabytesFormat" xml:space="preserve">
     <value>{0:0.#} MB</value>
-    <comment>{0} is a size in megabytes (1024 KB).</comment>
+    <comment>{0} is the size in MB (1024 KB).</comment>
   </data>
   <data name="SizeGigabytesFormat" xml:space="preserve">
     <value>{0:0.##} GB</value>
-    <comment>{0} is a size in gigabytes (1024 MB).</comment>
+    <comment>{0} is the size in GB (1024 MB).</comment>
   </data>
   <data name="CancelButton" xml:space="preserve">
     <value>Cancel</value>
@@ -76,11 +76,11 @@
   </data>
   <data name="BackgroundFileTypeFormat" xml:space="preserve">
     <value>Backgrounds ({0})</value>
-    <comment>A file-picker filter. {0} is the extensions, e.g. "png, jpg, mp4".</comment>
+    <comment>File-picker filter. {0} is the extensions, e.g. "png, jpg, mp4".</comment>
   </data>
   <data name="ImageFileTypeFormat" xml:space="preserve">
     <value>Images ({0})</value>
-    <comment>A file-picker filter. {0} is the extensions.</comment>
+    <comment>File-picker filter. {0} is the extensions.</comment>
   </data>
   <data name="VideoFileTypeFormat" xml:space="preserve">
     <value>Videos ({0})</value>
@@ -103,15 +103,15 @@
   </data>
   <data name="ChartFileTypeFormat" xml:space="preserve">
     <value>Charts ({0})</value>
-    <comment>A file-picker filter. {0} is the extensions, e.g. "chart, mid, midi".</comment>
+    <comment>File-picker filter. {0} is the extensions, e.g. "chart, mid, midi".</comment>
   </data>
   <data name="SongFileTypeName" xml:space="preserve">
     <value>Songs (sng, song.ini, notes.mid, notes.chart)</value>
-    <comment>A file-picker filter: a .sng, or a file in a song folder, which stands for the folder.</comment>
+    <comment>File-picker filter: a .sng, or a file in a song folder standing for the folder.</comment>
   </data>
   <data name="LyricsSourceFileTypeFormat" xml:space="preserve">
     <value>Charts and songs ({0})</value>
-    <comment>A file-picker filter. {0} is the extensions, e.g. "chart, mid, midi, sng".</comment>
+    <comment>File-picker filter. {0} is the extensions, e.g. "chart, mid, midi, sng".</comment>
   </data>
   <data name="SettingsWindowTitle" xml:space="preserve">
     <value>Settings</value>
@@ -121,11 +121,11 @@
   </data>
   <data name="SettingsAllCategories" xml:space="preserve">
     <value>All settings</value>
-    <comment>The first entry in the Settings window's category tree; it shows every category.</comment>
+    <comment>First entry in the Settings category tree; shows every category.</comment>
   </data>
   <data name="SettingsCategoriesName" xml:space="preserve">
     <value>Setting categories</value>
-    <comment>The accessible name of the category tree in the Settings window.</comment>
+    <comment>Accessible name of the Settings category tree.</comment>
   </data>
   <data name="SettingsNoMatchesFormat" xml:space="preserve">
     <value>No settings match "{0}".</value>
@@ -139,7 +139,7 @@
   </data>
   <data name="SettingsCategoryGeneral" xml:space="preserve">
     <value>General</value>
-    <comment>A top-level category in the Settings window, for settings that are about the app as a whole.</comment>
+    <comment>Top-level Settings category for app-wide settings.</comment>
   </data>
   <data name="SettingsCategoryLogging" xml:space="preserve">
     <value>Logging</value>
@@ -148,16 +148,16 @@
     <value>Write log files</value>
   </data>
   <data name="LoggingEnabledDescriptionFormat" xml:space="preserve">
-    <value>Records what the app does in a log file each day, to help track down problems. The last {0} days are kept.</value>
+    <value>Logs app activity daily to help diagnose issues. Keeps the last {0} days.</value>
     <comment>{0} is the number of daily log files kept, e.g. 7.</comment>
   </data>
   <data name="LoggingEnabledKeywords" xml:space="preserve">
     <value>log logs logging diagnostics debug troubleshooting crash</value>
-    <comment>Extra words, separated by spaces, that find the logging setting in the Settings search.</comment>
+    <comment>Search terms for the logging setting.</comment>
   </data>
   <data name="OpenLogFolderButton" xml:space="preserve">
     <value>Open log folder</value>
-    <comment>The tooltip of the folder icon button beside the logging setting, which opens the folder the log files are written to.</comment>
+    <comment>Tooltip of the folder button beside the logging setting; opens the log folder.</comment>
   </data>
   <data name="OkButton" xml:space="preserve">
     <value>OK</value>
@@ -167,7 +167,7 @@
   </data>
   <data name="SettingLockedFormat" xml:space="preserve">
     <value>Turn on {0} to change this.</value>
-    <comment>Under a setting that only applies while another is on: {0} is that setting's label, e.g. Show waveforms.</comment>
+    <comment>Under a setting needing another setting on: {0} is that setting's label, e.g. Show waveforms.</comment>
   </data>
   <data name="InstrumentGuitar" xml:space="preserve">
     <value>Guitar</value>
@@ -204,50 +204,50 @@
   </data>
   <data name="InstrumentProDrumsPs" xml:space="preserve">
     <value>Pro Drums (PS)</value>
-    <comment>Phase Shift's pro drums difficulty.</comment>
+    <comment>Phase Shift pro drums difficulty.</comment>
   </data>
   <data name="InstrumentProKeysPs" xml:space="preserve">
     <value>Pro Keys (PS)</value>
-    <comment>Phase Shift's pro keys difficulty.</comment>
+    <comment>Phase Shift pro keys difficulty.</comment>
   </data>
   <data name="InstrumentBand" xml:space="preserve">
     <value>Band</value>
-    <comment>The whole band's difficulty.</comment>
+    <comment>Whole-band difficulty.</comment>
   </data>
   <data name="NoteCountFormat" xml:space="preserve">
     <value>{0:N0} notes</value>
-    <comment>{0} is how many notes a difficulty has, more than one, e.g. '1,234 notes'. A chord counts as one note.</comment>
+    <comment>{0} is the note count, more than one, e.g. '1,234 notes'. A chord counts as one note.</comment>
   </data>
   <data name="NoteCountOne" xml:space="preserve">
     <value>1 note</value>
   </data>
   <data name="NoteCountVocals" xml:space="preserve">
     <value>Notes</value>
-    <comment>Labels the note count of a vocal part, which has no difficulties.</comment>
+    <comment>Note count label for a vocal part, which has no difficulties.</comment>
   </data>
   <data name="NoteCountHarmonyFormat" xml:space="preserve">
     <value>Harmony {0}</value>
-    <comment>Labels one harmony line's note count; {0} is the line, 1 to 3.</comment>
+    <comment>One harmony line's note count; {0} is the line, 1 to 3.</comment>
   </data>
   <data name="DifficultyTagCoop" xml:space="preserve">
     <value>2P</value>
-    <comment>Tag on the co-op guitar's icon. Keep it to 3 characters.</comment>
+    <comment>Co-op guitar icon tag. Keep to 3 characters.</comment>
   </data>
   <data name="DifficultyTagPro" xml:space="preserve">
     <value>PRO</value>
-    <comment>Tag on a pro instrument's icon. Keep it to 3 characters.</comment>
+    <comment>Pro instrument icon tag. Keep to 3 characters.</comment>
   </data>
   <data name="DifficultyTagPro22" xml:space="preserve">
     <value>22</value>
-    <comment>Tag on a 22-fret pro instrument's icon. Keep it to 3 characters.</comment>
+    <comment>22-fret pro instrument icon tag. Keep to 3 characters.</comment>
   </data>
   <data name="DifficultyTagGhl" xml:space="preserve">
     <value>GHL</value>
-    <comment>Tag on a six-fret (Guitar Hero Live) instrument's icon. Keep it to 3 characters.</comment>
+    <comment>Six-fret (Guitar Hero Live) icon tag. Keep to 3 characters.</comment>
   </data>
   <data name="DifficultyTagPhaseShift" xml:space="preserve">
     <value>PS</value>
-    <comment>Tag on a Phase Shift instrument's icon. Keep it to 3 characters.</comment>
+    <comment>Phase Shift icon tag. Keep to 3 characters.</comment>
   </data>
   <data name="DifficultyEasy" xml:space="preserve">
     <value>Easy</value>
@@ -303,21 +303,22 @@
   <data name="MergePartDance" xml:space="preserve">
     <value>Dance</value>
   </data>
-  <data name="AddButton" xml:space="preserve">
-    <value>Add</value>
-  </data>
   <data name="AddRowButton" xml:space="preserve">
     <value>Add row</value>
+  </data>
+  <data name="AddRowHint" xml:space="preserve">
+    <value>Enter to add, Esc to close</value>
+    <comment>Under the metadata editor's new row while a key is being added.</comment>
   </data>
   <data name="AutoSetLengthButton" xml:space="preserve">
     <value>Auto-set song length</value>
   </data>
   <data name="AutoSetLengthToolTip" xml:space="preserve">
-    <value>Set each song's length to its longest part (the chart's last note, the longest audio track or the background video) plus 1 second</value>
+    <value>Set each song's length to its longest part (last chart note, longest audio track, or background video) plus 1 second</value>
   </data>
   <data name="DifficultyDistinctBadge" xml:space="preserve">
     <value>*</value>
-    <comment>The badge of an instrument whose difficulty differs between the selected songs.</comment>
+    <comment>Badge of an instrument whose difficulty differs between selected songs.</comment>
   </data>
   <data name="DifficultyDistinctToolTip" xml:space="preserve">
     <value>The selected songs have different difficulties.</value>
@@ -333,47 +334,51 @@
   </data>
   <data name="DifficultyStoredValueFormat" xml:space="preserve">
     <value>Stored as "{0}", which isn't a difficulty.</value>
-    <comment>{0} is the value in song.ini.</comment>
+    <comment>{0} is the song.ini value.</comment>
+  </data>
+  <data name="DifficultySuggestedFormat" xml:space="preserve">
+    <value>Suggested rating: {0}</value>
+    <comment>In a difficulty flyout. {0} is the suggested tier.</comment>
   </data>
   <data name="DifficultyUnsetBadge" xml:space="preserve">
     <value>?</value>
-    <comment>The badge of an instrument with no difficulty set.</comment>
+    <comment>Badge of an instrument with no difficulty set.</comment>
   </data>
   <data name="DifficultyUnsetToolTip" xml:space="preserve">
     <value>No difficulty (stored as -1)</value>
   </data>
   <data name="DistinctValues" xml:space="preserve">
     <value>&lt;&lt;contains distinct values&gt;&gt;</value>
-    <comment>Shown for a metadata row whose value differs between the selected items, or that some of them don't have.</comment>
+    <comment>Shown when selected items have different values, or some lack the row.</comment>
   </data>
   <data name="HiddenIssuesListName" xml:space="preserve">
     <value>Difficulties that fail validation</value>
   </data>
   <data name="InstrumentAccessibleNameFormat" xml:space="preserve">
     <value>{0}, difficulty {1}</value>
-    <comment>{0} is an instrument, {1} its song.ini difficulty, e.g. 'Guitar, difficulty 4'.</comment>
+    <comment>{0} is the instrument, {1} its song.ini difficulty, e.g. 'Guitar, difficulty 4'.</comment>
   </data>
   <data name="InstrumentCaptionSeparator" xml:space="preserve">
     <value> - </value>
-    <comment>Between an instrument's name and its charted difficulties' letters, e.g. 'Guitar - EMHX'.</comment>
+    <comment>Between instrument name and charted difficulty letters, e.g. 'Guitar - EMHX'.</comment>
   </data>
   <data name="InstrumentNotCharted" xml:space="preserve">
     <value>The chart has no notes for this part.</value>
   </data>
   <data name="InstrumentsListName" xml:space="preserve">
     <value>Instrument difficulties</value>
-    <comment>Accessible name of the instrument icons above the metadata rows.</comment>
+    <comment>Accessible name of the instrument icons above metadata rows.</comment>
   </data>
   <data name="InstrumentsShowAllFormat" xml:space="preserve">
     <value>Show all ({0} more)</value>
-    <comment>{0} is how many instruments are hidden: not charted, with no difficulty set.</comment>
+    <comment>{0} is how many instruments are hidden: uncharted, with no difficulty set.</comment>
   </data>
   <data name="InstrumentsShowFewer" xml:space="preserve">
     <value>Show fewer</value>
   </data>
   <data name="IssueSongCountFormat" xml:space="preserve">
     <value>{0} ({1} of {2} songs)</value>
-    <comment>A metadata row's validation message with several songs selected: {0} is the message, {1} how many of the songs fail, {2} how many are selected.</comment>
+    <comment>Metadata row validation message with several songs selected: {0} the message, {1} failing songs, {2} selected songs.</comment>
   </data>
   <data name="KeyEmpty" xml:space="preserve">
     <value>Enter a key.</value>
@@ -386,7 +391,7 @@
   </data>
   <data name="MetadataHeaderFormat" xml:space="preserve">
     <value>Metadata ({0:N0})</value>
-    <comment>{0} is the number of metadata keys.</comment>
+    <comment>{0} is the metadata key count.</comment>
   </data>
   <data name="MetadataListName" xml:space="preserve">
     <value>Metadata</value>
@@ -405,21 +410,29 @@
   </data>
   <data name="QuickFixMenu" xml:space="preserve">
     <value>Quick Fix</value>
-    <comment>Right-click menu item on a metadata row that applies the row's quick fix to the draft; disabled when it has none.</comment>
+    <comment>Right-click menu item applying the row's quick fix. Disabled when it has none.</comment>
   </data>
   <data name="QuickFixMenuFormat" xml:space="preserve">
     <value>Quick Fix: {0}</value>
-    <comment>Right-click menu item on a metadata row. {0} is what the fix does, e.g. "Change to True".</comment>
+    <comment>Right-click menu item. {0} is what the fix does, e.g. "Change to True".</comment>
   </data>
   <data name="RemoveRowToolTip" xml:space="preserve">
     <value>Remove this row</value>
   </data>
+  <data name="RestoreRowToolTip" xml:space="preserve">
+    <value>Restore this row</value>
+    <comment>Undo for a row removed until saved.</comment>
+  </data>
   <data name="RevertRowToolTip" xml:space="preserve">
     <value>Undo the changes to this row</value>
   </data>
+  <data name="StopAddingToolTip" xml:space="preserve">
+    <value>Stop adding</value>
+    <comment>Closes the new metadata row, discarding typed text.</comment>
+  </data>
   <data name="StoredMillisecondsFormat" xml:space="preserve">
     <value>Stored value: {0} (milliseconds)</value>
-    <comment>Tooltip on a time shown as HH:MM:SS:mmm. {0} is the value as stored, e.g. "225123".</comment>
+    <comment>Tooltip on a time shown as HH:MM:SS:mmm. {0} is the stored value, e.g. "225123".</comment>
   </data>
   <data name="ValueEmpty" xml:space="preserve">
     <value>Enter a value, or remove the row instead.</value>
@@ -429,7 +442,7 @@
   </data>
   <data name="ChartIssuesWindowTitle" xml:space="preserve">
     <value>Chart Issues</value>
-    <comment>The chart issues window's title before a song is named.</comment>
+    <comment>Chart issues window title before a song is named.</comment>
   </data>
   <data name="ChartIssuesWindowTitleFormat" xml:space="preserve">
     <value>Chart Issues · {0}</value>
@@ -440,15 +453,15 @@
   </data>
   <data name="ChartIssuesErrorsFormat" xml:space="preserve">
     <value>{0} Errors</value>
-    <comment>The footer's count of errors, for any number but 1.</comment>
+    <comment>Footer error count, for any number but 1.</comment>
   </data>
   <data name="ChartIssuesWarningsFormat" xml:space="preserve">
     <value>{0} Warnings</value>
-    <comment>The footer's count of warnings, for any number but 1.</comment>
+    <comment>Footer warning count, for any number but 1.</comment>
   </data>
   <data name="ChartIssuesInfosFormat" xml:space="preserve">
     <value>{0} Informational</value>
-    <comment>The footer's count of info findings.</comment>
+    <comment>Footer info count.</comment>
   </data>
   <data name="ChartIssuesCountsSeparator" xml:space="preserve">
     <value> - </value>
@@ -456,7 +469,7 @@
   </data>
   <data name="ChartIssuesTheChart" xml:space="preserve">
     <value>the chart</value>
-    <comment>Stands in for the chart file's name when it isn't known.</comment>
+    <comment>Chart file name placeholder when unknown.</comment>
   </data>
   <data name="ChartIssuesNoneInFormat" xml:space="preserve">
     <value>No warnings or errors in {0}</value>
@@ -468,56 +481,56 @@
   </data>
   <data name="ChartIssuesHeadlineInfoFormat" xml:space="preserve">
     <value>{0} · {1} info</value>
-    <comment>{0} is the headline; {1} the count of info findings.</comment>
+    <comment>{0} is the headline; {1} the info count.</comment>
   </data>
   <data name="ChartIssuesViewButton" xml:space="preserve">
     <value>View issues…</value>
   </data>
   <data name="ChartIssuesViewToolTip" xml:space="preserve">
-    <value>List every finding in a window of its own, to search and filter</value>
+    <value>List all findings in their own window, to search and filter</value>
   </data>
   <data name="ChartIssuesNone" xml:space="preserve">
     <value>No findings: nothing the rules check for.</value>
   </data>
   <data name="ChartIssuesListName" xml:space="preserve">
     <value>Chart issues</value>
-    <comment>The issues list's name, for screen readers.</comment>
+    <comment>Issues list name, for screen readers.</comment>
   </data>
   <data name="FilterChipFormat" xml:space="preserve">
     <value>{0} ({1})</value>
-    <comment>A filter chip. {0} is what it shows, e.g. "Empty value"; {1} is how many listed things it matches.</comment>
+    <comment>Filter chip. {0} is its label, e.g. "Empty value"; {1} is its match count.</comment>
   </data>
   <data name="ChartIssuesErrorOne" xml:space="preserve">
     <value>1 Error</value>
-    <comment>The footer's count of errors when there's one.</comment>
+    <comment>Footer error count for one.</comment>
   </data>
   <data name="ChartIssuesWarningOne" xml:space="preserve">
     <value>1 Warning</value>
-    <comment>The footer's count of warnings when there's one.</comment>
+    <comment>Footer warning count for one.</comment>
   </data>
   <data name="ChartIssuesErrorsSection" xml:space="preserve">
     <value>Errors</value>
-    <comment>The heading over the errors in the issues list.</comment>
+    <comment>Heading over errors in the issues list.</comment>
   </data>
   <data name="ChartIssuesWarningsSection" xml:space="preserve">
     <value>Warnings</value>
-    <comment>The heading over the warnings in the issues list.</comment>
+    <comment>Heading over warnings in the issues list.</comment>
   </data>
   <data name="ChartIssuesInfosSection" xml:space="preserve">
     <value>Informational</value>
-    <comment>The heading over the info findings in the issues list.</comment>
+    <comment>Heading over info findings in the issues list.</comment>
   </data>
   <data name="ChartIssuesWholeChart" xml:space="preserve">
     <value>Whole chart</value>
-    <comment>A finding's place when it's about the chart as a whole, not one part.</comment>
+    <comment>Finding place for the chart as a whole, not one part.</comment>
   </data>
   <data name="ChartIssuesChartFile" xml:space="preserve">
     <value>Chart file</value>
-    <comment>A finding's place when it's about what reading the chart file left out.</comment>
+    <comment>Finding place for what reading the chart file left out.</comment>
   </data>
   <data name="ChartIssuesTrackFormat" xml:space="preserve">
     <value>{0} · {1}</value>
-    <comment>A finding's part and difficulty: {0} the part, {1} the difficulty.</comment>
+    <comment>Finding part and difficulty: {0} the part, {1} the difficulty.</comment>
   </data>
   <data name="ChartIssuesSearchWatermark" xml:space="preserve">
     <value>Search descriptions, codes and places</value>
@@ -539,11 +552,11 @@
   </data>
   <data name="ChartIssuesFilterNone" xml:space="preserve">
     <value>None in this chart.</value>
-    <comment>In place of a filter group's chips when no finding has one.</comment>
+    <comment>Instead of a filter group's chips when no finding has one.</comment>
   </data>
   <data name="ChartIssuesFilterChipToolTipFormat" xml:space="preserve">
-    <value>{0}: {1} findings. Turn on chips to show only the findings that match them.</value>
-    <comment>{0} is what the chip shows, e.g. "Guitar"; {1} is how many findings it matches.</comment>
+    <value>{0}: {1} findings. Turn on chips to show only matching findings.</value>
+    <comment>{0} is the chip label, e.g. "Guitar"; {1} its match count.</comment>
   </data>
   <data name="ChartIssuesResetFilters" xml:space="preserve">
     <value>Reset filters</value>
@@ -559,11 +572,11 @@
   </data>
   <data name="ChartIssuesTypeTiming" xml:space="preserve">
     <value>Timing</value>
-    <comment>A type of chart finding: the tempo map and the grid.</comment>
+    <comment>Chart finding type: tempo map and grid.</comment>
   </data>
   <data name="ChartIssuesTypeFrets" xml:space="preserve">
     <value>Frets</value>
-    <comment>A type of chart finding: 5-fret and GHL parts.</comment>
+    <comment>Chart finding type: 5-fret and GHL parts.</comment>
   </data>
   <data name="ChartIssuesTypeDrums" xml:space="preserve">
     <value>Drums</value>
@@ -575,7 +588,7 @@
   </data>
   <data name="ChartIssuesTypeSong" xml:space="preserve">
     <value>Song</value>
-    <comment>A type of chart finding: about the song as a whole.</comment>
+    <comment>Chart finding type: the song as a whole.</comment>
   </data>
   <data name="ChartIssuesTypeVocals" xml:space="preserve">
     <value>Vocals</value>
@@ -583,61 +596,61 @@
   </data>
   <data name="ChartIssuesTypeLoad" xml:space="preserve">
     <value>Loading</value>
-    <comment>A type of chart finding: what reading the chart file found.</comment>
+    <comment>Chart finding type: chart-file loading.</comment>
   </data>
   <data name="ChartIssuesTypeOther" xml:space="preserve">
     <value>Other</value>
-    <comment>A type of chart finding: any outside the chart catalogue.</comment>
+    <comment>Chart finding type: outside the chart catalogue.</comment>
   </data>
   <data name="FindingPlaceFormat" xml:space="preserve">
     <value>m{0} · beat {1:0.##}</value>
-    <comment>Where a finding is: its measure and beat, e.g. "m41 · beat 3".</comment>
+    <comment>Finding place: its measure and beat, e.g. "m41 · beat 3".</comment>
   </data>
   <data name="VocalTrackVocals" xml:space="preserve">
     <value>Vocals</value>
-    <comment>The lead vocal part, PART VOCALS.</comment>
+    <comment>Lead vocal part, PART VOCALS.</comment>
   </data>
   <data name="VocalTrackHarmonyFormat" xml:space="preserve">
     <value>Harmony {0}</value>
-    <comment>A harmony vocal part, e.g. "Harmony 2".</comment>
+    <comment>Harmony vocal part, e.g. "Harmony 2".</comment>
   </data>
   <data name="FindingPlaceRangeFormat" xml:space="preserve">
     <value>{0} – {1}</value>
-    <comment>A finding's place when it covers a stretch of the chart: {0} where it starts, {1} where it ends, e.g. "m40 · beat 1".</comment>
+    <comment>Finding place covering a range: {0} the start, {1} the end, e.g. "m40 · beat 1".</comment>
   </data>
   <data name="ChartIssuesCloseButton" xml:space="preserve">
     <value>Close</value>
   </data>
   <data name="FindingGoToButton" xml:space="preserve">
     <value>→</value>
-    <comment>A finding row's button that goes to where it is.</comment>
+    <comment>Finding row button going to its place.</comment>
   </data>
   <data name="FindingGoToToolTip" xml:space="preserve">
     <value>Go to it in the chart</value>
   </data>
   <data name="FindingFixMenuItem" xml:space="preserve">
     <value>Fix</value>
-    <comment>A finding's right-click menu item that applies its quick fix.</comment>
+    <comment>Right-click menu item applying the finding's quick fix.</comment>
   </data>
   <data name="FindingFixAllForFormat" xml:space="preserve">
     <value>Fix All For {0}</value>
-    <comment>A finding's right-click menu item that fixes every finding of its rule in its part, as one step. {0} is the part (Guitar).</comment>
+    <comment>Right-click menu item fixing every finding of its rule in its part, as one step. {0} is the part.</comment>
   </data>
   <data name="FindingFixAllMenuItem" xml:space="preserve">
     <value>Fix All</value>
-    <comment>A finding's right-click menu item that fixes every finding of its rule in the chart, as one step.</comment>
+    <comment>Right-click menu item fixing every finding of its rule in the chart, as one step.</comment>
   </data>
   <data name="FindingNoFixesMenuItem" xml:space="preserve">
     <value>No Fixes Available</value>
-    <comment>The greyed-out right-click menu item of a finding without a quick fix.</comment>
+    <comment>Disabled right-click menu item for a finding without a quick fix.</comment>
   </data>
   <data name="MuteButton" xml:space="preserve">
     <value>M</value>
-    <comment>Short label for the mute toggle on a track row.</comment>
+    <comment>Short mute toggle label on a track row.</comment>
   </data>
   <data name="SoloButton" xml:space="preserve">
     <value>S</value>
-    <comment>Short label for the solo toggle on a track row.</comment>
+    <comment>Short solo toggle label on a track row.</comment>
   </data>
   <data name="MuteToolTip" xml:space="preserve">
     <value>Mute this track</value>
@@ -676,7 +689,7 @@
   </data>
   <data name="TrackUnusableFormat" xml:space="preserve">
     <value>{0} can't be used as a track: {1}</value>
-    <comment>{0} is the file name; {1} is the reason.</comment>
+    <comment>{0} is the file name; {1} the reason.</comment>
   </data>
   <data name="PickTrackTitleFormat" xml:space="preserve">
     <value>Choose the {0} Track</value>
@@ -684,22 +697,470 @@
   </data>
   <data name="TrackRowMenuToolTip" xml:space="preserve">
     <value>Right-click to replace or remove this track</value>
-    <comment>A track row's tooltip where Replace and Remove are on its right-click menu.</comment>
+    <comment>Track row tooltip; Replace and Remove are on its right-click menu.</comment>
   </data>
   <data name="RemovedTrackRowMenuToolTip" xml:space="preserve">
     <value>Right-click to keep this track</value>
-    <comment>A removed track row's tooltip where Keep is on its right-click menu.</comment>
+    <comment>Removed track row tooltip; Keep is on its right-click menu.</comment>
   </data>
   <data name="OffsetControlsHelp" xml:space="preserve">
-    <value>Drag sideways across it to change it as you watch: a millisecond a pixel, ten with Shift, finer with Ctrl. Click it to type a value; Enter keeps it. While typing, Up and Down or the mouse wheel step a millisecond, ten with Shift.</value>
-    <comment>Under each offset box's own tooltip: the ways to change it.</comment>
+    <value>Drag sideways to change it live: 1 ms per pixel, 10 with Shift, finer with Ctrl. Click to type a value; Enter keeps it. While typing, Up/Down or the wheel steps 1 ms, 10 with Shift.</value>
+    <comment>How to change each offset box, under its own tooltip.</comment>
   </data>
   <data name="VersionFormat" xml:space="preserve">
     <value>v{0}</value>
-    <comment>The program version in the title bar. {0} is the version, e.g. 1.2.0.</comment>
+    <comment>Program version in the title bar. {0} is the version, e.g. 1.2.0.</comment>
   </data>
   <data name="VersionLinkToolTip" xml:space="preserve">
     <value>See the releases on GitHub</value>
-    <comment>The title bar's version, which opens the project's releases page in the browser.</comment>
+    <comment>Title-bar version; opens the project's releases page.</comment>
+  </data>
+  <data name="VersionUpdateAvailableToolTipFormat" xml:space="preserve">
+    <value>Version {0} is available — see the releases on GitHub</value>
+    <comment>Title-bar version when a newer release is available. {0} is the latest version, e.g. v1.2.0.</comment>
+  </data>
+  <data name="VersionUpdatePrereleaseToolTipFormat" xml:space="preserve">
+    <value>Pre-release version {0} is available — see the releases on GitHub</value>
+    <comment>Title-bar version when a newer pre-release is available. {0} is the latest version, e.g. v1.3.0-beta.1.</comment>
+  </data>
+  <data name="UpdateIncludePrereleasesLabel" xml:space="preserve">
+    <value>Include pre-releases in update check</value>
+    <comment>Setting for whether pre-releases count for the title-bar version badge.</comment>
+  </data>
+  <data name="UpdateIncludePrereleasesDescription" xml:space="preserve">
+    <value>When on, the title-bar version shows an update badge for pre-releases too. (Shared by both apps.)</value>
+    <comment>Setting description.</comment>
+  </data>
+  <data name="UpdateIncludePrereleasesKeywords" xml:space="preserve">
+    <value>update updates upgrade prerelease pre-release beta version releases github</value>
+    <comment>Search terms for the pre-release update setting.</comment>
+  </data>
+  <data name="UpdateCheckLabel" xml:space="preserve">
+    <value>Check for updates</value>
+    <comment>Setting for whether the app checks GitHub for newer releases.</comment>
+  </data>
+  <data name="UpdateCheckDescription" xml:space="preserve">
+    <value>When on, the title-bar version shows a badge when a newer release is available. (Shared by both apps.)</value>
+    <comment>Setting description.</comment>
+  </data>
+  <data name="UpdateCheckKeywords" xml:space="preserve">
+    <value>update updates upgrade version releases github badge</value>
+    <comment>Search terms for the update check setting.</comment>
+  </data>
+  <data name="UpdateFrequencyLabel" xml:space="preserve">
+    <value>Update check frequency</value>
+    <comment>Setting for how often the app checks GitHub for newer releases.</comment>
+  </data>
+  <data name="UpdateFrequencyDescription" xml:space="preserve">
+    <value>How often to check for a newer release. (Shared by both apps.)</value>
+    <comment>Setting description.</comment>
+  </data>
+  <data name="UpdateFrequencyKeywords" xml:space="preserve">
+    <value>update updates upgrade frequency hourly daily startup launch version releases github</value>
+    <comment>Search terms for the update frequency setting.</comment>
+  </data>
+  <data name="UpdateFrequencyHourly" xml:space="preserve">
+    <value>Hourly</value>
+    <comment>Update check at most once an hour.</comment>
+  </data>
+  <data name="UpdateFrequencyDaily" xml:space="preserve">
+    <value>Daily</value>
+    <comment>Update check at most once a day.</comment>
+  </data>
+  <data name="UpdateFrequencyOnStartup" xml:space="preserve">
+    <value>On Startup</value>
+    <comment>Update check on every launch.</comment>
+  </data>
+  <data name="CalibrationWindowTitle" xml:space="preserve">
+    <value>Calibrate Audio Latency</value>
+  </data>
+  <data name="CalibrationUnknownDevice" xml:space="preserve">
+    <value>Default output device</value>
+    <comment>Device name in the calibration tool when unknown.</comment>
+  </data>
+  <data name="CalibrationInstructions" xml:space="preserve">
+    <value>Move the latency until each click sounds as a note hits the strike line and lights it up. Each bar's first beat has an accented click and a bolder highway line. Or tap along with the clicks to measure it, then fine-tune here.</value>
+  </data>
+  <data name="CalibrationLatencyLabel" xml:space="preserve">
+    <value>Latency</value>
+    <comment>Section over the latency controls, and their name.</comment>
+  </data>
+  <data name="CalibrationKeysHint" xml:space="preserve">
+    <value>The arrow keys move it by 1 ms, or by 5 ms with Shift.</value>
+  </data>
+  <data name="CalibrationReset" xml:space="preserve">
+    <value>Reset to 0</value>
+  </data>
+  <data name="CalibrationDetectedFormat" xml:space="preserve">
+    <value>Plus {0} ms detected from the device: {1} ms in all.</value>
+    <comment>Under the latency. {0} is device-buffer latency in whole ms, added to the latency set here; {1} is the total.</comment>
+  </data>
+  <data name="CalibrationNotDetected" xml:space="preserve">
+    <value>No latency detected from the device is added.</value>
+    <comment>Under the latency when it can't be read from the device, or detection is off in Settings.</comment>
+  </data>
+  <data name="CalibrationDetectedToolTip" xml:space="preserve">
+    <value>Device-buffer latency reported by the system is added to the latency set here while Detect output latency is on. Excludes Bluetooth and display delay: set those here.</value>
+  </data>
+  <data name="CalibrationSave" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <data name="CalibrationSaveFailed" xml:space="preserve">
+    <value>The latency couldn't be saved.</value>
+  </data>
+  <data name="CalibrationDeviceCaption" xml:space="preserve">
+    <value>Output device</value>
+    <comment>Over the audio device name being calibrated.</comment>
+  </data>
+  <data name="CalibrationHowSection" xml:space="preserve">
+    <value>How to calibrate</value>
+    <comment>Section over the instructions.</comment>
+  </data>
+  <data name="CalibrationLatencyUnit" xml:space="preserve">
+    <value>ms</value>
+    <comment>After the latency box: milliseconds.</comment>
+  </data>
+  <data name="CalibrationLatencyToolTip" xml:space="preserve">
+    <value>How much later audio is heard than the screen shows, beyond detected device latency, which is added to it. Positive latency draws notes earlier.</value>
+  </data>
+  <data name="CalibrationRevertToolTip" xml:space="preserve">
+    <value>Back to the saved latency</value>
+  </data>
+  <data name="CalibrationCompareSection" xml:space="preserve">
+    <value>Compare</value>
+    <comment>Section over the hold-off button.</comment>
+  </data>
+  <data name="CalibrationHoldOffButton" xml:space="preserve">
+    <value>Hold for no calibration</value>
+    <comment>Button drawing notes with no latency while held.</comment>
+  </data>
+  <data name="CalibrationHoldOffHint" xml:space="preserve">
+    <value>While the button or Space is held, notes are drawn uncalibrated, to show how far calibration moves them.</value>
+  </data>
+  <data name="CalibrationOffBadge" xml:space="preserve">
+    <value>Calibration off</value>
+    <comment>Over the highway while calibration is held off.</comment>
+  </data>
+  <data name="CalibrationDeviceWindowTitle" xml:space="preserve">
+    <value>Calibrate Input Device</value>
+  </data>
+  <data name="CalibrationInputDeviceCaption" xml:space="preserve">
+    <value>Input device</value>
+    <comment>Over the input device name being calibrated.</comment>
+  </data>
+  <data name="CalibrationSavedOffsetFormat" xml:space="preserve">
+    <value>Saved offset: {0:+0;−0;0} ms</value>
+    <comment>{0} is the device's stored offset, in ms.</comment>
+  </data>
+  <data name="CalibrationTestSection" xml:space="preserve">
+    <value>Test</value>
+    <comment>Section over the input-device test's Start button and result.</comment>
+  </data>
+  <data name="CalibrationStartTest" xml:space="preserve">
+    <value>Start</value>
+  </data>
+  <data name="CalibrationTryAgain" xml:space="preserve">
+    <value>Try again</value>
+  </data>
+  <data name="CalibrationGetReady" xml:space="preserve">
+    <value>Get ready</value>
+    <comment>Over the highway in the input-device test's first bar, before the countdown.</comment>
+  </data>
+  <data name="CalibrationNoteProgressFormat" xml:space="preserve">
+    <value>Note {0} of {1}</value>
+    <comment>{0} is the current note, {1} the total.</comment>
+  </data>
+  <data name="CalibrationDeviceReady" xml:space="preserve">
+    <value>Press Start, watch the count-in, then hit the device as each of the 16 notes reaches the strike line.</value>
+  </data>
+  <data name="CalibrationDeviceResultFormat" xml:space="preserve">
+    <value>Measured {0:+0;−0;0} ms, with a spread of {1} ms over {2} taps.</value>
+    <comment>{0} is the offset, {1} the taps' interquartile range in ms; {2} taps used.</comment>
+  </data>
+  <data name="CalibrationDeviceResultWideFormat" xml:space="preserve">
+    <value>Measured {0:+0;−0;0} ms, but with a spread of {1} ms over {2} taps. Try it again for a steadier value.</value>
+    <comment>Like CalibrationDeviceResultFormat, when spread is over 30 ms.</comment>
+  </data>
+  <data name="CalibrationDeviceClampedFormat" xml:space="preserve">
+    <value>That's more than an offset can be, so {0:+0;−0;0} ms will be saved.</value>
+    <comment>After an out-of-range result beyond ±250 ms. {0} is saved, in ms.</comment>
+  </data>
+  <data name="CalibrationDeviceTooFew" xml:space="preserve">
+    <value>There weren't enough taps near the notes to measure. Try again.</value>
+  </data>
+  <data name="CalibrationDeviceSaveFailed" xml:space="preserve">
+    <value>The offset couldn't be saved.</value>
+  </data>
+  <data name="CalibrationDeviceHowText" xml:space="preserve">
+    <value>No sound: hit along with what you see. Any button, fret, strum, key, or pad counts; releases don't. The result accounts for device lag, screen lag, and your timing bias; playtests subtract it from every input from the device.</value>
+  </data>
+  <data name="CalibrationAudioUnavailableFormat" xml:space="preserve">
+    <value>The audio can't be played: {0}</value>
+    <comment>{0} is the error.</comment>
+  </data>
+  <data name="CalibrationTapSection" xml:space="preserve">
+    <value>Tap along</value>
+  </data>
+  <data name="CalibrationTapReady" xml:space="preserve">
+    <value>Press Start: after a quiet bar, the highway counts in from 4 at the clicks' tempo, then tap with each of the 16 clicks.</value>
+  </data>
+  <data name="CalibrationTapNow" xml:space="preserve">
+    <value>Tap with each click</value>
+  </data>
+  <data name="CalibrationTapProgressFormat" xml:space="preserve">
+    <value>Click {0} of {1}</value>
+    <comment>{0} is the current click; {1} the total.</comment>
+  </data>
+  <data name="CalibrationTapResultFormat" xml:space="preserve">
+    <value>Measured {0:+0;−0;0} ms, with a spread of {1} ms over {2} taps. Check it against the notes, then save.</value>
+    <comment>{0} is measured latency; {1} the spread in ms; {2} taps used.</comment>
+  </data>
+  <data name="CalibrationTapResultWideFormat" xml:space="preserve">
+    <value>Measured {0:+0;−0;0} ms, but with a spread of {1} ms over {2} taps. Try it again for a steadier value.</value>
+    <comment>{0} is the latency measured; {1} is the spread in ms; {2} is how many taps were used.</comment>
+  </data>
+  <data name="CalibrationTapLessDetectedFormat" xml:space="preserve">
+    <value>Less the {0} ms detected from the device, that's {1:+0;−0;0} ms.</value>
+    <comment>After the tap-test result. {0} is detected device latency, added anyway; {1} is the latency set beyond it.</comment>
+  </data>
+  <data name="CalibrationTapClampedFormat" xml:space="preserve">
+    <value>That's more than a latency can be, so it's set to {0:+0;−0;0} ms.</value>
+    <comment>{0} is the latency set.</comment>
+  </data>
+  <data name="CalibrationTapTooFew" xml:space="preserve">
+    <value>There weren't enough taps near the clicks to measure. Try again.</value>
+  </data>
+  <data name="CalibrationTapHowText" xml:space="preserve">
+    <value>Notes are hidden while you tap, so follow the sound alone. Any key or highway click counts; releases don't. The result goes into the latency above; check it against the notes before saving.</value>
+  </data>
+  <data name="CalibrationTapDevicesNote" xml:space="preserve">
+    <value>Instrument devices count too. A device calibrated under Input devices has its offset subtracted, improving accuracy.</value>
+  </data>
+  <data name="ReductionRulesHeading" xml:space="preserve">
+    <value>Rules</value>
+  </data>
+  <data name="ReductionFamilyLabel" xml:space="preserve">
+    <value>Part</value>
+  </data>
+  <data name="ReductionFamilyFiveFret" xml:space="preserve">
+    <value>5-fret and keys</value>
+  </data>
+  <data name="ReductionFamilyGhl" xml:space="preserve">
+    <value>GHL (6-fret)</value>
+  </data>
+  <data name="ReductionFamilyDrums" xml:space="preserve">
+    <value>Drums</value>
+  </data>
+  <data name="ReductionRulesForLabel" xml:space="preserve">
+    <value>Rules for</value>
+  </data>
+  <data name="ReductionChordSizeLabel" xml:space="preserve">
+    <value>Max chord size</value>
+  </data>
+  <data name="ReductionThinningLabel" xml:space="preserve">
+    <value>On average no closer than</value>
+  </data>
+  <data name="ReductionBurstLabel" xml:space="preserve">
+    <value>Bursts no closer than</value>
+  </data>
+  <data name="ReductionMaxBurstLabel" xml:space="preserve">
+    <value>Longest burst (chords)</value>
+  </data>
+  <data name="ReductionMaxBurstHitsLabel" xml:space="preserve">
+    <value>Longest burst (hits)</value>
+  </data>
+  <data name="ReductionKeepForcing" xml:space="preserve">
+    <value>Keep HOPOs and taps as played</value>
+  </data>
+  <data name="ReductionKeepShortSustains" xml:space="preserve">
+    <value>Keep sustains shorter than a beat</value>
+  </data>
+  <data name="ReductionKeepExtendedSustains" xml:space="preserve">
+    <value>Keep sustains held while other notes are played</value>
+  </data>
+  <data name="ReductionKeepOpenNotes" xml:space="preserve">
+    <value>Keep open notes in phrases that have pressed notes too</value>
+  </data>
+  <data name="ReductionPadsLabel" xml:space="preserve">
+    <value>Pads per hit (plus kick)</value>
+  </data>
+  <data name="ReductionKickLabel" xml:space="preserve">
+    <value>Kick no closer than</value>
+  </data>
+  <data name="ReductionColumnsLabel" xml:space="preserve">
+    <value>Columns used</value>
+  </data>
+  <data name="ReductionFretsLabel" xml:space="preserve">
+    <value>Frets used</value>
+  </data>
+  <data name="ReductionColumnsFormat" xml:space="preserve">
+    <value>1 to {0}</value>
+    <comment>{0} is the highest column a reduced chord may use.</comment>
+  </data>
+  <data name="ReductionFretsFormat" xml:space="preserve">
+    <value>Green to {0}</value>
+    <comment>{0} is the highest fret a reduced chord may use, e.g. "yellow".</comment>
+  </data>
+  <data name="ReductionNoThinning" xml:space="preserve">
+    <value>No thinning</value>
+  </data>
+  <data name="ReductionKickKept" xml:space="preserve">
+    <value>Kept</value>
+  </data>
+  <data name="ReductionSnapFormat" xml:space="preserve">
+    <value>1/{0}</value>
+    <comment>Snap as a fraction of a whole note, e.g. "1/16".</comment>
+  </data>
+  <data name="ReductionFretGreen" xml:space="preserve">
+    <value>green</value>
+  </data>
+  <data name="ReductionFretRed" xml:space="preserve">
+    <value>red</value>
+  </data>
+  <data name="ReductionFretYellow" xml:space="preserve">
+    <value>yellow</value>
+  </data>
+  <data name="ReductionFretBlue" xml:space="preserve">
+    <value>blue</value>
+  </data>
+  <data name="ReductionFretOrange" xml:space="preserve">
+    <value>orange</value>
+  </data>
+  <data name="ReductionResetButton" xml:space="preserve">
+    <value>Reset</value>
+  </data>
+  <data name="ReductionResetToolTip" xml:space="preserve">
+    <value>Put back the shipped rules for this part and difficulty</value>
+  </data>
+  <data name="DifficultyLadderHeading" xml:space="preserve">
+    <value>Difficulties</value>
+  </data>
+  <data name="DifficultyLadderPeakFormat" xml:space="preserve">
+    <value>{0:0.0} notes/s</value>
+    <comment>{0} is peak notes/second over any two seconds.</comment>
+  </data>
+  <data name="DifficultyLadderPeakToolTip" xml:space="preserve">
+    <value>Most notes/second over any two seconds, with the draft in place</value>
+  </data>
+  <data name="DifficultyLadderTierToolTip" xml:space="preserve">
+    <value>Suggested rating: 0 to 6 for charts written to be played, 7 and up for overcharts</value>
+  </data>
+  <data name="DifficultyLadderOrderWarningFormat" xml:space="preserve">
+    <value>Not easier than the difficulty above: {0}.</value>
+    <comment>{0} lists the difficulties, e.g. "Hard, Easy".</comment>
+  </data>
+  <data name="ReductionPreviewPlayToolTip" xml:space="preserve">
+    <value>Play or pause (Space)</value>
+  </data>
+  <data name="ReductionPreviewPlayPauseButton" xml:space="preserve">
+    <value>Play or pause</value>
+  </data>
+  <data name="ReductionPreviewPreviousToolTip" xml:space="preserve">
+    <value>Previous change (Shift+N)</value>
+  </data>
+  <data name="ReductionPreviewNextToolTip" xml:space="preserve">
+    <value>Next change (N)</value>
+  </data>
+  <data name="ReductionPreviewSpeedToolTip" xml:space="preserve">
+    <value>How fast the song plays</value>
+  </data>
+  <data name="ReductionPreviewSpeedPercentFormat" xml:space="preserve">
+    <value>{0}%</value>
+    <comment>Playback speed, e.g. "75%".</comment>
+  </data>
+  <data name="ReductionPreviewLaneLookAheadToolTip" xml:space="preserve">
+    <value>Look-ahead: seconds of lane shown past the strike line. Ctrl+wheel, + and − change it too.</value>
+    <comment>Lane header look-ahead button tooltip.</comment>
+  </data>
+  <data name="ReductionPreviewLaneLookAheadLabel" xml:space="preserve">
+    <value>Look-ahead</value>
+    <comment>Lane header look-ahead slider label.</comment>
+  </data>
+  <data name="ReductionPreviewStripToolTip" xml:space="preserve">
+    <value>Where each draft changed, plus its findings. Click a mark to jump to it; click or drag elsewhere to move through the song.</value>
+  </data>
+  <data name="ReductionPreviewFilterCountFormat" xml:space="preserve">
+    <value>{0} ({1})</value>
+  </data>
+  <data name="ReductionPreviewLookAheadFormat" xml:space="preserve">
+    <value>{0:0.0} s</value>
+  </data>
+  <data name="ReductionPreviewWorking" xml:space="preserve">
+    <value>Comparing the draft with what it's reduced from…</value>
+  </data>
+  <data name="ReductionPreviewFailed" xml:space="preserve">
+    <value>The draft couldn't be compared with what it's reduced from.</value>
+  </data>
+  <data name="ReductionPreviewDraftLaneFormat" xml:space="preserve">
+    <value>{0} (draft)</value>
+  </data>
+  <data name="ReductionPreviewFilterFindings" xml:space="preserve">
+    <value>Findings</value>
+  </data>
+  <data name="ReductionPreviewNoStops" xml:space="preserve">
+    <value>No changes shown</value>
+  </data>
+  <data name="ReductionPreviewStopFormat" xml:space="preserve">
+    <value>{0} / {1}</value>
+  </data>
+  <data name="ReductionPreviewChangeFormat" xml:space="preserve">
+    <value>{0} · {1}: {2}</value>
+  </data>
+  <data name="ReductionPreviewChangeRemoved" xml:space="preserve">
+    <value>chord left out</value>
+  </data>
+  <data name="ReductionPreviewChangeDoubleKick" xml:space="preserve">
+    <value>2x kick left out</value>
+  </data>
+  <data name="ReductionPreviewChangeReshaped" xml:space="preserve">
+    <value>chord changed</value>
+  </data>
+  <data name="ReductionPreviewChangeAdded" xml:space="preserve">
+    <value>chord added</value>
+  </data>
+  <data name="ReductionPreviewChangeSustain" xml:space="preserve">
+    <value>held shorter</value>
+  </data>
+  <data name="ReductionPreviewChangeHopoFlip" xml:space="preserve">
+    <value>natural HOPO turned</value>
+  </data>
+  <data name="ReductionPreviewChangeForcing" xml:space="preserve">
+    <value>forcing changed</value>
+  </data>
+  <data name="ReductionPreviewChangeBoundaryFormat" xml:space="preserve">
+    <value>{0}, beside the range</value>
+  </data>
+  <data name="ReductionPreviewFilterRemovals" xml:space="preserve">
+    <value>Removals</value>
+  </data>
+  <data name="ReductionPreviewFilterReshapes" xml:space="preserve">
+    <value>Reshapes</value>
+  </data>
+  <data name="ReductionPreviewFilterSustains" xml:space="preserve">
+    <value>Sustains</value>
+  </data>
+  <data name="ReductionPreviewFilterForcing" xml:space="preserve">
+    <value>HOPOs and forcing</value>
+  </data>
+  <data name="ReductionPreviewFilterRemovalsToolTip" xml:space="preserve">
+    <value>Chords left out, and 2x kicks dropped: faded on the difficulty above</value>
+  </data>
+  <data name="ReductionPreviewFilterReshapesToolTip" xml:space="preserve">
+    <value>Chords with other frets or pads, or added: ringed on the draft</value>
+  </data>
+  <data name="ReductionPreviewFilterSustainsToolTip" xml:space="preserve">
+    <value>Notes held shorter, or no longer held</value>
+  </data>
+  <data name="ReductionPreviewFilterForcingToolTip" xml:space="preserve">
+    <value>Chords reading as a different strum, HOPO, or tap than before: a natural HOPO turned, or forcing changed</value>
+  </data>
+  <data name="ReductionPreviewFilterFindingsToolTip" xml:space="preserve">
+    <value>The draft's lint findings</value>
+  </data>
+  <data name="ReductionPreviewButton" xml:space="preserve">
+    <value>Preview</value>
+  </data>
+  <data name="ReductionPreviewToolTip" xml:space="preserve">
+    <value>Show the draft against its source, with the song, marking where it changed</value>
   </data>
 </root>

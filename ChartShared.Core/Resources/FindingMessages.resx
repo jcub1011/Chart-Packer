@@ -43,100 +43,100 @@
   </resheader>
   <data name="SectionMetadata" xml:space="preserve">
     <value>metadata</value>
-    <comment>Section name, inserted into other messages.</comment>
+    <comment>Section name.</comment>
   </data>
   <data name="SectionFileIndex" xml:space="preserve">
     <value>file index</value>
-    <comment>Section name, inserted into other messages.</comment>
+    <comment>Section name.</comment>
   </data>
   <data name="SectionFileData" xml:space="preserve">
     <value>file data</value>
-    <comment>Section name, inserted into other messages.</comment>
+    <comment>Section name.</comment>
   </data>
   <data name="BadIdentifier" xml:space="preserve">
-    <value>The file doesn't start with "SNGPKG", so it isn't an .sng file.</value>
+    <value>Missing "SNGPKG" header; not an .sng file.</value>
   </data>
   <data name="UnsupportedVersionFormat" xml:space="preserve">
-    <value>The file uses format version {0}. Only version 1 is supported.</value>
-    <comment>{0} is the version number read from the file.</comment>
+    <value>The file uses format version {0}. Only version 1 supported.</value>
+    <comment>{0} is the file's version.</comment>
   </data>
   <data name="HeaderTruncatedFormat" xml:space="preserve">
-    <value>The file is only {0:N0} bytes long, too short for the 26-byte header.</value>
-    <comment>{0} is the file size in bytes.</comment>
+    <value>File is only {0:N0} bytes; 26-byte header doesn't fit.</value>
+    <comment>{0} is file size in bytes.</comment>
   </data>
   <data name="SectionTruncatedFormat" xml:space="preserve">
-    <value>The file ends before the {0} section's length field.</value>
-    <comment>{0} is a section name.</comment>
+    <value>File ends before the {0} length field.</value>
+    <comment>{0} is section.</comment>
   </data>
   <data name="SectionPastEndFormat" xml:space="preserve">
-    <value>The {0} section says it is {1:N0} bytes long, which runs past the end of the file.</value>
-    <comment>{0} is a section name; {1} is the declared length.</comment>
+    <value>{0} declares {1:N0} bytes, past end of file.</value>
+    <comment>{0} is section; {1} declared length.</comment>
   </data>
   <data name="FilePastEndFormat" xml:space="preserve">
-    <value>"{0}" is {1:N0} bytes at offset {2:N0}, which runs past the end of the file.</value>
-    <comment>{0} is a stored filename; {1} its length; {2} its offset.</comment>
+    <value>"{0}": {1:N0} bytes at offset {2:N0}, past end of file.</value>
+    <comment>{0} is stored filename; {1} length; {2} offset.</comment>
   </data>
   <data name="SectionTooLargeFormat" xml:space="preserve">
-    <value>The {0} section says it is {1:N0} bytes long, which is too large to be real.</value>
-    <comment>{0} is a section name; {1} is the declared length.</comment>
+    <value>{0} declares {1:N0} bytes, unrealistically large.</value>
+    <comment>{0} is section; {1} declared length.</comment>
   </data>
   <data name="LengthMismatchFormat" xml:space="preserve">
-    <value>The {0} section says it is {1:N0} bytes long, but its entries use {2:N0}.</value>
-    <comment>{0} is a section name; {1} the declared length; {2} the bytes actually used.</comment>
+    <value>{0} declares {1:N0} bytes, but entries use {2:N0}.</value>
+    <comment>{0} is section; {1} declared length; {2} bytes used.</comment>
   </data>
   <data name="EntryOverrunFormat" xml:space="preserve">
-    <value>Entry {0:N0} in the {1} section runs past the section's declared length of {2:N0} bytes.</value>
-    <comment>{0} is the 1-based entry number; {1} a section name; {2} the declared length.</comment>
+    <value>Entry {0:N0} in {1} runs past declared length of {2:N0} bytes.</value>
+    <comment>{0} is entry number; {1} section; {2} declared length.</comment>
   </data>
   <data name="NegativeKeyLengthFormat" xml:space="preserve">
     <value>Metadata entry {0:N0} has a negative key length ({1:N0}).</value>
-    <comment>{0} is the 1-based entry number; {1} the length.</comment>
+    <comment>{0} is entry number; {1} length.</comment>
   </data>
   <data name="NegativeValueLengthFormat" xml:space="preserve">
     <value>Metadata entry {0:N0} has a negative value length ({1:N0}).</value>
-    <comment>{0} is the 1-based entry number; {1} the length.</comment>
+    <comment>{0} is entry number; {1} length.</comment>
   </data>
   <data name="CountTooLargeFormat" xml:space="preserve">
-    <value>The {0} section says it holds {1:N0} entries, which can't fit in its {2:N0} bytes.</value>
-    <comment>{0} is a section name; {1} the declared count; {2} the declared length.</comment>
+    <value>{0} declares {1:N0} entries, which can't fit in {2:N0} bytes.</value>
+    <comment>{0} is section; {1} declared count; {2} declared length.</comment>
   </data>
   <data name="InvalidKeyTextFormat" xml:space="preserve">
     <value>Metadata key {0:N0} isn't valid UTF-8 or contains a NUL byte.</value>
-    <comment>{0} is the 1-based entry number.</comment>
+    <comment>{0} is entry number.</comment>
   </data>
   <data name="InvalidValueTextFormat" xml:space="preserve">
     <value>The value of metadata key "{0}" isn't valid UTF-8 or contains a NUL byte.</value>
-    <comment>{0} is the key.</comment>
+    <comment>{0} is key.</comment>
   </data>
   <data name="InvalidFilenameTextFormat" xml:space="preserve">
     <value>Filename {0:N0} isn't valid UTF-8 or contains a NUL byte.</value>
-    <comment>{0} is the 1-based entry number.</comment>
+    <comment>{0} is entry number.</comment>
   </data>
   <data name="FileOutsideDataFormat" xml:space="preserve">
-    <value>"{0}" is {1:N0} bytes at offset {2:N0}, which is outside the file data section.</value>
-    <comment>{0} is a stored filename; {1} its length; {2} its offset.</comment>
+    <value>"{0}": {1:N0} bytes at offset {2:N0}, outside file data.</value>
+    <comment>{0} is stored filename; {1} length; {2} offset.</comment>
   </data>
   <data name="FilesOverlapFormat" xml:space="preserve">
     <value>"{0}" and "{1}" overlap in the file data.</value>
-    <comment>{0} and {1} are stored filenames.</comment>
+    <comment>{0} and {1} are filenames.</comment>
   </data>
   <data name="FileDataGaps" xml:space="preserve">
-    <value>There are unused bytes between files in the file data.</value>
+    <value>Unused bytes between files in file data.</value>
   </data>
   <data name="FileDataOutOfOrder" xml:space="preserve">
-    <value>Files aren't stored in the same order as the file index lists them.</value>
+    <value>Files not in file index order.</value>
   </data>
   <data name="FileDataSumMismatchFormat" xml:space="preserve">
-    <value>The file sizes add up to {0:N0} bytes, but the file data section says it is {1:N0}.</value>
-    <comment>{0} is the sum of file sizes; {1} the declared section length.</comment>
+    <value>File sizes total {0:N0} bytes, but file data declares {1:N0}.</value>
+    <comment>{0} is file size sum; {1} declared length.</comment>
   </data>
   <data name="TrailingBytesFormat" xml:space="preserve">
-    <value>There are {0:N0} extra bytes after the end of the file data section.</value>
-    <comment>{0} is the number of extra bytes.</comment>
+    <value>{0:N0} extra bytes after file data.</value>
+    <comment>{0} is extra byte count.</comment>
   </data>
   <data name="ReasonTooLongFormat" xml:space="preserve">
-    <value>it is {0:N0} bytes long, and stored names can be at most {1:N0}</value>
-    <comment>{0} is the name's length in UTF-8 bytes; {1} the limit.</comment>
+    <value>it is {0:N0} bytes; max is {1:N0}</value>
+    <comment>{0} is name length in bytes; {1} limit.</comment>
   </data>
   <data name="ReasonDotDot" xml:space="preserve">
     <value>it contains ".."</value>
@@ -149,123 +149,123 @@
   </data>
   <data name="ReasonReservedCharacterFormat" xml:space="preserve">
     <value>it contains "{0}", which isn't allowed in filenames</value>
-    <comment>{0} is the offending character.</comment>
+    <comment>{0} is offending character.</comment>
   </data>
   <data name="ReasonTrailingCharacter" xml:space="preserve">
     <value>a folder or file name ends with a period or a space</value>
   </data>
   <data name="ReasonReservedNameFormat" xml:space="preserve">
     <value>"{0}" is a reserved name on Windows</value>
-    <comment>{0} is the reserved name, e.g. CON.</comment>
+    <comment>{0} is reserved name, e.g. CON.</comment>
   </data>
   <data name="FilenameProblemFormat" xml:space="preserve">
     <value>"{0}" can't be stored: {1}.</value>
-    <comment>{0} is the filename; {1} one of the Reason* strings.</comment>
+    <comment>{0} is filename; {1} Reason* string.</comment>
   </data>
   <data name="DuplicateFilenameFormat" xml:space="preserve">
-    <value>"{0}" and "{1}" have the same name when case is ignored.</value>
-    <comment>{0} and {1} are the two filenames.</comment>
+    <value>"{0}" and "{1}" match ignoring case.</value>
+    <comment>{0} and {1} are filenames.</comment>
   </data>
   <data name="UnsafeExtractNameFormat" xml:space="preserve">
-    <value>"{0}" wasn't extracted because it isn't a safe filename: {1}.</value>
-    <comment>{0} is the stored filename; {1} one of the Reason* strings.</comment>
+    <value>"{0}" not extracted: unsafe filename: {1}.</value>
+    <comment>{0} is stored filename; {1} Reason* string.</comment>
   </data>
   <data name="ExtractOutsideFolderFormat" xml:space="preserve">
-    <value>"{0}" wasn't extracted because it would be written outside the output folder.</value>
-    <comment>{0} is the stored filename.</comment>
+    <value>"{0}" not extracted: writes outside output folder.</value>
+    <comment>{0} is stored filename.</comment>
   </data>
   <data name="DuplicateExtractNameFormat" xml:space="preserve">
-    <value>"{0}" wasn't extracted because another file with the same name, ignoring case, already was.</value>
-    <comment>{0} is the stored filename.</comment>
+    <value>"{0}" not extracted: duplicate name ignoring case.</value>
+    <comment>{0} is stored filename.</comment>
   </data>
   <data name="StoredSongIni" xml:space="preserve">
-    <value>The .sng contains its own song.ini. It wasn't extracted; the song.ini generated from the metadata was written instead.</value>
+    <value>Skipped embedded song.ini; wrote generated song.ini instead.</value>
   </data>
   <data name="KeyForbiddenCharacterFormat" xml:space="preserve">
-    <value>The metadata key "{0}" contains ;, =, a line break or a NUL, which song.ini can't hold.</value>
-    <comment>{0} is the key.</comment>
+    <value>Metadata key "{0}" contains ;, =, line break, or NUL; song.ini can't hold it.</value>
+    <comment>{0} is key.</comment>
   </data>
   <data name="ValueForbiddenCharacterFormat" xml:space="preserve">
-    <value>The value of "{0}" contains ;, a line break or a NUL, which song.ini can't hold.</value>
-    <comment>{0} is the key.</comment>
+    <value>Value of "{0}" contains ;, line break, or NUL; song.ini can't hold it.</value>
+    <comment>{0} is key.</comment>
   </data>
   <data name="EmptyKey" xml:space="preserve">
-    <value>A metadata entry has an empty key.</value>
+    <value>Empty metadata key.</value>
   </data>
   <data name="EmptyValueDroppedFormat" xml:space="preserve">
-    <value>"{0}" has an empty value and was left out.</value>
-    <comment>{0} is the key.</comment>
+    <value>"{0}" left out: empty value.</value>
+    <comment>{0} is key.</comment>
   </data>
   <data name="FixSnapNearest" xml:space="preserve">
     <value>Snap to the nearest grid line</value>
-    <comment>A way to fix an off-grid note (CHR004), as its menu lists it.</comment>
+    <comment>Fix for off-grid note (CHR004).</comment>
   </data>
   <data name="FixSnapBefore" xml:space="preserve">
     <value>Snap to the grid line before</value>
-    <comment>A way to fix an off-grid note (CHR004) when the nearest grid line is after it.</comment>
+    <comment>Fix for off-grid note (CHR004) when nearest grid line is after it.</comment>
   </data>
   <data name="FixSnapAfter" xml:space="preserve">
     <value>Snap to the grid line after</value>
-    <comment>A way to fix an off-grid note (CHR004) when the nearest grid line is before it.</comment>
+    <comment>Fix for off-grid note (CHR004) when nearest grid line is before it.</comment>
   </data>
   <data name="FixDeleteChord" xml:space="preserve">
     <value>Delete the note</value>
-    <comment>A way to fix an off-grid note or chord (CHR004).</comment>
+    <comment>Fix for off-grid note or chord (CHR004).</comment>
   </data>
   <data name="FixMakePlain" xml:space="preserve">
     <value>Make it a plain note</value>
-    <comment>A way to fix a sustain shorter than the cutoff (CHR021).</comment>
+    <comment>Fix for sustain shorter than cutoff (CHR021).</comment>
   </data>
   <data name="FixLengthenToCutoff" xml:space="preserve">
     <value>Lengthen it to the sustain cutoff</value>
-    <comment>A way to fix a sustain shorter than the cutoff (CHR021).</comment>
+    <comment>Fix for sustain shorter than cutoff (CHR021).</comment>
   </data>
   <data name="FixRemoveOpen" xml:space="preserve">
     <value>Remove the open note</value>
-    <comment>A way to fix an open note in a chord (CHR022).</comment>
+    <comment>Fix for open note in chord (CHR022).</comment>
   </data>
   <data name="FixKeepOpen" xml:space="preserve">
     <value>Keep only the open note</value>
-    <comment>A way to fix an open note in a chord (CHR022): the frets are removed.</comment>
+    <comment>Fix for open note in chord (CHR022): removes frets.</comment>
   </data>
   <data name="FixDeleteLater" xml:space="preserve">
     <value>Delete the later note</value>
-    <comment>A way to fix two notes too close together (CHR026).</comment>
+    <comment>Fix for notes too close together (CHR026).</comment>
   </data>
   <data name="FixDeleteEarlier" xml:space="preserve">
     <value>Delete the earlier note</value>
-    <comment>A way to fix two notes too close together (CHR026).</comment>
+    <comment>Fix for notes too close together (CHR026).</comment>
   </data>
   <data name="FixSwitchToPro" xml:space="preserve">
     <value>Switch to Pro drums</value>
-    <comment>A way to fix tom markers on 4-lane drums (CHR045).</comment>
+    <comment>Fix for tom markers on 4-lane drums (CHR045).</comment>
   </data>
   <data name="FixRemoveTomMarkers" xml:space="preserve">
     <value>Remove the tom markers</value>
-    <comment>A way to fix tom markers on 4-lane drums (CHR045).</comment>
+    <comment>Fix for tom markers on 4-lane drums (CHR045).</comment>
   </data>
   <data name="PartKeyDroppedFormat" xml:space="preserve">
-    <value>"{0}" is for a part the chart has no notes for, and was left out.</value>
-    <comment>{0} is the key.</comment>
+    <value>"{0}" left out: no notes for that part.</value>
+    <comment>{0} is key.</comment>
   </data>
   <data name="MetadataNotWrittenFormat" xml:space="preserve">
-    <value>"{0}" was left out of song.ini because its key or value contains a character song.ini can't hold.</value>
-    <comment>{0} is the key.</comment>
+    <value>"{0}" left out of song.ini: unsupported character in key or value.</value>
+    <comment>{0} is key.</comment>
   </data>
   <data name="PairKeyForbidden" xml:space="preserve">
-    <value>The key contains ;, =, a line break or a NUL, which song.ini can't hold.</value>
+    <value>Key contains ;, =, line break, or NUL; song.ini can't hold it.</value>
   </data>
   <data name="PairValueForbidden" xml:space="preserve">
-    <value>The value contains ;, a line break or a NUL, which song.ini can't hold.</value>
+    <value>Value contains ;, line break, or NUL; song.ini can't hold it.</value>
   </data>
   <data name="PairKeyEmpty" xml:space="preserve">
-    <value>The key is empty.</value>
+    <value>Empty key.</value>
   </data>
   <data name="PairValueEmpty" xml:space="preserve">
-    <value>The value is empty, so packing leaves it out.</value>
+    <value>Empty value; left out when packing.</value>
   </data>
   <data name="PairDuplicateKey" xml:space="preserve">
-    <value>The key appears more than once; only the last value is kept.</value>
+    <value>Duplicate key; only last value kept.</value>
   </data>
   <data name="PairExpectedInteger" xml:space="preserve">
     <value>Expected a whole number, e.g. 150 or -1.</value>
@@ -274,11 +274,11 @@
     <value>Expected True or False.</value>
   </data>
   <data name="PairLenientBooleanFormat" xml:space="preserve">
-    <value>Write this as {0}: some games only read True or False exactly.</value>
+    <value>Write as {0}; some games require exact True/False.</value>
     <comment>{0} is True or False.</comment>
   </data>
   <data name="PairExpectedColor" xml:space="preserve">
-    <value>Expected a hex colour, e.g. #FF8800.</value>
+    <value>Expected a hex color, e.g. #FF8800.</value>
   </data>
   <data name="PairExpectedIntegerPair" xml:space="preserve">
     <value>Expected two whole numbers separated by a space, e.g. 55000 85000.</value>
@@ -288,231 +288,244 @@
   </data>
   <data name="PairLegacyKeyFormat" xml:space="preserve">
     <value>A legacy key; newer games read {0} instead.</value>
-    <comment>{0} is the key that replaced it.</comment>
+    <comment>{0} is replacement key.</comment>
   </data>
   <data name="QuickFixSetValueFormat" xml:space="preserve">
     <value>Change to {0}</value>
-    <comment>A quick fix that replaces a pair's value. {0} is the new value, e.g. True.</comment>
+    <comment>Replaces value. {0} is the new value.</comment>
   </data>
   <data name="QuickFixRemoveKey" xml:space="preserve">
     <value>Remove the key</value>
-    <comment>A quick fix that removes a pair, e.g. one with an empty value.</comment>
+    <comment>Removes the pair.</comment>
   </data>
   <data name="QuickFixStripForbidden" xml:space="preserve">
-    <value>Remove the ; and line breaks</value>
-    <comment>A quick fix that removes the characters song.ini can't hold from a value; line breaks become spaces.</comment>
+    <value>Remove ; and line breaks</value>
+    <comment>Strips unsupported characters; line breaks become spaces.</comment>
   </data>
   <data name="QuickFixRenameKeyFormat" xml:space="preserve">
     <value>Rename to {0}</value>
-    <comment>A quick fix that renames a legacy key. {0} is the key that replaced it.</comment>
+    <comment>Renames legacy key. {0} is the replacement.</comment>
   </data>
   <data name="QuickFixMergeDuplicates" xml:space="preserve">
     <value>Remove the repeats</value>
-    <comment>A quick fix that keeps one line of a key stored more than once, with the value it has.</comment>
+    <comment>Keeps one line for a duplicated key.</comment>
   </data>
   <data name="NoAudioStem" xml:space="preserve">
-    <value>There's no audio stem (song, guitar, drums and the like), so the song plays in silence.</value>
+    <value>No audio stem; song plays silent.</value>
   </data>
   <data name="NoSongIni" xml:space="preserve">
-    <value>There's no song.ini, so the .sng will have no metadata.</value>
+    <value>No song.ini; .sng will have no metadata.</value>
   </data>
   <data name="SongIniNoSongSection" xml:space="preserve">
-    <value>song.ini has no [song] section, so the .sng will have no metadata.</value>
+    <value>song.ini has no [song] section; .sng will have no metadata.</value>
   </data>
   <data name="SongIniTooLarge" xml:space="preserve">
     <value>song.ini is too large to read.</value>
   </data>
   <data name="ExcludedJunkFormat" xml:space="preserve">
-    <value>"{0}" was left out as OS or tool junk.</value>
-    <comment>{0} is a file or folder path.</comment>
+    <value>"{0}" left out: OS/tool junk.</value>
+    <comment>{0} is file or folder path.</comment>
   </data>
   <data name="ExcludedNestedSngFormat" xml:space="preserve">
-    <value>"{0}" was left out because an .sng can't contain another .sng.</value>
-    <comment>{0} is a file path.</comment>
+    <value>"{0}" left out: .sng can't contain another .sng.</value>
+    <comment>{0} is file path.</comment>
   </data>
   <data name="ExcludedSubfolderFormat" xml:space="preserve">
-    <value>The subfolder "{0}" was left out because subfolders aren't included.</value>
-    <comment>{0} is a folder path.</comment>
+    <value>Subfolder "{0}" left out: subfolders excluded.</value>
+    <comment>{0} is folder path.</comment>
   </data>
   <data name="ChrNoTimeSignatureAtStart" xml:space="preserve">
-    <value>There's no time signature at the start; the games assume 4/4.</value>
+    <value>No time signature at start; 4/4 assumed.</value>
   </data>
   <data name="ChrTempoOutOfRangeFormat" xml:space="preserve">
-    <value>A tempo of {0} BPM is outside 20 to 400, which is probably a typo or a half- or double-time mistake.</value>
+    <value>Tempo {0} BPM outside 20-400; likely typo or half/double-time error.</value>
     <comment>{0} is the tempo.</comment>
   </data>
   <data name="ChrNotesAfterAudioFormat" xml:space="preserve">
-    <value>Notes after the end of the audio: {0}.</value>
-    <comment>{0} is how many.</comment>
+    <value>Notes past end of audio: {0}.</value>
+    <comment>{0} is the count.</comment>
   </data>
   <data name="ChrPhrasesAfterAudioFormat" xml:space="preserve">
-    <value>Phrases after the end of the audio: {0}.</value>
-    <comment>{0} is how many.</comment>
+    <value>Phrases past end of audio: {0}.</value>
+    <comment>{0} is the count.</comment>
   </data>
   <data name="ChrEventAfterAudioFormat" xml:space="preserve">
-    <value>The event "{0}" is after the end of the audio.</value>
-    <comment>{0} is the event's text.</comment>
+    <value>Event "{0}" past end of audio.</value>
+    <comment>{0} is event text.</comment>
   </data>
   <data name="ChrOffGrid" xml:space="preserve">
-    <value>The note isn't on any common grid (1/1 to 1/192, or a triplet).</value>
+    <value>Note off common grid (1/1 to 1/192 or triplet).</value>
   </data>
   <data name="ChrDuplicateTempo" xml:space="preserve">
-    <value>Two tempo markers are on the same tick; the games read only the last.</value>
+    <value>Two tempo markers on the same tick; only the last is read.</value>
   </data>
   <data name="ChrDuplicateTimeSignature" xml:space="preserve">
-    <value>Two time signatures are on the same tick; the games read only the last.</value>
+    <value>Two time signatures on the same tick; only the last is read.</value>
   </data>
   <data name="ChrSustainIntoNext" xml:space="preserve">
-    <value>The sustain runs into the next note on its lane, so the games cut it short.</value>
+    <value>Sustain runs into next note on lane; cut short.</value>
   </data>
   <data name="ChrSustainUnderCutoffFormat" xml:space="preserve">
-    <value>The sustain is shorter than the sustain cutoff ({0} ticks), so the games read it as a plain note.</value>
-    <comment>{0} is the cutoff in ticks.</comment>
+    <value>Sustain shorter than cutoff ({0} ticks); read as plain note.</value>
+    <comment>{0} is cutoff in ticks.</comment>
   </data>
   <data name="ChrOpenInChord" xml:space="preserve">
-    <value>An open note is in a chord with frets; the games read it differently.</value>
+    <value>Open note chorded with frets.</value>
   </data>
   <data name="ChrRedundantForceHopo" xml:space="preserve">
-    <value>The chord is forced HOPO, but it's a HOPO anyway.</value>
+    <value>Forced HOPO, but already HOPO.</value>
   </data>
   <data name="ChrRedundantForceStrum" xml:space="preserve">
-    <value>The chord is forced strum, but it's a strum anyway.</value>
+    <value>Forced strum, but already strum.</value>
   </data>
   <data name="ChrForcedRepeat" xml:space="preserve">
-    <value>A forced HOPO repeats the note or chord before it exactly, so it can't be hammered on.</value>
+    <value>Forced HOPO exactly repeats previous note/chord; can't be hammered on.</value>
   </data>
   <data name="ChrFirstNoteHopo" xml:space="preserve">
-    <value>The part's first note is a HOPO; there's nothing to hammer on from.</value>
+    <value>First note is HOPO; nothing to hammer on from.</value>
   </data>
   <data name="ChrCloseNotes" xml:space="preserve">
-    <value>Two notes on the same lane are closer than 1/64 of a whole note; the later is probably a stray duplicate.</value>
+    <value>Two notes on same lane closer than 1/64 note; later likely duplicate.</value>
   </data>
   <data name="ChrTomMarkerCoversNothing" xml:space="preserve">
-    <value>The tom marker covers no note on its pad, so it does nothing.</value>
+    <value>Tom marker covers no note; does nothing.</value>
   </data>
   <data name="ChrTooManyPads" xml:space="preserve">
-    <value>More than two pads are hit at once, not counting the kick: more hands than a drummer has.</value>
+    <value>More than 2 pads at once, excluding kick.</value>
   </data>
   <data name="ChrFillInStarPower" xml:space="preserve">
-    <value>The drum fill overlaps a star power phrase.</value>
+    <value>Drum fill overlaps star power phrase.</value>
   </data>
   <data name="ChrFillEndsWithoutNoteFormat" xml:space="preserve">
-    <value>The drum fill's last note isn't on {0}, so there's nothing to activate star power on there.</value>
-    <comment>{0} is the difficulty, e.g. Hard.</comment>
+    <value>Drum fill doesn't end on {0}; nothing to activate on.</value>
+    <comment>{0} is difficulty.</comment>
   </data>
   <data name="ChrRollTooFew" xml:space="preserve">
-    <value>The roll has fewer than two notes in it.</value>
+    <value>Roll has fewer than 2 notes.</value>
   </data>
   <data name="ChrTrillTooFew" xml:space="preserve">
-    <value>The trill has fewer than two notes in it.</value>
+    <value>Trill has fewer than 2 notes.</value>
   </data>
   <data name="ChrTrillOnePad" xml:space="preserve">
-    <value>The trill covers only one pad; a trill goes between two.</value>
+    <value>Trill on one pad; trills need two.</value>
   </data>
   <data name="ChrTomMarkersOnFourLane" xml:space="preserve">
-    <value>4-lane drums have tom markers. The games would read them as Pro drums, so saving leaves them out.</value>
+    <value>Tom markers on 4-lane drums; read as Pro drums, omitted on save.</value>
   </data>
   <data name="ChrFifthPadNotFiveLane" xml:space="preserve">
-    <value>A fifth-pad note (5-lane green) on drums that aren't 5-lane.</value>
+    <value>Fifth-pad note on non-5-lane drums.</value>
   </data>
   <data name="ChrDrums2xTrack" xml:space="preserve">
-    <value>The chart has a PART DRUMS_2X track. It's kept as it is, and doesn't follow edits to PART DRUMS.</value>
+    <value>PART DRUMS_2X track kept as-is; ignores PART DRUMS edits.</value>
   </data>
   <data name="ChrEmptyStarPower" xml:space="preserve">
-    <value>The star power phrase has no notes in it.</value>
+    <value>Empty star power phrase.</value>
   </data>
   <data name="ChrEmptySolo" xml:space="preserve">
-    <value>The solo has no notes in it.</value>
+    <value>Empty solo.</value>
+  </data>
+  <data name="ChrStarPowerEmptyOnDifficultyFormat" xml:space="preserve">
+    <value>Empty star power on {0}; other difficulties have notes.</value>
+  </data>
+  <data name="ChrNoStarPower" xml:space="preserve">
+    <value>No star power phrases; never earned on this part.</value>
+  </data>
+  <data name="ChrSoloEmptyOnDifficultyFormat" xml:space="preserve">
+    <value>Empty solo on {0}; other difficulties have notes.</value>
   </data>
   <data name="ChrOverlappingStarPower" xml:space="preserve">
-    <value>Two star power phrases overlap; saving merges them.</value>
+    <value>Overlapping star power phrases; merged on save.</value>
   </data>
   <data name="ChrOverlappingSolos" xml:space="preserve">
-    <value>Two solos overlap; saving merges them.</value>
+    <value>Overlapping solos; merged on save.</value>
   </data>
   <data name="ChrNotesInBigRockEnding" xml:space="preserve">
-    <value>Notes are inside a big rock ending, which the games skip.</value>
+    <value>Notes in big rock ending; skipped.</value>
   </data>
   <data name="ChrEmptyPart" xml:space="preserve">
-    <value>The part is in the chart but has no notes on any difficulty.</value>
+    <value>Part has no notes on any difficulty.</value>
   </data>
   <data name="ChrLowerDifficultyDenserFormat" xml:space="preserve">
     <value>{0} has more notes per second ({1:0.0}) than {2} ({3:0.0}).</value>
-    <comment>{0} and {2} are difficulties, the lower first; {1} and {3} are their chords per second.</comment>
+    <comment>{0}, {2} are difficulties, lower first; {1}, {3} chords per second.</comment>
   </data>
   <data name="ChrNoSections" xml:space="preserve">
-    <value>The chart has no sections.</value>
+    <value>No sections.</value>
   </data>
   <data name="ChrUnratedFormat" xml:space="preserve">
-    <value>The part has notes but {0} is unset or -1.</value>
-    <comment>{0} is the song.ini key, e.g. diff_guitar.</comment>
+    <value>Part has notes but {0} unset or -1.</value>
+    <comment>{0} is song.ini key.</comment>
+  </data>
+  <data name="ChrMissingDifficultyFormat" xml:space="preserve">
+    <value>{0} has no notes, though {1} is charted.</value>
+    <comment>{0} is missing difficulty; {1} highest charted.</comment>
   </data>
   <data name="ChrSongLengthFormat" xml:space="preserve">
-    <value>song_length ({0} ms) doesn't match the audio's length ({1} ms).</value>
-    <comment>{0} is song.ini's value; {1} is the audio's length.</comment>
+    <value>song_length ({0} ms) mismatches audio ({1} ms).</value>
+    <comment>{0} is song.ini value; {1} audio length.</comment>
   </data>
   <data name="ChrEndMissing" xml:space="preserve">
-    <value>There's no [end] event; saving adds one after the last note.</value>
+    <value>No [end] event; added after last note on save.</value>
   </data>
   <data name="ChrEndEarly" xml:space="preserve">
-    <value>[end] is before the last note; saving moves it after it.</value>
+    <value>[end] before last note; moved after on save.</value>
   </data>
   <data name="ChrLoadUnholdableTempo" xml:space="preserve">
-    <value>A tempo marker of 0 microseconds per beat was left out, as the games skip it.</value>
+    <value>Tempo marker of 0 microseconds per beat left out; skipped.</value>
   </data>
   <data name="ChrLoadUnholdableTimeSignature" xml:space="preserve">
-    <value>A time signature of 0 beats was left out, as the games skip it.</value>
+    <value>Time signature of 0 beats left out; skipped.</value>
   </data>
   <data name="ChrLoadStrayAnchor" xml:space="preserve">
-    <value>An anchor that isn't on a tempo marker, or a second one on it, was left out, as it anchors nothing.</value>
+    <value>Stray/duplicate anchor left out; anchors nothing.</value>
   </data>
   <data name="ChrLoadFirstEventDropped" xml:space="preserve">
-    <value>The track's first event, which the games never read, wasn't its name, and was left out.</value>
+    <value>Track's first event wasn't its name; left out, never read.</value>
   </data>
   <data name="ChrLoadDuplicateNote" xml:space="preserve">
-    <value>A second note on a lane at one tick was left out, as the games leave it out.</value>
+    <value>Duplicate note on lane at same tick left out.</value>
   </data>
   <data name="ChrLoadDuplicateOpen" xml:space="preserve">
-    <value>A note made open by a Phase Shift open phrase, in a chord that already has an open note, was left out.</value>
+    <value>Phase Shift open creating second open in chord left out.</value>
   </data>
   <data name="ChrLoadOpenBeforeEnhancedOpens" xml:space="preserve">
-    <value>A note below green before [ENHANCED_OPENS], which the games don't read, was left out.</value>
+    <value>Note below green before [ENHANCED_OPENS] left out; not read.</value>
   </data>
   <data name="ChrLoadUnpairedNoteEvent" xml:space="preserve">
-    <value>A note-on or note-off that the games pair with nothing was left out.</value>
+    <value>Unpaired note-on/off left out.</value>
   </data>
   <data name="ChrLoadUnpairedSysexEvent" xml:space="preserve">
-    <value>A Phase Shift open or tap event that the games pair with nothing was left out.</value>
+    <value>Unpaired Phase Shift open/tap left out.</value>
   </data>
   <data name="ChrLoadUnusedMarker" xml:space="preserve">
-    <value>A force HOPO, force strum, tap or open marker that covers no note was left out.</value>
+    <value>Unused HOPO/strum/tap/open marker left out.</value>
   </data>
   <data name="ChrLoadUnreadStarPower" xml:space="preserve">
-    <value>A star power phrase on pitch 116 was left out, as multiplier_note puts star power on 103 and the games don't read it.</value>
+    <value>Star power on pitch 116 left out; star power is on 103.</value>
   </data>
   <data name="ChrLoadDuplicateStarPower" xml:space="preserve">
-    <value>A second star power phrase starting at one tick was left out, as the games leave it out.</value>
+    <value>Duplicate star power at same tick left out.</value>
   </data>
   <data name="ChrVocalNotesOverlap" xml:space="preserve">
-    <value>The vocal note runs into the next one; a part sings one note at a time.</value>
+    <value>Vocal note runs into next; one note at a time.</value>
   </data>
   <data name="ChrVocalNoteWithoutLyric" xml:space="preserve">
-    <value>The vocal note has no lyric.</value>
+    <value>Vocal note has no lyric.</value>
   </data>
   <data name="ChrVocalNoteOutsidePhrase" xml:space="preserve">
-    <value>The vocal note is outside every phrase, so the games don't show it.</value>
+    <value>Vocal note outside all phrases; not shown.</value>
   </data>
   <data name="ChrLyricWithoutNote" xml:space="preserve">
-    <value>The lyric isn't on a vocal note's start.</value>
+    <value>Lyric not on vocal note start.</value>
   </data>
   <data name="ChrSlideWithoutNote" xml:space="preserve">
-    <value>The slide has no sung note before it in its phrase to carry on from.</value>
+    <value>Slide with no prior sung note in phrase.</value>
   </data>
   <data name="ChrHarmonyWithoutFirst" xml:space="preserve">
-    <value>The chart has this harmony without HARM1, which the games need to show harmonies.</value>
+    <value>Harmony without HARM1; harmonies need HARM1.</value>
   </data>
   <data name="ChrLoadWithPitchFormat" xml:space="preserve">
     <value>{0} (MIDI note {1})</value>
-    <comment>{0} is what was left out; {1} is its MIDI note number.</comment>
+    <comment>{0} is the dropped item; {1} its MIDI note.</comment>
   </data>
 </root>

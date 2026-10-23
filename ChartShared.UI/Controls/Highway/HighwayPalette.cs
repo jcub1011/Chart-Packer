@@ -28,6 +28,9 @@ namespace ChartShared.UI.Controls.Highway
         public static readonly Color Blue = Color.FromRgb(0x25, 0x8C, 0xF0);
         public static readonly Color Orange = Color.FromRgb(0xFF, 0x8A, 0x10);
 
+        /// <summary>The ring round a note that changed (<see cref="HighwayNoteMark.Flagged"/>): a pink no fret, pad or star power has.</summary>
+        public static readonly Color ChangeMark = Color.FromRgb(0xFF, 0x4F, 0xA3);
+
         private static readonly Color[] FretColors = [Green, Red, Yellow, Blue, Orange];
         private static readonly Color[] FourPadColors = [Red, Yellow, Blue, Green];
         private static readonly Color[] FivePadColors = [Red, Yellow, Blue, Orange, Green];

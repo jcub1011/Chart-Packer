@@ -111,7 +111,7 @@ public static class ExportCleanup
     /// </summary>
     /// <exception cref="IOException">A file can't be read or written, or the copy failed to verify.</exception>
     /// <exception cref="UnauthorizedAccessException">Access is denied.</exception>
-    /// <exception cref="OperationCanceledException">The copy was cancelled; nothing is left at the target.</exception>
+    /// <exception cref="OperationCanceledException">The copy was cancelled; the target is left as it was.</exception>
     public static async Task CopySngAsync(string sourcePath, string targetPath, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sourcePath);
@@ -135,29 +135,34 @@ public static class ExportCleanup
             }
         }
 
-        File.Copy(sourcePath, targetPath, overwrite: true);
-        if (pruned.Count == metadata.Count && stripped is null)
-            return;
-
+        // Made beside the target and moved into place once it's done, so a target that's there is only ever replaced
+        // whole, once another that has it open lets go of it.
+        string copy = StagingPath.For(targetPath);
         DirectoryInfo? staging = null;
         try
         {
-            IReadOnlyList<SngSourceFile> add = [];
-            if (stripped is not null)
+            File.Copy(sourcePath, copy);
+            if (pruned.Count != metadata.Count || stripped is not null)
             {
-                staging = Directory.CreateTempSubdirectory("chartpacker-export-");
-                string staged = Path.Combine(staging.FullName, chartEntry!.Name);
-                await File.WriteAllBytesAsync(staged, stripped, cancellationToken).ConfigureAwait(false);
-                add = [new SngSourceFile(chartEntry.Name, staged, stripped.Length)];
+                IReadOnlyList<SngSourceFile> add = [];
+                if (stripped is not null)
+                {
+                    staging = Directory.CreateTempSubdirectory("chartpacker-export-");
+                    string staged = Path.Combine(staging.FullName, chartEntry!.Name);
+                    await File.WriteAllBytesAsync(staged, stripped, cancellationToken).ConfigureAwait(false);
+                    add = [new SngSourceFile(chartEntry.Name, staged, stripped.Length)];
+                }
+
+                var findings = await SngWriter.RewriteAsync(copy, pruned, stripped is null ? [] : [chartEntry!.Name], add, cancellationToken).ConfigureAwait(false);
+                if (findings.FirstOrDefault(f => f.Severity == Severity.Error) is { } error)
+                    throw new IOException(error.Message);
             }
 
-            var findings = await SngWriter.RewriteAsync(targetPath, pruned, stripped is null ? [] : [chartEntry!.Name], add, cancellationToken).ConfigureAwait(false);
-            if (findings.FirstOrDefault(f => f.Severity == Severity.Error) is { } error)
-                throw new IOException(error.Message);
+            await SongFileCommit.MoveOverAsync(copy, targetPath, cancellationToken).ConfigureAwait(false);
         }
         catch
         {
-            TryDelete(targetPath);
+            StagingPath.TryDeleteFile(copy);
             throw;
         }
         finally
@@ -206,18 +211,6 @@ public static class ExportCleanup
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             // Left for the OS to clear from the temp folder.
-        }
-    }
-
-    private static void TryDelete(string path)
-    {
-        try
-        {
-            File.Delete(path);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            // Nothing more to do: the copy is incomplete either way.
         }
     }
 }

@@ -59,6 +59,12 @@ namespace ChartShared.UI.Controls
         /// <summary>The pointer over a lane that can be scrubbed.</summary>
         public static readonly Cursor HandCursor = new(StandardCursorType.Hand);
 
+        /// <summary>The pointer over a highway, dragged up and down to scrub it.</summary>
+        public static readonly Cursor UpDownCursor = new(StandardCursorType.SizeNorthSouth);
+
+        /// <summary>The pointer over a lane or seek bar that's dragged sideways to scrub it.</summary>
+        public static readonly Cursor SidewaysCursor = new(StandardCursorType.SizeWestEast);
+
         /// <summary>Over what's been played, so what's to come stands out.</summary>
         public static readonly IBrush PlayedBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x70, 0x00, 0x00, 0x00));
 

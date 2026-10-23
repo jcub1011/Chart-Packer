@@ -406,7 +406,7 @@
     <value>Pack into one folder (flat)</value>
   </data>
   <data name="FlatPackToolTip" xml:space="preserve">
-    <value>Put every packed .sng directly in the output folder instead of mirroring the scanned folder's layout. If two folders would make the same .sng, the first one packed keeps the name; the others are skipped, or renamed when the output policy is "Keep both".</value>
+    <value>Put every packed .sng directly in the output folder instead of mirroring the scanned layout. On name conflicts, the first packed keeps the name; others are skipped or renamed with "Keep both".</value>
   </data>
   <data name="JobDuplicateOutputFormat" xml:space="preserve">
     <value>Skipped because {0} was already written by "{1}" in this job.</value>
@@ -420,7 +420,7 @@
     <value>Save</value>
   </data>
   <data name="SaveToolTip" xml:space="preserve">
-    <value>Write the changes to the selected items. Only the rows that were edited, added or removed change.</value>
+    <value>Write the changes to the selected items. Only edited, added, or removed rows change.</value>
   </data>
   <data name="DiscardButton" xml:space="preserve">
     <value>Discard</value>
@@ -443,7 +443,7 @@
     <value>Click to edit</value>
   </data>
   <data name="AutoSetLengthFailedFormat" xml:space="preserve">
-    <value>Couldn't work out the length of {0} song(s); they were left as they are.</value>
+    <value>Couldn't work out the length of {0} song(s); left unchanged.</value>
   </data>
   <data name="SngHasErrorsFormat" xml:space="preserve">
     <value>Editing is off: "{0}" has structural errors.</value>
@@ -481,7 +481,6 @@
   </data>
   <data name="AlbumArtName" xml:space="preserve">
     <value>Album art</value>
-    <comment>Automation name of the album-art tile in the detail panel.</comment>
   </data>
   <data name="NoAlbumArt" xml:space="preserve">
     <value>Album art not set</value>
@@ -511,7 +510,6 @@
   </data>
   <data name="BackgroundName" xml:space="preserve">
     <value>Background</value>
-    <comment>Automation name of the background tile beside the album art.</comment>
   </data>
   <data name="NoBackground" xml:space="preserve">
     <value>No background set</value>
@@ -538,11 +536,9 @@
   </data>
   <data name="ShowBackgroundImageToolTip" xml:space="preserve">
     <value>Show the background image</value>
-    <comment>Tooltip of the image toggle on the background tile's caption.</comment>
   </data>
   <data name="ShowBackgroundVideoToolTip" xml:space="preserve">
     <value>Show the background video</value>
-    <comment>Tooltip of the video toggle on the background tile's caption.</comment>
   </data>
   <data name="ReplaceBackgroundToolTip" xml:space="preserve">
     <value>Set a background image or video…</value>
@@ -560,7 +556,7 @@
     <value>Choose a Background Image or Video</value>
   </data>
   <data name="BackgroundNotSupported" xml:space="preserve">
-    <value>That file isn't a png, jpg or jpeg image, or an mp4, avi, webm, vp8, ogv or mpeg video.</value>
+    <value>That file isn't a png, jpg, or jpeg image, or an mp4, avi, webm, vp8, ogv, or mpeg video.</value>
   </data>
   <data name="BackgroundUnreadableFormat" xml:space="preserve">
     <value>That file can't be used: {0}</value>
@@ -643,10 +639,10 @@
     <value>Playback speed</value>
   </data>
   <data name="PlaybackSpeedToolTip" xml:space="preserve">
-    <value>Playback speed, from 1% to 1000%; pick one or type a percent. Shared by every song, and back to 100% when the app starts again.</value>
+    <value>Playback speed, 1% to 1000%. Applies to all songs; resets to 100% on restart.</value>
   </data>
   <data name="PitchCorrectionToolTip" xml:space="preserve">
-    <value>Keep the pitch when playing faster or slower. When off, the pitch rises and falls with the speed.</value>
+    <value>Keep pitch when playing faster or slower. When off, pitch rises and falls with speed.</value>
   </data>
   <data name="TrackUnplayableFormat" xml:space="preserve">
     <value>Can't be played: {0}</value>
@@ -729,7 +725,7 @@
     <comment>{0} is the reason.</comment>
   </data>
   <data name="LyricsChartKeepsWordsOnly" xml:space="preserve">
-    <value>A .chart keeps only the words, so the notes and harmonies are left out.</value>
+    <value>A .chart keeps only words; notes and harmonies are dropped.</value>
   </data>
   <data name="LyricsAddToolTip" xml:space="preserve">
     <value>Add lyrics from another chart…</value>
@@ -747,13 +743,13 @@
     <value>Lyrics offset</value>
   </data>
   <data name="LyricsOffsetToolTip" xml:space="preserve">
-    <value>Moves the lyrics and vocal notes later (positive) or earlier (negative). Saving rewrites the chart.</value>
+    <value>Moves lyrics and vocal notes later (positive) or earlier (negative). Saving rewrites the chart.</value>
   </data>
   <data name="LyricsRevertOffsetToolTip" xml:space="preserve">
     <value>Reset the lyrics offset</value>
   </data>
   <data name="LyricsOffsetBeforeStartFormat" xml:space="preserve">
-    <value>The lyrics would start {0} ms before the song does, so this can't be saved. Move them at least that much later.</value>
+    <value>The lyrics would start {0} ms before the song, so this can't be saved. Move them at least that much later.</value>
     <comment>{0} is a number of milliseconds: how much later the lyrics must move to start with the song.</comment>
   </data>
   <data name="PickLyricsTitle" xml:space="preserve">
@@ -789,7 +785,7 @@
     <value>Audio</value>
   </data>
   <data name="ScanDepthDescription" xml:space="preserve">
-    <value>How many folder levels below the chosen folder a scan searches. 0 searches only the folder itself.</value>
+    <value>How many folder levels below the chosen folder a scan searches. 0 searches just that folder.</value>
   </data>
   <data name="ScanDepthKeywords" xml:space="preserve">
     <value>depth levels subfolders recursive</value>
@@ -799,7 +795,7 @@
     <value>Parallel reads</value>
   </data>
   <data name="ScanParallelismDescription" xml:space="preserve">
-    <value>How many folders a scan searches, and how many songs it reads, at once. Deduplicate reads and compares this many files at once too. Higher can be faster on SSDs and network drives; 1 reads one at a time.</value>
+    <value>How many folders a scan searches and songs it reads at once. Deduplicate compares this many files at once too. Higher is faster on SSDs and network drives; 1 reads one at a time.</value>
   </data>
   <data name="ScanParallelismKeywords" xml:space="preserve">
     <value>threads parallel parallelism concurrency workers speed performance</value>
@@ -838,7 +834,7 @@
     <value>Keep pitch when changing speed</value>
   </data>
   <data name="PitchCorrectionDescription" xml:space="preserve">
-    <value>Play songs faster or slower at their own pitch, by stretching the audio in time. When off, the pitch rises and falls with the speed.</value>
+    <value>Play songs faster or slower at their own pitch by stretching the audio in time. When off, pitch rises and falls with speed.</value>
   </data>
   <data name="PitchCorrectionKeywords" xml:space="preserve">
     <value>pitch correction keep preserve tempo time stretch speed slow fast chipmunk</value>
@@ -851,7 +847,7 @@
     <value>Show waveforms</value>
   </data>
   <data name="ShowWaveformsDescription" xml:space="preserve">
-    <value>Draw the song's and each track's waveform. When off, tracks aren't read ahead of playback, which saves work on slower computers. The song's length shows once it's played.</value>
+    <value>Draw the song's and each track's waveform. When off, tracks aren't read ahead, saving work on slower computers. The song's length shows once played.</value>
   </data>
   <data name="ShowWaveformsKeywords" xml:space="preserve">
     <value>waveform peaks visualizer visualiser performance slow</value>
@@ -861,7 +857,7 @@
     <value>Show spectrum</value>
   </data>
   <data name="ShowSpectrumDescription" xml:space="preserve">
-    <value>Draw the moving spectrum behind the details panel while a song plays. When off, it isn't worked out at all.</value>
+    <value>Draw the moving spectrum behind the details panel during playback. When off, it isn't computed at all.</value>
   </data>
   <data name="ShowSpectrumKeywords" xml:space="preserve">
     <value>spectrum analyzer analyser bars visualizer visualiser performance slow</value>
@@ -871,10 +867,10 @@
     <value>Appearance</value>
   </data>
   <data name="AlbumArtThemeLabel" xml:space="preserve">
-    <value>Take colours from album art</value>
+    <value>Take colors from album art</value>
   </data>
   <data name="AlbumArtThemeDescription" xml:space="preserve">
-    <value>Tint the main window, its accent colour and the spectrum to match the selected song's album art, fading as you move between songs. When off, the app keeps its own colours.</value>
+    <value>Tints the main window, its accent color, and the spectrum to match the selected song's album art, fading between songs. When off, the app keeps its own colors.</value>
   </data>
   <data name="AlbumArtThemeKeywords" xml:space="preserve">
     <value>colour color theme dynamic accent tint cover art album artwork palette</value>
@@ -1096,7 +1092,7 @@
     <value>Audio offset</value>
   </data>
   <data name="AudioOffsetToolTip" xml:space="preserve">
-    <value>Moves all the audio later (positive) or earlier (negative) against the chart and lyrics. The background video stays with the audio; it has its own offset. Saved as song.ini's delay.</value>
+    <value>Moves all audio later (positive) or earlier (negative) relative to the chart and lyrics. The background video stays with the audio and has its own offset. Saved as song.ini's delay.</value>
   </data>
   <data name="AudioRevertOffsetToolTip" xml:space="preserve">
     <value>Reset the audio offset</value>
@@ -1105,7 +1101,7 @@
     <value>Video Offset</value>
   </data>
   <data name="VideoOffsetToolTip" xml:space="preserve">
-    <value>Moves the background video later (positive) or earlier (negative) against the audio. Saved as song.ini's video_start_time.</value>
+    <value>Moves the background video later (positive) or earlier (negative) relative to the audio. Saved as song.ini's video_start_time.</value>
   </data>
   <data name="VideoOffsetButtonToolTip" xml:space="preserve">
     <value>Line the video up with the audio</value>
@@ -1127,7 +1123,7 @@
     <value>Show note highway</value>
   </data>
   <data name="ShowHighwayDescription" xml:space="preserve">
-    <value>Draw the chart's notes falling in time with the audio. Choose the instruments from the note highway's button: next to the Image and Video switch, or in its row's caption.</value>
+    <value>Draw the chart's notes falling with the audio. Pick instruments from the note highway's button: next to the Image and Video switch, or in its row's caption.</value>
   </data>
   <data name="ShowHighwayKeywords" xml:space="preserve">
     <value>highway notes chart lanes falling preview guitar drums bass keys</value>
@@ -1137,7 +1133,7 @@
     <value>Note highway position</value>
   </data>
   <data name="HighwayPlacementDescription" xml:space="preserve">
-    <value>Where the note highway is drawn: over the background video or image, as a game draws it, or in its own row below the lyrics, leaving the background clear. Needs Show note highway.</value>
+    <value>Where the note highway is drawn: over the background, as in a game, or in its own row below the lyrics, leaving the background clear. Needs Show note highway.</value>
   </data>
   <data name="HighwayPlacementKeywords" xml:space="preserve">
     <value>highway position placement location row lane overlay background video lyrics</value>
@@ -1145,17 +1141,15 @@
   </data>
   <data name="HighwayPlacementBackground" xml:space="preserve">
     <value>Over the background</value>
-    <comment>A choice of Note highway position.</comment>
   </data>
   <data name="HighwayPlacementRow" xml:space="preserve">
     <value>In its own row</value>
-    <comment>A choice of Note highway position.</comment>
   </data>
   <data name="ShowLaneWaveformsLabel" xml:space="preserve">
     <value>Show waveforms in lanes</value>
   </data>
   <data name="ShowLaneWaveformsDescription" xml:space="preserve">
-    <value>Draw each instrument's track behind its notes on the note highway, and the vocals track behind the lyrics, to help line the chart up with the audio. A lane without a track of its own shows the song's. Needs Show waveforms.</value>
+    <value>Draw each instrument's track behind its notes, and the vocals track behind the lyrics, to align the chart with the audio. A lane with no track of its own shows the song's track. Needs Show waveforms.</value>
   </data>
   <data name="ShowLaneWaveformsKeywords" xml:space="preserve">
     <value>waveform lanes highway lyrics align alignment offset sync timing audio track stem</value>
@@ -1165,7 +1159,7 @@
     <value>Waveform detail</value>
   </data>
   <data name="WaveformFidelityDescription" xml:space="preserve">
-    <value>How finely each track's waveform is read: finer detail shows the start of each note more sharply in the lanes, but takes longer to read and more memory. Changing it reads the tracks again. Needs Show waveforms.</value>
+    <value>How finely each track's waveform is read: finer detail shows note starts more sharply in the lanes but takes longer to read and more memory. Changing it re-reads the tracks. Needs Show waveforms.</value>
   </data>
   <data name="WaveformFidelityKeywords" xml:space="preserve">
     <value>waveform resolution fidelity detail quality precision sharp fine lanes highway</value>
@@ -1197,7 +1191,7 @@
     <value>Waveform</value>
   </data>
   <data name="LaneWaveformPickerToolTip" xml:space="preserve">
-    <value>The track whose waveform is drawn behind the notes. Your choice lasts for this song until the app closes.</value>
+    <value>The track drawn behind the notes. Your choice lasts for this song until the app closes.</value>
   </data>
   <data name="LaneWaveformOptionsName" xml:space="preserve">
     <value>Lyrics waveform options</value>
@@ -1227,7 +1221,7 @@
     <value>The offsets can't be applied, so the notes are shown where the chart has them: {0}</value>
   </data>
   <data name="HighwayMarkingsChangedFormat" xml:space="preserve">
-    <value>Moving {0} changes some notes' star power, taps or cymbals, because the markers every difficulty shares stay put. Move each difficulty by the same amount to move the markers with them.</value>
+    <value>Moving {0} changes some notes' star power, taps, or cymbals because shared markers stay put. Move every difficulty by the same amount to move the markers too.</value>
     <comment>{0} lists instrument difficulties, e.g. 'Expert Guitar, Hard Drums'.</comment>
   </data>
   <data name="HighwayDifficultyOffsetFormat" xml:space="preserve">
@@ -1250,7 +1244,7 @@
     <value>Merge</value>
   </data>
   <data name="MergeToolTip" xml:space="preserve">
-    <value>Combine the selected songs into one new .sng, choosing which song each part, the audio and the metadata come from</value>
+    <value>Combine the selected songs into one new .sng, choosing which song each part, the audio, and the metadata come from.</value>
   </data>
   <data name="MergeWindowTitle" xml:space="preserve">
     <value>Merge Songs</value>
@@ -1271,7 +1265,7 @@
     <value>Base Chart</value>
   </data>
   <data name="MergeBaseDescription" xml:space="preserve">
-    <value>Its tempo map, sections, events and delay are kept. Parts from the other songs are placed by song time; fine-tune them afterwards with the note highway's offsets.</value>
+    <value>Its tempo map, sections, events, and delay are kept. Other songs' parts are placed by song time; then fine-tune them with the note highway's offsets.</value>
   </data>
   <data name="MergeBaseLabel" xml:space="preserve">
     <value>Tempo Map and Events</value>
@@ -1280,7 +1274,7 @@
     <value>Parts</value>
   </data>
   <data name="MergePartsDescription" xml:space="preserve">
-    <value>Choose the song each part comes from; its difficulties come with it. Parts more than one song has must be chosen.</value>
+    <value>Choose which song each part comes from; its difficulties come with it. Choose every part found in more than one song.</value>
   </data>
   <data name="MergeSectionAudio" xml:space="preserve">
     <value>Audio</value>
@@ -1304,7 +1298,7 @@
     <value>Alignment</value>
   </data>
   <data name="MergeAlignmentDescription" xml:space="preserve">
-    <value>How far each song's chart moves to line up with the kept audio; its parts, lyrics and video move with it. Auto-align lines each song up with one already lined up: by a part they share, the pattern of its notes all through the song or its first notes, or else by their audio, each mixed down. Fine-tune each part afterwards with the note highway's offsets.</value>
+    <value>How far each song's chart shifts to match the kept audio; its parts, lyrics, and video shift with it. Auto-align matches each song to one already aligned: by a shared part, its full or opening note pattern, or by mixed-down audio. Then fine-tune each part with the note highway's offsets.</value>
   </data>
   <data name="MergeAlignmentLabel" xml:space="preserve">
     <value>Offset</value>
@@ -1313,13 +1307,13 @@
     <value>Auto-Align</value>
   </data>
   <data name="MergeAutoAlignToolTip" xml:space="preserve">
-    <value>Works out how far each song is from the kept audio, by the parts the songs share or else by their audio, and lines them all up. Offsets typed by hand are replaced. The first time, each song's audio is read, which can take a few seconds.</value>
+    <value>Lines up every song with the kept audio using shared parts or audio. Replaces hand-typed offsets. The first run reads each song's audio and can take a few seconds.</value>
   </data>
   <data name="MergeAlignmentResetButton" xml:space="preserve">
     <value>Reset</value>
   </data>
   <data name="MergeAlignmentResetToolTip" xml:space="preserve">
-    <value>Moves every song back to where its own chart has it.</value>
+    <value>Move every song back to where its own chart has it.</value>
   </data>
   <data name="MergeAligning" xml:space="preserve">
     <value>Lining up…</value>
@@ -1361,7 +1355,7 @@
     <comment>{0} is how alike the two songs' audio is at the offset, from 0 to 1.</comment>
   </data>
   <data name="MergeAlignmentAudioWeakFormat" xml:space="preserve">
-    <value>The audio is only {0:P0} alike: the songs may be different recordings, or the offset may be wrong.</value>
+    <value>The audio is only {0:P0} alike: the songs may be different recordings, or the offset wrong.</value>
   </data>
   <data name="MergeAlignmentAudioUnreadFormat" xml:space="preserve">
     <value>The audio of {0} couldn't be read, so it's lined up by its chart alone.</value>
@@ -1372,16 +1366,16 @@
     <comment>At the top of a linked song's offset tooltip: {0} is how far the link moves it from the song it's lined up with, {1} that song.</comment>
   </data>
   <data name="MergeAlignmentFirstNotesHint" xml:space="preserve">
-    <value>Only the first notes line it up: check both charts start at the same place in the song.</value>
+    <value>Only the first notes line it up: check that both charts start at the same place in the song.</value>
   </data>
   <data name="MergeAlignmentAmbiguous" xml:space="preserve">
     <value>Another offset, about a beat out, lines up nearly as well.</value>
   </data>
   <data name="MergeAlignmentNarrowed" xml:space="preserve">
-    <value>The notes repeat, so it was looked for near the first notes.</value>
+    <value>The notes repeat, so it was matched near the first notes.</value>
   </data>
   <data name="MergeAlignmentNarrowedByAudio" xml:space="preserve">
-    <value>The notes repeat, so it was looked for near where the audio puts it.</value>
+    <value>The notes repeat, so it was matched near where the audio puts it.</value>
   </data>
   <data name="MergeAlignmentAudioDisagreesFormat" xml:space="preserve">
     <value>Its audio puts it at {0:+0;-0;0} ms, {1:+0;-0;0} ms from here: check which is right.</value>
@@ -1392,13 +1386,13 @@
     <comment>{0} is how far the part's note pattern puts the song from where its first notes do; {1} the share of notes that line up there.</comment>
   </data>
   <data name="MergeAlignmentDriftFormat" xml:space="preserve">
-    <value>The end of the song lines up {0:+0;-0} ms from its start: the songs may differ in length or speed.</value>
+    <value>The song's end lines up {0:+0;-0} ms from its start: the songs may differ in length or speed.</value>
   </data>
   <data name="MergeAlignmentUnreached" xml:space="preserve">
     <value>No part or audio in common with a song that's lined up.</value>
   </data>
   <data name="MergeAlignmentNoLinks" xml:space="preserve">
-    <value>Some songs share no part or audio with the kept audio's song, or with one lined up with it; set those by hand.</value>
+    <value>Some songs share no part or audio with the kept audio's song or one lined up with it; set those by hand.</value>
   </data>
   <data name="MergeAlignmentFailedFormat" xml:space="preserve">
     <value>The songs couldn't be lined up: {0}</value>
@@ -1407,7 +1401,7 @@
     <value>Alignment offset</value>
   </data>
   <data name="MergeAlignmentOffsetToolTip" xml:space="preserve">
-    <value>How far everything from this song moves, in milliseconds, later when positive. A value typed for a linked song is added to its link, and the songs lined up with it follow.</value>
+    <value>How far everything from this song moves, in milliseconds; later when positive. A value typed for a linked song adds to its link, and songs lined up with it follow.</value>
   </data>
   <data name="MergeAlignmentLinkName" xml:space="preserve">
     <value>Lined up by</value>
@@ -1416,7 +1410,7 @@
     <value>Compare…</value>
   </data>
   <data name="MergeCompareToolTip" xml:space="preserve">
-    <value>Line this song up by eye: its waveform and notes against the kept audio's song's.</value>
+    <value>Line this song up by eye: match its waveform and notes to the kept audio's song.</value>
   </data>
   <data name="MergeCompareTitleFormat" xml:space="preserve">
     <value>Line Up {0}</value>
@@ -1427,7 +1421,7 @@
     <comment>{0} is the song being lined up, {1} the kept audio's song.</comment>
   </data>
   <data name="MergeCompareDescriptionFormat" xml:space="preserve">
-    <value>Drag {0}'s lanes sideways until its waveform and notes line up with those above them; drag anywhere else to move along the song. Scroll to zoom, or with Shift held to move along it. Hold Ctrl for a finer drag.</value>
+    <value>Drag {0}'s lanes sideways to align its waveform and notes with those above; drag elsewhere to move along the song. Scroll to zoom, Shift+scroll to move along it, Ctrl+drag for finer moves.</value>
     <comment>{0} is the song being lined up.</comment>
   </data>
   <data name="MergeCompareNoAudioFormat" xml:space="preserve">
@@ -1446,7 +1440,7 @@
     <value>Undo</value>
   </data>
   <data name="MergeCompareRevertToolTip" xml:space="preserve">
-    <value>Back to the offset the song had when this opened.</value>
+    <value>Restores the offset the song had when this opened.</value>
   </data>
   <data name="MergeCompareZoomIn" xml:space="preserve">
     <value>Zoom In</value>
@@ -1480,14 +1474,14 @@
     <value>Use This Offset</value>
   </data>
   <data name="MergeAlignmentBeforeStartFormat" xml:space="preserve">
-    <value>Lining up moves {0} before the song starts. Move its song later, or choose another base chart.</value>
+    <value>Lining up moves {0} before the song starts. Move its song later, or pick another base chart.</value>
     <comment>{0} lists the parts, e.g. "Guitar, Drums".</comment>
   </data>
   <data name="MergeSectionMetadata" xml:space="preserve">
     <value>Metadata</value>
   </data>
   <data name="MergeMetadataDescription" xml:space="preserve">
-    <value>Only the values the songs disagree on are listed. Charters, difficulties, preview and song length are worked out.</value>
+    <value>Lists only values the songs disagree on. Charters, difficulties, preview, and song length are worked out.</value>
   </data>
   <data name="MergeNoConflicts" xml:space="preserve">
     <value>The songs agree on every other value.</value>
@@ -1567,7 +1561,7 @@
     <value>{0} is one of the songs being merged, so it can't be written over.</value>
   </data>
   <data name="MergeLyricsOffsetBeforeStart" xml:space="preserve">
-    <value>The lyrics offset set on the preview would start the vocals before the song does. Move them later to merge.</value>
+    <value>The preview's lyrics offset would start the vocals before the song. Move them later to merge.</value>
   </data>
   <data name="MergeMerging" xml:space="preserve">
     <value>Merging…</value>
@@ -1600,7 +1594,7 @@
     <value>{0} {1}: some sustains became plain notes, or the other way round</value>
   </data>
   <data name="MergeIssueMarkingsFormat" xml:space="preserve">
-    <value>{0} {1}: some notes changed what they are (HOPO, tap, cymbal or star power)</value>
+    <value>{0} {1}: some notes changed type (HOPO, tap, cymbal, or star power)</value>
   </data>
   <data name="MergeIssueNotesChangedFormat" xml:space="preserve">
     <value>{0} {1}: some notes moved or changed lane</value>
@@ -1627,10 +1621,10 @@
     <value>The preview can't be put together: {0}</value>
   </data>
   <data name="MergePreviewNote" xml:space="preserve">
-    <value>This is a preview of the merged song. Offsets set on its note highway are applied when it's merged; everything else can be edited once it's merged.</value>
+    <value>Preview of the merged song. Offsets set on its note highway apply at merge; everything else can be edited after merging.</value>
   </data>
   <data name="DedupToolTip" xml:space="preserve">
-    <value>Find duplicate copies of songs across the whole library, and different charts of the same song, and move the copies you don't need to the trash. Rescans the library first, so it compares what's on disk now.</value>
+    <value>Find duplicate songs across the library, including different charts of the same song, and move unneeded copies to the trash. Rescans first to compare what's on disk now.</value>
   </data>
   <data name="DedupWindowTitle" xml:space="preserve">
     <value>Deduplicate Library</value>
@@ -1652,7 +1646,7 @@
     <value>The folder</value>
   </data>
   <data name="DedupKeepDescription" xml:space="preserve">
-    <value>Which copy Deduplicate keeps by default when a song is in the library both as a folder and as a .sng. You can still choose another copy in each group.</value>
+    <value>Which copy Deduplicate keeps by default when a song exists both as a folder and a .sng. You can still pick another copy in each group.</value>
   </data>
   <data name="DedupKeepKeywords" xml:space="preserve">
     <value>duplicate dedupe deduplicate keep prefer sng folder copy</value>
@@ -1667,7 +1661,7 @@
     <comment>{0} is the number of songs the library scan has read, {1} the number found. Shown once every folder has been searched.</comment>
   </data>
   <data name="DedupScanIncomplete" xml:space="preserve">
-    <value>The library scan didn't finish, so nothing was compared. Close this window and try again once the folder can be read.</value>
+    <value>The library scan didn't finish, so nothing was compared. Close this window and retry once the folder is readable.</value>
   </data>
   <data name="DedupPhaseReadingFormat" xml:space="preserve">
     <value>Reading songs… {0:N0} of {1:N0}</value>
@@ -1698,13 +1692,13 @@
     <comment>{0} is the number of groups.</comment>
   </data>
   <data name="DedupExactDescription" xml:space="preserve">
-    <value>Every file and all the metadata match, so deleting a copy loses nothing. One copy in each group is kept.</value>
+    <value>Every file and all metadata match, so deleting a copy loses nothing. One copy per group is kept.</value>
   </data>
   <data name="DedupSameChartDescription" xml:space="preserve">
-    <value>The chart is the same, but the metadata or other files differ. Check what's different, then delete group by group or all at once, or open a group in Merge to compare and combine its metadata and files.</value>
+    <value>The chart matches, but metadata or other files differ. Review the differences, then delete by group or all at once, or open a group in Merge to combine metadata and files.</value>
   </data>
   <data name="DedupMergeDescription" xml:space="preserve">
-    <value>The same artist and title, with different charts. Merge them into one new .sng; once it's made, you can delete the charts it came from.</value>
+    <value>Same artist and title with different charts. Merge them into one new .sng, then delete the charts it came from.</value>
   </data>
   <data name="DedupNoExact" xml:space="preserve">
     <value>No exact duplicates were found.</value>
@@ -1789,7 +1783,7 @@
     <value>Open in Merge…</value>
   </data>
   <data name="DedupMergedIntoFormat" xml:space="preserve">
-    <value>Merged into {0}. It's kept; mark the sources it came from to delete them.</value>
+    <value>Merged into {0}, which is kept. Mark its sources to delete them.</value>
     <comment>{0} is the merged .sng's path.</comment>
   </data>
   <data name="DedupMergeCheckFailedFormat" xml:space="preserve">
@@ -1866,7 +1860,7 @@
     <value>Trash</value>
   </data>
   <data name="DedupTrashUnsupported" xml:space="preserve">
-    <value>Deleting is turned off: this system has no trash the app can move files to.</value>
+    <value>Deleting is off: this system has no trash to move files to.</value>
   </data>
   <data name="DedupConfirmTitle" xml:space="preserve">
     <value>Delete Duplicates</value>
@@ -1874,7 +1868,7 @@
   <data name="DedupConfirmFormat" xml:space="preserve">
     <value>Move {0:N0} songs ({1}) to the {2}?
 
-Each one is checked first. Anything that has changed since it was compared, or whose kept copy is missing, is left alone.</value>
+Each song is rechecked first. Changed songs, or ones whose kept copy is missing, are left alone.</value>
     <comment>{0} is the number of songs, {1} their size, {2} "Recycle Bin" or "Trash".</comment>
   </data>
   <data name="DedupConfirmButtonFormat" xml:space="preserve">
@@ -2024,7 +2018,7 @@ Each one is checked first. Anything that has changed since it was compared, or w
     <value>Ctrl+scroll step</value>
   </data>
   <data name="ScrubStepDescription" xml:space="preserve">
-    <value>How far each notch of the wheel moves the song with Ctrl held over the seek bar, a highway or the lyrics, to the next note of this length on the chart's beat grid.</value>
+    <value>How far each wheel notch moves the song with Ctrl held over the seek bar, highway, or lyrics: to the next note of this length on the chart's beat grid.</value>
   </data>
   <data name="ScrubStepKeywords" xml:space="preserve">
     <value>scroll wheel ctrl control step snap grid beat quarter eighth sixteenth note seek scrub</value>
@@ -2032,19 +2026,15 @@ Each one is checked first. Anything that has changed since it was compared, or w
   </data>
   <data name="ScrubStepWhole" xml:space="preserve">
     <value>Whole note</value>
-    <comment>A choice of Ctrl+scroll step.</comment>
   </data>
   <data name="ScrubStepHalf" xml:space="preserve">
     <value>Half note</value>
-    <comment>A choice of Ctrl+scroll step.</comment>
   </data>
   <data name="ScrubStepQuarter" xml:space="preserve">
     <value>Quarter note</value>
-    <comment>A choice of Ctrl+scroll step.</comment>
   </data>
   <data name="ScrubStepEighth" xml:space="preserve">
     <value>Eighth note</value>
-    <comment>A choice of Ctrl+scroll step.</comment>
   </data>
   <data name="ScrubStepEighthTriplet" xml:space="preserve">
     <value>Eighth-note triplet</value>
@@ -2052,7 +2042,6 @@ Each one is checked first. Anything that has changed since it was compared, or w
   </data>
   <data name="ScrubStepSixteenth" xml:space="preserve">
     <value>Sixteenth note</value>
-    <comment>A choice of Ctrl+scroll step.</comment>
   </data>
   <data name="ScrubStepSixteenthTriplet" xml:space="preserve">
     <value>Sixteenth-note triplet</value>
@@ -2060,13 +2049,12 @@ Each one is checked first. Anything that has changed since it was compared, or w
   </data>
   <data name="ScrubStepThirtySecond" xml:space="preserve">
     <value>Thirty-second note</value>
-    <comment>A choice of Ctrl+scroll step.</comment>
   </data>
   <data name="FineScrubSpeedLabel" xml:space="preserve">
     <value>Seek bar Ctrl+drag speed</value>
   </data>
   <data name="FineScrubSpeedDescription" xml:space="preserve">
-    <value>How far the song moves for each pixel dragged with Ctrl held on the seek bar, the same however long the song is.</value>
+    <value>How far the song moves per pixel dragged with Ctrl held on the seek bar, regardless of song length.</value>
   </data>
   <data name="FineScrubSpeedKeywords" xml:space="preserve">
     <value>ctrl control drag fine scrub seek slow precise speed pixel waveform</value>
@@ -2076,7 +2064,7 @@ Each one is checked first. Anything that has changed since it was compared, or w
     <value>Highway and lyrics Ctrl+drag</value>
   </data>
   <data name="LaneFineScrubDescription" xml:space="preserve">
-    <value>How many times finer a drag with Ctrl held is than a plain drag on a highway or the lyrics.</value>
+    <value>How much finer a Ctrl+drag is than a plain drag on a highway or the lyrics.</value>
   </data>
   <data name="LaneFineScrubKeywords" xml:space="preserve">
     <value>ctrl control drag fine scrub slow precise speed highway lyrics vocals notes lane</value>
@@ -2092,7 +2080,6 @@ Each one is checked first. Anything that has changed since it was compared, or w
   </data>
   <data name="SeekBarFineScrubToolTip" xml:space="preserve">
     <value>Ctrl+drag to scrub finely</value>
-    <comment>A line of the seek bar's tooltip.</comment>
   </data>
   <data name="HighwayScrubToolTip" xml:space="preserve">
     <value>Drag to move through the notes</value>
@@ -2100,11 +2087,9 @@ Each one is checked first. Anything that has changed since it was compared, or w
   </data>
   <data name="HighwayOverviewToolTip" xml:space="preserve">
     <value>Hold Shift to see the whole chart, and drag to scrub through it</value>
-    <comment>A line of a highway's tooltip.</comment>
   </data>
   <data name="HighwayFineScrubToolTip" xml:space="preserve">
     <value>Ctrl+drag to scrub finely</value>
-    <comment>A line of a highway's tooltip.</comment>
   </data>
   <data name="LyricsScrubToolTip" xml:space="preserve">
     <value>Drag to move through the lyrics</value>
@@ -2112,11 +2097,9 @@ Each one is checked first. Anything that has changed since it was compared, or w
   </data>
   <data name="LyricsOverviewToolTip" xml:space="preserve">
     <value>Hold Shift to see the whole part, and drag to scrub through it</value>
-    <comment>A line of the lyrics lane's tooltip.</comment>
   </data>
   <data name="LyricsFineScrubToolTip" xml:space="preserve">
     <value>Ctrl+drag to scrub finely</value>
-    <comment>A line of the lyrics lane's tooltip.</comment>
   </data>
   <data name="ScrubStepToolTipFormat" xml:space="preserve">
     <value>Ctrl+scroll to step through the beat grid ({0})</value>
@@ -2130,14 +2113,14 @@ Each one is checked first. Anything that has changed since it was compared, or w
     <value>Save Invalid Metadata</value>
   </data>
   <data name="SaveInvalidMessageFormat" xml:space="preserve">
-    <value>Some of the metadata fails validation: {0} marked in orange. Games may misread or ignore these values. Save it anyway?</value>
+    <value>Some metadata fails validation: {0} marked in orange. Games may misread or ignore these values. Save anyway?</value>
     <comment>{0} is how many keys fail.</comment>
   </data>
   <data name="SaveAnywayButton" xml:space="preserve">
     <value>Save anyway</value>
   </data>
   <data name="ValidateToolTip" xml:space="preserve">
-    <value>Check the selected songs' metadata for values games may misread, such as a word where a number belongs, and fix them in place. Unsaved changes are checked as drafted.</value>
+    <value>Checks the selected songs' metadata for values games may misread, such as a word where a number belongs, and fixes them in place. Unsaved changes are checked as drafted.</value>
   </data>
   <data name="ValidatorWindowTitle" xml:space="preserve">
     <value>Validate Metadata</value>
@@ -2174,7 +2157,7 @@ Each one is checked first. Anything that has changed since it was compared, or w
     <comment>A chip on a song in the Validator's list. {0} is how many of its issues have no quick fix.</comment>
   </data>
   <data name="ValidatorManualCountToolTip" xml:space="preserve">
-    <value>Issues without a quick fix, to correct by hand in the inspector</value>
+    <value>Issues with no quick fix; correct by hand in the inspector</value>
   </data>
   <data name="ValidatorSelectSongFixesFormat" xml:space="preserve">
     <value>Select the quick fixes of {0}</value>
@@ -2192,7 +2175,7 @@ Each one is checked first. Anything that has changed since it was compared, or w
     <comment>{0} is why.</comment>
   </data>
   <data name="ValidatorPickSong" xml:space="preserve">
-    <value>Pick a song to see and fix its metadata. Changes you don't save here stay as drafts in the main window.</value>
+    <value>Pick a song to see and fix its metadata. Unsaved changes here stay as drafts in the main window.</value>
   </data>
   <data name="ValidatorSongsListName" xml:space="preserve">
     <value>Songs that fail validation</value>
@@ -2206,7 +2189,7 @@ Each one is checked first. Anything that has changed since it was compared, or w
     <comment>{0} is how many ticked issues the button fixes.</comment>
   </data>
   <data name="ValidatorFixSelectedToolTip" xml:space="preserve">
-    <value>Apply the quick fixes of the ticked issues to the songs' drafts. Nothing is saved until you save.</value>
+    <value>Apply the ticked issues' quick fixes to the songs' drafts. Nothing is saved until you save.</value>
   </data>
   <data name="ValidatorSaveAll" xml:space="preserve">
     <value>Save all changes</value>
@@ -2301,52 +2284,81 @@ Each one is checked first. Anything that has changed since it was compared, or w
     <value>Edit Chart</value>
   </data>
   <data name="EditChartToolTip" xml:space="preserve">
-    <value>Open the selected song's chart in Chart Builder. Select one song to edit it.</value>
+    <value>Open the selected song's chart in Chart Builder. Select a single song.</value>
   </data>
   <data name="EditChartUnsavedTitle" xml:space="preserve">
     <value>Unsaved Changes</value>
   </data>
   <data name="EditChartUnsavedMessageFormat" xml:space="preserve">
-    <value>{0} has metadata changes that aren't saved. Chart Builder opens the song as it is on disk, so save or discard them first.</value>
+    <value>{0} has unsaved metadata changes. Chart Builder opens the song as it is on disk, so save or discard them first.</value>
     <comment>{0} is the song's name.</comment>
   </data>
-  <data name="ChartBuilderOpenTitle" xml:space="preserve">
-    <value>Open in Chart Builder</value>
-  </data>
-  <data name="ChartBuilderOpenSaveOneFormat" xml:space="preserve">
-    <value>Chart Builder has {0} open. It may overwrite these changes when it saves the song. Save anyway?</value>
+  <data name="SongInUseByBuilderFormat" xml:space="preserve">
+    <value>{0} is open in Chart Builder.</value>
     <comment>{0} is the song's name.</comment>
   </data>
-  <data name="ChartBuilderOpenSaveManyFormat" xml:space="preserve">
-    <value>Chart Builder has {0} of these songs open. It may overwrite these changes when it saves them. Save anyway?</value>
+  <data name="SongInUseByPackerFormat" xml:space="preserve">
+    <value>{0} has unsaved changes in another Chart Packer window.</value>
+    <comment>{0} is the song's name.</comment>
+  </data>
+  <data name="SongInUseElsewhereFormat" xml:space="preserve">
+    <value>{0} is being edited in another window of Chart Builder or Chart Packer.</value>
+    <comment>{0} is the song's name.</comment>
+  </data>
+  <data name="SongsInUseFormat" xml:space="preserve">
+    <value>{0} of these songs are open in Chart Builder or another Chart Packer window.</value>
     <comment>{0} is how many.</comment>
   </data>
-  <data name="ChartBuilderOpenDeleteOneFormat" xml:space="preserve">
-    <value>Chart Builder has {0} open. Delete it anyway?</value>
-    <comment>{0} is the song's name.</comment>
+  <data name="SongInUseReadOnlyFormat" xml:space="preserve">
+    <value>{0} It can be edited and played here once closed there.</value>
+    <comment>{0} says where the song is open, e.g. SongInUseByBuilderFormat.</comment>
   </data>
-  <data name="ChartBuilderOpenDeleteManyFormat" xml:space="preserve">
-    <value>Chart Builder has {0} of these songs open. Delete them anyway?</value>
+  <data name="SongsInUseReadOnlyFormat" xml:space="preserve">
+    <value>{0} of these songs are open in Chart Builder or another Chart Packer window. They can be edited here once closed there.</value>
     <comment>{0} is how many.</comment>
   </data>
-  <data name="DeleteAnywayButton" xml:space="preserve">
-    <value>Delete anyway</value>
+  <data name="NotSavedInUseFormat" xml:space="preserve">
+    <value>Nothing was saved. {0}</value>
+    <comment>{0} says where the songs are open, e.g. SongInUseByBuilderFormat.</comment>
   </data>
-  <data name="ChartBuilderOpenOverwriteFormat" xml:space="preserve">
-    <value>Chart Builder has {0} open. It may overwrite the merged song when it saves. Overwrite anyway?</value>
-    <comment>{0} is the .sng's file name.</comment>
+  <data name="NotDeletedInUseFormat" xml:space="preserve">
+    <value>Nothing was deleted. {0}</value>
+    <comment>{0} says where the songs are open, e.g. SongInUseByBuilderFormat.</comment>
   </data>
-  <data name="OverwriteAnywayButton" xml:space="preserve">
-    <value>Overwrite anyway</value>
+  <data name="NotMergedInUseFormat" xml:space="preserve">
+    <value>The songs weren't merged. {0}</value>
+    <comment>{0} says where the merged song is open, e.g. SongInUseByBuilderFormat.</comment>
+  </data>
+  <data name="ChangeRefusedFormat" xml:space="preserve">
+    <value>The change wasn't kept. {0}</value>
+    <comment>{0} says why, e.g. SongInUseByBuilderFormat or SongLockFailedFormat.</comment>
+  </data>
+  <data name="SongLockFailedFormat" xml:space="preserve">
+    <value>{0} can't be locked for editing: {1}</value>
+    <comment>{0} is the song's name; {1} is the system's reason, e.g. access denied.</comment>
+  </data>
+  <data name="JobOutputInUseFormat" xml:space="preserve">
+    <value>Skipped because {0} is open in Chart Builder or another Chart Packer window.</value>
+    <comment>{0} is the output path.</comment>
   </data>
   <data name="AudioLatencyLabel" xml:space="preserve">
     <value>Audio/visual latency</value>
   </data>
   <data name="AudioLatencyDescription" xml:space="preserve">
-    <value>How much later the audio is heard than the screen shows it, measured for each output device by Chart Builder's calibration tool. The highway, lyrics and background are drawn that much earlier.</value>
+    <value>How much later audio is heard than shown, measured per output device by the calibration tool. The highway, lyrics, and background are drawn that much earlier. This adds to the latency detected from the device.</value>
   </data>
   <data name="AudioLatencyKeywords" xml:space="preserve">
     <value>latency delay offset sync calibrate calibration audio video lag bluetooth</value>
+  </data>
+  <data name="DetectLatencyLabel" xml:space="preserve">
+    <value>Detect output latency</value>
+    <comment>A switch: whether the latency read from the output device's buffers is added to its calibrated latency.</comment>
+  </data>
+  <data name="DetectLatencyDescription" xml:space="preserve">
+    <value>Read the output device's buffer latency from the system and add it to the calibrated latency. Excludes Bluetooth and display delay, so calibrate to cover those. Shared with Chart Builder.</value>
+  </data>
+  <data name="DetectLatencyKeywords" xml:space="preserve">
+    <value>detect automatic auto latency delay buffer hardware device sync calibration audio lag</value>
   </data>
   <data name="CalibrateButton" xml:space="preserve">
     <value>Calibrate…</value>
@@ -2389,5 +2401,323 @@ Each one is checked first. Anything that has changed since it was compared, or w
   </data>
   <data name="ValidatorTypeChartLoad" xml:space="preserve">
     <value>Chart: load</value>
+  </data>
+  <data name="ValidatorSuggestedRatingFixFormat" xml:space="preserve">
+    <value>Set to {0} (estimated)</value>
+    <comment>{0} is the difficulty estimator's tier for the part, e.g. 4.</comment>
+  </data>
+  <data name="ValidatorMissingDifficultiesFormat" xml:space="preserve">
+    <value>Missing difficulties: {0}</value>
+    <comment>{0} lists each part's missing difficulties, e.g. "Guitar Hard, Medium; Drums Easy".</comment>
+  </data>
+  <data name="ValidatorMissingPartFormat" xml:space="preserve">
+    <value>{0} {1}</value>
+    <comment>{0} is the part, {1} its missing difficulties, e.g. "Guitar Hard, Medium".</comment>
+  </data>
+  <data name="ValidatorMissingPartSeparator" xml:space="preserve">
+    <value>; </value>
+    <comment>Between parts in the list of missing difficulties.</comment>
+  </data>
+  <data name="ValidatorNoStarPowerFormat" xml:space="preserve">
+    <value>No star power: {0}</value>
+    <comment>{0} lists the parts without star power phrases, e.g. "Guitar; Bass".</comment>
+  </data>
+  <data name="ValidatorGenerateStarPowerFix" xml:space="preserve">
+    <value>Generate star power phrases, charged for the hard passages</value>
+  </data>
+  <data name="ValidatorGeneratingFormat" xml:space="preserve">
+    <value>Generating difficulties for {0} of {1} songs…</value>
+    <comment>{0} is how many songs are done, {1} how many are being generated.</comment>
+  </data>
+  <data name="ValidatorGenerateFailedFormat" xml:space="preserve">
+    <value>Some songs' difficulties weren't generated:
+{0}</value>
+    <comment>{0} is one line per song.</comment>
+  </data>
+  <data name="ValidatorGenerateSongFailedFormat" xml:space="preserve">
+    <value>{0}: {1}</value>
+    <comment>{0} is the song, {1} why its difficulties weren't generated.</comment>
+  </data>
+  <data name="ValidatorGenerateChangedMeanwhile" xml:space="preserve">
+    <value>its draft changed the chart during generation.</value>
+  </data>
+  <data name="ValidatorGenerateEditedMeanwhile" xml:space="preserve">
+    <value>it was edited or saved during generation. Run the fix again to generate from its current state.</value>
+  </data>
+  <data name="GenerateDifficultiesWorking" xml:space="preserve">
+    <value>Working out the difficulties…</value>
+  </data>
+  <data name="GenerateDifficultiesPreviewFailedFormat" xml:space="preserve">
+    <value>Couldn't preview this song: {0}</value>
+    <comment>{0} is why.</comment>
+  </data>
+  <data name="GenerateDifficultiesFindingsFormat" xml:space="preserve">
+    <value>Findings on the new difficulties: {0}</value>
+    <comment>{0} is how many chart lint findings the generated difficulties have.</comment>
+  </data>
+  <data name="GenerateDifficultiesNoFindings" xml:space="preserve">
+    <value>No findings on the new difficulties.</value>
+  </data>
+  <data name="GenerateDifficultiesSaveDefaultsButton" xml:space="preserve">
+    <value>Save as defaults</value>
+  </data>
+  <data name="GenerateDifficultiesSaveDefaultsToolTip" xml:space="preserve">
+    <value>Make these the rules this dialog and Chart Builder's Reduce start from</value>
+  </data>
+  <data name="GenerateDifficultiesSavedDefaults" xml:space="preserve">
+    <value>Saved as the default rules.</value>
+  </data>
+  <data name="GenerateDifficultiesSaveDefaultsFailed" xml:space="preserve">
+    <value>The default rules couldn't be saved.</value>
+  </data>
+  <data name="GenerateDifficultiesPositionFormat" xml:space="preserve">
+    <value>{0} / {1}</value>
+    <comment>Where the preview's song is, and how long it is, e.g. "0:42 / 3:00".</comment>
+  </data>
+  <data name="GenerateDifficultiesPreviewPartLabel" xml:space="preserve">
+    <value>Part</value>
+    <comment>Which part of the song picked the preview's highways show.</comment>
+  </data>
+  <data name="MenuGenerateLowerDifficulties" xml:space="preserve">
+    <value>_Generate Lower Difficulties…</value>
+  </data>
+  <data name="MenuGenerateLowerDifficultiesContext" xml:space="preserve">
+    <value>Generate Lower Difficulties…</value>
+    <comment>Library right-click menu: opens the Generate lower difficulties window for the selected songs.</comment>
+  </data>
+  <data name="GenerateLowerDifficultiesToolTip" xml:space="preserve">
+    <value>Fill in Hard, Medium, and Easy from the difficulty above each, skipping charted ones. New charts go into the songs' drafts until saved.</value>
+  </data>
+  <data name="LowerDifficultiesTitle" xml:space="preserve">
+    <value>Generate Lower Difficulties</value>
+  </data>
+  <data name="LowerDifficultiesDifficultiesHeading" xml:space="preserve">
+    <value>Difficulties</value>
+  </data>
+  <data name="LowerDifficultiesPartsHeading" xml:space="preserve">
+    <value>Parts</value>
+  </data>
+  <data name="LowerDifficultiesPartsPending" xml:space="preserve">
+    <value>The songs' parts show here as their charts are read.</value>
+  </data>
+  <data name="LowerDifficultiesChartedHeading" xml:space="preserve">
+    <value>Already charted</value>
+    <comment>Heading over the Skip / Replace switch: what happens to a difficulty that already has notes.</comment>
+  </data>
+  <data name="LowerDifficultiesSkip" xml:space="preserve">
+    <value>Skip</value>
+  </data>
+  <data name="LowerDifficultiesReplace" xml:space="preserve">
+    <value>Replace</value>
+  </data>
+  <data name="LowerDifficultiesSkipNote" xml:space="preserve">
+    <value>A difficulty that already has notes is left as it is.</value>
+  </data>
+  <data name="LowerDifficultiesReplaceNote" xml:space="preserve">
+    <value>A difficulty with notes is remade from the one above it, replacing what it has.</value>
+  </data>
+  <data name="LowerDifficultiesRulesNote" xml:space="preserve">
+    <value>Each difficulty is made from the one above it by these rules, like Chart Builder's Reduce.</value>
+  </data>
+  <data name="LowerDifficultiesSearchWatermark" xml:space="preserve">
+    <value>Search songs</value>
+  </data>
+  <data name="LowerDifficultiesTabToGenerate" xml:space="preserve">
+    <value>To generate</value>
+  </data>
+  <data name="LowerDifficultiesTabSkipped" xml:space="preserve">
+    <value>Skipped</value>
+  </data>
+  <data name="LowerDifficultiesTabProblems" xml:space="preserve">
+    <value>Problems</value>
+  </data>
+  <data name="LowerDifficultiesTabDone" xml:space="preserve">
+    <value>Done</value>
+  </data>
+  <data name="LowerDifficultiesTabAll" xml:space="preserve">
+    <value>All</value>
+  </data>
+  <data name="LowerDifficultiesTabFormat" xml:space="preserve">
+    <value>{0} {1}</value>
+    <comment>{0} is the tab's name, e.g. Skipped; {1} how many songs it lists.</comment>
+  </data>
+  <data name="LowerDifficultiesReading" xml:space="preserve">
+    <value>Reading…</value>
+    <comment>A song whose chart hasn't been read yet.</comment>
+  </data>
+  <data name="LowerDifficultiesNewFormat" xml:space="preserve">
+    <value>{0} new</value>
+    <comment>{0} is how many of the song's difficulties would be generated, counting every part.</comment>
+  </data>
+  <data name="LowerDifficultiesReplacedFormat" xml:space="preserve">
+    <value>{0} replaced</value>
+    <comment>{0} is how many of the song's charted difficulties would be made again.</comment>
+  </data>
+  <data name="LowerDifficultiesNewReplacedFormat" xml:space="preserve">
+    <value>{0} new, {1} replaced</value>
+    <comment>{0} is how many difficulties would be generated, {1} how many charted ones made again.</comment>
+  </data>
+  <data name="LowerDifficultiesSkippedCharted" xml:space="preserve">
+    <value>Already charted</value>
+    <comment>A song skipped because every difficulty picked already has notes.</comment>
+  </data>
+  <data name="LowerDifficultiesSkippedNoParts" xml:space="preserve">
+    <value>No part to make difficulties from</value>
+    <comment>A song skipped because none of its parts can be reduced, e.g. vocals only.</comment>
+  </data>
+  <data name="LowerDifficultiesSkippedFiltered" xml:space="preserve">
+    <value>None of the parts picked</value>
+    <comment>A song skipped because it has none of the parts picked.</comment>
+  </data>
+  <data name="LowerDifficultiesChartEdits" xml:space="preserve">
+    <value>Has unsaved chart changes; save them first</value>
+  </data>
+  <data name="LowerDifficultiesNoChart" xml:space="preserve">
+    <value>No chart</value>
+  </data>
+  <data name="LowerDifficultiesChartTooLarge" xml:space="preserve">
+    <value>The chart is too large to read</value>
+  </data>
+  <data name="LowerDifficultiesUnreadableFormat" xml:space="preserve">
+    <value>Can't be read: {0}</value>
+    <comment>{0} is why.</comment>
+  </data>
+  <data name="LowerDifficultiesUnreadable" xml:space="preserve">
+    <value>Can't be read</value>
+  </data>
+  <data name="LowerDifficultiesCantSave" xml:space="preserve">
+    <value>Can't be saved by Chart Packer</value>
+    <comment>A song whose metadata can't be rewritten, e.g. a .sng with errors.</comment>
+  </data>
+  <data name="LowerDifficultiesFailedFormat" xml:space="preserve">
+    <value>Not generated: {0}</value>
+    <comment>{0} is why.</comment>
+  </data>
+  <data name="LowerDifficultiesNothingGenerated" xml:space="preserve">
+    <value>Nothing was generated</value>
+  </data>
+  <data name="LowerDifficultiesChangedMeanwhile" xml:space="preserve">
+    <value>Its chart changed during generation; nothing was added</value>
+  </data>
+  <data name="LowerDifficultiesRefused" xml:space="preserve">
+    <value>Another app has this song open; nothing was added</value>
+  </data>
+  <data name="LowerDifficultiesGenerated" xml:space="preserve">
+    <value>Generated, not saved yet</value>
+  </data>
+  <data name="LowerDifficultiesSaved" xml:space="preserve">
+    <value>Saved</value>
+  </data>
+  <data name="LowerDifficultiesPipFormat" xml:space="preserve">
+    <value>{0}: {1}</value>
+    <comment>A line of a part's tooltip: {0} is the difficulty, {1} what happens to it, e.g. To generate.</comment>
+  </data>
+  <data name="LowerDifficultiesPipCharted" xml:space="preserve">
+    <value>Charted</value>
+  </data>
+  <data name="LowerDifficultiesPipEmpty" xml:space="preserve">
+    <value>Empty</value>
+  </data>
+  <data name="LowerDifficultiesPipTarget" xml:space="preserve">
+    <value>To generate</value>
+  </data>
+  <data name="LowerDifficultiesPipReplace" xml:space="preserve">
+    <value>To be made again</value>
+  </data>
+  <data name="LowerDifficultiesPipGenerated" xml:space="preserve">
+    <value>Generated</value>
+  </data>
+  <data name="LowerDifficultiesReadingFormat" xml:space="preserve">
+    <value>Reading charts: {0} of {1}</value>
+    <comment>{0} is how many songs have been read, {1} how many there are.</comment>
+  </data>
+  <data name="LowerDifficultiesGeneratingFormat" xml:space="preserve">
+    <value>Generating: {0} of {1}</value>
+    <comment>{0} is how many songs are done, {1} how many there are.</comment>
+  </data>
+  <data name="LowerDifficultiesSaving" xml:space="preserve">
+    <value>Saving…</value>
+  </data>
+  <data name="LowerDifficultiesReadyFormat" xml:space="preserve">
+    <value>{0} songs read</value>
+    <comment>{0} is how many songs were read.</comment>
+  </data>
+  <data name="LowerDifficultiesUnsavedFormat" xml:space="preserve">
+    <value>{0} generated, not saved yet</value>
+    <comment>{0} is how many songs have new difficulties in their drafts.</comment>
+  </data>
+  <data name="LowerDifficultiesSavedFormat" xml:space="preserve">
+    <value>{0} saved</value>
+    <comment>{0} is how many songs were saved.</comment>
+  </data>
+  <data name="LowerDifficultiesFailedCountFormat" xml:space="preserve">
+    <value>{0} with problems</value>
+    <comment>A link to the Problems tab; {0} is how many songs it lists.</comment>
+  </data>
+  <data name="LowerDifficultiesGenerateOne" xml:space="preserve">
+    <value>Generate 1 song</value>
+  </data>
+  <data name="LowerDifficultiesGenerateFormat" xml:space="preserve">
+    <value>Generate {0} songs</value>
+    <comment>{0} is how many songs, more than one.</comment>
+  </data>
+  <data name="LowerDifficultiesGenerateNone" xml:space="preserve">
+    <value>Generate</value>
+    <comment>The Generate button when no song has anything to generate.</comment>
+  </data>
+  <data name="LowerDifficultiesStop" xml:space="preserve">
+    <value>Stop</value>
+    <comment>Stops generating; songs already done keep their new difficulties.</comment>
+  </data>
+  <data name="LowerDifficultiesSaveOne" xml:space="preserve">
+    <value>Save 1 song</value>
+  </data>
+  <data name="LowerDifficultiesSaveFormat" xml:space="preserve">
+    <value>Save {0} songs</value>
+    <comment>{0} is how many songs, more than one.</comment>
+  </data>
+  <data name="LowerDifficultiesSaveToolTip" xml:space="preserve">
+    <value>Write the generated songs to disk, with any other unsaved changes they have.</value>
+  </data>
+  <data name="LowerDifficultiesCloseToolTip" xml:space="preserve">
+    <value>Generated songs left unsaved keep their new difficulties as unsaved changes, saved from the library.</value>
+  </data>
+  <data name="LowerDifficultiesNothing" xml:space="preserve">
+    <value>Nothing to generate for this song with these settings.</value>
+  </data>
+  <data name="LowerDifficultiesPickSong" xml:space="preserve">
+    <value>Pick a song to see its difficulties as they'd be generated.</value>
+  </data>
+  <data name="LowerDifficultiesDoneDetail" xml:space="preserve">
+    <value>This song's new difficulties are in its draft.</value>
+  </data>
+  <data name="LowerDifficultiesProblemDetail" xml:space="preserve">
+    <value>This song can't be generated:</value>
+    <comment>Followed by why, on the next line.</comment>
+  </data>
+  <data name="LowerDifficultiesEmptyReading" xml:space="preserve">
+    <value>Reading the songs' charts…</value>
+  </data>
+  <data name="LowerDifficultiesEmptyToGenerate" xml:space="preserve">
+    <value>Nothing to generate with these settings. Pick more difficulties or parts, or switch to Replace.</value>
+  </data>
+  <data name="LowerDifficultiesEmptySearch" xml:space="preserve">
+    <value>No songs here match the search.</value>
+  </data>
+  <data name="LowerDifficultiesEmptyTab" xml:space="preserve">
+    <value>No songs here.</value>
+  </data>
+  <data name="LowerDifficultiesGridToolTip" xml:space="preserve">
+    <value>Each part's difficulties, Expert on top: a ring is generated, a faint dot is charted and kept, a ring around a faint dot is remade.</value>
+  </data>
+  <data name="LowerDifficultiesIncludeToolTip" xml:space="preserve">
+    <value>Generate this song's new difficulties. Untick it to leave the song as it is.</value>
+  </data>
+  <data name="LowerDifficultiesIncludeAll" xml:space="preserve">
+    <value>All listed</value>
+    <comment>Ticks or unticks every song listed that has something to generate.</comment>
+  </data>
+  <data name="LowerDifficultiesIncludeAllToolTip" xml:space="preserve">
+    <value>Tick or untick every song listed here that has something to generate.</value>
   </data>
 </root>

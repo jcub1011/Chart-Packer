@@ -1,4 +1,6 @@
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
+using ChartShared.Audio.Waveforms;
 using ChartShared.Core.Charting;
 using ChartShared.Core.Charting.Authoring;
 using ChartShared.Core.Charting.Editing;
@@ -7,6 +9,7 @@ using ChartShared.Core.Charting.Playtest;
 using ChartShared.Core.Jobs;
 using ChartShared.Core.Launching;
 using ChartShared.UI.Services;
+using ChartShared.UI.ViewModels;
 
 namespace ChartBuilder.Services
 {
@@ -20,6 +23,16 @@ namespace ChartBuilder.Services
         KeepTimes,
     }
 
+    /// <summary>Which way the mouse wheel moves through the song, along the lanes in either view and the timeline alike.</summary>
+    public enum WheelScrollDirection
+    {
+        /// <summary>The wheel turned up is later, as up the highway.</summary>
+        UpIsLater,
+
+        /// <summary>The wheel turned down is later.</summary>
+        DownIsLater,
+    }
+
     /// <summary>What Chart Builder opens with when it starts with nothing on its command line.</summary>
     public enum StartupAction
     {
@@ -28,6 +41,28 @@ namespace ChartBuilder.Services
 
         /// <summary>The song opened most recently.</summary>
         ReopenRecent,
+    }
+
+    /// <summary>The Reduce dialog's preview's settings, as Chart Builder keeps them in <see cref="BuilderSettings"/>.</summary>
+    public sealed class BuilderReductionPreviewSettings(BuilderSettings settings) : IReductionPreviewSettings
+    {
+        public bool IsShown
+        {
+            get => settings.ReducePreviewShown;
+            set => settings.ReducePreviewShown = value;
+        }
+
+        public double LookAhead
+        {
+            get => settings.ReducePreviewLookAhead;
+            set => settings.ReducePreviewLookAhead = value;
+        }
+
+        public ReductionChangeCategories Categories
+        {
+            get => settings.ReducePreviewCategories;
+            set => settings.ReducePreviewCategories = value;
+        }
     }
 
     /// <summary>Chart Builder's settings, persisted to <c>builder-settings.json</c> (charter-spec §10).</summary>
@@ -79,8 +114,21 @@ namespace ChartBuilder.Services
         /// <summary>How fast notes go by in a lane whose look-ahead hasn't been set: 1 shows <see cref="LookAheadAtSpeedOne"/> seconds beyond the strike line.</summary>
         public double EditorHighwaySpeed { get; set; } = 1;
 
+        /// <summary>Which way the mouse wheel moves the cursor, in both lane views and on the timeline along the bottom.</summary>
+        public WheelScrollDirection WheelScrollDirection { get; set; } = WheelScrollDirection.UpIsLater;
+
+        /// <summary>
+        /// How finely each track's waveform is read. Finer detail shows note starts more sharply
+        /// in the lanes but takes longer to read and more memory.
+        /// </summary>
+        public const WaveformFidelity DefaultWaveformFidelity = WaveformFidelity.High;
+
         /// <summary>What a lane draws its audio as, until it's switched (<c>W</c>): the waveform or the spectrogram (charter-spec C12, C13).</summary>
         public LaneBackdrop DefaultLaneBackdrop { get; set; } = LaneBackdrop.Waveform;
+
+        /// <summary>How finely each track's waveform is read.</summary>
+        [JsonConverter(typeof(JsonStringEnumConverter<WaveformFidelity>))]
+        public WaveformFidelity WaveformFidelity { get; set; } = DefaultWaveformFidelity;
 
         /// <summary>The least the spectrogram memory budget can be, in MB.</summary>
         public const int MinSpectrogramBudgetMb = 64;
@@ -90,6 +138,12 @@ namespace ChartBuilder.Services
 
         /// <summary>How much memory every stem's spectrogram may take together, in MB (charter-spec C13 item 3).</summary>
         public int SpectrogramBudgetMb { get; set; } = 256;
+
+        /// <summary>The master volume of fresh settings: full.</summary>
+        public const double DefaultMasterVolume = 1;
+
+        /// <summary>The master volume, from silence to full.</summary>
+        public double MasterVolume { get; set; } = DefaultMasterVolume;
 
         /// <summary>The metronome's volume, in percent of full.</summary>
         public int MetronomeVolume { get; set; } = 50;
@@ -106,11 +160,34 @@ namespace ChartBuilder.Services
         /// <summary>The height of the timeline along the bottom of the editor.</summary>
         public double EditorTimelineHeight { get; set; } = DefaultEditorTimelineHeight;
 
-        /// <summary>Whether the editor's left panel is collapsed to a strip along the window's edge.</summary>
+        /// <summary>Whether the editor's left panel was collapsed to a strip, before panels could auto-hide.</summary>
+        /// <remarks>Only read, for <see cref="EditorLeftPanelAutoHide"/> in files saved before it.</remarks>
         public bool EditorLeftPanelCollapsed { get; set; }
 
-        /// <summary>Whether the editor's right panel is collapsed to a strip along the window's edge.</summary>
+        /// <summary>Whether the editor's right panel was collapsed to a strip, before panels could auto-hide.</summary>
+        /// <remarks>Only read, for <see cref="EditorRightPanelAutoHide"/> in files saved before it.</remarks>
         public bool EditorRightPanelCollapsed { get; set; }
+
+        /// <summary>
+        /// Whether the editor's left panel auto-hides: a strip along the window's edge that it flies out from, over the chart,
+        /// rather than pinned beside it. Null in files saved before it, which <see cref="EditorLeftPanelCollapsed"/> stands in for.
+        /// </summary>
+        public bool? EditorLeftPanelAutoHide { get; set; }
+
+        /// <summary>Whether the editor's right panel auto-hides, as <see cref="EditorLeftPanelAutoHide"/>.</summary>
+        public bool? EditorRightPanelAutoHide { get; set; }
+
+        /// <summary>The order of the left panel's tabs, by key, as the user dragged them. Null for the default order.</summary>
+        public List<string>? EditorLeftTabs { get; set; }
+
+        /// <summary>The order of the right panel's tabs, by key. Null for the default order.</summary>
+        public List<string>? EditorRightTabs { get; set; }
+
+        /// <summary>The order of each side-panel tab's sections, by the tab's key and then the sections'. Null for the defaults.</summary>
+        public Dictionary<string, List<string>>? EditorSectionOrder { get; set; }
+
+        /// <summary>The side-panel sections that are collapsed, each as <c>tab/section</c>. Null for none.</summary>
+        public List<string>? EditorCollapsedSections { get; set; }
 
         /// <summary>The editor's lanes, where each is docked and how big. Null for the default layout.</summary>
         public LaneDockState? EditorLanes { get; set; }
@@ -179,13 +256,39 @@ namespace ChartBuilder.Services
         public List<string> CalibrationPrompted { get; set; } = [];
 
         /// <summary>
-        /// The default rules Reduce starts from, per family and target difficulty (charter-spec C9 item 2, §10). The Reduce
-        /// dialog's changes apply to one run; its Settings mode changes these.
+        /// The default rules Reduce started from before both apps shared them in <c>reduction-rules.json</c>
+        /// (<see cref="BuilderSettingsService.ReductionRules"/>), which reads them from here until it's first saved. Never
+        /// written now; kept so a file an older Chart Builder saved still has them.
         /// </summary>
-        public ReductionDefaults ReductionRules { get; set; } = ReductionDefaults.Shipped;
+        public ReductionDefaults? ReductionRules { get; set; }
 
         /// <summary>How many seconds ahead the highway preview shows (charter-spec C18), as its slider last left it.</summary>
         public double PreviewLookAhead { get; set; } = 1.4;
+
+        /// <summary>Whether the Reduce dialog shows its preview, as it was last left.</summary>
+        public bool ReducePreviewShown { get; set; }
+
+        /// <summary>
+        /// How many seconds ahead the Reduce dialog's preview shows, as its slider last left it: its own, as it goes further
+        /// than the highway preview's, to see a stretch of changes at once.
+        /// </summary>
+        public double ReducePreviewLookAhead { get; set; } = 1.5;
+
+        /// <summary>The shortest and longest look-ahead the Reduce dialog's preview gives, and the steps its slider takes.</summary>
+        public const double MinReducePreviewLookAhead = ReductionPreviewViewModel.MinLookAhead;
+
+        public const double MaxReducePreviewLookAhead = ReductionPreviewViewModel.MaxLookAhead;
+
+        public const double ReducePreviewLookAheadStep = ReductionPreviewViewModel.LookAheadStep;
+
+        /// <summary><paramref name="seconds"/> as the Reduce dialog's preview takes a look-ahead: on its steps, in its range.</summary>
+        public static double SnapReducePreviewLookAhead(double seconds) => ReductionPreviewViewModel.SnapLookAhead(seconds);
+
+        /// <summary>
+        /// Which kinds of change the Reduce dialog's preview marks and stops at, as its filters were last left: all but the
+        /// removals at first, as a reduction is mostly those.
+        /// </summary>
+        public ReductionChangeCategories ReducePreviewCategories { get; set; } = ReductionChangeCategories.Default;
 
         /// <summary>How long before a note a playtest takes a hit for it, in real milliseconds (charter-spec C19).</summary>
         public int PlaytestEarlyMs { get; set; } = (int)HitWindow.DefaultMs;
@@ -218,6 +321,9 @@ namespace ChartBuilder.Services
         /// The grid Quantize puts notes on, and record mode with it on, as steps in a whole note: one of
         /// <see cref="SnapGrid.CommonDivisions"/>, the last one picked.
         /// </summary>
-        public int QuantizeDivision { get; set; } = SnapGrid.Default.Division;
+        public int QuantizeDivision { get; set; } = DefaultQuantizeDivision;
+
+        /// <summary>1/32, the quantize grid before one is picked: finer than the snap, so a quick part keeps its notes apart.</summary>
+        public const int DefaultQuantizeDivision = 32;
     }
 }

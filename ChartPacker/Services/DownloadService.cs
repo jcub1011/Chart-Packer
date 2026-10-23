@@ -22,7 +22,8 @@ namespace ChartPacker.Services
     /// moved into place, so a failure leaves nothing half-written. A song is read only while
     /// <paramref name="songFiles"/> says it isn't being saved.
     /// </summary>
-    public sealed class DownloadService(SettingsService settings, Func<TopLevel?> topLevel, NoticeViewModel notice, SongFileGate songFiles) : IDownloadService
+    /// <param name="locks">Holds a song a download replaces while it's written, so one open elsewhere isn't written over (charter-spec §4.8).</param>
+    public sealed class DownloadService(SettingsService settings, Func<TopLevel?> topLevel, NoticeViewModel notice, SongFileGate songFiles, SongLocks? locks = null) : IDownloadService
     {
         /// <summary>Where downloads go; <see langword="null"/> for the system's Downloads folder.</summary>
         public string? Folder
@@ -64,8 +65,17 @@ namespace ChartPacker.Services
                 if (path is null)
                     return;
 
-                busy = notice.BeginBusy(Format(Strings.DownloadSavingFormat, Path.GetFileName(path)));
+                // A file the picker chose to replace may be a song open elsewhere, such as a .sng.
                 string target = path;
+                IReadOnlyList<(string Path, SongLockHolder Holder)> refused = [];
+                using IDisposable? held = ask && locks is not null ? locks.TryHold([target], out refused) : null;
+                if (ask && locks is not null && held is null)
+                {
+                    notice.ShowError(Format(Strings.DownloadFailedFormat, Path.GetFileName(path), SongLocks.Describe(refused, Path.GetFileName)));
+                    return;
+                }
+
+                busy = notice.BeginBusy(Format(Strings.DownloadSavingFormat, Path.GetFileName(path)));
                 using (await songFiles.ReadAsync(song is null ? [] : [song.FullPath]))
                     await Task.Run(() => WriteAsync(target, open, overwrite: ask));
                 notice.ShowSaved(Format(Strings.DownloadSavedFormat, Path.GetFileName(path), FolderLabel(path)), [path]);
@@ -148,7 +158,12 @@ namespace ChartPacker.Services
                 await using (var source = await open(CancellationToken.None))
                 await using (var output = new FileStream(temp, FileMode.CreateNew, FileAccess.Write, FileShare.None, bufferSize: 64 * 1024, useAsync: true))
                     await source.CopyToAsync(output);
-                File.Move(temp, path, overwrite);
+
+                // A file replaced may be a song another Chart Packer has open, which lets go of it in a moment.
+                if (overwrite)
+                    SongFileCommit.MoveOver(temp, path);
+                else
+                    File.Move(temp, path);
             }
             finally
             {

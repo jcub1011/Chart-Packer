@@ -108,7 +108,7 @@ namespace ChartShared.UI.Controls
         {
             AffectsRender<WaveformView>(WaveformProperty, LengthSecondsProperty, PlayedBrushProperty, UnplayedBrushProperty);
             FocusableProperty.OverrideDefaultValue<WaveformView>(false);
-            CursorProperty.OverrideDefaultValue<WaveformView>(new Cursor(StandardCursorType.Hand));
+            CursorProperty.OverrideDefaultValue<WaveformView>(LaneScrub.SidewaysCursor);
         }
 
         public WaveformView()

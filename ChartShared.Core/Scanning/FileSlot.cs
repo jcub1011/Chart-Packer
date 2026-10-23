@@ -52,10 +52,10 @@ public static class FileSlot
         {
             cancellationToken.ThrowIfCancellationRequested();
             foreach (string path in Directory.EnumerateFiles(folder).Where(p => isSlotName(Path.GetFileName(p))).ToList())
-                File.Delete(path);
+                SongFileCommit.Delete(path, cancellationToken);
 
             if (tempPath is not null)
-                File.Move(tempPath, target!, overwrite: true);
+                SongFileCommit.MoveOver(tempPath, target!, cancellationToken);
         }
         catch
         {

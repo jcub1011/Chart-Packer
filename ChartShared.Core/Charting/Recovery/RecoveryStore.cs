@@ -84,7 +84,7 @@ public enum RecoveryOffer
 /// manifest, in the per-user recovery folder, never in the song.
 /// </summary>
 /// <remarks>
-/// <para>A song's files are named by a hash of its full path, as its lock is (<see cref="SongLock.FileNameOf"/>), and a
+/// <para>A song's files are named by a hash of its full path (<see cref="SongLock.KeyOf"/>), and a
 /// new chart's by an ID of its own until it's first saved. Each file is written to a temp file and renamed into place,
 /// the chart first and the manifest last. The chart's file is named by the start of its hash too, so writing a new one
 /// leaves the last autosave whole until the new manifest replaces it, and the manifest holds the whole hash, so a chart
@@ -101,7 +101,7 @@ public sealed class RecoveryStore(string folder)
     public string Folder { get; } = folder ?? throw new ArgumentNullException(nameof(folder));
 
     /// <summary>The key of the song at <paramref name="songPath"/>'s recovery file.</summary>
-    public static string KeyOf(string songPath) => SongLock.FileNameOf(songPath);
+    public static string KeyOf(string songPath) => SongLock.KeyOf(songPath);
 
     /// <summary>The key of a new chart's recovery file, before it's saved.</summary>
     public static string KeyOfNew(Guid id) => NewChartPrefix + id.ToString("N");

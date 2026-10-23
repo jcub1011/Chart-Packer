@@ -715,6 +715,38 @@ public sealed class StemPlayerTests
     }
 
     [TestMethod]
+    public void AScheduleGivenWhilePlayingStartsFromWhereTheMixIs()
+    {
+        // Turning the metronome on mid-song must not play every click since playback started at once.
+        using var output = new FakeOutput();
+        using var player = SilentPlayer(output, seconds: 10);
+        var schedule = new Schedule(
+            new ScheduledSound(0, Constant(0.25f, Rate / 10)),
+            new ScheduledSound(Rate / 10, Constant(0.25f, Rate / 10)),
+            new ScheduledSound(2 * Rate, Constant(0.125f, Rate / 10)));
+        player.Play();
+        PlayFor(output, Rate / 2);
+
+        player.Sounds = schedule;
+        PlayFor(output, 3 * Rate);
+        WaitUntil(() => output.QueuedFrames > 0);
+
+        float[] written = output.WrittenLeft();
+        Assert.IsTrue(written[..(2 * Rate)].All(sample => sample == 0f), "Sounds from before the schedule was given played.");
+        Assert.AreEqual(0.125f, written[2 * Rate], 1e-6f, "The schedule's next sound didn't play.");
+
+        // Off and on again, the same.
+        player.Sounds = null;
+        PlayFor(output, Rate);
+        player.Sounds = schedule;
+        PlayFor(output, Rate);
+        WaitUntil(() => output.QueuedFrames > 0);
+
+        written = output.WrittenLeft();
+        Assert.IsTrue(written[((2 * Rate) + (Rate / 10))..].All(sample => sample == 0f), "Sounds from before the schedule was given again played.");
+    }
+
+    [TestMethod]
     public void PlayedAsMixedASoundIsReadAtTheSpeedSoItKeepsItsLength()
     {
         // The device plays what's written twice as fast, so the sound is written over twice as many frames, to be heard
@@ -863,6 +895,169 @@ public sealed class StemPlayerTests
         Assert.AreEqual(5000, player.SmoothPosition.TotalMilliseconds, 1e-3);
         clock.Advance(TimeSpan.FromMilliseconds(5));
         Assert.AreEqual(5005, player.SmoothPosition.TotalMilliseconds, 1e-3);
+    }
+
+    [TestMethod]
+    public void PlayingHoldsWhatsDrawnWhereItStartedUntilThatsHeard()
+    {
+        var clock = new ManualClock();
+        using var output = new FakeOutput();
+        using var player = SilentPlayer(output, seconds: 10, clock);
+        player.Seek(TimeSpan.FromSeconds(2));
+        player.Play();
+        WaitUntil(() => output.Clears > 0 && output.QueuedFrames >= QueueTarget);
+        Assert.AreEqual(2000, player.DrawnPosition(200).TotalMilliseconds, 1e-3);
+
+        // For the first 200 ms nothing played is heard yet, so it stays where playing started; then it's 200 ms behind
+        // what's played, never having stepped back.
+        double last = 0;
+        for (int step = 1; step <= 40; step++)
+        {
+            PlayStep(clock, output);
+            double drawn = player.DrawnPosition(200).TotalMilliseconds;
+            Assert.AreEqual(Math.Max(2000, 2000 + (step * 10) - 200), drawn, 1e-3, $"At {step * 10} ms.");
+            Assert.IsGreaterThanOrEqualTo(last, drawn);
+            last = drawn;
+        }
+    }
+
+    [TestMethod]
+    public void PausingWhereDrawnLeavesTheAudioWhereItWasDrawn()
+    {
+        var clock = new ManualClock();
+        using var output = new FakeOutput();
+        using var player = SilentPlayer(output, seconds: 10, clock);
+        player.Play();
+        WaitUntil(() => output.QueuedFrames >= QueueTarget);
+        for (int step = 1; step <= 50; step++)
+            PlayStep(clock, output);
+        Assert.AreEqual(300, player.DrawnPosition(200).TotalMilliseconds, 1e-3);
+
+        int clears = output.Clears;
+        player.PauseWhereDrawn(200);
+
+        Assert.IsFalse(player.IsPlaying);
+        Assert.AreEqual(300, player.Position.TotalMilliseconds, 1e-3);
+        Assert.AreEqual(player.Position, player.DrawnPosition(200));
+        WaitUntil(() => output.Clears > clears && player.Mixer.PositionFrames == Rate * 3 / 10);
+        Assert.AreEqual(300, player.Position.TotalMilliseconds, 1e-3);
+
+        // Played again, it holds there.
+        player.Play();
+        WaitUntil(() => output.QueuedFrames >= QueueTarget);
+        PlayStep(clock, output);
+        Assert.AreEqual(300, player.DrawnPosition(200).TotalMilliseconds, 1e-3);
+    }
+
+    [TestMethod]
+    public void ASeekWhilePlayingHoldsAtItsTarget()
+    {
+        var clock = new ManualClock();
+        using var output = new FakeOutput();
+        using var player = SilentPlayer(output, seconds: 10, clock);
+        player.Play();
+        WaitUntil(() => output.QueuedFrames >= QueueTarget);
+        for (int step = 1; step <= 50; step++)
+            PlayStep(clock, output);
+
+        int clears = output.Clears;
+        player.Seek(TimeSpan.FromSeconds(5));
+        Assert.AreEqual(5000, player.DrawnPosition(200).TotalMilliseconds, 1e-3);
+        WaitUntil(() => output.Clears > clears && output.QueuedFrames >= QueueTarget);
+        for (int step = 1; step <= 10; step++)
+            PlayStep(clock, output);
+        Assert.AreEqual(5000, player.DrawnPosition(200).TotalMilliseconds, 1e-3);
+        for (int step = 1; step <= 20; step++)
+            PlayStep(clock, output);
+        Assert.AreEqual(5100, player.DrawnPosition(200).TotalMilliseconds, 1e-3);
+    }
+
+    [TestMethod]
+    public void PlayingARegionHoldsAtItsStart()
+    {
+        var clock = new ManualClock();
+        using var output = new FakeOutput();
+        using var player = SilentPlayer(output, seconds: 10, clock);
+        player.PlayRegion(TimeSpan.FromSeconds(3), TimeSpan.FromSeconds(6), loops: false);
+        Assert.AreEqual(3000, player.DrawnPosition(100).TotalMilliseconds, 1e-3);
+        WaitUntil(() => output.Clears > 0 && output.QueuedFrames >= QueueTarget);
+        PlayStep(clock, output);
+        Assert.AreEqual(3000, player.DrawnPosition(100).TotalMilliseconds, 1e-3);
+    }
+
+    [TestMethod]
+    public void PausingWhereDrawnWithANegativeLatencyLeavesTheAudioWhereItsHeard()
+    {
+        // What's drawn is ahead of what's heard: pausing there would skip the audio between, never heard.
+        var clock = new ManualClock();
+        using var output = new FakeOutput();
+        using var player = SilentPlayer(output, seconds: 10, clock);
+        player.Play();
+        WaitUntil(() => output.QueuedFrames >= QueueTarget);
+        for (int step = 1; step <= 50; step++)
+            PlayStep(clock, output);
+        Assert.AreEqual(700, player.DrawnPosition(-200).TotalMilliseconds, 1e-3);
+
+        int clears = output.Clears;
+        player.PauseWhereDrawn(-200);
+
+        Assert.IsFalse(player.IsPlaying);
+        Assert.AreEqual(500, player.Position.TotalMilliseconds, 1e-3);
+        Assert.AreEqual(clears, output.Clears);
+    }
+
+    [TestMethod]
+    public void ALoopTurningBackIsDrawnAtItsEndUntilItsStartIsHeard()
+    {
+        // Just after the mix turns back, what's heard 200 ms ago is the loop's end, not before its start.
+        var clock = new ManualClock();
+        using var output = new FakeOutput();
+        using var player = SilentPlayer(output, seconds: 10, clock);
+        player.PlayRegion(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1.5), loops: true);
+        WaitUntil(() => output.Clears > 0 && output.QueuedFrames >= QueueTarget);
+
+        for (int step = 1; step <= 105; step++)
+        {
+            PlayStep(clock, output);
+            int at = step * 10;
+            double expected = at < 200 ? 1000 : 1000 + ((at - 200) % 500);
+            Assert.AreEqual(expected, player.DrawnPosition(200).TotalMilliseconds, 1e-3, $"At {at} ms.");
+        }
+
+        // 50 ms after the second turn is heard, pausing there stays in the loop, where it's drawn.
+        player.PauseWhereDrawn(200);
+        Assert.AreEqual(1350, player.Position.TotalMilliseconds, 1e-3);
+    }
+
+    [TestMethod]
+    public void PlayingIntoALoopFromBeforeItIsNotTakenForItTurningBack()
+    {
+        // Having turned back once, a seek to before the loop plays into its start, which is drawn as it is.
+        var clock = new ManualClock();
+        using var output = new FakeOutput();
+        using var player = SilentPlayer(output, seconds: 10, clock);
+        player.PlayRegion(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1.5), loops: true);
+        WaitUntil(() => output.Clears > 0 && output.QueuedFrames >= QueueTarget);
+        for (int step = 1; step <= 60; step++)
+            PlayStep(clock, output);
+        int clears = output.Clears;
+        player.Seek(TimeSpan.FromSeconds(0.5));
+        WaitUntil(() => output.Clears > clears && output.QueuedFrames >= QueueTarget);
+
+        for (int step = 1; step <= 60; step++)
+        {
+            PlayStep(clock, output);
+            int at = step * 10;
+            Assert.AreEqual(Math.Max(500, 500 + at - 200), player.DrawnPosition(200).TotalMilliseconds, 1e-3, $"At {at} ms.");
+        }
+    }
+
+    /// <summary>10 ms pass, in which the device takes 10 ms, and the player fills the queue again.</summary>
+    private static void PlayStep(ManualClock clock, FakeOutput output)
+    {
+        clock.Advance(TimeSpan.FromMilliseconds(10));
+        output.Drain(Rate / 100);
+        WaitUntil(() => output.QueuedFrames >= QueueTarget);
     }
 
     /// <summary>A player of one stem whose value rises from 0 to 1 over <paramref name="seconds"/>.</summary>

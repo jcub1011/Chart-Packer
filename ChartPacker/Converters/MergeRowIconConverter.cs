@@ -9,7 +9,7 @@ namespace ChartPacker.Converters
     /// <summary>Maps a merge row's fixed icon to its geometry.</summary>
     public sealed class MergeRowIconConverter : IValueConverter
     {
-        public Geometry? Waveform { get; set; }
+        public Geometry? Audio { get; set; }
 
         public Geometry? Midi { get; set; }
 
@@ -21,7 +21,7 @@ namespace ChartPacker.Converters
 
         public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture) => value switch
         {
-            MergeRowIcon.Waveform => Waveform,
+            MergeRowIcon.Audio => Audio,
             MergeRowIcon.Midi => Midi,
             MergeRowIcon.AlbumArt => AlbumArt,
             MergeRowIcon.Background => Background,

@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
+using Avalonia.Media;
 using Avalonia.Threading;
 using ChartBuilder.Resources;
 using ChartBuilder.Services;
@@ -13,6 +14,7 @@ using ChartShared.Core.Charting.Commands;
 using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charting.Layout;
 using ChartShared.Core.Charts;
+using ChartShared.UI.Controls.Highway;
 using ChartShared.UI.Services;
 using ChartShared.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -26,9 +28,6 @@ namespace ChartBuilder.ViewModels
     /// <summary>A kind of phrase the toolbar's picker offers the Phrase tool, or disco flip.</summary>
     public sealed record PhraseKindChoice(RailKind Kind, string Label);
 
-    /// <summary>What a generated fill must end on, as Generate fills' options offer it.</summary>
-    public sealed record FillEndChoice(FillEnd End, string Label);
-
     /// <summary>
     /// The chart's editor (charter-spec §4.5, C3): the lanes and their canvases, the tools, the snap, and the editor's
     /// <see cref="EditorSession"/>, joined to playback. The cursor is the lanes' strike line and the playhead: it follows
@@ -39,9 +38,6 @@ namespace ChartBuilder.ViewModels
     {
         // How long after an edit the hit sounds and the overview are worked out again, so a burst of edits does it once.
         private static readonly TimeSpan RefreshDelay = TimeSpan.FromMilliseconds(250);
-
-        // How many columns the overview's note density has across the song.
-        private const int DensityColumns = 600;
 
         // Tap tempo's message, which each tap updates.
         private const string TapTempoMessageKey = "tap-tempo";
@@ -61,6 +57,12 @@ namespace ChartBuilder.ViewModels
         private double _firstTap;
         private bool _syncing;
         private IReadOnlyList<PhraseKindChoice>? _phraseChoices;
+
+        // The modifier keys held (HoldModifiers), whose swaps the place tool's options show while they're held.
+        private EditorModifiers _heldModifiers;
+
+        // What the place tool's options last showed for (RefreshPlacing): the tool, the lane in focus, the drums' variant and the options.
+        private (EditorTool, ChartTrackKey?, DrumsVariant?, PlaceOptions)? _placingShown;
 
         // The frame the playhead was last followed in.
         private TimeSpan? _followed;
@@ -86,17 +88,17 @@ namespace ChartBuilder.ViewModels
                 KeepTimes = saved.TempoEdits == TempoEditMode.KeepTimes,
             };
             SnapChoices = [.. SnapGrid.CommonDivisions.Select(d => new SnapChoice(d, BuilderSettingsCatalog.SnapLabel(d)))];
-            FillEndChoices = [new FillEndChoice(FillEnd.Crash, Strings.GenerateFillsEndCrash), new FillEndChoice(FillEnd.AnyNote, Strings.GenerateFillsEndAnyNote)];
-            SelectedFillEnd = FillEndChoices[0];
             SelectedRecordMode = RecordModeChoices[0];
-            SelectedQuantize = SnapChoices.FirstOrDefault(c => c.Division == saved.QuantizeDivision) ?? SnapChoices.First(c => c.Division == SnapGrid.Default.Division);
+            SelectedQuantize = SnapChoices.FirstOrDefault(c => c.Division == saved.QuantizeDivision) ?? SnapChoices.First(c => c.Division == BuilderSettings.DefaultQuantizeDivision);
             IsRecordQuantized = saved.RecordQuantize;
+            WheelUpIsLater = IsWheelUpLater(saved);
             Lanes = new LaneDockViewModel(layout, this);
             Properties = new PropertiesViewModel(this);
             Session.Onsets = new LaneOnsetSource(this);
             Session.VisibleTracks = () => [.. Lanes.Layout.Lanes.Select(l => l.Part.Track).OfType<ChartTrackKey>()];
             AudioAssist = new AudioAssistViewModel(this);
             Preview = new PreviewViewModel(this, settings);
+            Difficulty = new DifficultyViewModel(this);
             Playtest = new PlaytestViewModel(this, settings, input?.Settings.Settings, Devices);
 
             _refresh = new DispatcherTimer(DispatcherPriority.Background) { Interval = RefreshDelay };
@@ -133,6 +135,9 @@ namespace ChartBuilder.ViewModels
 
         /// <summary>The highway preview, docked in the side panel or in a window of its own (charter-spec C18).</summary>
         public PreviewViewModel Preview { get; }
+
+        /// <summary>The difficulty analysis of a five-fret lane, docked in the side panel or in a window of its own.</summary>
+        public DifficultyViewModel Difficulty { get; }
 
         /// <summary>Playtest: the focused lane played with the keyboard and the instrument devices (charter-spec C19).</summary>
         public PlaytestViewModel Playtest { get; }
@@ -223,12 +228,6 @@ namespace ChartBuilder.ViewModels
             set => SetTool(EditorTool.Erase, value);
         }
 
-        public bool IsSustainTool
-        {
-            get => Session.Tool == EditorTool.Sustain;
-            set => SetTool(EditorTool.Sustain, value);
-        }
-
         public bool IsPhraseTool
         {
             get => Session.Tool == EditorTool.Phrase;
@@ -294,39 +293,172 @@ namespace ChartBuilder.ViewModels
             }
         }
 
-        /// <summary>Whether Generate fills can run (charter-spec C6 item 5): the lane in focus is a drums part with notes.</summary>
-        public bool CanGenerateFills =>
-            Session.Focused is { } key && ChartInstruments.KindOf(key.Instrument) == ChartInstrumentKind.Drums && Session.Chart.PartOf(key.Instrument) is { HasNotes: true };
+        // The kind of part in focus, which the place tool's options are offered for; null for none.
+        private ChartInstrumentKind? FocusedKind => Session.Focused is { } key ? ChartInstruments.KindOf(key.Instrument) : null;
+
+        /// <summary>Whether the place tool's options for a 5-fret or GHL lane show: the place tool is picked, and such a lane has focus.</summary>
+        public bool ShowsFretPlaceOptions => IsPlaceTool && FocusedKind is ChartInstrumentKind.FiveFret or ChartInstrumentKind.SixFret;
+
+        /// <summary>Whether the place tool's options for a drums lane show: the place tool is picked, and a drums lane has focus.</summary>
+        public bool ShowsDrumPlaceOptions => IsPlaceTool && FocusedKind is ChartInstrumentKind.Drums;
 
         /// <summary>
-        /// How many measures apart generated fills start, at the least. Generate fills' options are kept while the editor is
-        /// open, so the next run starts from the last one's.
+        /// Whether the place tool offers cymbal or tom: on drums set to Pro, the only drums with toms, as the note menu and
+        /// Properties offer them; drums read as Pro from their markers alone can't have toms set.
         /// </summary>
-        [ObservableProperty]
-        public partial decimal? FillSpacing { get; set; } = FillOptions.Default.SpacingMeasures;
+        public bool ShowsTomChoice => ShowsDrumPlaceOptions && Session.Chart.DrumsVariant == DrumsVariant.Pro;
 
-        /// <summary>How many measures a generated fill lasts.</summary>
-        [ObservableProperty]
-        public partial decimal? FillLength { get; set; } = FillOptions.Default.LengthMeasures;
+        /// <summary>Whether the place tool offers the 2× kick: on Expert, the only difficulty with one.</summary>
+        public bool ShowsDoubleKickChoice => ShowsDrumPlaceOptions && Session.Focused?.Difficulty == ChartDifficulty.Expert;
 
-        public IReadOnlyList<FillEndChoice> FillEndChoices { get; }
+        /// <summary>Whether the place tool leaves the chord a note goes in as it is, a new one natural.</summary>
+        public bool IsNaturalPlace
+        {
+            get => Session.Placing.ChordType == ChordFlags.None;
+            set => SetPlacing(value, Session.Placing with { ChordType = ChordFlags.None });
+        }
 
-        /// <summary>What a generated fill must end on.</summary>
-        [ObservableProperty]
-        public partial FillEndChoice? SelectedFillEnd { get; set; }
+        /// <summary>Whether the place tool makes the chord a note goes in a forced HOPO.</summary>
+        public bool IsHopoPlace
+        {
+            get => Session.Placing.ChordType == ChordFlags.ForceHopo;
+            set => SetPlacing(value, Session.Placing with { ChordType = ChordFlags.ForceHopo });
+        }
 
-        /// <summary>Where Generate fills proposes: over the selection's span when there's one, else the whole part.</summary>
-        public string FillScopeText => Session.Selection.Span is null ? Strings.GenerateFillsScopeWholePart : Strings.GenerateFillsScopeSelection;
+        /// <summary>Whether the place tool makes the chord a note goes in a forced strum.</summary>
+        public bool IsStrumPlace
+        {
+            get => Session.Placing.ChordType == ChordFlags.ForceStrum;
+            set => SetPlacing(value, Session.Placing with { ChordType = ChordFlags.ForceStrum });
+        }
 
-        /// <summary>Whether a run of Generate fills is going on, with its proposals shown as ghosts to keep or drop.</summary>
-        public bool IsFillRunActive => Session.Fills.IsActive;
+        /// <summary>Whether the place tool makes the chord a note goes in a tap.</summary>
+        public bool IsTapPlace
+        {
+            get => Session.Placing.ChordType == ChordFlags.Tap;
+            set => SetPlacing(value, Session.Placing with { ChordType = ChordFlags.Tap });
+        }
+
+        /// <summary>
+        /// Takes in the modifier keys held, wherever focus is in the window: while Alt is held, Open shows the other way
+        /// about, and while Ctrl is, the drag shows the other choice, as the place tool would use them.
+        /// </summary>
+        public void HoldModifiers(EditorModifiers modifiers)
+        {
+            if (modifiers == _heldModifiers)
+                return;
+            bool swapsOpen = IsAltHeld, swapsDrag = IsCtrlHeld;
+            _heldModifiers = modifiers;
+            ModifiersHeld?.Invoke(this, modifiers);
+            if (IsAltHeld != swapsOpen)
+                OnPropertyChanged(nameof(PlaceOpen));
+            if (IsCtrlHeld != swapsDrag)
+            {
+                OnPropertyChanged(nameof(IsRunDrag));
+                OnPropertyChanged(nameof(IsSustainDrag));
+            }
+        }
+
+        /// <summary>
+        /// The modifier keys held changed, wherever focus is: the lanes take them in, so the place tool's ghost changes
+        /// with Alt even while a lane doesn't have the keys.
+        /// </summary>
+        public event EventHandler<EditorModifiers>? ModifiersHeld;
+
+        private bool IsAltHeld => _heldModifiers.HasFlag(EditorModifiers.Alt);
+
+        private bool IsCtrlHeld => _heldModifiers.HasFlag(EditorModifiers.Control);
+
+        /// <summary>
+        /// Whether a click of the place tool puts down an open note: <see cref="PlaceOptions.Open"/>, swapped while Alt is
+        /// held. Picked while Alt is held, it's set so as to show what was picked.
+        /// </summary>
+        public bool PlaceOpen
+        {
+            get => Session.Placing.Open != IsAltHeld;
+            set => Session.Placing = Session.Placing with { Open = value != IsAltHeld };
+        }
+
+        /// <summary>Whether a drag of the place tool lays a run of the note: not <see cref="PlaceOptions.DragSustains"/>, swapped while Ctrl is held.</summary>
+        public bool IsRunDrag
+        {
+            get => Session.Placing.DragSustains == IsCtrlHeld;
+            set => SetPlacing(value, Session.Placing with { DragSustains = IsCtrlHeld });
+        }
+
+        /// <summary>Whether a drag of the place tool draws out the note's sustain: <see cref="PlaceOptions.DragSustains"/>, swapped while Ctrl is held.</summary>
+        public bool IsSustainDrag
+        {
+            get => Session.Placing.DragSustains != IsCtrlHeld;
+            set => SetPlacing(value, Session.Placing with { DragSustains = !IsCtrlHeld });
+        }
+
+        /// <summary>Whether the place tool leaves a yellow, blue or green pad a cymbal, unless a tom marker covers it.</summary>
+        public bool IsCymbalPlace
+        {
+            get => !Session.Placing.Tom;
+            set => SetPlacing(value, Session.Placing with { Tom = false });
+        }
+
+        /// <summary>Whether the place tool makes a yellow, blue or green pad a tom, on every difficulty.</summary>
+        public bool IsTomPlace
+        {
+            get => Session.Placing.Tom;
+            set => SetPlacing(value, Session.Placing with { Tom = true });
+        }
+
+        /// <summary>Whether the place tool places pads as normal hits.</summary>
+        public bool IsNormalPlace
+        {
+            get => Session.Placing.Dynamics == NoteDynamics.None;
+            set => SetPlacing(value, Session.Placing with { Dynamics = NoteDynamics.None });
+        }
+
+        /// <summary>Whether the place tool places pads as accents.</summary>
+        public bool IsAccentPlace
+        {
+            get => Session.Placing.Dynamics == NoteDynamics.Accent;
+            set => SetPlacing(value, Session.Placing with { Dynamics = NoteDynamics.Accent });
+        }
+
+        /// <summary>Whether the place tool places pads as ghosts.</summary>
+        public bool IsGhostPlace
+        {
+            get => Session.Placing.Dynamics == NoteDynamics.Ghost;
+            set => SetPlacing(value, Session.Placing with { Dynamics = NoteDynamics.Ghost });
+        }
+
+        /// <summary>Whether the place tool places kicks as 2× kicks, on Expert.</summary>
+        public bool PlaceDoubleKick
+        {
+            get => Session.Placing.DoubleKick;
+            set => Session.Placing = Session.Placing with { DoubleKick = value };
+        }
+
+        /// <summary>Whether a run of Generate fills or Generate star power is going on, with its proposals shown as ghosts to keep or drop.</summary>
+        public bool IsProposalRunActive => Session.Proposals is not null;
 
         /// <summary>How many of the run's proposals are kept, of how many.</summary>
-        public string FillRunText => string.Format(CultureInfo.CurrentCulture, Strings.FillRunFormat, Session.Fills.KeptCount, Session.Fills.Proposals.Count);
+        public string ProposalRunText => Session.Proposals is { } run
+            ? string.Format(CultureInfo.CurrentCulture, run is StarPowerProposals ? Strings.StarPowerRunFormat : Strings.FillRunFormat, run.KeptCount, run.Phrases.Count)
+            : string.Empty;
+
+        /// <summary>How the run's proposals are kept or dropped.</summary>
+        public string ProposalRunHint => Session.Proposals is StarPowerProposals ? Strings.StarPowerRunHint : Strings.FillRunHint;
+
+        /// <summary>What adding the run's kept proposals is called.</summary>
+        public string ProposalRunAdd => Session.Proposals is StarPowerProposals ? Strings.StarPowerRunAdd : Strings.FillRunAdd;
+
+        /// <summary>What adding the run's kept proposals does.</summary>
+        public string ProposalRunAddToolTip => Session.Proposals is StarPowerProposals ? Strings.StarPowerRunAddToolTip : Strings.FillRunAddToolTip;
 
         /// <summary>What the bottom timeline shows of the whole song for the lane in focus (charter-spec C3 item 2).</summary>
         [ObservableProperty]
         public partial OverviewData? Overview { get; private set; }
+
+        /// <summary>The chart tick the playhead is on, for beside its time, e.g. "Tick 15,360"; Tick 0 before the chart starts.</summary>
+        public string PlayheadTickText => string.Format(
+            CultureInfo.CurrentCulture, Strings.TimelineTickFormat, Math.Max(0, (long)Math.Floor(Session.TickAt(Playback.PositionSeconds))));
 
         /// <summary>Where the span of the song the lanes show starts, in seconds of audio, as the overview marks it.</summary>
         [ObservableProperty]
@@ -336,10 +468,18 @@ namespace ChartBuilder.ViewModels
         [ObservableProperty]
         public partial double VisibleEnd { get; private set; }
 
-        /// <summary>Takes up what may have changed in Settings: whether tempo edits keep times, and what lanes draw their audio as.</summary>
+        /// <summary>Whether the mouse wheel turned up moves later, along the lanes in either view and the timeline alike: the setting's.</summary>
+        [ObservableProperty]
+        public partial bool WheelUpIsLater { get; private set; }
+
+        // Whether the wheel turned up is later, as the settings say.
+        private static bool IsWheelUpLater(BuilderSettings settings) => settings.WheelScrollDirection == WheelScrollDirection.UpIsLater;
+
+        /// <summary>Takes up what may have changed in Settings: whether tempo edits keep times, what lanes draw their audio as, and which way the wheel scrolls.</summary>
         public void ReloadSettings()
         {
             Session.KeepTimes = _settings.Settings.TempoEdits == TempoEditMode.KeepTimes;
+            WheelUpIsLater = IsWheelUpLater(_settings.Settings);
             Audio.ReloadSettings(_settings.Settings);
             foreach (var lane in Lanes.All)
                 lane.Audio.Refresh();
@@ -458,32 +598,37 @@ namespace ChartBuilder.ViewModels
         [RelayCommand]
         private void CoarserSnap() => Session.Snap = Session.Snap.Coarser();
 
-        /// <summary>Proposes fills with the options picked, over the selection's span or the whole part.</summary>
-        [RelayCommand]
-        private void GenerateFills()
-        {
-            var options = new FillOptions(
-                (int)Math.Max(1, FillSpacing ?? FillOptions.Default.SpacingMeasures),
-                (int)Math.Max(1, FillLength ?? FillOptions.Default.LengthMeasures),
-                SelectedFillEnd?.End ?? FillEnd.Crash);
-            Session.Fills.Start(options, Session.Selection.Span);
-        }
+        [RelayCommand(CanExecute = nameof(IsProposalRunActive))]
+        private void KeepAllProposals() => Session.Proposals?.KeepAll();
 
-        [RelayCommand(CanExecute = nameof(IsFillRunActive))]
-        private void KeepAllFills() => Session.Fills.KeepAll();
+        [RelayCommand(CanExecute = nameof(IsProposalRunActive))]
+        private void DropAllProposals() => Session.Proposals?.DropAll();
 
-        [RelayCommand(CanExecute = nameof(IsFillRunActive))]
-        private void DropAllFills() => Session.Fills.DropAll();
+        /// <summary>Adds the run's kept proposals as one undoable step, ending the run.</summary>
+        [RelayCommand(CanExecute = nameof(CanAddProposals))]
+        private void AddProposals() => Session.Proposals?.Accept();
 
-        /// <summary>Adds the kept fills as one undoable step, ending the run.</summary>
-        [RelayCommand(CanExecute = nameof(CanAddFills))]
-        private void AddFills() => Session.Fills.Accept();
-
-        private bool CanAddFills() => Session.Fills.KeptCount > 0;
+        private bool CanAddProposals() => Session.Proposals is { KeptCount: > 0 };
 
         /// <summary>Ends the run, adding nothing (Esc).</summary>
-        [RelayCommand(CanExecute = nameof(IsFillRunActive))]
-        private void CancelFills() => Session.Fills.Cancel();
+        [RelayCommand(CanExecute = nameof(IsProposalRunActive))]
+        private void CancelProposals() => Session.Proposals?.Cancel();
+
+        /// <summary>Moves the cursor to the start of the run's proposal before it, which scrolls the lanes there.</summary>
+        [RelayCommand(CanExecute = nameof(IsProposalRunActive))]
+        private void PreviousProposal()
+        {
+            if (Session.Proposals is { } run && !run.GoToPrevious())
+                Session.Status = Strings.ProposalRunNoneBefore;
+        }
+
+        /// <summary>Moves the cursor to the start of the run's proposal after it, which scrolls the lanes there.</summary>
+        [RelayCommand(CanExecute = nameof(IsProposalRunActive))]
+        private void NextProposal()
+        {
+            if (Session.Proposals is { } run && !run.GoToNext())
+                Session.Status = Strings.ProposalRunNoneAfter;
+        }
 
         [RelayCommand]
         private void FinerSnap() => Session.Snap = Session.Snap.Finer();
@@ -503,6 +648,7 @@ namespace ChartBuilder.ViewModels
             Playback.Scrubbed -= OnScrubbed;
             Lanes.LayoutChanged -= OnLayoutChanged;
             Preview.Dispose();
+            Difficulty.Dispose();
             Playtest.Dispose();
             _devices?.Dispose();
             _devices = null;
@@ -521,6 +667,18 @@ namespace ChartBuilder.ViewModels
                 OnSessionState(this, EventArgs.Empty);
         }
 
+        /// <summary>
+        /// Picks <paramref name="picked"/> as the place tool's options, from a button of a row of them, one of which is always
+        /// down: pressed again, the button stays down.
+        /// </summary>
+        private void SetPlacing(bool on, PlaceOptions picked)
+        {
+            if (on)
+                Session.Placing = picked;
+            else
+                RefreshPlacing();
+        }
+
         private void OnSessionState(object? sender, EventArgs e)
         {
             OnPropertyChanged(nameof(SelectedSnap));
@@ -528,29 +686,64 @@ namespace ChartBuilder.ViewModels
             OnPropertyChanged(nameof(IsSelectTool));
             OnPropertyChanged(nameof(IsPlaceTool));
             OnPropertyChanged(nameof(IsEraseTool));
-            OnPropertyChanged(nameof(IsSustainTool));
             OnPropertyChanged(nameof(IsPhraseTool));
             OnPropertyChanged(nameof(IsTempoTool));
             OnPropertyChanged(nameof(IsSyncTool));
             OnPropertyChanged(nameof(IsRecording));
             OnPropertyChanged(nameof(RecordToolTip));
-            RefreshFills();
+
+            // The place tool's options go by these alone, so a state change of something else, such as each note record
+            // mode takes in, leaves them be.
+            var placing = (Session.Tool, Session.Focused, Session.Chart.DrumsVariant, Session.Placing);
+            if (placing != _placingShown)
+            {
+                _placingShown = placing;
+                RefreshPlacing();
+            }
+
+            RefreshProposalRun();
             RefreshPhraseChoices();
             RefreshVisibleSpan();
             AudioAssist.Refresh();
             ScheduleRefresh();
         }
 
-        /// <summary>Generate fills' button, and the bar over the lanes while a run goes on, after the focus, the chart or the run changes.</summary>
-        private void RefreshFills()
+        /// <summary>The place tool's options, and which of them show, after the tool, the focus or the options change.</summary>
+        private void RefreshPlacing()
         {
-            OnPropertyChanged(nameof(CanGenerateFills));
-            OnPropertyChanged(nameof(IsFillRunActive));
-            OnPropertyChanged(nameof(FillRunText));
-            KeepAllFillsCommand.NotifyCanExecuteChanged();
-            DropAllFillsCommand.NotifyCanExecuteChanged();
-            AddFillsCommand.NotifyCanExecuteChanged();
-            CancelFillsCommand.NotifyCanExecuteChanged();
+            OnPropertyChanged(nameof(ShowsFretPlaceOptions));
+            OnPropertyChanged(nameof(ShowsDrumPlaceOptions));
+            OnPropertyChanged(nameof(ShowsTomChoice));
+            OnPropertyChanged(nameof(ShowsDoubleKickChoice));
+            OnPropertyChanged(nameof(IsNaturalPlace));
+            OnPropertyChanged(nameof(IsHopoPlace));
+            OnPropertyChanged(nameof(IsStrumPlace));
+            OnPropertyChanged(nameof(IsTapPlace));
+            OnPropertyChanged(nameof(PlaceOpen));
+            OnPropertyChanged(nameof(IsRunDrag));
+            OnPropertyChanged(nameof(IsSustainDrag));
+            OnPropertyChanged(nameof(IsCymbalPlace));
+            OnPropertyChanged(nameof(IsTomPlace));
+            OnPropertyChanged(nameof(IsNormalPlace));
+            OnPropertyChanged(nameof(IsAccentPlace));
+            OnPropertyChanged(nameof(IsGhostPlace));
+            OnPropertyChanged(nameof(PlaceDoubleKick));
+        }
+
+        /// <summary>The bar over the lanes while a run of Generate fills or Generate star power goes on, after the run changes.</summary>
+        private void RefreshProposalRun()
+        {
+            OnPropertyChanged(nameof(IsProposalRunActive));
+            OnPropertyChanged(nameof(ProposalRunText));
+            OnPropertyChanged(nameof(ProposalRunHint));
+            OnPropertyChanged(nameof(ProposalRunAdd));
+            OnPropertyChanged(nameof(ProposalRunAddToolTip));
+            KeepAllProposalsCommand.NotifyCanExecuteChanged();
+            DropAllProposalsCommand.NotifyCanExecuteChanged();
+            AddProposalsCommand.NotifyCanExecuteChanged();
+            CancelProposalsCommand.NotifyCanExecuteChanged();
+            PreviousProposalCommand.NotifyCanExecuteChanged();
+            NextProposalCommand.NotifyCanExecuteChanged();
         }
 
         /// <summary>
@@ -583,19 +776,31 @@ namespace ChartBuilder.ViewModels
         internal static string PhraseKindName(RailKind kind) => kind.Phrase is { } phrase ? PhraseKindName(phrase) : Strings.PhraseKindDiscoFlip;
 
         private static IReadOnlyList<PhraseKindChoice> PhraseChoicesOf(ChartInstrumentKind kind, bool proDrums) =>
-            [.. PhraseRail.ToolKindsOf(kind, proDrums).Select(k => new PhraseKindChoice(k, PhraseKindName(k)))];
+            [.. PhraseRail.ToolKindsOf(kind, proDrums).Select(k => new PhraseKindChoice(k, PhraseKindTitle(k)))];
+
+        /// <summary>A kind the Phrase tool draws, in title case, as its picker names it: Star Power, Drum Fill, Disco Flip…</summary>
+        private static string PhraseKindTitle(RailKind kind) => kind.Phrase switch
+        {
+            null => Strings.PhraseKindTitleDiscoFlip,
+            PhraseKind.StarPower => Strings.PhraseKindTitleStarPower,
+            PhraseKind.Solo => Strings.PhraseKindTitleSolo,
+            PhraseKind.DrumFill => Strings.PhraseKindTitleDrumFill,
+            PhraseKind.Roll => Strings.PhraseKindTitleRoll,
+            PhraseKind.Trill => Strings.PhraseKindTitleTrill,
+            _ => Strings.PhraseKindTitleBigRockEnding,
+        };
 
         // What the session says is why something was refused.
         private void OnStatusPosted(object? sender, string status) => Messages.Warning(status);
 
         private void OnChartChanged(object? sender, EditorChartChangedEventArgs e)
         {
+            OnPropertyChanged(nameof(PlayheadTickText)); // A tempo change moves the ticks against the audio.
             if (e.IsPreview)
                 return;
             ScheduleRefresh();
             Properties.Refresh();
             RefreshPhraseChoices();
-            OnPropertyChanged(nameof(CanGenerateFills));
             foreach (var lane in Lanes.All)
                 lane.RefreshDifficulties();
         }
@@ -603,7 +808,6 @@ namespace ChartBuilder.ViewModels
         private void OnSelectionChanged(object? sender, EventArgs e)
         {
             Properties.Refresh();
-            OnPropertyChanged(nameof(FillScopeText));
             AudioAssist.Refresh();
         }
 
@@ -612,6 +816,7 @@ namespace ChartBuilder.ViewModels
         {
             ScheduleRefresh();
             Properties.Refresh();
+            OnPropertyChanged(nameof(PlayheadTickText));
         }
 
         private void OnLayoutChanged(object? sender, EventArgs e) => ScheduleRefresh();
@@ -639,6 +844,9 @@ namespace ChartBuilder.ViewModels
 
         private void OnPlaybackChanged(object? sender, PropertyChangedEventArgs e)
         {
+            if (e.PropertyName == nameof(PlaybackViewModel.PositionSeconds))
+                OnPropertyChanged(nameof(PlayheadTickText));
+
             switch (e.PropertyName)
             {
                 case nameof(PlaybackViewModel.PositionSeconds) when !Playback.IsPlaying && !_syncing:
@@ -694,7 +902,8 @@ namespace ChartBuilder.ViewModels
         {
             _refresh.Stop();
             var shown = Lanes.Layout.Lanes.Select(l => l.Part.Track).OfType<ChartTrackKey>().Where(k => Session.Chart.PartOf(k.Instrument) is not null).ToList();
-            Playback.SetHits([.. shown.SelectMany(HitsOf)]);
+            // Lent to a dialog, the hit sounds stay quiet until it's given back.
+            Playback.SetHits(_playbackBorrows > 0 ? [] : [.. shown.SelectMany(HitsOf)]);
             Overview = OverviewOf(Session.Focused is { } focused && Session.Chart.PartOf(focused.Instrument) is not null ? focused : shown.Cast<ChartTrackKey?>().FirstOrDefault());
         }
 
@@ -712,70 +921,125 @@ namespace ChartBuilder.ViewModels
             }
         }
 
-        private OverviewData? OverviewOf(ChartTrackKey? key)
-        {
-            double length = Playback.LengthSeconds;
-            if (!(length > 0))
-                return null;
-
-            var chart = Session.Chart;
-            var sections = new List<OverviewSection>();
-            foreach (var e in chart.Events)
-            {
-                if (SectionEvents.NameOf(e.Text) is { } name)
-                    sections.Add(new OverviewSection(Session.AudioAt(e.Tick), name));
-            }
-
-            var density = new float[DensityColumns];
-            var starPower = new List<(double, double)>();
-            var solos = new List<(double, double)>();
-            if (key is { } track && chart.PartOf(track.Instrument) is { } part)
-            {
-                var game = Session.GameTrack(track);
-                foreach (var note in game.Notes)
-                {
-                    int column = (int)(Session.AudioAt(note.Tick) / length * DensityColumns);
-                    if (column >= 0 && column < DensityColumns)
-                        density[column]++;
-                }
-
-                float most = density.Max();
-                if (most > 0)
-                {
-                    for (int i = 0; i < density.Length; i++)
-                        density[i] /= most;
-                }
-
-                foreach (var phrase in game.StarPower)
-                    starPower.Add((Session.AudioAt(phrase.Tick), Session.AudioAt(phrase.Tick + phrase.Length)));
-                foreach (var phrase in part.Phrases.Where(p => p.Kind == PhraseKind.Solo))
-                    solos.Add((Session.AudioAt(phrase.Tick), Session.AudioAt(phrase.Tick + phrase.Length)));
-            }
-
-            var synced = new List<(double, double, bool)>();
-            if (Session.Sync is { Span: var (from, to) } sync)
-            {
-                synced.Add((Session.AudioAt(from), Session.AudioAt(to), true));
-                foreach (long start in sync.Matches)
-                    synced.Add((Session.AudioAt(start), Session.AudioAt(start + to - from), false));
-            }
-
-            return new OverviewData(sections, density, starPower, solos, synced);
-        }
+        private OverviewData? OverviewOf(ChartTrackKey? key) => OverviewData.Of(Session, key, Playback.LengthSeconds);
     }
 
     /// <summary>A section, at its time in the audio, for the overview.</summary>
     public sealed record OverviewSection(double Seconds, string Name);
 
+    /// <summary>A phrase of the lane in focus, in the audio, and the phrase rail's row it's drawn in, for the overview.</summary>
+    public readonly record struct OverviewPhrase(double Start, double End, RailKind Row);
+
+    /// <summary>A proposal of the run of Generate fills or Generate star power going on, in the audio, for the overview.</summary>
+    public readonly record struct OverviewProposal(double Start, double End, bool Kept);
+
     /// <summary>
-    /// What the bottom timeline shows of the whole song (charter-spec C3 item 2): sections, the note density of the lane in
-    /// focus, from 0 to 1 in columns across the song, its star power and solos, and the synchronized region and the
-    /// passages synced with it, each as audio seconds.
+    /// A note of the lane in focus, for the overview: when it starts and its sustain ends in the audio (its start, with
+    /// none), the row of its fret, pad or column from the top, or -1 for one across them all, as a kick or an open note,
+    /// its colour on the highway, and whether it's drawn in the top half of its row, as a six-fret black fret played with a
+    /// white one covers its top half on the highway.
     /// </summary>
+    public readonly record struct OverviewNote(double Start, double End, int Row, Color Color, bool Top = false);
+
+    /// <summary>
+    /// What the bottom timeline shows of the whole song (charter-spec C3 item 2): sections, the notes of the lane in focus,
+    /// every one of its phrases, a row for each of the phrase rail's rows, the ghosts of a run of Generate fills or Generate
+    /// star power going on, and the synchronized region and the passages synced with it, each as audio seconds.
+    /// </summary>
+    /// <param name="NoteRows">How many rows the notes are drawn in: a fret, pad or column each; none with no lane.</param>
+    /// <param name="Notes">The notes of the lane in focus, as the games read them, in time order.</param>
+    /// <param name="Rows">The rows of the phrase rail of the lane in focus, in order; none with no lane.</param>
+    /// <param name="Phrases">
+    /// Its phrases: star power as the games read it, overlapping phrases as one; disco flips of the difficulty shown; and
+    /// every other kind as charted.
+    /// </param>
+    /// <param name="Proposals">The run's proposals, whichever lane is in focus, so they can always be found; none without a run.</param>
     public sealed record OverviewData(
         IReadOnlyList<OverviewSection> Sections,
-        IReadOnlyList<float> Density,
-        IReadOnlyList<(double Start, double End)> StarPower,
-        IReadOnlyList<(double Start, double End)> Solos,
-        IReadOnlyList<(double Start, double End, bool IsRegion)> Synced);
+        int NoteRows,
+        IReadOnlyList<OverviewNote> Notes,
+        IReadOnlyList<RailKind> Rows,
+        IReadOnlyList<OverviewPhrase> Phrases,
+        IReadOnlyList<OverviewProposal> Proposals,
+        IReadOnlyList<(double Start, double End, bool IsRegion)> Synced)
+    {
+        /// <summary>
+        /// The overview of <paramref name="session"/>'s song, <paramref name="length"/> seconds long, for the lane
+        /// <paramref name="key"/>; null while the length isn't known.
+        /// </summary>
+        internal static OverviewData? Of(EditorSession session, ChartTrackKey? key, double length)
+        {
+            if (!(length > 0))
+                return null;
+
+            var chart = session.Chart;
+            var sections = new List<OverviewSection>();
+            foreach (var e in chart.Events)
+            {
+                if (SectionEvents.NameOf(e.Text) is { } name)
+                    sections.Add(new OverviewSection(session.AudioAt(e.Tick), name));
+            }
+
+            int noteRows = 0;
+            var notes = new List<OverviewNote>();
+            IReadOnlyList<RailKind> rows = [];
+            var phrases = new List<OverviewPhrase>();
+            if (key is { } track && chart.PartOf(track.Instrument) is { } part)
+            {
+                // In the highway's rows and colours: six-fret's black and white frets share a column, a black fret played
+                // with a white one in its top half, and a black fret is drawn in its outline's colour, as faded black
+                // wouldn't show on the timeline.
+                var game = session.GameTrack(track);
+                var kind = part.Kind;
+                int laneCount = HighwayLane.LaneCountOf(kind, session.IsFiveLaneDrums);
+                noteRows = laneCount;
+                var whites = kind == ChartInstrumentKind.SixFret
+                    ? game.Notes.Where(n => n.Lane is >= 0 and < 3).Select(n => (n.Tick, n.Lane)).ToHashSet()
+                    : [];
+                foreach (var note in game.Notes)
+                {
+                    double start = session.AudioAt(note.Tick);
+                    double end = note.Length > 0 ? session.AudioAt(note.Tick + note.Length) : start;
+                    int row = note.Lane == ChartNote.OpenLane ? -1 : HighwayPalette.Column(kind, laneCount, note.Lane);
+                    var color = HighwayPalette.NoteColor(kind, laneCount, note);
+                    bool top = HighwayPalette.IsBlackFret(kind, note.Lane) && whites.Contains((note.Tick, note.Lane - 3));
+                    notes.Add(new OverviewNote(start, end, row, color == HighwayPalette.BlackFret ? HighwayPalette.BlackFretOutline : color, top));
+                }
+
+                rows = PhraseRail.RowsOf(part.Kind);
+                var starPower = new RailKind(PhraseKind.StarPower);
+                foreach (var phrase in game.StarPower)
+                    phrases.Add(new OverviewPhrase(session.AudioAt(phrase.Tick), session.AudioAt(phrase.Tick + phrase.Length), starPower));
+                foreach (var phrase in part.Phrases)
+                {
+                    RailKind row = PhraseRail.RowOf(part.Kind, phrase.Kind);
+                    if (phrase.Kind != PhraseKind.StarPower && rows.Contains(row))
+                        phrases.Add(new OverviewPhrase(session.AudioAt(phrase.Tick), session.AudioAt(phrase.Tick + phrase.Length), row));
+                }
+
+                if (rows.Contains(RailKind.DiscoFlip))
+                {
+                    foreach (var range in session.DiscoFlipRangesOf(track))
+                        phrases.Add(new OverviewPhrase(session.AudioAt(range.Tick), range.EndTick is { } end ? session.AudioAt(end) : length, RailKind.DiscoFlip));
+                }
+            }
+
+            var proposals = new List<OverviewProposal>();
+            if (session.Proposals is { } run)
+            {
+                for (int i = 0; i < run.Phrases.Count; i++)
+                    proposals.Add(new OverviewProposal(session.AudioAt(run.Phrases[i].Tick), session.AudioAt(run.Phrases[i].CoverEnd), run.IsKept(i)));
+            }
+
+            var synced = new List<(double, double, bool)>();
+            if (session.Sync is { Span: var (from, to) } sync)
+            {
+                synced.Add((session.AudioAt(from), session.AudioAt(to), true));
+                foreach (long start in sync.Matches)
+                    synced.Add((session.AudioAt(start), session.AudioAt(start + to - from), false));
+            }
+
+            return new OverviewData(sections, noteRows, notes, rows, phrases, proposals, synced);
+        }
+    }
 }

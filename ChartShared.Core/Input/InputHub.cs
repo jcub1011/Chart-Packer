@@ -137,6 +137,29 @@ public sealed class InputHub : IInputSink, IDisposable
         Received?.Invoke(_batch);
     }
 
+    /// <summary>
+    /// Takes <paramref name="input"/> as its control's last value and its device's last activity, without handing it to
+    /// <see cref="Received"/>: a control seen but not played, as the Input devices window's keys are, so a playtest running
+    /// meanwhile isn't played by them. On the owning thread; nothing while the backends aren't running.
+    /// </summary>
+    public void Observe(in RawInputEvent input)
+    {
+        if (!IsRunning)
+            return;
+        _last[(input.Device, input.Control)] = input.Value;
+        _activity[input.Device] = input.Time;
+    }
+
+    /// <summary>
+    /// Lets go of the keyboard's keys as last read, as a window loses the keyboard and won't hear them let go. Nothing is
+    /// played; it's only what <see cref="LastValue"/> and <see cref="Snapshot"/> give.
+    /// </summary>
+    public void ReleaseKeys()
+    {
+        foreach (var key in _last.Keys.Where(static k => k.Item1 == InputDeviceId.Keyboard).ToList())
+            _last[key] = 0;
+    }
+
     /// <summary>The value <paramref name="control"/> last had, as drained; null when it hasn't moved since the backends started.</summary>
     public float? LastValue(InputDeviceId device, InputControl control) =>
         _last.TryGetValue((device, control.Whole), out float value) ? value : null;

@@ -110,5 +110,83 @@ public sealed class LatencyCalibrationTests
         Assert.AreEqual(new LatencyLookup(25, LatencySource.Id), new AudioLatencyFile(_path).Find("Renamed", "{speakers}"));
     }
 
-    private LatencyCalibration Open(string name, string? id) => new(new AudioLatencyFile(_path), name, id);
+    [TestMethod]
+    public void ADeviceNeverCalibratedStartsAtZeroWithTheDetectedLatencyAdded()
+    {
+        var calibration = Open("Speakers", "{speakers}", 23);
+
+        Assert.AreEqual(0, calibration.Value);
+        Assert.AreEqual(0, calibration.Stored);
+        Assert.AreEqual(23, calibration.Detected);
+        Assert.AreEqual(23, calibration.Total);
+        Assert.AreEqual(LatencySource.Fallback, calibration.Source);
+    }
+
+    [TestMethod]
+    public void TheCalibratedLatencyIsWhatsBeyondTheDetectedOne()
+    {
+        new AudioLatencyFile(_path).Save("Speakers", "{speakers}", 12);
+
+        var calibration = Open("Speakers", "{speakers}", 23);
+
+        Assert.AreEqual(12, calibration.Value);
+        Assert.AreEqual(35, calibration.Total);
+        calibration.Value = -5;
+        Assert.AreEqual(18, calibration.Total);
+    }
+
+    [TestMethod]
+    public void SaveStoresOnlyWhatsBeyondTheDetectedLatency()
+    {
+        var calibration = Open("Speakers", "{speakers}", 23);
+        calibration.Value = 12;
+
+        Assert.IsTrue(calibration.Save());
+
+        var found = new AudioLatencyFile(_path).Find("Speakers", "{speakers}", 23);
+        Assert.AreEqual(new LatencyLookup(12, LatencySource.Id, 23), found);
+        Assert.AreEqual(35, found.Milliseconds);
+    }
+
+    [TestMethod]
+    public void ResetLeavesOnlyTheDetectedLatency()
+    {
+        new AudioLatencyFile(_path).Save("Speakers", "{speakers}", 60);
+        var calibration = Open("Speakers", "{speakers}", 23);
+
+        calibration.Reset();
+        Assert.AreEqual(0, calibration.Value);
+        Assert.AreEqual(23, calibration.Total);
+
+        calibration.Cancel();
+        Assert.AreEqual(60, calibration.Value);
+    }
+
+    [TestMethod]
+    public void WithDetectingOffNothingIsAdded()
+    {
+        var file = new AudioLatencyFile(_path);
+        file.SetDetect(false);
+        file.Save("Speakers", "{speakers}", 40);
+
+        var calibration = Open("Speakers", "{speakers}", 23);
+
+        Assert.IsNull(calibration.Detected);
+        Assert.AreEqual(40, calibration.Value);
+        Assert.AreEqual(40, calibration.Total);
+    }
+
+    [TestMethod]
+    public void ADeviceChangeLoadsThatDevicesDetectedLatency()
+    {
+        var calibration = Open("Speakers", "{speakers}", 23);
+
+        calibration.OnDeviceChanged("Headphones", "{headphones}", 41);
+
+        Assert.AreEqual(0, calibration.Value);
+        Assert.AreEqual(41, calibration.Detected);
+        Assert.AreEqual(41, calibration.Total);
+    }
+
+    private LatencyCalibration Open(string name, string? id, int? detected = null) => new(new AudioLatencyFile(_path), name, id, detected);
 }

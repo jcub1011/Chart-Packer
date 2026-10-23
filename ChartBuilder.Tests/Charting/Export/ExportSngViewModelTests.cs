@@ -1,3 +1,4 @@
+using System.Globalization;
 using ChartBuilder.Resources;
 using ChartBuilder.ViewModels;
 using ChartShared.Audio.Encoding;
@@ -111,8 +112,9 @@ public sealed class ExportSngViewModelTests
     {
         var vm = Dialog(errors: 2);
 
-        Assert.IsNotNull(vm.Problem);
+        Assert.AreEqual(Strings.ExportSngErrorsProblem, vm.Problem);
         Assert.IsNotNull(vm.ErrorsText);
+        Assert.AreNotEqual(vm.ErrorsText, vm.Problem);
         Assert.IsFalse(vm.ExportCommand.CanExecute(null));
     }
 
@@ -271,10 +273,6 @@ public sealed class ExportSngViewModelTests
         Assert.AreEqual("2011", vm.Year);
         Assert.AreEqual("Charter", vm.Charter);
         Assert.AreEqual("3:24", vm.SongLength);
-        Assert.IsTrue(vm.HasDetails);
-        CollectionAssert.AreEquivalent(
-            new[] { "diff_guitar" },
-            vm.OtherMetadata.Select(m => m.Key).ToList());
     }
 
     [TestMethod]
@@ -287,6 +285,93 @@ public sealed class ExportSngViewModelTests
         Assert.IsNull(vm.SongLength);
         Assert.IsFalse(vm.HasAlbum);
         Assert.IsFalse(vm.HasSongLength);
-        Assert.IsFalse(vm.HasOtherMetadata);
+    }
+
+    [TestMethod]
+    public void HeaderShowsTheExportedNameAndCharter()
+    {
+        var vm = Dialog();
+
+        Assert.AreEqual("Name", vm.Headline);
+        Assert.IsNull(vm.CharterText);
+        Assert.IsTrue(vm.HasMetadata);
+        Assert.AreEqual(string.Format(CultureInfo.CurrentCulture, Strings.ExportSngMetadataFormat, 1), vm.MetadataHeading);
+    }
+
+    [TestMethod]
+    public void HeadlineFallsBackToTheSongTitleWithoutAName()
+    {
+        var vm = new ExportSngViewModel(
+            "Artist – Title",
+            [new ExportMetadataRow("charter", "Someone")],
+            "album.png",
+            null,
+            [],
+            "/out",
+            false,
+            0,
+            0,
+            OverwritePolicy.Overwrite,
+            false,
+            dest => dest + "/Band.sng",
+            new StubFolders(null),
+            "Browse");
+
+        Assert.AreEqual("Artist – Title", vm.Headline);
+        Assert.IsNotNull(vm.CharterText);
+        Assert.Contains("Someone", vm.CharterText);
+    }
+
+    private static ExportSngViewModel WithTitle(string songTitle, params ExportMetadataRow[] metadata) => new(
+        songTitle,
+        metadata,
+        "album.png",
+        null,
+        [],
+        "/out",
+        false,
+        0,
+        0,
+        OverwritePolicy.Overwrite,
+        false,
+        dest => dest + "/Band.sng",
+        new StubFolders(null),
+        "Browse");
+
+    [TestMethod]
+    public void ArtistLineShownUnderTheName()
+    {
+        var vm = WithTitle("Band – Song", new ExportMetadataRow("name", "Song"), new ExportMetadataRow("artist", "Band"));
+
+        Assert.AreEqual("Song", vm.Headline);
+        Assert.AreEqual("Band", vm.ArtistLine);
+    }
+
+    [TestMethod]
+    public void ArtistLineHiddenWhenTheFallbackTitleHasTheArtist()
+    {
+        var vm = WithTitle("Band – Song", new ExportMetadataRow("artist", "Band"));
+
+        Assert.AreEqual("Band – Song", vm.Headline);
+        Assert.IsNull(vm.ArtistLine);
+    }
+
+    [TestMethod]
+    public void ArtistLineShownWhenTheFallbackTitleLacksTheArtist()
+    {
+        var vm = WithTitle("Some Folder", new ExportMetadataRow("artist", "Band"));
+
+        Assert.AreEqual("Some Folder", vm.Headline);
+        Assert.AreEqual("Band", vm.ArtistLine);
+    }
+
+    [TestMethod]
+    public void BlockedTranscodeGivesTheShortProblem()
+    {
+        var vm = Dialog(transcodeAvailable: false);
+
+        vm.TranscodeToOpus = true;
+
+        Assert.AreEqual(Strings.ExportSngTranscodeBlockedProblem, vm.Problem);
     }
 }

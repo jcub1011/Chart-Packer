@@ -9,6 +9,7 @@
             <ResourceDictionary.MergedDictionaries>
                 <ResourceInclude Source="avares://ChartShared.UI/Styles/Icons.axaml" />
                 <ResourceInclude Source="avares://ChartBuilder/Controls/EditorSidePanel.axaml" />
+                <ResourceInclude Source="avares://ChartBuilder/Controls/PanelSection.axaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>

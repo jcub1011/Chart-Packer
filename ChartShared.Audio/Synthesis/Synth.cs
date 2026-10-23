@@ -23,7 +23,6 @@ public static class Synth
     public const float Peak = 0.5f;
 
     /// <summary>A sine tone, faded in and out over <paramref name="fadeMs"/> each, at <see cref="Peak"/>.</summary>
-    /// <remarks>The calibration beep is 1 kHz for 30 ms with 2 ms fades, which has a sharp start; 2 kHz marks a bar's first beat (C11).</remarks>
     public static SynthSound Beep(double hz, double ms, double fadeMs, int sampleRate)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(hz);
@@ -42,9 +41,6 @@ public static class Synth
 
         return new SynthSound(samples, sampleRate);
     }
-
-    /// <summary>The calibration tool's beep (C11): 1 kHz for 30 ms with 2 ms fades, or 2 kHz on a bar's first beat.</summary>
-    public static SynthSound CalibrationBeep(bool marked, int sampleRate) => Beep(marked ? 2000 : 1000, 30, 2, sampleRate);
 
     /// <summary>
     /// A metronome click:a high sine that dies away within 30 ms. The click on a measure's first beat is higher and at

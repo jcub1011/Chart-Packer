@@ -16,6 +16,7 @@ namespace ChartShared.UI.Controls.Highway
         private static readonly IPen OutlinePen = new ImmutablePen(Color.FromArgb(0xA0, 0x00, 0x00, 0x00).ToUInt32(), 1);
         private static readonly IBrush HopoMarkBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xF2, 0xFF, 0xFF, 0xFF));
         private static readonly IBrush TapBodyBrush = new ImmutableSolidColorBrush(Color.FromRgb(0x16, 0x16, 0x1B));
+        private static readonly IPen RingShadowPen = new ImmutablePen(Color.FromArgb(0xC0, 0x00, 0x00, 0x00).ToUInt32(), 4);
 
         // How opaque a ghost note's face is, and its edge's dashes and the gaps between them, in pixels.
         private const double GhostOpacity = 0.45;
@@ -164,6 +165,17 @@ namespace ChartShared.UI.Controls.Highway
 
                 context.DrawGeometry(null, OutlinePen, hexagon);
             }
+        }
+
+        /// <summary>
+        /// Draws a ring in <paramref name="color"/> round the gem or bar drawn in <paramref name="rect"/>, outside an accent's,
+        /// with a dark edge so it reads over the gems beside it.
+        /// </summary>
+        public void DrawRing(DrawingContext context, ChartNote note, Rect rect, Color color)
+        {
+            var ring = rect.Inflate(3.5);
+            DrawEdge(context, note, ring, RingShadowPen);
+            DrawEdge(context, note, ring, Pen(color, 2));
         }
 
         /// <summary>Draws the edge of a gem's shape in <paramref name="rect"/>: a cymbal's hexagon, or a rounded gem's.</summary>

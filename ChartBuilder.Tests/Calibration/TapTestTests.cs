@@ -5,13 +5,11 @@ namespace ChartBuilder.Tests.Calibration;
 [TestClass]
 public sealed class TapTestTests
 {
-    private const double Period = 1.0; // 60 BPM
-    private const int TapsPerPhase = 16;
+    private static readonly double[] Notes = CalibrationChart.DeviceNoteTimes();
 
     /// <summary>
-    /// AC C11.2: simulated taps with a known audio offset, normal jitter with σ = 20 ms and two outliers of
-    /// ±150 ms per phase. Over 1,000 seeded trials the median estimate is within 2 ms of the offset, and 95%
-    /// of estimates are within 20 ms.
+    /// AC C11.2: simulated taps with a known offset, normal jitter with σ = 20 ms and two outliers of ±150 ms. Over 1,000
+    /// seeded trials the median estimate is within 2 ms of the offset, and 95% of estimates are within 20 ms.
     /// </summary>
     [TestMethod]
     public void EstimatesTheOffsetOfSimulatedTaps()
@@ -20,15 +18,11 @@ public sealed class TapTestTests
         var misses = new List<double>();
         for (int trial = 0; trial < 1000; trial++)
         {
-            double offset = (random.NextDouble() - 0.5) * 0.5; // within ±250 ms
-            double reaction = (random.NextDouble() - 0.5) * 0.1; // the same in both phases
-            var visual = SimulatedPhase(random, firstBeat: 2, error: reaction);
-            var audio = SimulatedPhase(random, firstBeat: 30, error: reaction + offset);
-
-            var estimate = TapTest.Estimate(visual, audio);
+            double offset = (random.NextDouble() - 0.5) * 0.4; // within ±200 ms
+            var estimate = TapTest.Estimate(Notes, SimulatedTaps(random, offset));
 
             Assert.IsNotNull(estimate);
-            misses.Add(estimate.LatencyMilliseconds - (offset * 1000));
+            misses.Add(estimate.OffsetMilliseconds - (offset * 1000));
         }
 
         misses.Sort();
@@ -39,77 +33,80 @@ public sealed class TapTestTests
     }
 
     [TestMethod]
-    public void TapsOnTheBeatGiveNoLatencyAndNoSpread()
+    public void TapsOnTheNotesGiveNoOffsetAndNoSpread()
     {
-        var onBeat = new TapPhase(5, Period, [.. Enumerable.Range(0, TapsPerPhase).Select(n => 5.0 + n)]);
-
-        var estimate = TapTest.Estimate(onBeat, onBeat with { FirstBeat = 40, Taps = [.. onBeat.Taps.Select(t => t + 35)] });
+        var estimate = TapTest.Estimate(Notes, Notes);
 
         Assert.IsNotNull(estimate);
-        Assert.AreEqual(0, estimate.LatencyMilliseconds, 1e-9);
+        Assert.AreEqual(0, estimate.OffsetMilliseconds, 1e-9);
         Assert.AreEqual(0, estimate.SpreadMilliseconds, 1e-9);
-        Assert.AreEqual(TapsPerPhase - TapTest.WarmUpTaps, estimate.VisualKept);
-        Assert.AreEqual(TapsPerPhase - TapTest.WarmUpTaps, estimate.AudioKept);
+        Assert.AreEqual(Notes.Length, estimate.Kept);
     }
 
     [TestMethod]
-    public void TheWarmUpTapsAreIgnored()
+    public void ADeviceThatReportsLateGivesAPositiveOffset()
     {
-        // The first four taps are wildly off, as while the user finds the beat; the rest are 80 ms late.
-        var visual = new TapPhase(0, Period, [.. Enumerable.Range(0, 12).Select(n => n + (n < 4 ? 0.4 : 0.0))]);
-        var audio = new TapPhase(0, Period, [.. Enumerable.Range(0, 12).Select(n => n + (n < 4 ? -0.3 : 0.08))]);
+        var estimate = TapTest.Estimate(Notes, [.. Notes.Select(n => n + 0.045)]);
 
-        var estimate = TapTest.Estimate(visual, audio);
-
-        Assert.IsNotNull(estimate);
-        Assert.AreEqual(80, estimate.LatencyMilliseconds, 1e-6);
+        Assert.AreEqual(45, estimate!.OffsetMilliseconds, 1e-6);
     }
 
     [TestMethod]
-    public void ATapIsMeasuredAgainstItsNearestBeat()
+    public void TapsInTheLeadInAndFarFromAnyNoteAreIgnored()
     {
-        // Audio 400 ms late reads as 400 ms, and 600 ms late as 400 ms early: the beats are 1 s apart.
-        var visual = new TapPhase(0, Period, [.. Enumerable.Range(0, 10).Select(n => (double)n)]);
+        // Tapping along with the count-in, and once between two notes, as well as 30 ms late on every note.
+        double beat = CalibrationChart.BeatSeconds;
+        double[] leadIn = [.. Enumerable.Range(0, CalibrationChart.DeviceLeadBeats - 1).Select(b => b * beat)];
+        double between = Notes[3] + (beat / 2);
 
-        Assert.AreEqual(400, TapTest.Estimate(visual, visual with { Taps = [.. visual.Taps.Select(t => t + 0.4)] })!.LatencyMilliseconds, 1e-6);
-        Assert.AreEqual(-400, TapTest.Estimate(visual, visual with { Taps = [.. visual.Taps.Select(t => t + 0.6)] })!.LatencyMilliseconds, 1e-6);
+        var estimate = TapTest.Estimate(Notes, [.. leadIn, between, .. Notes.Select(n => n + 0.03)]);
+
+        Assert.AreEqual(30, estimate!.OffsetMilliseconds, 1e-6);
+        Assert.AreEqual(Notes.Length, estimate.Kept);
+    }
+
+    [TestMethod]
+    public void OnlyTheClosestTapToANoteIsUsed()
+    {
+        // A double hit on every note: one 20 ms late, the other 200 ms late.
+        var estimate = TapTest.Estimate(Notes, [.. Notes.SelectMany(n => new[] { n + 0.02, n + 0.2 })]);
+
+        Assert.AreEqual(20, estimate!.OffsetMilliseconds, 1e-6);
+        Assert.AreEqual(Notes.Length, estimate.Kept);
     }
 
     [TestMethod]
     public void TooFewTapsGiveNoEstimate()
     {
-        var enough = new TapPhase(0, Period, [.. Enumerable.Range(0, 10).Select(n => (double)n)]);
-        var tooFew = enough with { Taps = [.. enough.Taps.Take(TapTest.WarmUpTaps + TapTest.MinimumKept - 1)] };
-
-        Assert.IsNull(TapTest.Estimate(tooFew, enough));
-        Assert.IsNull(TapTest.Estimate(enough, tooFew));
-        Assert.IsNull(TapTest.Estimate(enough, enough with { Taps = [] }));
+        Assert.IsNull(TapTest.Estimate(Notes, [.. Notes.Take(TapTest.MinimumKept - 1)]));
+        Assert.IsNull(TapTest.Estimate(Notes, []));
+        Assert.IsNull(TapTest.Estimate([], Notes));
+        Assert.IsNotNull(TapTest.Estimate(Notes, [.. Notes.Take(TapTest.MinimumKept)]));
     }
 
-    // A phase of 16 taps, each `error` from its beat plus jitter, two of the counted ones 150 ms off either way.
-    private static TapPhase SimulatedPhase(Random random, double firstBeat, double error)
+    // A tap for each note, `offset` late plus jitter, two of them 150 ms off either way.
+    private static double[] SimulatedTaps(Random random, double offset)
     {
         var outliers = new HashSet<int>();
         while (outliers.Count < 2)
-            outliers.Add(random.Next(TapTest.WarmUpTaps, TapsPerPhase));
+            outliers.Add(random.Next(Notes.Length));
 
         int sign = 1;
-        var taps = new double[TapsPerPhase];
-        for (int n = 0; n < TapsPerPhase; n++)
+        var taps = new double[Notes.Length];
+        for (int n = 0; n < Notes.Length; n++)
         {
-            double beat = firstBeat + (n * Period);
             if (outliers.Contains(n))
             {
-                taps[n] = beat + error + (sign * 0.15);
+                taps[n] = Notes[n] + offset + (sign * 0.15);
                 sign = -sign;
             }
             else
             {
-                taps[n] = beat + error + (Gaussian(random) * 0.02);
+                taps[n] = Notes[n] + offset + (Gaussian(random) * 0.02);
             }
         }
 
-        return new TapPhase(firstBeat, Period, taps);
+        return taps;
     }
 
     // A standard normal value (Box–Muller).

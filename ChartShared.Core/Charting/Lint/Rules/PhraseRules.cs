@@ -1,3 +1,5 @@
+using System.Globalization;
+using ChartShared.Core.Charting.Authoring;
 using ChartShared.Core.Resources;
 using ChartShared.Core.Validation;
 
@@ -158,5 +160,94 @@ public sealed class NotesInBigRockEndingRule : IChartLintRule
         }
 
         return findings;
+    }
+}
+
+/// <summary>
+/// CHR065: a star power phrase or solo with no notes in it on a charted difficulty, though another difficulty has some, as
+/// a reduction can leave one. One finding for each such difficulty; a phrase empty on every difficulty is CHR060's or
+/// CHR061's.
+/// </summary>
+public sealed class PhraseEmptyOnDifficultyRule : IChartLintRule
+{
+    public string RuleId => ChrRules.Chr065;
+
+    public Severity Severity => Severity.Warning;
+
+    // Part, not range: a difficulty getting its first note, or losing its last, changes its findings anywhere.
+    public LintScope Scope => LintScope.Part;
+
+    public int Reach => 0;
+
+    public IEnumerable<Finding> Check(ChartLintContext context)
+    {
+        var findings = new List<Finding>();
+        foreach (var part in context.Parts)
+        {
+            Add(part, PhraseKind.StarPower, FindingMessages.ChrStarPowerEmptyOnDifficultyFormat);
+            Add(part, PhraseKind.Solo, FindingMessages.ChrSoloEmptyOnDifficultyFormat);
+        }
+
+        return findings;
+
+        void Add(EditablePart part, PhraseKind kind, string format)
+        {
+            foreach (var phrase in PhraseSpans.PhrasesIn(context, part, kind))
+            {
+                if (EmptyStarPowerRule.IsEmpty(part, phrase))
+                    continue;
+                foreach (var track in part.Tracks)
+                {
+                    if (track.Notes.Count > 0 && PhraseSpans.Covered(track, phrase).IsEmpty)
+                        findings.Add(new Finding(RuleId, Severity, string.Format(CultureInfo.CurrentCulture, format, track.Difficulty), Location: PhraseSpans.Span(part, track, phrase)));
+                }
+            }
+        }
+    }
+}
+
+/// <summary>
+/// CHR066: a 5-fret or keys part with notes has no star power phrases, so a player never earns star power on it. One
+/// finding for each such part where a phrase fits (<see cref="StarPowerGenerator.HasSpot"/>), so generating it
+/// (<see cref="StarPowerGenerator"/>) always proposes some.
+/// </summary>
+public sealed class NoStarPowerRule : IChartLintRule
+{
+    public string RuleId => ChrRules.Chr066;
+
+    public Severity Severity => Severity.Info;
+
+    // Part, not range: adding or removing any phrase, or a difficulty's notes, changes it.
+    public LintScope Scope => LintScope.Part;
+
+    public int Reach => 0;
+
+    public IEnumerable<Finding> Check(ChartLintContext context)
+    {
+        var findings = new List<Finding>();
+        foreach (var part in context.Parts)
+        {
+            if (!StarPowerGenerator.CanGenerate(part.Kind) || StarPowerGenerator.HasStarPower(part) || DifficultyGenerator.HighestCharted(part) is not { } highest)
+                continue;
+
+            // Too few chords for a phrase is the common case, told without looking for a spot.
+            if (ChordCount(part[highest]) >= StarPowerParameters.Default.MinChords && StarPowerGenerator.HasSpot(context.Chart, part))
+                findings.Add(new Finding(RuleId, Severity, FindingMessages.ChrNoStarPower, Location: new ChartLocation(part.Instrument, null, 0, 0)));
+        }
+
+        return findings;
+    }
+
+    private static int ChordCount(EditableTrack track)
+    {
+        var notes = track.Notes.AsSpan();
+        int chords = 0;
+        for (int i = 0; i < notes.Length; i++)
+        {
+            if (i == 0 || notes[i].Tick != notes[i - 1].Tick)
+                chords++;
+        }
+
+        return chords;
     }
 }

@@ -10,12 +10,29 @@ namespace ChartBuilder.Views
     /// </summary>
     public partial class PreviewView : UserControl
     {
+        public static readonly StyledProperty<bool> CanPopOutProperty =
+            AvaloniaProperty.Register<PreviewView, bool>(nameof(CanPopOut), true);
+
         private PreviewViewModel? _shownFor;
 
         public PreviewView()
         {
             InitializeComponent();
             Highway.Scrubbed += (_, e) => (DataContext as PreviewViewModel)?.Playback.SeekTo(e.Seconds);
+        }
+
+        /// <summary>Whether it offers to open the preview in a window of its own: not when it's in that window.</summary>
+        public bool CanPopOut
+        {
+            get => GetValue(CanPopOutProperty);
+            set => SetValue(CanPopOutProperty, value);
+        }
+
+        protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+        {
+            base.OnPropertyChanged(change);
+            if (change.Property == CanPopOutProperty)
+                PopOutButton.IsVisible = change.GetNewValue<bool>();
         }
 
         protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)

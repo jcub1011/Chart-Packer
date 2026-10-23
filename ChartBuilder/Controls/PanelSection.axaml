@@ -1,0 +1,81 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:res="using:ChartBuilder.Resources"
+                    xmlns:ctl="using:ChartShared.UI.Controls"
+                    xmlns:bctl="using:ChartBuilder.Controls">
+
+    <!-- A section of a side-panel tab (PanelSection.cs): a slim header, its chevron, title and, on hover, the grip that says
+         it can be dragged; then what it holds, unless it's collapsed. -->
+    <ControlTheme x:Key="{x:Type bctl:PanelSection}" TargetType="bctl:PanelSection">
+        <Setter Property="Template">
+            <ControlTemplate>
+                <DockPanel>
+                    <Border Name="PART_Header"
+                            DockPanel.Dock="Top"
+                            Height="28"
+                            Padding="8,0,6,0"
+                            Background="Transparent"
+                            BorderBrush="{DynamicResource SubtleBorderBrush}"
+                            BorderThickness="0,0,0,1"
+                            Focusable="True"
+                            Cursor="Hand"
+                            ToolTip.Tip="{x:Static res:Strings.SectionHeaderToolTip}">
+                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="6">
+                            <ctl:LineIcon Name="PART_Chevron"
+                                          Grid.Column="0"
+                                          Width="12" Height="12"
+                                          Opacity="0.7"
+                                          Data="{StaticResource ChevronDownStroke}" />
+                            <ContentPresenter Grid.Column="1"
+                                              VerticalAlignment="Center"
+                                              FontSize="12"
+                                              FontWeight="SemiBold"
+                                              Opacity="0.8"
+                                              Content="{TemplateBinding Header}"
+                                              ContentTemplate="{TemplateBinding HeaderTemplate}" />
+                            <ctl:LineIcon Name="PART_Grip"
+                                          Grid.Column="2"
+                                          Width="14" Height="14"
+                                          Opacity="0"
+                                          Data="{StaticResource GripStroke}" />
+                        </Grid>
+                    </Border>
+                    <ContentPresenter Name="PART_ContentPresenter"
+                                      Content="{TemplateBinding Content}"
+                                      ContentTemplate="{TemplateBinding ContentTemplate}"
+                                      Padding="{TemplateBinding Padding}"
+                                      HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                      VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+                </DockPanel>
+            </ControlTemplate>
+        </Setter>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="VerticalContentAlignment" Value="Stretch" />
+
+        <Style Selector="^ /template/ Border#PART_Header:pointerover">
+            <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+        </Style>
+        <Style Selector="^ /template/ Border#PART_Header:pointerover ctl|LineIcon#PART_Grip">
+            <Setter Property="Opacity" Value="0.55" />
+        </Style>
+        <Style Selector="^ /template/ Border#PART_Header:focus-visible">
+            <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+        </Style>
+
+        <!-- Collapsed: only the header, its chevron pointing along it. -->
+        <Style Selector="^:collapsed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="IsVisible" Value="False" />
+        </Style>
+        <Style Selector="^:collapsed /template/ ctl|LineIcon#PART_Chevron">
+            <Setter Property="RenderTransform" Value="rotate(-90deg)" />
+        </Style>
+
+        <!-- Being dragged: faded where it was, as the accent line shows where it's going. -->
+        <Style Selector="^:dragging">
+            <Setter Property="Opacity" Value="0.5" />
+        </Style>
+        <Style Selector="^:dragging /template/ Border#PART_Header">
+            <Setter Property="Cursor" Value="SizeNorthSouth" />
+        </Style>
+    </ControlTheme>
+</ResourceDictionary>

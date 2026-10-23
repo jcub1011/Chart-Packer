@@ -85,11 +85,12 @@ public sealed partial class EditorTools
     private TempoMap Map => _session.TempoMap;
 
     /// <summary>
-    /// Starts a gesture at <paramref name="point"/> with the current tool; in the phrase rail, with any tool, a gesture on
-    /// the phrase there (charter-spec C8). Pressed on a selected note with Ctrl, a drag lengthens or shortens each selected
-    /// note's sustain by the same grid steps; with Alt, it lays a run of each, as many steps as dragged. With Shift, any
-    /// tool selects as the select tool does, the first press while Shift is held selecting afresh. The place tool puts an
-    /// open note, or a kick, down with Alt.
+    /// Starts a gesture at <paramref name="point"/> with the current tool; in the phrase rail, with any tool but the erase
+    /// tool, a gesture on the phrase there (charter-spec C8). Pressed on a selected note with Ctrl, a drag lengthens or
+    /// shortens each selected note's sustain by the same grid steps; with Alt, it lays a run of each, as many steps as
+    /// dragged. With Shift, any tool selects as the select tool does, the first press while Shift is held selecting afresh.
+    /// The place tool puts a note down as <see cref="EditorSession.Placing"/> has it, Alt swapping a fret for an open note
+    /// or the kick, and Ctrl a run for a sustain.
     /// </summary>
     public void Press(ChartPoint point, EditorModifiers modifiers = EditorModifiers.None)
     {
@@ -103,7 +104,9 @@ public sealed partial class EditorTools
             return;
         if (point.Rail is not null)
         {
-            _gesture = PressRail(point, shift);
+            // The erase tool erases there too, as it shows; a proposed phrase's ghost is still kept or dropped.
+            bool erases = _session.Tool == EditorTool.Erase && !shift && _session.Proposals?.HitTest(point) is null;
+            _gesture = erases ? new EraseGesture(this, point) : PressRail(point, shift);
             return;
         }
 
@@ -133,10 +136,9 @@ public sealed partial class EditorTools
         _gesture = _session.Tool switch
         {
             EditorTool.Select => PressSelect(point, shift),
-            EditorTool.Place => PressPlace(point, apart: modifiers.HasFlag(EditorModifiers.Alt)),
+            EditorTool.Place => PressPlace(point, alt: modifiers.HasFlag(EditorModifiers.Alt)),
             EditorTool.Erase => new EraseGesture(this, point),
-            EditorTool.Sustain => PressSustain(point),
-            EditorTool.Phrase => point.Lane is null ? null : PressDraw(point),
+            EditorTool.Phrase => PhraseDrawStart(point) is { } from ? PressDraw(point.Track, from) : null,
             EditorTool.Tempo => PressTempo(point),
             EditorTool.Sync => point.Lane is null ? null : new SyncGesture(this, point),
             _ => null,
@@ -144,15 +146,20 @@ public sealed partial class EditorTools
     }
 
     /// <summary>
-    /// Starts erasing at <paramref name="point"/> whatever the tool, as the middle button does: each note the pointer
-    /// passes over goes, and in the phrase rail each phrase or disco flip section, as one step.
+    /// Starts erasing at <paramref name="point"/>, as the middle button does: each note the pointer passes over goes, and
+    /// in the phrase rail each phrase or disco flip section, as one step. With the Tempo tool, it removes the tempo marker
+    /// there instead.
     /// </summary>
     public void PressErase(ChartPoint point)
     {
         Cancel();
         _modifiers = EditorModifiers.None;
         _session.Focused = point.Track;
-        if (_session.TrackOf(point.Track) is not null)
+        if (_session.TrackOf(point.Track) is null)
+            return;
+        if (_session.Tool == EditorTool.Tempo)
+            RemoveTempoNear(point.Tick, point.Tolerance);
+        else
             _gesture = new EraseGesture(this, point);
     }
 
@@ -189,14 +196,14 @@ public sealed partial class EditorTools
     }
 
     /// <summary>
-    /// The left button's gesture on a selected note with Ctrl or Alt held, with the select, place or sustain tool: with
-    /// Ctrl, each selected note's sustain lengthened or shortened by the same grid steps; with Alt, a run of each, as many
-    /// steps as dragged. Null anywhere else, or with neither held.
+    /// The left button's gesture on a selected note with Ctrl or Alt held, with the select or place tool: with Ctrl, each
+    /// selected note's sustain lengthened or shortened by the same grid steps; with Alt, a run of each, as many steps as
+    /// dragged. Null anywhere else, or with neither held.
     /// </summary>
     private NoteLengthGesture? PressSelected(ChartPoint point, EditorModifiers modifiers)
     {
         bool ctrl = modifiers.HasFlag(EditorModifiers.Control);
-        if ((!ctrl && !modifiers.HasFlag(EditorModifiers.Alt)) || _session.Tool is not (EditorTool.Select or EditorTool.Place or EditorTool.Sustain))
+        if ((!ctrl && !modifiers.HasFlag(EditorModifiers.Alt)) || _session.Tool is not (EditorTool.Select or EditorTool.Place))
             return null;
         var selection = _session.Selection;
         if (HitTest(point) is not { } hit || !selection.Contains(point.Track, hit.Note))
@@ -804,6 +811,34 @@ public sealed partial class EditorTools
     }
 
     /// <summary>
+    /// What the erase tool takes away at <paramref name="point"/>, for it and for the red it shows there first: the note
+    /// whose start or tail is under it, or in the phrase rail, the phrase or disco flip section whose bar is. An open note's
+    /// tail is drawn across the lanes, so passing over it leaves the note; its gem erases it. Null for nothing.
+    /// </summary>
+    public EraseTarget? EraseTargetAt(ChartPoint point) => EraseTargetAt(point, afresh: false);
+
+    // With afresh, the disco flip sections are read from the track rather than as the session keeps them.
+    private EraseTarget? EraseTargetAt(ChartPoint point, bool afresh)
+    {
+        if (_session.TrackOf(point.Track) is not { } track)
+            return null;
+        if (point.Rail is null)
+            return HitTest(point) is { } hit && !(hit.IsTail && hit.Note.Lane == ChartNote.OpenLane) ? new EraseTarget(Note: hit.Note) : null;
+
+        if (point.Rail is { IsDiscoFlip: true })
+        {
+            var flip = afresh
+                ? PhraseRail.HitTestDiscoFlip(track, point)
+                : PhraseRail.HitTestDiscoFlip(point.Track.Difficulty, _session.DiscoFlipRangesOf(point.Track), point);
+            return flip is { } bar ? new EraseTarget(DiscoFlip: bar.Section) : null;
+        }
+
+        return Chart.PartOf(point.Track.Instrument) is { } part && PhraseRail.HitTest(part, point) is { } phrase
+            ? new EraseTarget(Phrase: phrase.Phrase)
+            : null;
+    }
+
+    /// <summary>
     /// The note whose start or tail is under <paramref name="point"/>, the start first, or null for none. In a shared
     /// column (GHL's), a note in the half the pointer is in comes first, then the other half's, whose gem fills the column
     /// when it's alone. A note is in the column it's drawn in: inside a disco flip section, the pad the player hits
@@ -873,32 +908,91 @@ public sealed partial class EditorTools
         return new BoxGesture(this, point, shift);
     }
 
-    // With apart, the note goes in the lane apart from the columns: an open note, or the kick.
-    private Gesture? PressPlace(ChartPoint point, bool apart)
+    private Gesture? PressPlace(ChartPoint point, bool alt)
     {
         var track = _session.TrackOf(point.Track)!;
-        int? lane = apart ? ApartLane(point.Slots) : point.Lane;
-        if (lane is not { } shown)
+        if (PlacedLane(track.Kind, point.Lane, point.Slots, alt) is not { } shown)
             return null;
         long tick = SnapTick(point.Tick, point.Track);
 
         // The pad drawn in the column clicked: inside a disco flip section, yellow's column places red (C6 item 7).
         int placed = _session.StoredLane(point.Track, tick, shown);
-        if (track.TryGetNote(tick, placed, doubleKick: false, out var there))
+        var note = PlacedNote(point.Track, track.Kind, tick, placed);
+        if (TryGetPlaced(track, note, out var there))
         {
             if (!_session.Selection.Contains(point.Track, there))
                 _session.Selection.Select(point.Track, [there]);
             return new MoveGesture(this, point, there);
         }
 
-        var note = new EditableNote(tick, EditableNote.PlainLength, placed);
         var gesture = new PlaceGesture(this, point.Track, note, point.Tick);
         return gesture.Start() ? gesture : null;
     }
 
-    private Gesture? PressSustain(ChartPoint point)
+    /// <summary>
+    /// The lane the place tool puts a note in with the pointer in <paramref name="lane"/>: the lane apart from the columns,
+    /// an open note or the kick, with <paramref name="alt"/> held, or on fret parts the other way about while
+    /// <see cref="PlaceOptions.Open"/> is picked. Null outside the lanes, unless Alt is held.
+    /// </summary>
+    public int? PlacedLane(ChartInstrumentKind kind, int? lane, LaneSlots slots, bool alt)
     {
-        return HitTest(point) is { } hit ? SustainOf(point, hit.Note) : null;
+        bool apart = kind != ChartInstrumentKind.Drums && _session.Placing.Open ? !alt : alt;
+        return apart && (alt || lane is not null) ? ApartLane(slots) : lane;
+    }
+
+    /// <summary>
+    /// The note the place tool puts in <paramref name="lane"/> at <paramref name="tick"/> of <paramref name="key"/>'s track,
+    /// as <see cref="EditorSession.Placing"/> has it: on drums, a pad an accent or a ghost, and on Expert a 2× kick.
+    /// </summary>
+    public EditableNote PlacedNote(ChartTrackKey key, ChartInstrumentKind kind, long tick, int lane)
+    {
+        var placing = _session.Placing;
+        bool drums = kind == ChartInstrumentKind.Drums;
+        return new EditableNote(
+            tick,
+            EditableNote.PlainLength,
+            lane,
+            drums && lane > 0 ? placing.Dynamics : NoteDynamics.None,
+            drums && lane == 0 && placing.DoubleKick && key.Difficulty == ChartDifficulty.Expert);
+    }
+
+    /// <summary>
+    /// The note already where the place tool would put <paramref name="note"/>, which a click there selects rather than
+    /// places over: the note in its lane at its tick, and on the kick's lane, a kick of either kind, as a kick and a 2×
+    /// kick are one pad.
+    /// </summary>
+    public static bool TryGetPlaced(EditableTrack track, EditableNote note, out EditableNote there) =>
+        track.TryGetNote(note.Tick, note.Lane, note.DoubleKick, out there)
+        || (note.Lane == 0 && track.Kind == ChartInstrumentKind.Drums && track.TryGetNote(note.Tick, 0, !note.DoubleKick, out there));
+
+    /// <summary>
+    /// The command that places <paramref name="notes"/> on <paramref name="key"/>'s track as <see cref="EditorSession.Placing"/>
+    /// has it: with the chords they're in made the type picked, and on Pro drums the yellow, blue and green pads made toms
+    /// when that's picked, as <paramref name="toms"/>.
+    /// </summary>
+    private IChartCommand PlacementOf(ChartTrackKey key, IReadOnlyList<EditableNote> notes, out SetToms? toms)
+    {
+        toms = null;
+        var placing = _session.Placing;
+        var commands = new List<IChartCommand> { new AddNotes(key.Instrument, key.Difficulty, notes) };
+        if (ChartInstruments.KindOf(key.Instrument) == ChartInstrumentKind.Drums)
+        {
+            var pads = placing.Tom && Chart.DrumsVariant == DrumsVariant.Pro
+                ? notes.Where(n => CanToggleCymbal(key, n)).Select(static n => (n.Lane, n.Tick)).Distinct().ToList()
+                : [];
+            if (pads.Count > 0)
+                commands.Add(toms = new SetToms(pads, tom: true, key.Difficulty));
+        }
+        else if (placing.ChordType != ChordFlags.None)
+        {
+            // Each set whatever the chord had, so the preview before this one, still in the chart, can't hide a change.
+            var ticks = notes.Select(static n => n.Tick).Distinct().ToList();
+            const ChordFlags types = ChordFlags.ForceHopo | ChordFlags.ForceStrum | ChordFlags.Tap;
+            commands.Add(new SetChordFlags(key.Instrument, key.Difficulty, ticks, types & ~placing.ChordType, on: false));
+            commands.Add(new SetChordFlags(key.Instrument, key.Difficulty, ticks, placing.ChordType, on: true));
+        }
+
+        return commands.Count == 1 ? commands[0] : new CompositeCommand(commands);
     }
 
     private SustainGesture SustainOf(ChartPoint point, EditableNote grabbed)
@@ -910,23 +1004,47 @@ public sealed partial class EditorTools
 
     private Gesture? PressTempo(ChartPoint point) => PressTempo(point.Tick, point.Tolerance);
 
+    /// <summary>The tick of the tempo marker nearest <paramref name="pressed"/>, within <paramref name="tolerance"/> ticks of it; null for none.</summary>
+    private long? TempoMarkerNear(double pressed, double tolerance)
+    {
+        long from = (long)Math.Floor(pressed - tolerance), to = (long)Math.Ceiling(pressed + tolerance);
+        var near = Chart.TempoMap.Tempos.Between(Math.Max(0, from), to);
+        if (near.IsEmpty)
+            return null;
+        long tick = near[0].Tick;
+        double best = Math.Abs(tick - pressed);
+        foreach (var marker in near)
+        {
+            if (Math.Abs(marker.Tick - pressed) < best)
+                (tick, best) = (marker.Tick, Math.Abs(marker.Tick - pressed));
+        }
+
+        return tick;
+    }
+
+    /// <summary>
+    /// Removes the tempo marker within the tolerance of <paramref name="pressed"/>, as the middle button does with the
+    /// Tempo tool, as one step: the marker nearest it, if any. A refusal, such as for the song's first marker, is said in
+    /// the status.
+    /// </summary>
+    private void RemoveTempoNear(double pressed, double tolerance)
+    {
+        if (TempoMarkerNear(pressed, tolerance) is not { } tick)
+            return;
+        var edit = TempoMapEdits.RemoveMarker(Chart, tick, _session.Delay, _session.KeepTimes);
+        if (edit.IsRefused)
+            _session.Status = edit.Refusal;
+        else
+            _session.Execute(edit.Command!);
+    }
+
     // The Tempo tool's press at a tick, in any lane: on a marker within the tolerance, a drag of it; elsewhere, a marker
     // added on the grid.
     private Gesture? PressTempo(double pressed, double tolerance)
     {
         var map = Chart.TempoMap;
-        long from = (long)Math.Floor(pressed - tolerance), to = (long)Math.Ceiling(pressed + tolerance);
-        var near = map.Tempos.Between(Math.Max(0, from), to);
-        if (!near.IsEmpty)
+        if (TempoMarkerNear(pressed, tolerance) is { } tick)
         {
-            long tick = near[0].Tick;
-            double best = Math.Abs(tick - pressed);
-            foreach (var marker in near)
-            {
-                if (Math.Abs(marker.Tick - pressed) < best)
-                    (tick, best) = (marker.Tick, Math.Abs(marker.Tick - pressed));
-            }
-
             _session.Selection.SelectTempos([tick]);
             return new TempoDragGesture(this, tick, anchored: !map.Anchors.At(tick).IsEmpty);
         }
@@ -945,16 +1063,17 @@ public sealed partial class EditorTools
     }
 
     /// <summary>
-    /// A press in the phrase rail, with any tool: on a proposed fill's ghost, while Generate fills runs, it keeps or drops
-    /// the fill (charter-spec C6 item 5), before any bar under it. On a phrase's bar it selects the phrase (Shift adds it
-    /// or takes it away), and a drag moves it, or resizes it by the end grabbed; the same on a disco flip section's bar.
-    /// Elsewhere in the rail, the Phrase tool draws, and the others select no phrases or sections.
+    /// A press in the phrase rail, with any tool: on a proposed phrase's ghost, while Generate fills or Generate star power
+    /// runs, it keeps or drops the phrase (charter-spec C6 item 5, C8 item 1), before any bar under it. On a phrase's bar it
+    /// selects the phrase (Shift adds it or takes it away), and a drag moves it, or resizes it by the end grabbed; the same
+    /// on a disco flip section's bar. Elsewhere in the rail, the Phrase tool draws, and the others select no phrases or
+    /// sections.
     /// </summary>
     private Gesture? PressRail(ChartPoint point, bool shift)
     {
-        if (_session.Fills.HitTest(point) is { } ghost)
+        if (_session.Proposals is { } run && run.HitTest(point) is { } ghost)
         {
-            _session.Fills.Toggle(ghost);
+            run.Toggle(ghost);
             return null;
         }
 
@@ -965,7 +1084,7 @@ public sealed partial class EditorTools
         if (PhraseRail.HitTest(part, point) is not { } hit)
         {
             if (_session.Tool == EditorTool.Phrase)
-                return PressDraw(point);
+                return PressDraw(point.Track, Snap.Nearest(point.Tick, Map));
             if (!shift)
             {
                 selection.ClearPhrases();
@@ -1005,21 +1124,49 @@ public sealed partial class EditorTools
     }
 
     /// <summary>
-    /// A press with the Phrase tool where it draws: a phrase of the kind picked, or a disco flip section on the lane's
-    /// difficulty, which only Pro drums have.
+    /// Where a press with the Phrase tool at <paramref name="point"/> starts drawing: the grid step nearest it, in the lanes
+    /// or in an empty part of the rail. Null with another tool, or where a press does something else: on a phrase's bar, a
+    /// disco flip section's or a proposed phrase's ghost, as <see cref="PressRail"/> tells them apart.
     /// </summary>
-    private Gesture? PressDraw(ChartPoint point)
+    public long? PhraseDrawStart(ChartPoint point)
+    {
+        if (_session.Tool != EditorTool.Phrase || Chart.PartOf(point.Track.Instrument) is not { } part)
+            return null;
+        if (point.Rail is null ? point.Lane is null
+            : _session.Proposals?.HitTest(point) is not null
+                || PhraseRail.HitTestDiscoFlip(point.Track.Difficulty, _session.DiscoFlipRangesOf(point.Track), point) is not null
+                || PhraseRail.HitTest(part, point) is not null)
+        {
+            return null;
+        }
+
+        return Snap.Nearest(point.Tick, Map);
+    }
+
+    /// <summary>
+    /// A press with the Phrase tool where it draws, from <paramref name="from"/>: a phrase of the kind picked, or a disco
+    /// flip section on the lane's difficulty, which only Pro drums have.
+    /// </summary>
+    private Gesture? PressDraw(ChartTrackKey track, long from)
     {
         if (_session.PhraseKind.Phrase is { } kind)
-            return new PhraseDrawGesture(this, point, kind);
-        if (ChartInstruments.KindOf(point.Track.Instrument) != ChartInstrumentKind.Drums || !_session.IsProDrums)
+            return new PhraseDrawGesture(this, track, from, kind);
+        if (!DrawsIn(track))
         {
             _session.Status = DiscoFlipOffPro;
             return null;
         }
 
-        return new DiscoFlipDrawGesture(this, point);
+        return new DiscoFlipDrawGesture(this, track, from);
     }
+
+    /// <summary>
+    /// Whether the Phrase tool draws what's picked in <paramref name="track"/>'s lanes: any phrase kind, but a disco flip
+    /// section only on Pro drums.
+    /// </summary>
+    public bool DrawsIn(ChartTrackKey track) =>
+        _session.PhraseKind.Phrase is not null
+        || (ChartInstruments.KindOf(track.Instrument) == ChartInstrumentKind.Drums && _session.IsProDrums);
 
     /// <summary>The lanes <paramref name="notes"/> of <paramref name="key"/>'s track are drawn in (<see cref="EditorSession.ShownLane(ChartTrackKey, EditableNote)"/>).</summary>
     private List<int> ShownLanes(ChartTrackKey key, IReadOnlyList<EditableNote> notes) => [.. notes.Select(n => _session.ShownLane(key, n))];
@@ -1344,12 +1491,15 @@ public sealed partial class EditorTools
 
     /// <summary>
     /// Places a note, and as the pointer drags, a run of it on every grid step up to the pointer, on or back, leaving out
-    /// the places with a note already; with Ctrl, its sustain instead, which drums don't have. It leaves nothing selected.
+    /// the places with a note already; with Ctrl, its sustain instead, which drums don't have, or the other way about
+    /// while <see cref="PlaceOptions.DragSustains"/> is picked. Each chord placed in is made as <see cref="EditorSession.Placing"/>
+    /// has it. It leaves nothing selected.
     /// </summary>
     private sealed class PlaceGesture(EditorTools tools, ChartTrackKey track, EditableNote note, double pressed) : Gesture(tools)
     {
         private (long End, bool Sustain)? _last;
-        private AddNotes? _placed;
+        private IReadOnlyList<EditableNote> _placed = [];
+        private SetToms? _toms;
 
         public bool Start() => Preview([note]);
 
@@ -1357,7 +1507,8 @@ public sealed partial class EditorTools
         {
             // Back on the grid step pressed, the note alone: the note itself may have gone to an onset off the grid.
             long end = Tools.Snap.Nearest(point.Tick, Tools.Map);
-            bool sustain = Tools._modifiers.HasFlag(EditorModifiers.Control);
+            bool fret = Session.TrackOf(track) is not { Kind: ChartInstrumentKind.Drums };
+            bool sustain = Tools._modifiers.HasFlag(EditorModifiers.Control) != (fret && Session.Placing.DragSustains);
             if (_last == (end, sustain))
                 return;
             _last = (end, sustain);
@@ -1369,7 +1520,7 @@ public sealed partial class EditorTools
 
             if (sustain)
             {
-                if (Session.TrackOf(track) is { Kind: ChartInstrumentKind.Drums })
+                if (!fret)
                 {
                     Preview([note]);
                     Session.Status = NoDrumSustain;
@@ -1381,24 +1532,26 @@ public sealed partial class EditorTools
             }
 
             // The run previewed last is in the chart until this one replaces it, so its notes don't count as there.
-            var previewed = _placed?.Notes.ToHashSet() ?? [];
-            var run = Tools.RunOf(track, [note], steps: null, end, previewed);
+            var run = Tools.RunOf(track, [note], steps: null, end, _placed.ToHashSet());
             Preview([note, .. run?.Notes ?? []]);
         }
 
         public override void Release(ChartPoint point)
         {
             Drag(point);
-            if (Session.CommitPreview() is not null)
-                Session.Selection.Clear();
+            if (Session.CommitPreview() is null)
+                return;
+            Session.Selection.Clear();
+            if (_toms is { SharedWith.Count: > 0 } toms)
+                Session.Status = $"Made toms on every difficulty: {Names(toms.SharedWith)} changed too.";
         }
 
         private bool Preview(IReadOnlyList<EditableNote> notes)
         {
-            var placed = new AddNotes(track.Instrument, track.Difficulty, notes);
+            var placed = Tools.PlacementOf(track, notes, out var toms);
             if (!Session.Preview(placed))
                 return false;
-            _placed = placed;
+            (_placed, _toms) = (notes, toms);
             return true;
         }
     }
@@ -1423,24 +1576,21 @@ public sealed partial class EditorTools
             if (point.Track != _track)
                 return;
 
-            // What's erased so far is out of the chart, as the preview, so the hit is among what's left.
-            if (point.Rail is not null)
+            // What's erased so far is out of the chart, as the preview, so the hit is among what's left; the sections are
+            // read afresh, not as the session keeps them, so one this erase previews out is gone at once.
+            switch (Tools.EraseTargetAt(point, afresh: true))
             {
-                if (Session.TrackOf(_track) is { } track && PhraseRail.HitTestDiscoFlip(track, point) is { } flip)
-                    _discoFlips.Add(flip.Section.Range);
-                else if (Tools.Chart.PartOf(_track.Instrument) is { } part && PhraseRail.HitTest(part, point) is { } phrase)
-                    _phrases.Add(phrase.Phrase);
-                else
+                case { Note: { } note }:
+                    _erased.Add(note);
+                    break;
+                case { Phrase: { } phrase }:
+                    _phrases.Add(phrase);
+                    break;
+                case { DiscoFlip: { } flip }:
+                    _discoFlips.Add(flip.Range);
+                    break;
+                default:
                     return;
-            }
-            // An open note's tail is drawn across the lanes, so passing over it leaves the note; its gem erases it.
-            else if (Tools.HitTest(point) is { } hit && !(hit.IsTail && hit.Note.Lane == ChartNote.OpenLane))
-            {
-                _erased.Add(hit.Note);
-            }
-            else
-            {
-                return;
             }
 
             var commands = new List<IChartCommand>();
@@ -1518,12 +1668,12 @@ public sealed partial class EditorTools
         private readonly long _from;
         private Phrase? _tried;
 
-        public PhraseDrawGesture(EditorTools tools, ChartPoint pressed, PhraseKind kind)
+        public PhraseDrawGesture(EditorTools tools, ChartTrackKey track, long from, PhraseKind kind)
             : base(tools)
         {
-            _part = pressed.Track.Instrument;
+            _part = track.Instrument;
             _kind = kind;
-            _from = Tools.Snap.Nearest(pressed.Tick, Tools.Map);
+            _from = from;
         }
 
         public override void Drag(ChartPoint point)
@@ -1683,11 +1833,11 @@ public sealed partial class EditorTools
         private readonly long _from;
         private (long Tick, long EndTick)? _tried;
 
-        public DiscoFlipDrawGesture(EditorTools tools, ChartPoint pressed)
+        public DiscoFlipDrawGesture(EditorTools tools, ChartTrackKey track, long from)
             : base(tools)
         {
-            _track = pressed.Track;
-            _from = Tools.Snap.Nearest(pressed.Tick, Tools.Map);
+            _track = track;
+            _from = from;
         }
 
         public override void Drag(ChartPoint point)

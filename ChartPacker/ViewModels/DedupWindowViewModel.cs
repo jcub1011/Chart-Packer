@@ -40,8 +40,8 @@ namespace ChartPacker.ViewModels
         private readonly DedupRequest _request;
         private readonly Func<string, bool> _hasDrafts;
 
-        // Whether Chart Builder has the song at a path open, so deleting it asks first (charter-spec §4.8).
-        private readonly Func<string, bool>? _isOpenInChartBuilder;
+        // Holds the copies being deleted, so none open elsewhere is deleted (charter-spec §4.8).
+        private readonly SongLocks? _locks;
         private readonly SettingsService _settings;
         private readonly IConfirmationService _confirmation;
         private readonly IMergeWindowService _merge;
@@ -72,6 +72,7 @@ namespace ChartPacker.ViewModels
         /// <param name="merge">Shows the Merge window over this one.</param>
         /// <param name="trash">Where deleted copies go; <see langword="null"/> when this OS has none, which turns deleting off.</param>
         /// <param name="log">Records every deletion.</param>
+        /// <param name="locks">Holds the copies while they're deleted; a copy another Chart Builder or Chart Packer has open stops it.</param>
         public DedupWindowViewModel(
             DedupRequest request,
             Func<string, bool> hasDrafts,
@@ -80,9 +81,9 @@ namespace ChartPacker.ViewModels
             IMergeWindowService merge,
             ITrash? trash,
             DeletionLog log,
-            Func<string, bool>? isOpenInChartBuilder = null)
+            SongLocks? locks = null)
         {
-            _isOpenInChartBuilder = isOpenInChartBuilder;
+            _locks = locks;
             _request = request;
             _hasDrafts = hasDrafts;
             _settings = settings;
@@ -494,11 +495,15 @@ namespace ChartPacker.ViewModels
             if (!await _confirmation.ConfirmAsync(Strings.DedupConfirmTitle, message, button))
                 return;
 
-            if (!await ChartBuilderSongs.ConfirmWriteAsync(
-                    _confirmation, _isOpenInChartBuilder, [.. items.Select(i => i.Victim)],
-                    Strings.ChartBuilderOpenDeleteOneFormat, Strings.ChartBuilderOpenDeleteManyFormat, Strings.DeleteAnywayButton))
+            IDisposable? held = null;
+            if (_locks is not null)
             {
-                return;
+                held = _locks.TryHold([.. items.Select(i => i.Victim)], out string? inUse);
+                if (held is null)
+                {
+                    ErrorMessage = string.Format(CultureInfo.CurrentCulture, Strings.NotDeletedInUseFormat, inUse);
+                    return;
+                }
             }
 
             _deleteCts?.Dispose();
@@ -524,6 +529,7 @@ namespace ChartPacker.ViewModels
             }
             finally
             {
+                held?.Dispose();
                 IsDeleting = false;
                 UpdateSummary();
             }

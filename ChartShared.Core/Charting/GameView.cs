@@ -16,10 +16,6 @@ namespace ChartShared.Core.Charting;
 /// each flagged chord as a marker over its tick, the part's star-power phrases, tom markers and mixes.
 /// </para>
 /// <para>
-/// The game view has only the instruments the model edits (<see cref="Instruments"/>). <c>PART KEYS</c>, which the
-/// reader reads, passes through byte for byte, and is checked that way rather than here.
-/// </para>
-/// <para>
 /// It holds for a file written in <see cref="PartEventOrder"/>, which the writer follows: the order of a part
 /// track's events at one tick decides which of two notes on a pad is kept, which mix is in effect, and whether a
 /// fifth-pad note or a tom marker settles the drums' layout.
@@ -27,9 +23,8 @@ namespace ChartShared.Core.Charting;
 /// </remarks>
 public static class GameView
 {
-    /// <summary>The instruments the model edits, and so the game view has: all but <c>PART KEYS</c> (charter-spec §7.4).</summary>
-    public static IReadOnlyList<ChartInstrument> Instruments { get; } =
-        [.. Enum.GetValues<ChartInstrument>().Where(i => i != ChartInstrument.Keys)];
+    /// <summary>The instruments the model edits, and so the game view has: every one the reader reads (charter-spec §7.4).</summary>
+    public static IReadOnlyList<ChartInstrument> Instruments { get; } = Enum.GetValues<ChartInstrument>();
 
     /// <summary>The chart the games read from the file <paramref name="chart"/> saves to.</summary>
     /// <param name="options">
@@ -47,11 +42,7 @@ public static class GameView
         DrumsLayout? drumsLayout = null;
         foreach (var part in chart.Parts)
         {
-            if (part.Instrument == ChartInstrument.Keys)
-                continue;
-
-            // The model's star power is always star power: the writer writes it on 116, and solos never become it.
-            var starPower = GameNotes.StarPower(part.Phrases.Where(p => p.Kind == PhraseKind.StarPower).Select(p => new TickSpan(p.Tick, p.Tick + p.Length)));
+            var starPower = StarPowerOf(part);
             if (part.Kind == ChartInstrumentKind.Drums)
             {
                 var markers = SavedTomMarkers(chart, part);
@@ -82,20 +73,61 @@ public static class GameView
         ArgumentNullException.ThrowIfNull(options);
 
         var part = chart.PartOf(key.Instrument);
-        if (part is null || part.Instrument == ChartInstrument.Keys)
+        if (part is null)
             return new NoteTrack([], []);
 
-        var starPower = GameNotes.StarPower(part.Phrases.Where(p => p.Kind == PhraseKind.StarPower).Select(p => new TickSpan(p.Tick, p.Tick + p.Length)));
+        var starPower = StarPowerOf(part);
         List<ChartNote>? notes;
         if (part.Kind == ChartInstrumentKind.Drums)
-        {
-            var markers = SavedTomMarkers(chart, part);
-            Drums(part, markers, DrumsLayoutOf(part, markers, options), starPower).TryGetValue(key.Difficulty, out notes);
-        }
+            DrumsOf(chart, part, options, starPower).TryGetValue(key.Difficulty, out notes);
         else
             notes = Frets(part[key.Difficulty], chart.Resolution, options, starPower);
         notes ??= [];
         return new NoteTrack(notes, starPower);
+    }
+
+    /// <summary>
+    /// Every difficulty of <paramref name="instrument"/> as <see cref="Project(EditableChart, ChartTrackKey, ChartReadOptions)"/>
+    /// works each out, the drums worked out once for them all.
+    /// </summary>
+    /// <returns>A track for each difficulty; empty where the chart hasn't the part or the difficulty has no notes.</returns>
+    public static IReadOnlyDictionary<ChartDifficulty, NoteTrack> ProjectPart(EditableChart chart, ChartInstrument instrument, ChartReadOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(chart);
+        ArgumentNullException.ThrowIfNull(options);
+
+        var tracks = new Dictionary<ChartDifficulty, NoteTrack>();
+        var part = chart.PartOf(instrument);
+        if (part is null)
+        {
+            foreach (var difficulty in Enum.GetValues<ChartDifficulty>())
+                tracks[difficulty] = new NoteTrack([], []);
+            return tracks;
+        }
+
+        var starPower = StarPowerOf(part);
+        var drums = part.Kind == ChartInstrumentKind.Drums ? DrumsOf(chart, part, options, starPower) : null;
+        foreach (var difficulty in Enum.GetValues<ChartDifficulty>())
+        {
+            List<ChartNote>? notes = null;
+            if (drums is not null)
+                drums.TryGetValue(difficulty, out notes);
+            else
+                notes = Frets(part[difficulty], chart.Resolution, options, starPower);
+            tracks[difficulty] = new NoteTrack(notes ?? [], starPower);
+        }
+
+        return tracks;
+    }
+
+    // The model's star power is always star power: the writer writes it on 116, and solos never become it.
+    private static IReadOnlyList<StarPowerPhrase> StarPowerOf(EditablePart part) =>
+        GameNotes.StarPower(part.Phrases.Where(p => p.Kind == PhraseKind.StarPower).Select(p => new TickSpan(p.Tick, p.Tick + p.Length)));
+
+    private static Dictionary<ChartDifficulty, List<ChartNote>> DrumsOf(EditableChart chart, EditablePart part, ChartReadOptions options, IReadOnlyList<StarPowerPhrase> starPower)
+    {
+        var markers = SavedTomMarkers(chart, part);
+        return Drums(part, markers, DrumsLayoutOf(part, markers, options), starPower);
     }
 
     /// <summary>Whether the games read <paramref name="chart"/>'s drums as five-lane, given <paramref name="options"/>.</summary>
@@ -105,6 +137,18 @@ public static class GameView
         ArgumentNullException.ThrowIfNull(options);
         var drums = chart.Parts.FirstOrDefault(p => p.Kind == ChartInstrumentKind.Drums);
         return drums is not null && DrumsLayoutOf(drums, SavedTomMarkers(chart, drums), options) == DrumsLayout.FiveLane;
+    }
+
+    /// <summary>
+    /// Whether the games read <paramref name="chart"/>'s drums as Pro, with cymbals, given <paramref name="options"/>: only
+    /// then does the game view flag them.
+    /// </summary>
+    public static bool IsProDrums(EditableChart chart, ChartReadOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(chart);
+        ArgumentNullException.ThrowIfNull(options);
+        var drums = chart.Parts.FirstOrDefault(p => p.Kind == ChartInstrumentKind.Drums);
+        return drums is not null && DrumsLayoutOf(drums, SavedTomMarkers(chart, drums), options) == DrumsLayout.Pro;
     }
 
     /// <summary>
@@ -186,17 +230,24 @@ public static class GameView
     }
 
     /// <summary>A fret difficulty's notes, as <see cref="MidiChartReader"/> reads them from the written track.</summary>
-    private static List<ChartNote> Frets(EditableTrack track, int resolution, ChartReadOptions options, IReadOnlyList<StarPowerPhrase> starPower)
+    private static List<ChartNote> Frets(EditableTrack track, int resolution, ChartReadOptions options, IReadOnlyList<StarPowerPhrase> starPower) =>
+        Frets(track.Notes, track.FlaggedChords, resolution, options, starPower);
+
+    /// <summary>
+    /// 5-fret or GHL <paramref name="notes"/> with <paramref name="flags"/>, as the games read them: each note's HOPO and tap
+    /// flags as a track of them would have, for a draft not yet in a chart.
+    /// </summary>
+    internal static List<ChartNote> Frets(IReadOnlyCollection<EditableNote> notes, IEnumerable<FlaggedChord> flags, int resolution, ChartReadOptions options, IReadOnlyList<StarPowerPhrase> starPower)
     {
-        var gems = new List<Gem>(track.Notes.Count);
-        foreach (var note in track.Notes)
+        var gems = new List<Gem>(notes.Count);
+        foreach (var note in notes)
             gems.Add(new Gem(note.Tick, note.Length, note.Lane));
 
         // A flagged chord is written as a marker over its tick.
         var forceHopo = new List<TickSpan>();
         var forceStrum = new List<TickSpan>();
         var taps = new List<TickSpan>();
-        foreach (var chord in track.FlaggedChords)
+        foreach (var chord in flags)
         {
             var span = new TickSpan(chord.Tick, chord.Tick + 1);
             if (chord.Flags.HasFlag(ChordFlags.ForceHopo))

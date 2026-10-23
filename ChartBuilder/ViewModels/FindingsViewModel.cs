@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Avalonia.Threading;
 using ChartBuilder.Resources;
 using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Authoring;
 using ChartShared.Core.Charting.Commands;
 using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charting.Layout;
@@ -290,15 +291,34 @@ namespace ChartBuilder.ViewModels
 
         /// <summary>
         /// The ways to fix <paramref name="finding"/> now, for its menu: CHR084's reverted change restored, CHR083's suggested
-        /// rating used (charter-spec C18 item 3), or the chart's fixes, each of which Fix All can apply to every finding of
-        /// its rule, in its part or everywhere.
+        /// rating used (charter-spec C18 item 3), CHR087's missing difficulties generated in the Reduce dialog, CHR066's
+        /// star power proposed by a run of Generate star power, or the chart's fixes, each of which Fix All can apply to
+        /// every finding of its rule, in its part or everywhere.
         /// </summary>
         private IReadOnlyList<FindingFix> FixesOf(Finding finding)
         {
             if (PendingSongIniFixes.KeyToRestore(finding, _song) is { } key)
                 return [new FindingFix(null, () => _song.Restore(key), null, null)];
 
+            // Reduce all, the part's empty difficulties ticked: the drafts are the charter's to look over before Apply.
+            if (finding.RuleId == ChrRules.Chr087)
+            {
+                return finding.Location is { Difficulty: { } difficulty } missing
+                    ? [new FindingFix(null, () => _ = _editor.ReduceAsync(new ChartTrackKey(missing.Part, difficulty), all: true), null, null)]
+                    : [];
+            }
+
             var session = _editor.Session;
+
+            // A run with the defaults over the whole part, worked out only when it's picked: the ghosts are the charter's to
+            // keep or drop before Add.
+            if (finding.RuleId == ChrRules.Chr066)
+            {
+                return finding.Location is { } noStarPower
+                    ? [new FindingFix(null, () => session.StarPower.Start(noStarPower.Part, StarPowerOptions.Default, null), null, null)]
+                    : [];
+            }
+
             if (finding.RuleId == ChrRules.Chr083)
             {
                 return PendingSongIniFixes.SuggestedRating(finding, _song.Chart, session.ReadOptions) is { } rating

@@ -51,15 +51,11 @@ public sealed class BuilderArgsTests
     }
 
     [TestMethod]
-    public void CalibrateOpensTheCalibrationTool() =>
-        Assert.AreEqual(BuilderStart.Calibrate, BuilderArgs.Parse(["--calibrate"]).Start);
-
-    [TestMethod]
     [DataRow(new[] { "--edit" }, BuilderArgsProblemKind.UnknownOption, "--edit")]
     [DataRow(new[] { "--new", "--open", "a.ogg" }, BuilderArgsProblemKind.UnknownOption, "--open")]
     [DataRow(new[] { "--parent", "a" }, BuilderArgsProblemKind.UnknownOption, "--parent")]
     [DataRow(new[] { "--new", "" }, BuilderArgsProblemKind.UnexpectedArgument, "")]
-    [DataRow(new[] { "--calibrate", "now" }, BuilderArgsProblemKind.UnexpectedArgument, "now")]
+    [DataRow(new[] { "--calibrate" }, BuilderArgsProblemKind.UnknownOption, "--calibrate")]
     [DataRow(new[] { "one", "two" }, BuilderArgsProblemKind.UnexpectedArgument, "two")]
     [DataRow(new[] { "--", "one", "two" }, BuilderArgsProblemKind.UnexpectedArgument, "two")]
     [DataRow(new[] { "--" }, BuilderArgsProblemKind.UnexpectedArgument, "--")]
@@ -80,8 +76,4 @@ public sealed class BuilderArgsTests
         Assert.AreEqual(BuilderStart.OpenSong, args.Start);
         Assert.AreEqual(Path.GetFullPath("--song"), args.SongPath);
     }
-
-    [TestMethod]
-    public void CalibrateArgumentsReadBack() =>
-        Assert.AreEqual(BuilderStart.Calibrate, BuilderArgs.Parse(BuilderArgs.ForCalibrate()).Start);
 }

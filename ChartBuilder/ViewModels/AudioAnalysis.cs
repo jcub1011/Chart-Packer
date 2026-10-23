@@ -71,6 +71,8 @@ namespace ChartBuilder.ViewModels
         /// <summary>How much memory the spectrograms may take together (charter-spec C13 item 3).</summary>
         public void SetBudget(long bytes)
         {
+            if (_disposed)
+                return;
             _budget = bytes;
             if (_spectrograms is { } spectrograms)
                 spectrograms.BudgetBytes = bytes;
@@ -205,16 +207,29 @@ namespace ChartBuilder.ViewModels
                 spectrogram.Updated -= OnSpectrogramUpdated;
             _followed.Clear();
 
-            // The workers before the audio they read.
-            lock (_audioLock)
+            // The workers before the audio they read. Off the UI thread, which would otherwise wait for each worker to finish
+            // the chunk it's on, and for audio still being opened to analyse: as a song opens in this one's place, say. Nothing
+            // here reads them after this, as it's all been cancelled.
+            _ = Task.Run(() =>
             {
-                _spectrograms?.Dispose();
-                _workers?.Dispose();
-                _audio?.Dispose();
-                _spectrograms = null;
-                _workers = null;
-                _audio = null;
-            }
+                try
+                {
+                    lock (_audioLock)
+                    {
+                        _spectrograms?.Dispose();
+                        _workers?.Dispose();
+                        _audio?.Dispose();
+                        _spectrograms = null;
+                        _workers = null;
+                        _audio = null;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Nothing waits on this, so a failure would go unseen otherwise.
+                    Trace.TraceWarning($"Closing the audio analysed failed: {ex}");
+                }
+            });
         }
 
         private async Task<OnsetAnalysis?> FindOnsetsAsync(AudioSource source, bool drumBands, bool requested)
@@ -223,7 +238,8 @@ namespace ChartBuilder.ViewModels
             _messages?.Info(string.Format(CultureInfo.CurrentCulture, Strings.OnsetsFindingFormat, source.Label), RunningKey);
             try
             {
-                if (await PrepareAsync(source) is not { } prepared || _workers is not { } workers)
+                // Disposed meanwhile, its workers are being let go of off the UI thread, so they're left alone.
+                if (await PrepareAsync(source) is not { } prepared || token.IsCancellationRequested || _workers is not { } workers)
                     return null;
                 var onsets = await OnsetDetector.Start(prepared.Input, drumBands, workers, requested, token);
                 if (!token.IsCancellationRequested)
@@ -236,6 +252,11 @@ namespace ChartBuilder.ViewModels
             }
             catch (OperationCanceledException)
             {
+                return null;
+            }
+            catch (ObjectDisposedException) when (token.IsCancellationRequested)
+            {
+                // The workers were let go of mid-run, as this was disposed.
                 return null;
             }
             catch (IOException ex)

@@ -1,0 +1,288 @@
+using System.Text;
+using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Authoring;
+using ChartShared.Core.Charting.Commands;
+using ChartShared.Core.Charting.Saving;
+using ChartShared.Core.Charts;
+using ChartShared.Core.Metadata;
+using ChartShared.Core.Scanning;
+using ChartShared.Core.Validation;
+
+namespace ChartShared.Core.Tests.Validation;
+
+/// <summary>
+/// The library's chart generation (charter-spec C16 item 5): a song's missing difficulties (CHR087) generated into its
+/// draft, as Generate Lower Difficulties does, the draft's chart linted, and an unrated part's suggested rating (CHR083).
+/// </summary>
+[TestClass]
+public sealed class SongDifficultyGenerationTests
+{
+    private DirectoryInfo _root = null!;
+    private GeneratedChartStash _stash = null!;
+
+    public TestContext TestContext { get; set; } = null!;
+
+    [TestInitialize]
+    public void CreateRoot()
+    {
+        _root = Directory.CreateTempSubdirectory("chartpacker-generate-");
+        _stash = GeneratedChartStash.Create();
+    }
+
+    [TestCleanup]
+    public void DeleteRoot()
+    {
+        _stash.Dispose();
+        _root.Delete(recursive: true);
+    }
+
+    [TestMethod]
+    public async Task AFoldersMissingDifficultiesAreGeneratedIntoItsDraftAndNothingIsWritten()
+    {
+        var entry = Folder(("notes.mid", MidiChartWriter.Write(ExpertOnly())));
+        var pairs = await PairsOf(entry);
+        var before = Directory.GetFiles(entry.FullPath).ToDictionary(f => f, File.ReadAllBytes);
+
+        var chart = await SongDifficultyGeneration.GenerateAsync(entry, pairs, null, ReductionDefaults.Shipped, _stash, TestContext.CancellationToken);
+
+        Assert.IsNotNull(chart);
+        Assert.IsNull(chart.RemoveChart);
+        Assert.StartsWith(_stash.Folder, chart.StagedPath);
+        var generated = MidiChartLoader.Load(await File.ReadAllBytesAsync(chart.StagedPath, TestContext.CancellationToken), ChartReadOptions.From(pairs)).Chart;
+        Assert.IsTrue(generated.PartOf(ChartInstrument.Guitar)!.Tracks.All(t => t.Notes.Count > 0));
+        foreach (var (file, bytes) in before)
+            CollectionAssert.AreEqual(bytes, File.ReadAllBytes(file), $"{file} was written.");
+
+        var draft = new MetadataDraft();
+        chart.ApplyTo(draft);
+        Assert.IsTrue(draft.IsFileAdded(ChartFiles.MidiName));
+    }
+
+    [TestMethod]
+    public async Task TheDraftsChartIsLintedAndCachedApartFromTheSongs()
+    {
+        var entry = Folder(("notes.mid", MidiChartWriter.Write(ExpertOnly())));
+        var pairs = await PairsOf(entry);
+        var cache = new SongChartLintCache();
+        var draft = new MetadataDraft();
+        (await SongDifficultyGeneration.GenerateAsync(entry, pairs, null, ReductionDefaults.Shipped, _stash, TestContext.CancellationToken))!.ApplyTo(draft);
+
+        var stored = await SongChartLint.LintAsync(entry, pairs, null, cache, TestContext.CancellationToken);
+        var drafted = await SongChartLint.LintAsync(entry, pairs, draft, cache, TestContext.CancellationToken);
+        var storedAgain = await SongChartLint.LintAsync(entry, pairs, null, cache, TestContext.CancellationToken);
+
+        Assert.HasCount(3, stored.Findings.Where(f => f.Finding.RuleId == ChrRules.Chr087).ToList());
+        Assert.DoesNotContain(f => f.Finding.RuleId == ChrRules.Chr087, drafted.Findings);
+        Assert.HasCount(3, storedAgain.Findings.Where(f => f.Finding.RuleId == ChrRules.Chr087).ToList());
+    }
+
+    [TestMethod]
+    public async Task ANotesChartSongIsGivenANotesMidInItsPlace()
+    {
+        const string chart = "[Song]\n{\n  Resolution = 192\n}\n[SyncTrack]\n{\n  0 = TS 4\n  0 = B 120000\n}\n[ExpertSingle]\n{\n  0 = N 0 0\n  192 = N 1 0\n  384 = N 2 0\n  576 = N 3 0\n  768 = N 4 0\n  960 = N 0 0\n}\n";
+        var entry = Folder(("notes.chart", Encoding.UTF8.GetBytes(chart)));
+        var pairs = await PairsOf(entry);
+
+        var generated = await SongDifficultyGeneration.GenerateAsync(entry, pairs, null, ReductionDefaults.Shipped, _stash, TestContext.CancellationToken);
+
+        Assert.IsNotNull(generated);
+        Assert.AreEqual(ChartFiles.ChartName, generated.RemoveChart);
+        var draft = new MetadataDraft();
+        generated.ApplyTo(draft);
+        Assert.IsTrue(draft.IsFileRemoved(ChartFiles.ChartName));
+        var played = DraftedChart.Of([ChartFiles.ChartName, "song.ini"], draft);
+        Assert.AreEqual(ChartFiles.MidiName, played?.StoredName);
+        Assert.AreEqual(generated.StagedPath, played?.StagedPath);
+    }
+
+    [TestMethod]
+    public async Task ASongsKeysAreFilledToo()
+    {
+        const string chart = "[Song]\n{\n  Resolution = 192\n}\n[SyncTrack]\n{\n  0 = TS 4\n  0 = B 120000\n}\n[ExpertKeyboard]\n{\n  0 = N 0 0\n  192 = N 1 0\n  384 = N 2 0\n  576 = N 3 0\n  768 = N 4 0\n  960 = N 0 0\n}\n";
+        var entry = Folder(("notes.chart", Encoding.UTF8.GetBytes(chart)), songIni: "[song]\nname = Song\ndiff_keys = 3\n");
+        var pairs = await PairsOf(entry);
+
+        var generated = await SongDifficultyGeneration.GenerateAsync(entry, pairs, null, ReductionDefaults.Shipped, _stash, TestContext.CancellationToken);
+
+        Assert.IsNotNull(generated);
+        var keys = MidiChartLoader.Load(await File.ReadAllBytesAsync(generated.StagedPath, TestContext.CancellationToken), ChartReadOptions.From(pairs)).Chart.PartOf(ChartInstrument.Keys);
+        Assert.IsNotNull(keys);
+        Assert.IsTrue(keys.Tracks.All(t => t.Notes.Count > 0));
+    }
+
+    [TestMethod]
+    public async Task RevertingTheNotesMidBringsBackTheNotesChartAndItsSongIni()
+    {
+        const string chart = "[Song]\n{\n  Resolution = 192\n  Offset = 0.5\n}\n[SyncTrack]\n{\n  0 = TS 4\n  0 = B 120000\n}\n[ExpertSingle]\n{\n  0 = N 0 0\n  192 = N 1 0\n  384 = N 2 0\n  576 = N 3 0\n  768 = N 4 0\n  960 = N 0 0\n}\n";
+        var entry = Folder(("notes.chart", Encoding.UTF8.GetBytes(chart)));
+        var generated = await SongDifficultyGeneration.GenerateAsync(entry, await PairsOf(entry), null, ReductionDefaults.Shipped, _stash, TestContext.CancellationToken);
+        Assert.IsNotNull(generated);
+        Assert.IsNotEmpty(generated.SongIniChanges);
+        var draft = new MetadataDraft();
+        generated.ApplyTo(draft);
+
+        draft.RevertFile(ChartFiles.MidiName);
+
+        Assert.IsFalse(draft.IsFileRemoved(ChartFiles.ChartName));
+        Assert.IsTrue(draft.IsEmpty, $"Left: {string.Join(", ", draft.Keys)}.");
+    }
+
+    [TestMethod]
+    public async Task ThePreviewShowsEachDraftAgainstItsSource()
+    {
+        var entry = Folder(("notes.mid", MidiChartWriter.Write(ExpertOnly())));
+        var pairs = await PairsOf(entry);
+        var read = await SongDifficultyGeneration.ReadAsync(entry, pairs, null, TestContext.CancellationToken);
+
+        var generation = SongDifficultyGeneration.Prepare(read, pairs, ReductionDefaults.Shipped);
+        var diffs = generation.Diff(ChartInstrument.Guitar);
+
+        Assert.AreSequenceEqual(
+            [(ChartDifficulty.Expert, ChartDifficulty.Hard), (ChartDifficulty.Hard, ChartDifficulty.Medium), (ChartDifficulty.Medium, ChartDifficulty.Easy)],
+            [.. diffs.Select(d => (d.Source, d.Target))]);
+        Assert.IsTrue(diffs.All(d => d.DraftTrack.Notes.Count > 0));
+    }
+
+    [TestMethod]
+    public async Task ASongWhoseDraftChangesItsChartOtherwiseIsRefused()
+    {
+        var entry = Folder(("notes.mid", MidiChartWriter.Write(ExpertOnly())));
+        var draft = new MetadataDraft();
+        draft.SetChartOffset(new ChartTrackKey(ChartInstrument.Guitar, ChartDifficulty.Expert), 10);
+
+        Assert.IsFalse(SongDifficultyGeneration.CanGenerate(draft));
+        await Assert.ThrowsExactlyAsync<InvalidOperationException>(() =>
+            SongDifficultyGeneration.GenerateAsync(entry, [], draft, ReductionDefaults.Shipped, _stash, TestContext.CancellationToken));
+    }
+
+    [TestMethod]
+    public async Task ASongMissingNothingGeneratesNothing()
+    {
+        var full = ExpertOnly();
+        foreach (var difficulty in new[] { ChartDifficulty.Hard, ChartDifficulty.Medium, ChartDifficulty.Easy })
+            new AddNotes(ChartInstrument.Guitar, difficulty, [new EditableNote(0, 1, 0)]).Apply(full);
+        var entry = Folder(("notes.mid", MidiChartWriter.Write(full)));
+
+        var generated = await SongDifficultyGeneration.GenerateAsync(entry, await PairsOf(entry), null, ReductionDefaults.Shipped, _stash, TestContext.CancellationToken);
+
+        Assert.IsNull(generated);
+        Assert.IsEmpty(Directory.GetFiles(_stash.Folder, ChartFiles.MidiName, SearchOption.AllDirectories));
+    }
+
+    [TestMethod]
+    public async Task ReplacingMakesAChartedHardAgainFromExpert()
+    {
+        var chart = ExpertOnly();
+        new AddNotes(ChartInstrument.Guitar, ChartDifficulty.Hard, [new EditableNote(0, 1, 0)]).Apply(chart);
+        var entry = Folder(("notes.mid", MidiChartWriter.Write(chart)));
+        var pairs = await PairsOf(entry);
+        var scope = new LowerDifficultyScope(new HashSet<ChartDifficulty> { ChartDifficulty.Hard }, null, Replace: true);
+
+        var generated = await SongDifficultyGeneration.GenerateAsync(entry, pairs, null, ReductionDefaults.Shipped, new SongGenerationWork(true, [], scope), _stash, TestContext.CancellationToken);
+
+        Assert.IsNotNull(generated);
+        var guitar = MidiChartLoader.Load(await File.ReadAllBytesAsync(generated.StagedPath, TestContext.CancellationToken), ChartReadOptions.From(pairs)).Chart.PartOf(ChartInstrument.Guitar)!;
+        Assert.IsGreaterThan(1, guitar[ChartDifficulty.Hard].Notes.Count);
+        Assert.IsEmpty(guitar[ChartDifficulty.Medium].Notes);
+    }
+
+    [TestMethod]
+    public async Task SkippingLeavesAChartedHardAsItIs()
+    {
+        var chart = ExpertOnly();
+        new AddNotes(ChartInstrument.Guitar, ChartDifficulty.Hard, [new EditableNote(0, 1, 0)]).Apply(chart);
+        var entry = Folder(("notes.mid", MidiChartWriter.Write(chart)));
+        var pairs = await PairsOf(entry);
+        var read = await SongDifficultyGeneration.ReadAsync(entry, pairs, null, TestContext.CancellationToken);
+        var scope = new LowerDifficultyScope(new HashSet<ChartDifficulty> { ChartDifficulty.Hard }, null, Replace: false);
+
+        var generation = SongDifficultyGeneration.Prepare(read, pairs, ReductionDefaults.Shipped, new SongGenerationWork(true, [], scope));
+
+        Assert.IsTrue(generation.IsEmpty);
+    }
+
+    [TestMethod]
+    public async Task ReplacingHardAndMediumMakesMediumFromTheNewHard()
+    {
+        var chart = ExpertOnly();
+        new AddNotes(ChartInstrument.Guitar, ChartDifficulty.Hard, [new EditableNote(0, 1, 0)]).Apply(chart);
+        var entry = Folder(("notes.mid", MidiChartWriter.Write(chart)));
+        var pairs = await PairsOf(entry);
+        var read = await SongDifficultyGeneration.ReadAsync(entry, pairs, null, TestContext.CancellationToken);
+
+        var both = SongDifficultyGeneration.Prepare(read, pairs, ReductionDefaults.Shipped, new SongGenerationWork(true, [], Replacing(ChartDifficulty.Hard, ChartDifficulty.Medium)));
+        var mediumOnly = SongDifficultyGeneration.Prepare(read, pairs, ReductionDefaults.Shipped, new SongGenerationWork(true, [], Replacing(ChartDifficulty.Medium)));
+
+        // Made from the single note Hard has, Medium has at most that one; made from Hard drafted again, it has more.
+        Assert.IsGreaterThan(1, both.Drafted.PartOf(ChartInstrument.Guitar)![ChartDifficulty.Medium].Notes.Count);
+        Assert.IsLessThanOrEqualTo(1, mediumOnly.Drafted.PartOf(ChartInstrument.Guitar)![ChartDifficulty.Medium].Notes.Count);
+        Assert.HasCount(1, mediumOnly.Drafted.PartOf(ChartInstrument.Guitar)![ChartDifficulty.Hard].Notes);
+    }
+
+    [TestMethod]
+    public async Task APartNotPickedIsLeftAlone()
+    {
+        var chart = EditableChart.CreateNew(new NewChartSettings("Song", 480, 120, 4, 4, new HashSet<ChartInstrument> { ChartInstrument.Guitar, ChartInstrument.Drums }, DrumsVariant.Pro));
+        new AddNotes(ChartInstrument.Guitar, ChartDifficulty.Expert, [.. Enumerable.Range(0, 16).Select(i => new EditableNote(i * 480L, 1, i % 5))]).Apply(chart);
+        new AddNotes(ChartInstrument.Drums, ChartDifficulty.Expert, [.. Enumerable.Range(0, 16).Select(i => new EditableNote(i * 480L, 1, i % 4))]).Apply(chart);
+        var entry = Folder(("notes.mid", MidiChartWriter.Write(chart)));
+        var pairs = await PairsOf(entry);
+        var read = await SongDifficultyGeneration.ReadAsync(entry, pairs, null, TestContext.CancellationToken);
+        var scope = new LowerDifficultyScope(new HashSet<ChartDifficulty> { ChartDifficulty.Hard, ChartDifficulty.Medium, ChartDifficulty.Easy }, new HashSet<ChartInstrument> { ChartInstrument.Drums }, Replace: false);
+
+        var generation = SongDifficultyGeneration.Prepare(read, pairs, ReductionDefaults.Shipped, new SongGenerationWork(true, [], scope));
+
+        Assert.AreSequenceEqual([ChartInstrument.Drums], [.. generation.Parts.Keys]);
+        Assert.IsTrue(generation.Drafted.PartOf(ChartInstrument.Drums)!.Tracks.All(t => t.Notes.Count > 0));
+        Assert.IsEmpty(generation.Drafted.PartOf(ChartInstrument.Guitar)![ChartDifficulty.Hard].Notes);
+    }
+
+    [TestMethod]
+    public async Task AnUnratedPartIsGivenTheEstimatorsRating()
+    {
+        var entry = Folder(("notes.mid", MidiChartWriter.Write(ExpertOnly())), songIni: "[song]\nname = Song\n");
+
+        var report = await SongChartLint.LintAsync(entry, await PairsOf(entry), null, null, TestContext.CancellationToken);
+
+        Assert.Contains(f => f.Finding.RuleId == ChrRules.Chr083 && f.Finding.Key == "diff_guitar", report.Findings);
+        Assert.IsTrue(report.SuggestedRatings.TryGetValue("diff_guitar", out int tier));
+        Assert.IsTrue(tier is >= 0 and <= 9, $"Tier {tier}.");
+    }
+
+    [TestMethod]
+    public async Task AnUnratedProDrumsPartIsGivenARatingForEachKey()
+    {
+        // Sixteenths around the kit, cymbals among them, at 150 BPM.
+        var chart = EditableChart.CreateNew(new NewChartSettings("Song", 480, 150, 4, 4, new HashSet<ChartInstrument> { ChartInstrument.Drums }, DrumsVariant.Pro));
+        new AddNotes(ChartInstrument.Drums, ChartDifficulty.Expert, [.. Enumerable.Range(0, 256).Select(i => new EditableNote(i * 120L, 1, i % 5))]).Apply(chart);
+        var entry = Folder(("notes.mid", MidiChartWriter.Write(chart)), songIni: "[song]\nname = Song\npro_drums = True\n");
+
+        var report = await SongChartLint.LintAsync(entry, await PairsOf(entry), null, null, TestContext.CancellationToken);
+
+        Assert.IsTrue(report.SuggestedRatings.TryGetValue("diff_drums", out int drums));
+        Assert.IsTrue(report.SuggestedRatings.TryGetValue("diff_drums_real", out int pro));
+        Assert.IsTrue(drums is >= 0 and <= 9, $"Tier {drums}.");
+        Assert.IsGreaterThanOrEqualTo(drums, pro);
+    }
+
+    // Lead guitar on Expert alone: a note a beat for 32 beats, up and down the frets.
+    private static EditableChart ExpertOnly()
+    {
+        var chart = EditableChart.CreateNew(new NewChartSettings("Song", 480, 120, 4, 4, new HashSet<ChartInstrument> { ChartInstrument.Guitar }, DrumsVariant.Pro));
+        new AddNotes(ChartInstrument.Guitar, ChartDifficulty.Expert, [.. Enumerable.Range(0, 32).Select(i => new EditableNote(i * 480L, 1, Math.Abs((i % 8) - 4)))]).Apply(chart);
+        return chart;
+    }
+
+    private static LowerDifficultyScope Replacing(params ChartDifficulty[] targets) => new(targets.ToHashSet(), null, Replace: true);
+
+    private SongEntry Folder((string Name, byte[] Data) chart, string songIni = "[song]\nname = Song\ndiff_guitar = 3\n")
+    {
+        string folder = Directory.CreateDirectory(Path.Combine(_root.FullName, "Song")).FullName;
+        File.WriteAllBytes(Path.Combine(folder, chart.Name), chart.Data);
+        File.WriteAllBytes(Path.Combine(folder, "song.ini"), Encoding.UTF8.GetBytes(songIni));
+        return new SongEntry(SongEntryKind.SongFolder, folder, Path.GetRelativePath(_root.FullName, folder), Path.GetFileName(folder));
+    }
+
+    private async Task<IReadOnlyList<KeyValuePair<string, string>>> PairsOf(SongEntry entry) =>
+        (await SongMetadataCheck.ReadAsync(entry, TestContext.CancellationToken)).Pairs;
+}

@@ -49,6 +49,9 @@ namespace ChartBuilder.Controls.Editing
         public static readonly StyledProperty<IBrush?> LabelBrushProperty =
             AvaloniaProperty.Register<EditorCanvas, IBrush?>(nameof(LabelBrush));
 
+        public static readonly StyledProperty<bool> WheelUpIsLaterProperty =
+            AvaloniaProperty.Register<EditorCanvas, bool>(nameof(WheelUpIsLater), true);
+
         // How near a note's start, or a phrase bar's end in the rail, the pointer hits it, in pixels.
         private const double HitPixels = 7;
 
@@ -129,24 +132,33 @@ namespace ChartBuilder.Controls.Editing
         private static readonly IBrush StrikeBandBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x90, 0x00, 0x00, 0x00));
         private static readonly IPen StrikeEdgePen = new ImmutablePen(Color.FromArgb(0x8C, 0xFF, 0xFF, 0xFF).ToUInt32(), 1);
         private static readonly IBrush PhraseRowBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x12, 0xFF, 0xFF, 0xFF));
-        private static readonly Color SoloColor = Color.FromRgb(0xC3, 0x8E, 0xFF);
+        private static readonly Color SoloColor = PhraseColors.Solo;
         private static readonly IBrush StarPowerTintBrush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(HighwayPalette.StarPower, 0x16));
         private static readonly IBrush SoloTintBrush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(SoloColor, 0x1A));
         private static readonly IBrush SoloLabelBrush = new ImmutableSolidColorBrush(SoloColor);
-        private static readonly Color DiscoFlipColor = Color.FromRgb(0xF2, 0x7B, 0xD0);
-        private static readonly Color FillColor = Color.FromRgb(0x7C, 0xDB, 0x8A);
+        private static readonly Color DiscoFlipColor = PhraseColors.DiscoFlip;
 
-        // Generate fills' proposals (charter-spec C6 item 5): a kept one's ghost is a dashed bar, lit, with a faint band across
-        // the lanes; a dropped one's only a faint dashed outline, struck through, and a fainter band.
-        private static readonly IPen KeptGhostPen = new ImmutablePen(FillColor.ToUInt32(), 1.5, new ImmutableDashStyle([3, 2], 0));
-        private static readonly IPen DroppedGhostPen = new ImmutablePen(HighwayPalette.WithAlpha(FillColor, 0x60).ToUInt32(), 1, new ImmutableDashStyle([3, 2], 0));
-        private static readonly IBrush KeptGhostBrush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(FillColor, 0x50));
-        private static readonly IBrush KeptBandBrush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(FillColor, 0x1C));
-        private static readonly IBrush DroppedBandBrush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(FillColor, 0x08));
+        // Generate fills' and Generate star power's proposals (charter-spec C6 item 5, C8 item 1), in amber whatever their
+        // kind, so they stand out from the phrases there: a kept one's ghost is a lit bar taller than its row, with a bold
+        // dashed edge over a dark one so it reads on any bar, and a band across the lanes edged by dashed lines; a dropped
+        // one's only a faint dashed outline, struck through, and a fainter band.
+        private const double GhostRise = 2.5;
+        private static readonly IPen KeptGhostPen = new ImmutablePen(PhraseColors.Proposal.ToUInt32(), 2, new ImmutableDashStyle([4, 2], 0));
+        private static readonly IPen GhostShadowPen = new ImmutablePen(Color.FromArgb(0xC0, 0x00, 0x00, 0x00).ToUInt32(), 3);
+        private static readonly IPen DroppedGhostPen = new ImmutablePen(HighwayPalette.WithAlpha(PhraseColors.Proposal, 0x70).ToUInt32(), 1, new ImmutableDashStyle([3, 2], 0));
+        private static readonly IBrush KeptGhostBrush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(PhraseColors.Proposal, 0x80));
+        private static readonly IBrush KeptBandBrush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(PhraseColors.Proposal, 0x26));
+        private static readonly IPen KeptBandEdgePen = new ImmutablePen(HighwayPalette.WithAlpha(PhraseColors.Proposal, 0xC0).ToUInt32(), 1, new ImmutableDashStyle([4, 3], 0));
+        private static readonly IBrush DroppedBandBrush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(PhraseColors.Proposal, 0x0A));
         private static readonly Color SectionColor = Color.FromRgb(0x5E, 0xEA, 0xD4);
         private static readonly IPen SectionPen = new ImmutablePen(HighwayPalette.WithAlpha(SectionColor, 0x70).ToUInt32(), 1.5);
         private static readonly IBrush SectionBrush = new ImmutableSolidColorBrush(SectionColor);
         private static readonly Typeface LabelFace = new(FontFamily.Default, FontStyle.Normal, FontWeight.SemiBold);
+
+        // What a click of the erase tool would take away, in red over it.
+        private static readonly Color EraseColor = Color.FromRgb(0xF8, 0x71, 0x71);
+        private static readonly IBrush EraseBrush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(EraseColor, 0x70));
+        private static readonly IPen ErasePen = new ImmutablePen(EraseColor.ToUInt32(), 1.5);
 
         private readonly GemPainter _gems = new();
         private readonly Dictionary<(string Text, double Size, IBrush Brush, double? MaxWidth), TextLayout> _labels = [];
@@ -166,8 +178,8 @@ namespace ChartBuilder.Controls.Editing
         private Point _pressedAt;
         private bool _pressDragged;
 
-        // The modifier keys held as the pointer last moved or a key last went down or up: with Ctrl, the place
-        // tool's ghost is an open note, or a kick.
+        // The modifier keys held as the pointer last moved or a key last went down or up: with Alt, the place tool's ghost
+        // is an open note, or a kick, or a fret while the place tool places open notes.
         private KeyModifiers _keys;
 
         // The proposed beat being dragged by its handle, if one is.
@@ -283,6 +295,13 @@ namespace ChartBuilder.Controls.Editing
         {
             get => GetValue(LabelBrushProperty);
             set => SetValue(LabelBrushProperty, value);
+        }
+
+        /// <summary>Whether the wheel turned up moves the cursor later, as up the highway; otherwise turned down does.</summary>
+        public bool WheelUpIsLater
+        {
+            get => GetValue(WheelUpIsLaterProperty);
+            set => SetValue(WheelUpIsLaterProperty, value);
         }
 
         /// <summary>How the lane draws the song.</summary>
@@ -454,7 +473,7 @@ namespace ChartBuilder.Controls.Editing
                     RenderStrike(context, session, key, track, slots, screen);
                     return;
                 case LayerKind.Overlay:
-                    RenderOverlay(context, session, key, track, slots, screen);
+                    RenderOverlay(context, session, key, track, part, rows, slots, screen);
                     return;
                 case LayerKind.Playtest:
                     RenderPlaytest(context, session, key, slots, screen);
@@ -501,7 +520,7 @@ namespace ChartBuilder.Controls.Editing
             DrawBackdrop(context, size, projection, rows.Count);
             FindPhrasesShown(part, fromTick, toTick);
             DrawPhraseTints(context, session, projection);
-            DrawFillBands(context, session, key, projection, fromTick, toTick);
+            DrawProposalBands(context, session, key, projection, fromTick, toTick);
             DrawSpans(context, session, projection);
             DrawSyncBands(context, session, key, projection);
             DrawBeats(context, session, session.TempoMap, projection, fromTick, toTick, size);
@@ -513,7 +532,7 @@ namespace ChartBuilder.Controls.Editing
             // The phrase rail is beside the lanes, clear of the strike line's band, which is drawn over this.
             DrawPhraseRail(context, session, part, rows, projection);
             DrawDiscoFlips(context, session, key, rows, projection, fromTick, toTick);
-            DrawFillGhosts(context, session, key, rows, projection, fromTick, toTick);
+            DrawProposalGhosts(context, session, key, rows, projection, fromTick, toTick);
         }
 
         /// <summary>
@@ -568,12 +587,17 @@ namespace ChartBuilder.Controls.Editing
             }
         }
 
-        /// <summary>What follows the pointer and the focus: the place tool's ghost, the cursor, a box being drawn, and the focus's edge.</summary>
-        private void RenderOverlay(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, LaneSlots slots, LaneProjection screen)
+        /// <summary>
+        /// What follows the pointer and the focus: the place tool's ghost, what the erase tool would take away, where the
+        /// Phrase tool would start drawing, the cursor, a box being drawn, and the focus's edge.
+        /// </summary>
+        private void RenderOverlay(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, EditablePart part, IReadOnlyList<RailKind> rows, LaneSlots slots, LaneProjection screen)
         {
             var lanes = LanesOf(screen, slots);
             using (context.PushClip(lanes))
                 DrawHover(context, session, key, track, screen, slots);
+            DrawEraseHover(context, session, key, track, part, rows, screen, slots);
+            DrawPhraseHover(context, session, key, part, rows, screen, slots);
 
             DrawCursor(context, session, screen, lanes);
             DrawBox(context, screen);
@@ -664,8 +688,11 @@ namespace ChartBuilder.Controls.Editing
                 layer.Redraw();
         }
 
-        /// <summary>Whether the place tool's ghost is shown under the pointer, which snaps to the song as it moves under it.</summary>
-        private bool IsHoverShown => _hover is not null && !_isPressed && Session?.Tool == EditorTool.Place;
+        /// <summary>
+        /// Whether the place tool's ghost, the erase tool's red or the Phrase tool's line is shown under the pointer, which
+        /// follow the song as it moves under it.
+        /// </summary>
+        private bool IsHoverShown => _hover is not null && !_isPressed && Session?.Tool is EditorTool.Place or EditorTool.Erase or EditorTool.Phrase;
 
         /// <summary>
         /// Follows the cursor: the song and the notes are moved, as far as their page reaches, and drawn again around the
@@ -919,6 +946,9 @@ namespace ChartBuilder.Controls.Editing
             var position = e.GetPosition(this);
             _hover = position;
             _keys = e.KeyModifiers;
+
+            // Keys pressed while the window was in the background reach the toolbar's place options here.
+            _editor?.HoldModifiers(ModifiersOf(e.KeyModifiers));
             if (!_isPressed)
                 Session?.Tools.HoldKeys(ModifiersOf(e.KeyModifiers));
             if (_proposalDrag is { } beat)
@@ -999,9 +1029,9 @@ namespace ChartBuilder.Controls.Editing
         /// <summary>Opens the note menu at the pointer, for the selected notes, after a right click; nothing with none.</summary>
         private void ShowNoteMenu()
         {
-            if (_lane?.BuildNoteMenu() is not { Count: > 0 } items || !this.TryFindResource("LaneMenu", out var found) || found is not LaneMenuConverter menu)
+            if (_lane?.BuildNoteMenu() is not { Count: > 0 } items)
                 return;
-            new MenuFlyout { ItemsSource = menu.MenuItems(items) }.ShowAt(this, showAtPointer: true);
+            new MenuFlyout { ItemsSource = LaneMenu.MenuItems(items) }.ShowAt(this, showAtPointer: true);
         }
 
         protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
@@ -1028,27 +1058,6 @@ namespace ChartBuilder.Controls.Editing
             _overlay.Redraw();
         }
 
-        /// <summary>Takes at most one notch out of the wheel turn carried in <paramref name="carry"/>, adding <paramref name="delta"/> first, so a mouse reporting several units per physical notch still moves a single step. A turn the other way starts over, and fractions add up across events.</summary>
-        internal static int TakeZoomStep(ref double carry, double delta)
-        {
-            if (Math.Sign(delta) != Math.Sign(carry))
-                carry = 0;
-            carry += delta;
-            int notches = (int)Math.Truncate(carry);
-            carry -= notches;
-            return Math.Clamp(notches, -1, 1);
-        }
-
-        /// <summary>How many grid steps one notch of the wheel scrolls while Shift is held.</summary>
-        internal const int FastScrollSteps = 4;
-
-        /// <summary>Takes at most one notch out of the wheel turn carried in <paramref name="carry"/>, as grid steps: one step a notch, or <see cref="FastScrollSteps"/> while Shift is held (<paramref name="fast"/>).</summary>
-        internal static int TakeScrollStep(ref double carry, double delta, bool fast)
-        {
-            int notch = TakeZoomStep(ref carry, delta);
-            return notch * (fast ? FastScrollSteps : 1);
-        }
-
         protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
         {
             base.OnPointerWheelChanged(e);
@@ -1059,21 +1068,20 @@ namespace ChartBuilder.Controls.Editing
             if ((e.KeyModifiers & KeyModifiers.Control) != 0)
             {
                 // Turned up, the lane looks less far ahead, so the notes are further apart: half a second a notch, at most one notch per wheel event.
-                int zoomStep = TakeZoomStep(ref _zoomWheel, delta);
+                int zoomStep = WheelSteps.TakeZoomStep(ref _zoomWheel, delta);
                 if (zoomStep != 0)
                     lane.StepLookAhead(-zoomStep);
             }
             else
             {
                 // The song moves past the strike line a grid step a notch, through the tempo map, so the strike line stays
-                // on the grid across tempo and time-signature changes. Up the highway is later; along a timeline, the
-                // wheel turned down is. At most one notch per wheel event, so a mouse reporting several units per
-                // physical notch still moves a single step; with Shift held, a notch moves four grid steps instead.
+                // on the grid across tempo and time-signature changes. Which way is later is the setting's, the same in
+                // either view and on the timeline. At most one notch per wheel event, so a mouse reporting several units
+                // per physical notch still moves a single step; with Shift held, a notch moves four grid steps instead.
                 // Some platforms report Shift+wheel as a sideways scroll, so that counts too.
                 bool fast = (e.KeyModifiers & KeyModifiers.Shift) != 0;
                 double raw = delta != 0 ? delta : (fast ? e.Delta.X : 0);
-                double sign = View == LaneView.Highway ? 1 : -1;
-                int steps = TakeScrollStep(ref _wheel, sign * raw, fast);
+                int steps = WheelSteps.TakeScrollStep(ref _wheel, WheelSteps.TowardLater(raw, WheelUpIsLater), fast);
                 if (steps != 0)
                     session.Tools.StepCursor(steps);
             }
@@ -1119,6 +1127,19 @@ namespace ChartBuilder.Controls.Editing
             }
 
             _overlay.Redraw();
+        }
+
+        /// <summary>
+        /// Takes in the modifier keys held as the window sees them, wherever focus is: a key that goes down or up while
+        /// focus is elsewhere, or that something above the lane takes, as Alt can be, never reaches <see cref="OnKeyDown"/>.
+        /// </summary>
+        private void OnModifiersHeld(object? sender, EditorModifiers held)
+        {
+            var keys = (_keys & ~(KeyModifiers.Shift | KeyModifiers.Control | KeyModifiers.Alt))
+                | (held.HasFlag(EditorModifiers.Shift) ? KeyModifiers.Shift : KeyModifiers.None)
+                | (held.HasFlag(EditorModifiers.Control) ? KeyModifiers.Control : KeyModifiers.None)
+                | (held.HasFlag(EditorModifiers.Alt) ? KeyModifiers.Alt : KeyModifiers.None);
+            TakeKeys(keys);
         }
 
         /// <summary>Moves focus to the lane's other canvas, once it's shown in place of this one.</summary>
@@ -1186,9 +1207,10 @@ namespace ChartBuilder.Controls.Editing
             if (PointAt(position) is { Rail: not null } point && Session is { } session)
             {
                 PhraseGrip? grip = null;
-                if (session.Fills.HitTest(point) is not null)
+                if (session.Proposals is { } run && run.HitTest(point) is not null)
                 {
                     wanted = StandardCursorType.Hand;
+                    tip = string.Format(CultureInfo.CurrentCulture, Strings.ProposalGhostToolTipFormat, ChartEditorViewModel.PhraseKindName(run.Kind).ToLower(CultureInfo.CurrentCulture));
                 }
                 else if (session.Chart.PartOf(point.Track.Instrument) is { } part && PhraseRail.HitTest(part, point) is { } phrase)
                 {
@@ -1199,7 +1221,8 @@ namespace ChartBuilder.Controls.Editing
                     (grip, tip) = (flip.Grip, ChartEditorViewModel.PhraseKindName(RailKind.DiscoFlip));
                 }
 
-                if (grip is { } grabbed)
+                // The erase tool erases a bar rather than grabbing it, as its red shows.
+                if (grip is { } grabbed && (session.Tool != EditorTool.Erase || (_keys & KeyModifiers.Shift) != 0))
                 {
                     wanted = grabbed == PhraseGrip.Body ? StandardCursorType.Hand
                         : View == LaneView.Highway ? StandardCursorType.SizeNorthSouth
@@ -1242,7 +1265,7 @@ namespace ChartBuilder.Controls.Editing
             Cursor = cursor;
         }
 
-        private static EditorModifiers ModifiersOf(KeyModifiers keys) =>
+        internal static EditorModifiers ModifiersOf(KeyModifiers keys) =>
             ((keys & KeyModifiers.Shift) != 0 ? EditorModifiers.Shift : EditorModifiers.None)
             | ((keys & KeyModifiers.Control) != 0 ? EditorModifiers.Control : EditorModifiers.None)
             | ((keys & KeyModifiers.Alt) != 0 ? EditorModifiers.Alt : EditorModifiers.None);
@@ -1271,6 +1294,7 @@ namespace ChartBuilder.Controls.Editing
                 editor.Audio.Changed += OnAudioChanged;
                 editor.AudioAssist.PropertyChanged += OnAudioAssistChanged;
                 editor.Playtest.Changed += OnPlaytestChanged;
+                editor.ModifiersHeld += OnModifiersHeld;
             }
 
             _topLevel = TopLevel.GetTopLevel(this);
@@ -1295,6 +1319,7 @@ namespace ChartBuilder.Controls.Editing
                 editor.Audio.Changed -= OnAudioChanged;
                 editor.AudioAssist.PropertyChanged -= OnAudioAssistChanged;
                 editor.Playtest.Changed -= OnPlaytestChanged;
+                editor.ModifiersHeld -= OnModifiersHeld;
             }
 
             if (_topLevel is { } top)
@@ -1764,46 +1789,63 @@ namespace ChartBuilder.Controls.Editing
         }
 
         /// <summary>
-        /// The ghosts of Generate fills' proposals (charter-spec C6 item 5) in the fills row beside a drums lane, drawn over
-        /// the bars there, as a click on one keeps or drops it before it reaches a bar.
+        /// The ghosts of Generate fills' or Generate star power's proposals (charter-spec C6 item 5, C8 item 1) in their row
+        /// beside a lane of the part, drawn over the bars there, as a click on one keeps or drops it before it reaches a bar.
         /// </summary>
-        private void DrawFillGhosts(DrawingContext context, EditorSession session, ChartTrackKey key, IReadOnlyList<RailKind> rows, LaneProjection projection, double fromTick, double toTick)
+        private void DrawProposalGhosts(DrawingContext context, EditorSession session, ChartTrackKey key, IReadOnlyList<RailKind> rows, LaneProjection projection, double fromTick, double toTick)
         {
-            var fills = session.Fills;
-            int row = IndexOf(rows, PhraseKind.DrumFill);
-            if (!fills.IsActive || key.Instrument != FillProposals.Part || row < 0)
+            if (session.Proposals is not { } run || key.Instrument != run.ProposedPart)
+                return;
+            int row = IndexOf(rows, run.Kind);
+            if (row < 0)
                 return;
             var (across1, across2) = PhraseRowOf(projection, rows.Count, row);
-            for (int i = 0; i < fills.Proposals.Count; i++)
+            for (int i = 0; i < run.Phrases.Count; i++)
             {
-                var fill = fills.Proposals[i].Fill;
-                if (fill.Tick > toTick || fill.CoverEnd < fromTick)
+                var phrase = run.Phrases[i];
+                if (phrase.Tick > toTick || phrase.CoverEnd < fromTick)
                     continue;
-                var bar = BoxOf(projection, session, fill, across1, across2).Inflate(0.5);
-                if (fills.IsKept(i))
+                if (run.IsKept(i))
                 {
+                    // Taller than its row, so it rises over the bars beside it.
+                    var bar = BoxOf(projection, session, phrase, across1 - GhostRise, across2 + GhostRise).Inflate(0.5);
+                    context.DrawRectangle(null, GhostShadowPen, bar, 2, 2);
                     context.DrawRectangle(KeptGhostBrush, KeptGhostPen, bar, 2, 2);
                 }
                 else
                 {
+                    var bar = BoxOf(projection, session, phrase, across1, across2).Inflate(0.5);
                     context.DrawRectangle(null, DroppedGhostPen, bar, 2, 2);
                     context.DrawLine(DroppedGhostPen, bar.TopLeft, bar.BottomRight);
                 }
             }
         }
 
-        /// <summary>A faint band across the lanes, behind the notes, over each of Generate fills' proposals on a drums lane.</summary>
-        private void DrawFillBands(DrawingContext context, EditorSession session, ChartTrackKey key, LaneProjection projection, double fromTick, double toTick)
+        /// <summary>
+        /// A band across the lanes, behind the notes, over each of the proposals of the run going on, on a lane of its part: a
+        /// kept one's edged at its start and end by dashed lines across the lanes.
+        /// </summary>
+        private void DrawProposalBands(DrawingContext context, EditorSession session, ChartTrackKey key, LaneProjection projection, double fromTick, double toTick)
         {
-            var fills = session.Fills;
-            if (!fills.IsActive || key.Instrument != FillProposals.Part)
+            if (session.Proposals is not { } run || key.Instrument != run.ProposedPart)
                 return;
             double across1 = projection.LaneFrom, across2 = projection.LaneFrom + (projection.LaneSize * projection.Slots.Slots.Count);
-            for (int i = 0; i < fills.Proposals.Count; i++)
+            for (int i = 0; i < run.Phrases.Count; i++)
             {
-                var fill = fills.Proposals[i].Fill;
-                if (fill.Tick <= toTick && fill.CoverEnd >= fromTick)
-                    context.FillRectangle(fills.IsKept(i) ? KeptBandBrush : DroppedBandBrush, BoxOf(projection, session, fill, across1, across2));
+                var phrase = run.Phrases[i];
+                if (phrase.Tick > toTick || phrase.CoverEnd < fromTick)
+                    continue;
+                var band = BoxOf(projection, session, phrase, across1, across2);
+                if (!run.IsKept(i))
+                {
+                    context.FillRectangle(DroppedBandBrush, band);
+                    continue;
+                }
+
+                context.FillRectangle(KeptBandBrush, band);
+                bool alongIsDown = projection.View == LaneView.Highway;
+                context.DrawLine(KeptBandEdgePen, band.TopLeft, alongIsDown ? band.TopRight : band.BottomLeft);
+                context.DrawLine(KeptBandEdgePen, alongIsDown ? band.BottomLeft : band.TopRight, band.BottomRight);
             }
         }
 
@@ -1863,15 +1905,7 @@ namespace ChartBuilder.Controls.Editing
         }
 
         /// <summary>The colour of a kind of phrase in the rail: star power as its notes are drawn, the others each their own.</summary>
-        private static Color PhraseColor(PhraseKind kind) => kind switch
-        {
-            PhraseKind.StarPower => HighwayPalette.StarPower,
-            PhraseKind.Solo => SoloColor,
-            PhraseKind.DrumFill => FillColor,
-            PhraseKind.Roll => Color.FromRgb(0xFF, 0xD2, 0x5E),
-            PhraseKind.Trill => Color.FromRgb(0xFF, 0x9F, 0x5A),
-            _ => Color.FromRgb(0xFF, 0x6E, 0x7A),
-        };
+        private static Color PhraseColor(PhraseKind kind) => PhraseColors.Of(kind);
 
         /// <summary>The grid's steps faintly, then the beat and measure lines, with the measures' numbers in the labels' margin.</summary>
         private void DrawBeats(DrawingContext context, EditorSession session, TempoMap map, LaneProjection projection, double fromTick, double toTick, Size size)
@@ -2139,34 +2173,47 @@ namespace ChartBuilder.Controls.Editing
         }
 
         /// <summary>
-        /// The note the place tool would put down where the pointer is, as it would be drawn: with Alt held, an open
-        /// note, or a kick. None with Shift held, which lends the place tool the select tool's press.
+        /// The note the place tool would put down where the pointer is, as it would be drawn: an open note or a kick with
+        /// Alt held, or a fret while it places open notes, and made as the toolbar's place options have it. None with
+        /// Shift held, which lends the place tool the select tool's press.
         /// </summary>
         private void DrawHover(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, LaneProjection projection, LaneSlots slots)
         {
             if (_hover is not { } hover || _isPressed || session.Tool != EditorTool.Place || (_keys & KeyModifiers.Shift) != 0 || PointAt(hover) is not { Rail: null } point)
                 return;
-            bool apart = (_keys & KeyModifiers.Alt) != 0;
-            if ((apart ? EditorTools.ApartLane(slots) : point.Lane) is not { } lane)
+            if (session.Tools.PlacedLane(track.Kind, point.Lane, slots, alt: (_keys & KeyModifiers.Alt) != 0) is not { } lane)
                 return;
-            long tick = session.Snap.Nearest(point.Tick, session.TempoMap);
+            long tick = session.Quantize(point.Tick, key);
             int column = slots.IndexOf(lane);
             int stored = session.StoredLane(key, tick, lane);
             bool across = slots.Across == lane;
-            if ((column < 0 && !across) || track.TryGetNote(tick, stored, false, out _))
+            var note = session.Tools.PlacedNote(key, track.Kind, tick, stored);
+            if ((column < 0 && !across) || EditorTools.TryGetPlaced(track, note, out _))
                 return;
             double along = projection.AlongOf(session.AudioAt(tick));
 
             // As it would be placed: numbered and coloured as Shown has it, and on Pro drums a cymbal unless a tom marker
-            // covers it. Inside a disco flip section, the red placed in yellow's column is a yellow cymbal, and the yellow
-            // placed in red's a red pad (C6 item 7).
+            // covers it or a tom is picked. Inside a disco flip section, the red placed in yellow's column is a yellow
+            // cymbal, and the yellow placed in red's a red pad (C6 item 7).
             bool drums = track.Kind == ChartInstrumentKind.Drums;
             int laneCount = drums ? slots.Slots.Count - (slots.Across is null ? 1 : 0) : 5;
+            var placing = session.Placing;
             bool cymbal = stored != lane
                 ? lane == 2
                 : drums && session.Chart.DrumsVariant == DrumsVariant.Pro && lane is >= TomMarker.FirstPad and <= TomMarker.LastPad
-                    && !DrumCymbals.IsTom(session.Chart.PartOf(key.Instrument)!, lane, tick);
-            var placed = new ChartNote(tick, 0, drums ? lane - 1 : lane, cymbal ? NoteFlags.Cymbal : NoteFlags.None);
+                    && !placing.Tom && !DrumCymbals.IsTom(session.Chart.PartOf(key.Instrument)!, lane, tick);
+            var flags = cymbal ? NoteFlags.Cymbal : NoteFlags.None;
+            if (drums)
+            {
+                flags |= note.Dynamics switch { NoteDynamics.Accent => NoteFlags.Accent, NoteDynamics.Ghost => NoteFlags.Ghost, _ => NoteFlags.None };
+                flags |= note.DoubleKick ? NoteFlags.DoubleKick : NoteFlags.None;
+            }
+            else
+            {
+                flags |= placing.ChordType switch { ChordFlags.ForceHopo => NoteFlags.Hopo, ChordFlags.Tap => NoteFlags.Tap, _ => NoteFlags.None };
+            }
+
+            var placed = new ChartNote(tick, 0, drums ? lane - 1 : lane, flags);
             var color = HighwayPalette.NoteColor(track.Kind, laneCount, placed);
             double size = GemSize(projection);
 
@@ -2189,6 +2236,90 @@ namespace ChartBuilder.Controls.Editing
                 rect = rect.WithHeight(rect.Height / 2);
             using (context.PushOpacity(0.45))
                 _gems.DrawGem(context, track.Kind, placed, color, rect, outlined: true);
+        }
+
+        /// <summary>
+        /// What a click of the erase tool would take away where the pointer is, in red over it: a note with its sustain, or
+        /// in the phrase rail a phrase's bar or a disco flip section's. None over a proposed phrase's ghost, which a click
+        /// keeps or drops, or with Shift held, which lends the erase tool the select tool's press.
+        /// </summary>
+        private void DrawEraseHover(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, EditablePart part, IReadOnlyList<RailKind> rows, LaneProjection projection, LaneSlots slots)
+        {
+            if (_hover is not { } hover || _isPressed || session.Tool != EditorTool.Erase || (_keys & KeyModifiers.Shift) != 0 || PointAt(hover) is not { } point)
+                return;
+            if (point.Rail is not null && session.Proposals?.HitTest(point) is not null)
+                return;
+
+            switch (session.Tools.EraseTargetAt(point))
+            {
+                case { Note: { } note }:
+                    using (context.PushClip(LanesOf(projection, slots)))
+                        DrawErasedNote(context, session, key, track, note, projection, slots);
+                    break;
+                case { Phrase: { } phrase } when IndexOf(rows, PhraseRail.RowOf(part.Kind, phrase.Kind)) is var row and >= 0:
+                {
+                    var (across1, across2) = PhraseRowOf(projection, rows.Count, row);
+                    context.DrawRectangle(EraseBrush, ErasePen, BoxOf(projection, session, phrase, across1, across2).Inflate(1), 2, 2);
+                    break;
+                }
+                case { DiscoFlip: { } flip } when IndexOf(rows, RailKind.DiscoFlip) is var row and >= 0:
+                {
+                    var (across1, across2) = PhraseRowOf(projection, rows.Count, row);
+                    double start = projection.AlongOf(session.AudioAt(flip.Range.Tick));
+                    double end = flip.Range.EndTick is { } endTick ? projection.AlongOf(session.AudioAt(endTick)) : projection.AlongOf(projection.End);
+                    if (Math.Abs(end - start) < 2)
+                        end = start + (View == LaneView.Highway ? -2 : 2);
+                    context.DrawRectangle(EraseBrush, ErasePen, Box(start, end, across1, across2).Inflate(1), 2, 2);
+                    break;
+                }
+            }
+        }
+
+        /// <summary>A note the erase tool would take away, in red over its gem or bar and its sustain's tail, where DrawNotes draws them.</summary>
+        private void DrawErasedNote(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, EditableNote note, LaneProjection projection, LaneSlots slots)
+        {
+            bool across = slots.Across == note.Lane;
+            int column = slots.IndexOf(session.ShownLane(key, note));
+            if (column < 0 && !across)
+                return;
+            double size = GemSize(projection);
+            double across1 = projection.LaneFrom + 4, across2 = projection.LaneFrom + (projection.LaneSize * slots.Slots.Count) - 4;
+            double along = projection.AlongOf(session.AudioAt(note.Tick));
+            if (note.Length > EditableNote.PlainLength && track.Kind != ChartInstrumentKind.Drums)
+            {
+                double end = projection.AlongOf(session.AudioAt(note.Tick + note.Length));
+                double width = Math.Max(3, projection.LaneSize * 0.2);
+                var tail = across ? Box(along, end, across1, across2) : Box(along, end, projection.AcrossOf(column) - (width / 2), projection.AcrossOf(column) + (width / 2));
+                context.DrawRectangle(EraseBrush, ErasePen, tail);
+            }
+
+            double thickness = Math.Max(4, size * 0.45);
+            var gem = across ? Box(along - (thickness / 2), along + (thickness / 2), across1, across2) : GemRect(projection, column, along, size);
+            context.DrawRectangle(EraseBrush, ErasePen, gem.Inflate(1), 3, 3);
+        }
+
+        /// <summary>
+        /// Where a press of the Phrase tool would start drawing, on the grid: a line across the lanes in the colour of the
+        /// kind picked, and a mark in its row of the rail. None where a press does something else, such as on a phrase's
+        /// bar, or in the lanes with Shift held, which lends the Phrase tool the select tool's press; nor where a press is
+        /// refused, as a disco flip section is off Pro drums.
+        /// </summary>
+        private void DrawPhraseHover(DrawingContext context, EditorSession session, ChartTrackKey key, EditablePart part, IReadOnlyList<RailKind> rows, LaneProjection projection, LaneSlots slots)
+        {
+            if (_hover is not { } hover || _isPressed || session.Tool != EditorTool.Phrase || !session.Tools.DrawsIn(key) || PointAt(hover) is not { } point)
+                return;
+            if ((point.Rail is null && (_keys & KeyModifiers.Shift) != 0) || session.Tools.PhraseDrawStart(point) is not { } tick)
+                return;
+
+            var kind = session.PhraseKind;
+            var brush = _gems.Brush(kind.Phrase is { } phrase ? PhraseColor(phrase) : DiscoFlipColor);
+            double along = projection.AlongOf(session.AudioAt(tick));
+            context.FillRectangle(brush, Box(along - 1, along + 1, projection.LaneFrom, projection.LaneFrom + (projection.LaneSize * slots.Slots.Count)));
+            int row = IndexOf(rows, kind.Phrase is { } drawn ? PhraseRail.RowOf(part.Kind, drawn) : RailKind.DiscoFlip);
+            if (row < 0)
+                return;
+            var (across1, across2) = PhraseRowOf(projection, rows.Count, row);
+            context.FillRectangle(brush, Box(along - 1.5, along + 1.5, across1 - 1, across2 + 1));
         }
 
         /// <summary>The strike line's band, on the cursor, behind the notes: dark across the lanes, as in the games.</summary>

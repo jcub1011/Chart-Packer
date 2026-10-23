@@ -7,6 +7,7 @@ using ChartPacker.Resources;
 using ChartPacker.ViewModels;
 using ChartPacker.Views;
 using ChartShared.Audio.Playback;
+using ChartShared.Core.Charting.Saving;
 using ChartShared.Core.Metadata;
 using ChartShared.Core.Scanning;
 using ChartShared.Core.Settings;
@@ -25,7 +26,9 @@ namespace ChartPacker.Services
     /// </param>
     /// <param name="notice">Where downloads report, along the bottom of the main window.</param>
     /// <param name="songFiles">Keeps saving a song apart from copies of it being downloaded, in either window.</param>
+    /// <param name="locks">The songs this process holds and watches, shared with the main window (charter-spec §4.8).</param>
     /// <param name="latency">The calibrated audio latency, which the inspector's highway allows for.</param>
+    /// <param name="generated">Keeps the charts the quick fix for star power makes; none to make none.</param>
     public sealed class AvaloniaValidatorWindowService(
         Func<Window?> owner,
         MetadataDraftStore drafts,
@@ -36,8 +39,9 @@ namespace ChartPacker.Services
         IVideoDurationProbe video,
         NoticeViewModel notice,
         SongFileGate songFiles,
-        Func<string, bool>? isOpenInChartBuilder = null,
-        AudioLatencyFile? latency = null) : IValidatorWindowService
+        SongLocks? locks = null,
+        AudioLatencyFile? latency = null,
+        GeneratedChartStash? generated = null) : IValidatorWindowService
     {
         // How long the check runs before its progress is shown, so a quick one doesn't flash a dialog.
         private static readonly TimeSpan ProgressDelay = TimeSpan.FromMilliseconds(300);
@@ -66,18 +70,18 @@ namespace ChartPacker.Services
                 player,
                 highway,
                 video,
-                new DownloadService(settings, () => dialog, notice, songFiles),
+                new DownloadService(settings, () => dialog, notice, songFiles, locks),
                 new FileRevealService(() => dialog),
                 songFiles,
                 confirmation,
                 saver,
-                isOpenInChartBuilder,
+                locks,
                 new AvaloniaChartIssuesWindowService(() => dialog));
 
             // Songs are read as many at once as a library scan reads; the window lints and checks them on one core fewer
             // than there are, leaving one to the UI thread.
             int parallelism = Math.Max(settings.Settings.ScanParallelism, AppSettings.MinScanParallelism);
-            var viewModel = new ValidatorWindowViewModel(entries, drafts, inspector, parallelism, job, saver, settings, confirmation, isOpenInChartBuilder);
+            var viewModel = new ValidatorWindowViewModel(entries, drafts, inspector, parallelism, job, saver, settings, confirmation, locks, generated);
             dialog.DataContext = viewModel;
             _ = viewModel.LoadAsync();
 

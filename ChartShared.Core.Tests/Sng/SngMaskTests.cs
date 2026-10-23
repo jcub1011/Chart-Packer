@@ -14,7 +14,7 @@ public sealed class SngMaskTests
 
         SngMask.Apply(data, ExampleMask);
 
-        Assert.AreSequenceEqual(new byte[] { 0x51, 0x52, 0x53 }, data);
+        Assert.AreSequenceEqual("QRS"u8.ToArray(), data);
     }
 
     [TestMethod]

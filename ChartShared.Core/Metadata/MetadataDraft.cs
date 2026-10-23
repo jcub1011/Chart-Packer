@@ -69,6 +69,10 @@ public sealed class MetadataDraft
     // The removals an add made, by the added name, so that dropping the add drops them too.
     private readonly Dictionary<string, List<string>> _replacedBy = new(StringComparer.OrdinalIgnoreCase);
 
+    // The keys an add changed, by the added name: each one's change as the add made it, and what it was before, so that
+    // dropping the add puts them back.
+    private readonly Dictionary<string, Dictionary<string, (MetadataChange Made, MetadataChange? Before)>> _keysBy = new(StringComparer.OrdinalIgnoreCase);
+
     private readonly Dictionary<ChartTrackKey, int> _chartOffsets = [];
 
     /// <summary>True when there are no pending changes, to the metadata, the album art, the backgrounds, the files or the chart's vocals or timing.</summary>
@@ -258,6 +262,32 @@ public sealed class MetadataDraft
         }
     }
 
+    /// <summary>
+    /// Stages <paramref name="file"/> to be added in place of the files <paramref name="replaces"/>, as
+    /// <see cref="AddFile(AddedFile, IEnumerable{string})"/> does, along with the changes to metadata keys
+    /// <paramref name="keys"/> it comes with. Reverting the add puts each key back as it was before the first such add
+    /// under the name, unless it has been changed since.
+    /// </summary>
+    public void AddFile(AddedFile file, IEnumerable<string> replaces, IEnumerable<MetadataChange> keys)
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        AddFile(file, replaces);
+
+        foreach (var change in keys)
+        {
+            ArgumentException.ThrowIfNullOrEmpty(change.Key);
+            if (!_keysBy.TryGetValue(file.StoredName, out var made))
+                _keysBy[file.StoredName] = made = new(StringComparer.OrdinalIgnoreCase);
+
+            // Added again under the name: what the key was before the first add is what reverting brings back.
+            MetadataChange? before = made.TryGetValue(change.Key, out var earlier)
+                ? earlier.Before
+                : _changes.TryGetValue(change.Key, out var current) ? current : null;
+            made[change.Key] = (change, before);
+            Record(change);
+        }
+    }
+
     /// <summary>Marks the file <paramref name="name"/> for removal.</summary>
     public void RemoveFile(string name)
     {
@@ -270,7 +300,8 @@ public sealed class MetadataDraft
 
     /// <summary>
     /// Forgets any removal or add of the file <paramref name="name"/>. Forgetting an add also
-    /// forgets the removals it made; see <see cref="AddFile(AddedFile, IEnumerable{string})"/>.
+    /// forgets the removals it made, and puts back the keys it changed; see
+    /// <see cref="AddFile(AddedFile, IEnumerable{string}, IEnumerable{MetadataChange})"/>.
     /// </summary>
     public void RevertFile(string name)
     {
@@ -286,6 +317,20 @@ public sealed class MetadataDraft
             {
                 foreach (string removed in replaced)
                     _removedFiles.Remove(removed);
+            }
+
+            if (_keysBy.Remove(name, out var keys))
+            {
+                // A key changed since is the user's own change, and stays.
+                foreach (var (key, (made, before)) in keys)
+                {
+                    if (!_changes.TryGetValue(key, out var current) || current.Value != made.Value)
+                        continue;
+                    if (before is { } earlier)
+                        Record(earlier);
+                    else
+                        Revert(key);
+                }
             }
         }
     }
@@ -317,6 +362,7 @@ public sealed class MetadataDraft
         _removedFiles.Clear();
         _addedFiles.Clear();
         _replacedBy.Clear();
+        _keysBy.Clear();
         _chartOffsets.Clear();
     }
 
@@ -339,6 +385,8 @@ public sealed class MetadataDraft
         copy._addedFiles.AddRange(_addedFiles);
         foreach (var (name, replaced) in _replacedBy)
             copy._replacedBy[name] = [.. replaced];
+        foreach (var (name, keys) in _keysBy)
+            copy._keysBy[name] = new(keys, StringComparer.OrdinalIgnoreCase);
         foreach (var (track, milliseconds) in _chartOffsets)
             copy._chartOffsets[track] = milliseconds;
         return copy;

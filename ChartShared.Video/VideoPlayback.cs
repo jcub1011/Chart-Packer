@@ -189,7 +189,7 @@ public sealed class VideoPlayback : IDisposable
             decoder?.Dispose();
             _wake.Dispose();
             _closed.TrySetResult();
-            Logger.Debug("{Video} closed", _name);
+            Logger.Information("{Video} closed", _name);
         }
     }
 

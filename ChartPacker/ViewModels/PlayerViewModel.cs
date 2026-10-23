@@ -117,7 +117,7 @@ namespace ChartPacker.ViewModels
         /// </param>
         /// <param name="openOutput">Opens the audio device at a sample rate.</param>
         /// <param name="latency">
-        /// The audio/visual latency Chart Builder's calibration tool measured for each device, which what's drawn against
+        /// The audio/visual latency the calibration tool measured for each device, which what's drawn against
         /// the audio allows for (charter-spec C11 item 4); none to allow for none.
         /// </param>
         public PlayerViewModel(SettingsService settings, Func<int, IAudioOutput> openOutput, AudioLatencyFile? latency = null)
@@ -163,6 +163,15 @@ namespace ChartPacker.ViewModels
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasError))]
         public partial string? Error { get; set; }
+
+        /// <summary>
+        /// Why the song's audio isn't opened: another Chart Builder or Chart Packer is editing the song, so its files are
+        /// let go of for it to replace (charter-spec §4.8). The tracks are still shown, but can't be played until it's
+        /// <see langword="null"/> again. Set by the details panel.
+        /// </summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(PlayPauseToolTip))]
+        public partial string? FilesHeldNote { get; set; }
 
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(PositionText))]
@@ -425,21 +434,40 @@ namespace ChartPacker.ViewModels
         /// Where to draw what's drawn against the audio (the highway, the lyrics, the background): while playing, where
         /// the audio is, moving smoothly (<see cref="StemPlayer.SmoothPosition"/>), less the calibrated latency times the
         /// speed, so it's seen as it's heard (charter-spec C10 item 5, C11 item 4); otherwise <see cref="CurrentPosition"/>.
+        /// Pausing leaves the audio where this was, and playing holds here until that's heard
+        /// (<see cref="StemPlayer.DrawnPosition"/>), so it never jumps.
         /// </summary>
         public TimeSpan DrawnPosition => _player is { IsPlaying: true } player && !IsScrubbing
-            ? TimeSpan.FromTicks(Math.Max(0, LatencyCompensation.Drawn(player.SmoothPosition, _latencyMilliseconds, player.Speed).Ticks))
+            ? TimeSpan.FromTicks(Math.Max(0, player.DrawnPosition(_latencyMilliseconds).Ticks))
             : CurrentPosition;
 
         /// <summary>
-        /// Reads the latency of the device the song plays on again, as when the window is activated after Chart Builder's
-        /// calibration tool may have changed it (charter-spec §4.8).
+        /// Reads the latency of the device the song plays on again, as when the calibration tool closes, or when the window
+        /// is activated after Chart Builder's may have changed it (charter-spec §4.8).
         /// </summary>
         public void RefreshLatency()
         {
             if (_latencyFile is null || _output?.Device is not { } device)
                 return;
 
-            _latencyMilliseconds = _latencyFile.Find(device.Name, device.Id).Milliseconds;
+            _latencyMilliseconds = _latencyFile.Find(device.Name, device.Id, device.DetectedLatencyMs).Milliseconds;
+        }
+
+        /// <summary>
+        /// Whether the latency detected from the device is added to its calibrated latency (issue #140), kept in the shared
+        /// latency file; false, and not kept, without one. Setting it reads the song's device's latency again.
+        /// </summary>
+        public bool DetectLatency
+        {
+            get => _latencyFile?.DetectEnabled ?? false;
+            set
+            {
+                if (_latencyFile is null || value == _latencyFile.DetectEnabled)
+                    return;
+
+                _latencyFile.SetDetect(value);
+                RefreshLatency();
+            }
         }
 
         public string TracksHeader => string.Format(CultureInfo.CurrentCulture, Strings.TracksHeaderFormat, Tracks.Count);
@@ -472,7 +500,7 @@ namespace ChartPacker.ViewModels
         public string? LengthToolTip => IsLengthKnown ? null : Strings.LengthPendingToolTip;
 
         /// <summary>What the play button does now, with Space, which does the same from anywhere in the window.</summary>
-        public string PlayPauseToolTip => IsPlaying ? Strings.PauseShortcutToolTip : Strings.PlayShortcutToolTip;
+        public string PlayPauseToolTip => FilesHeldNote ?? (IsPlaying ? Strings.PauseShortcutToolTip : Strings.PlayShortcutToolTip);
 
         /// <summary>
         /// Shows <paramref name="tracks"/> of <paramref name="entry"/>. When they're the tracks
@@ -654,15 +682,46 @@ namespace ChartPacker.ViewModels
         /// <summary>Marks each track heard or not, the way the mixer and <see cref="WaveformPeaks.Mix"/> decide it.</summary>
         private void RefreshHeard() => TrackRowViewModel.RefreshHeard(Tracks);
 
-        private bool CanPlay() => HasTracks && !IsOpening;
+        private bool CanPlay() => HasTracks && !IsOpening && FilesHeldNote is null;
+
+        partial void OnFilesHeldNoteChanged(string? value)
+        {
+            if (value is not null)
+            {
+                // Every file goes: the audio's, and any waveform still being read.
+                CancelPeaks();
+                Close();
+            }
+            else if (ShowWaveforms && _entry is { } entry && HasTracks)
+            {
+                StartPeaks(entry, [.. Tracks.Select(t => t.Track).Where(t => !_peaks.ContainsKey(t) || _partialPeaks.Contains(t))]);
+            }
+
+            RefreshCommands();
+        }
+
+        /// <summary>The device the song plays on; null before one has been opened.</summary>
+        public AudioDevice? OutputDevice => _output?.Device;
+
+        /// <summary>Pauses the song, if it's playing, as when the calibration tool opens.</summary>
+        public void Pause()
+        {
+            if (!IsPlaying)
+                return;
+
+            // Where it's drawn, so what's seen stays where it is; the timer stops, so the position is taken here.
+            _player?.PauseWhereDrawn(_latencyMilliseconds);
+            SetPlaying(false);
+            if (_player is { } player && !IsScrubbing)
+                SetPosition(player.Position.TotalSeconds);
+        }
 
         [RelayCommand(CanExecute = nameof(CanPlay))]
         private async Task PlayPauseAsync()
         {
             if (IsPlaying)
             {
-                _player?.Pause();
-                SetPlaying(false);
+                Pause();
                 return;
             }
 
@@ -758,7 +817,7 @@ namespace ChartPacker.ViewModels
         /// </summary>
         private void StartPeaks(SongEntry entry, IReadOnlyList<SongTrack> tracks)
         {
-            if (tracks.Count == 0)
+            if (tracks.Count == 0 || FilesHeldNote is not null)
                 return;
 
             var cts = new CancellationTokenSource();
@@ -1101,7 +1160,7 @@ namespace ChartPacker.ViewModels
         {
             if (_player is not null)
                 return _player;
-            if (_entry is not { } entry)
+            if (_entry is not { } entry || FilesHeldNote is not null)
                 return null;
 
             int generation = ++_generation;

@@ -177,7 +177,7 @@ namespace ChartPacker.Services
                         Get = () => player.PitchCorrection,
                         Set = correct => player.PitchCorrection = correct,
                     },
-                    // Measured, per device, by Chart Builder's calibration tool, which owns the file (charter-spec §10).
+                    // Measured, per device, by the calibration tool both apps share (charter-spec C11).
                     new ActionSetting
                     {
                         Id = "playback.latency",
@@ -186,6 +186,18 @@ namespace ChartPacker.Services
                         Description = Strings.AudioLatencyDescription,
                         Keywords = SettingKeywords.Split(Strings.AudioLatencyKeywords),
                         Actions = [new SettingAction(Strings.CalibrateButton, calibrate)],
+                    },
+                    // Kept in the shared latency file, not Chart Packer's settings, so Chart Builder agrees (issue #140).
+                    new ToggleSetting
+                    {
+                        Id = "playback.detectLatency",
+                        Category = audio,
+                        Label = Strings.DetectLatencyLabel,
+                        Description = Strings.DetectLatencyDescription,
+                        Keywords = SettingKeywords.Split(Strings.DetectLatencyKeywords),
+                        DefaultValue = true,
+                        Get = () => player.DetectLatency,
+                        Set = detect => player.DetectLatency = detect,
                     },
                     new ToggleSetting
                     {
@@ -337,6 +349,7 @@ namespace ChartPacker.Services
                         Set = theme => player.AlbumArtTheming = theme,
                     },
                     AppLog.CreateSetting(logging, () => settings.Settings.LoggingEnabled, enabled => settings.Settings.LoggingEnabled = enabled),
+                    .. UpdateCheck.CreateSettings(general),
                 ]);
         }
     }
