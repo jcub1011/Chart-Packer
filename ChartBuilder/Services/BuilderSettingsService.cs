@@ -105,6 +105,11 @@ namespace ChartBuilder.Services
             settings.PreviewLookAhead = double.IsFinite(settings.PreviewLookAhead) ? Math.Clamp(settings.PreviewLookAhead, 0.5, 4) : 1.4;
             settings.ReducePreviewCategories &= ReductionChangeCategories.All;
             settings.ReducePreviewLookAhead = BuilderSettings.SnapReducePreviewLookAhead(settings.ReducePreviewLookAhead);
+            if (string.IsNullOrWhiteSpace(settings.ReduceMethodId))
+                settings.ReduceMethodId = BuilderSettings.DefaultReduceMethodId;
+            settings.ReduceMethodSettings = settings.ReduceMethodSettings?.Where(kv => !string.IsNullOrWhiteSpace(kv.Key) && kv.Value is not null).ToDictionary(kv => kv.Key, kv => kv.Value);
+            if (settings.ReduceMethodSettings?.Count == 0)
+                settings.ReduceMethodSettings = null;
             settings.PlaytestEarlyMs = Math.Clamp(settings.PlaytestEarlyMs, (int)HitWindow.MinMs, (int)HitWindow.MaxMs);
             settings.PlaytestLateMs = Math.Clamp(settings.PlaytestLateMs, (int)HitWindow.MinMs, (int)HitWindow.MaxMs);
             if (!Enum.IsDefined(settings.GuitarRecordStyle))

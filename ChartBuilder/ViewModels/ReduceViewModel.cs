@@ -70,8 +70,8 @@ namespace ChartBuilder.ViewModels
             _settings = settings;
             _editor = editor;
             _part = part;
-            Rules = new ReductionRulesViewModel(settings.ReductionRules.Load(), kind, ChartDifficulty.Hard);
-            Rules.Changed += (_, _) => ScheduleRedraw();
+            RulesMethod = new RulesReduceMethodViewModel(settings.ReductionRules.Load(), kind, ChartDifficulty.Hard);
+            RulesMethod.Changed += (_, _) => ScheduleRedraw();
             if (editor is not null)
             {
                 _redraw = new DispatcherTimer { Interval = RedrawDelay };
@@ -106,8 +106,10 @@ namespace ChartBuilder.ViewModels
             vm.ScopeChoices = scopes;
 
             vm._loading = true;
+            vm.SelectedMethod = vm.MethodChoices.FirstOrDefault(m => m.Id == settings.Settings.ReduceMethodId) ?? vm.MethodChoices[0];
             vm.SelectedTo = vm.ToChoices.First(c => c.Difficulty == (all ? null : to));
-            vm.SelectedRulesFor = vm.RulesForChoices.First(c => c.Difficulty == to);
+            vm.RulesMethod.SelectedRulesFor = vm.RulesMethod.RulesForChoices.First(c => c.Difficulty == to);
+            vm.RulesMethod.ShowRulesForPicker = vm.IsAll;
             vm.SelectedScope = all ? scopes[0] : scopes.FirstOrDefault(s => s.Label == Strings.ReduceScopeSelection) ?? scopes[0];
             vm.RefreshFrom(part is null ? null : d => part[d].Notes.Count > 0);
             vm._loading = false;
@@ -125,8 +127,12 @@ namespace ChartBuilder.ViewModels
             var vm = new ReduceViewModel(settings, null, ChartInstrument.Guitar, ChartInstrumentKind.FiveFret);
             vm.ToChoices = [.. Lower.Select(d => new TargetChoice(d, ChartLabels.DifficultyName(d)))];
             vm._loading = true;
+            vm.SelectedMethod = vm.MethodChoices.FirstOrDefault(m => m.Id == settings.Settings.ReduceMethodId) ?? vm.MethodChoices[0];
             vm.SelectedFamily = vm.FamilyChoices[0];
             vm.SelectedTo = vm.ToChoices[0];
+            if (vm.SelectedTo.Difficulty is { } toDifficulty)
+                vm.RulesMethod.SelectedRulesFor = vm.RulesMethod.RulesForChoices.First(c => c.Difficulty == toDifficulty);
+            vm.RulesMethod.ShowRulesForPicker = vm.IsAll;
             vm._loading = false;
             vm.ShowRules();
             return vm;
@@ -149,8 +155,22 @@ namespace ChartBuilder.ViewModels
 
         public string ApplyLabel => IsRun ? Strings.ReduceApplyButton : Strings.ReduceSaveButton;
 
-        /// <summary>The rules for the family and the difficulty picked, as fields; a run's changes are its own.</summary>
-        public ReductionRulesViewModel Rules { get; }
+        /// <summary>The default reduction method's rules, as fields; a run's changes are its own.</summary>
+        public RulesReduceMethodViewModel RulesMethod { get; }
+
+        /// <summary>How the lower difficulties are made; only the default reduction so far.</summary>
+        public IReadOnlyList<ReduceMethodChoice> MethodChoices { get; } =
+        [
+            new ReduceMethodChoice(RulesReduceMethodViewModel.MethodId, Strings.ReduceMethodRules),
+        ];
+
+        /// <summary>The method the draft is made by.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(IsRulesMethod))]
+        public partial ReduceMethodChoice? SelectedMethod { get; set; }
+
+        /// <summary>Whether the default reduction method is picked, so its rules are shown.</summary>
+        public bool IsRulesMethod => SelectedMethod?.Id == RulesReduceMethodViewModel.MethodId;
 
         public IReadOnlyList<FamilyChoice> FamilyChoices => ReductionRulesViewModel.FamilyChoices;
 
@@ -181,12 +201,6 @@ namespace ChartBuilder.ViewModels
 
         /// <summary>The difficulties Reduce all can fill, those without notes ticked.</summary>
         public IReadOnlyList<TargetToggle> Toggles { get; private set; } = [];
-
-        public IReadOnlyList<DifficultyChoice> RulesForChoices => ReductionRulesViewModel.TargetChoices;
-
-        /// <summary>Which difficulty's rules are shown, in Reduce all.</summary>
-        [ObservableProperty]
-        public partial DifficultyChoice? SelectedRulesFor { get; set; }
 
         public IReadOnlyList<ScopeChoice> ScopeChoices { get; private set; } = [];
 
@@ -248,7 +262,7 @@ namespace ChartBuilder.ViewModels
         }
 
         // The difficulty whose rules the fields show.
-        private ChartDifficulty? RulesTarget => IsAll ? SelectedRulesFor?.Difficulty : SelectedTo?.Difficulty;
+        private ChartDifficulty? RulesTarget => IsAll ? RulesMethod.SelectedRulesFor?.Difficulty : SelectedTo?.Difficulty;
 
         /// <summary>Adds the draft (a run), or saves the defaults (Settings).</summary>
         [RelayCommand]
@@ -274,7 +288,7 @@ namespace ChartBuilder.ViewModels
             }
             else
             {
-                _settings.ReductionRules.Save(Rules.Defaults);
+                _settings.ReductionRules.Save(RulesMethod.Defaults);
             }
 
             Finish();
@@ -292,13 +306,13 @@ namespace ChartBuilder.ViewModels
 
         /// <summary>The shipped rules for this family and target, in place of what's shown.</summary>
         [RelayCommand]
-        private void Reset() => Rules.Reset();
+        private void Reset() => RulesMethod.Reset();
 
         partial void OnSelectedFamilyChanged(FamilyChoice? value)
         {
             if (value is null || IsRun)
                 return;
-            Rules.Show(value.Kind, RulesTarget ?? ChartDifficulty.Hard);
+            RulesMethod.Show(value.Kind, RulesTarget ?? ChartDifficulty.Hard);
         }
 
         partial void OnSelectedToChanged(TargetChoice? value)
@@ -307,15 +321,18 @@ namespace ChartBuilder.ViewModels
                 return;
             if (_editor?.Session.Chart.PartOf(_part) is { } part)
                 RefreshFrom(d => part[d].Notes.Count > 0);
+            RulesMethod.ShowRulesForPicker = IsAll;
             ShowRules();
             ScheduleRedraw();
         }
 
-        partial void OnSelectedRulesForChanged(DifficultyChoice? value)
+        partial void OnSelectedMethodChanged(ReduceMethodChoice? value)
         {
             if (_loading || value is null)
                 return;
-            ShowRules();
+            _settings.Settings.ReduceMethodId = value.Id;
+            _settings.Save();
+            ScheduleRedraw();
         }
 
         partial void OnSelectedScopeChanged(ScopeChoice? value) => ScheduleRedraw();
@@ -330,7 +347,15 @@ namespace ChartBuilder.ViewModels
         private void ShowRules()
         {
             if (RulesTarget is { } to)
-                Rules.Show(Rules.Kind, to);
+            {
+                RulesMethod.ShowForTarget(to);
+                if (!IsAll)
+                {
+                    var match = RulesMethod.RulesForChoices.FirstOrDefault(c => c.Difficulty == to);
+                    if (match is not null && !Equals(RulesMethod.SelectedRulesFor, match))
+                        RulesMethod.SelectedRulesFor = match;
+                }
+            }
         }
 
         private static TargetToggle Toggle(ChartDifficulty difficulty, bool charted) => new(
@@ -376,7 +401,7 @@ namespace ChartBuilder.ViewModels
             bool started;
             if (IsAll)
             {
-                var defaults = Rules.Defaults;
+                var defaults = RulesMethod.Defaults;
                 var targets = Toggles.Where(static t => t.IsChecked).Select(static t => t.Difficulty).ToList();
                 if (targets.Count == 0)
                 {
@@ -387,15 +412,15 @@ namespace ChartBuilder.ViewModels
                     return;
                 }
 
-                started = Rules.IsDrums
+                started = RulesMethod.IsDrums
                     ? reduce.StartAll(targets.ToDictionary(t => t, defaults.DrumsFor), range)
-                    : reduce.StartAll(_part, targets.ToDictionary(t => t, t => defaults.FretsFor(Rules.Kind, t)), range);
+                    : reduce.StartAll(_part, targets.ToDictionary(t => t, t => defaults.FretsFor(RulesMethod.Kind, t)), range);
             }
             else if (SelectedFrom is { } from && to.Difficulty is { } target)
             {
-                started = Rules.IsDrums
-                    ? reduce.Start(from.Difficulty, target, Rules.DrumRules(), range)
-                    : reduce.Start(_part, from.Difficulty, target, Rules.FretRules(), range);
+                started = RulesMethod.IsDrums
+                    ? reduce.Start(from.Difficulty, target, RulesMethod.DrumRules(), range)
+                    : reduce.Start(_part, from.Difficulty, target, RulesMethod.FretRules(), range);
             }
             else
             {

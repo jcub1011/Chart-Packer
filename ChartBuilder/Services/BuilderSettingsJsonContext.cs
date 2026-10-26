@@ -12,6 +12,7 @@ namespace ChartBuilder.Services
     [JsonSerializable(typeof(LaneDockState))]
     [JsonSerializable(typeof(List<RecentSong>))]
     [JsonSerializable(typeof(List<string>))]
+    [JsonSerializable(typeof(Dictionary<string, string>))]
     [JsonSerializable(typeof(Dictionary<string, List<string>>))]
     [JsonSerializable(typeof(ReductionDefaults))]
     [JsonSerializable(typeof(OverwritePolicy))]
