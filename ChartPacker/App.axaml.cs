@@ -15,6 +15,7 @@ using ChartPacker.Views;
 using ChartShared.Audio.Playback;
 using ChartShared.Core;
 using ChartShared.Core.Charting.Saving;
+using ChartShared.Core.Generation;
 using ChartShared.Core.Scanning;
 using ChartShared.Core.Settings;
 using ChartShared.Ffmpeg;
@@ -131,10 +132,31 @@ namespace ChartPacker
 
                 void Calibrate() => _ = CalibrateAsync();
 
+                // The generator models both apps share (issue #154). The dialog manages the shared
+                // folder and the models in it; later the generation windows will open it too.
+                var generatorModels = new GeneratorModelStore(
+                    new GeneratorModelFolderFile(UserConfigPaths.GeneratorModelSettingsFile),
+                    UserConfigPaths.GeneratorModelsFolder);
+                var generatorModelsWindow = new AvaloniaGeneratorModelsWindowService(() => window, generatorModels);
+                async Task ManageGeneratorModelsAsync()
+                {
+                    try
+                    {
+                        await generatorModelsWindow.ShowAsync(desktop.Windows.LastOrDefault(w => w.IsActive) ?? window);
+                    }
+                    catch (Exception ex)
+                    {
+                        // Nothing awaits this, so anything not caught here would be lost.
+                        Trace.TraceError($"The generator models dialog failed: {ex}");
+                    }
+                }
+
+                void ManageGeneratorModels() => _ = ManageGeneratorModelsAsync();
+
                 var settingsWindow = new AvaloniaSettingsWindowService(
                     () => window,
                     settingsPicker => new SettingsWindowViewModel(
-                        AppSettingsCatalog.Create(library, player, highway, downloads, settings, Calibrate), settingsPicker, settings.Save),
+                        AppSettingsCatalog.Create(library, player, highway, downloads, settings, Calibrate, ManageGeneratorModels, generatorModels), settingsPicker, settings.Save),
                     settings.Settings,
                     settings.Save,
                     Strings.AppName);

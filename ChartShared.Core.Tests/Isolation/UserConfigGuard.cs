@@ -71,10 +71,13 @@ public sealed class UserConfigGuard
         [
             UserConfigPaths.SettingsFile, UserConfigPaths.BuilderSettingsFile, UserConfigPaths.ReductionRulesFile,
             UserConfigPaths.AudioLatencyFile, UserConfigPaths.InputBindingsFile, UserConfigPaths.UpdateSettingsFile,
+            UserConfigPaths.GeneratorModelSettingsFile,
         ];
         string recovery = Path.GetRelativePath(folder, UserConfigPaths.RecoveryFolder) + Path.DirectorySeparatorChar;
+        string models = Path.GetRelativePath(folder, UserConfigPaths.GeneratorModelsFolder) + Path.DirectorySeparatorChar;
         return files.Any(f => string.Equals(Path.GetRelativePath(folder, f), path, StringComparison.OrdinalIgnoreCase))
-            || path.StartsWith(recovery, StringComparison.OrdinalIgnoreCase);
+            || path.StartsWith(recovery, StringComparison.OrdinalIgnoreCase)
+            || path.StartsWith(models, StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool AppRunning()

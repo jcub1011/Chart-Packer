@@ -1,5 +1,6 @@
 using ChartBuilder.Services;
 using ChartShared.Audio.Waveforms;
+using ChartShared.Core.Generation;
 using ChartShared.Core.Settings;
 using ChartShared.UI.Services;
 
@@ -59,7 +60,10 @@ public sealed class WaveformFidelitySettingTests
     {
         var settings = BuilderSettingsService.Load(_path);
         var latency = new AudioLatencyService(new AudioLatencyFile(Path.Combine(_root.FullName, "latency.json")));
-        var catalog = BuilderSettingsCatalog.Create(settings, latency, () => { }, () => { }, () => { }, () => { });
+        var catalog = BuilderSettingsCatalog.Create(settings, latency, () => { }, () => { }, () => { }, () => { }, () => { },
+            new GeneratorModelStore(
+                new GeneratorModelFolderFile(Path.Combine(_root.FullName, "generator-model-settings.json")),
+                Path.Combine(_root.FullName, "GeneratorModels")));
 
         var fidelity = catalog.Definitions.Single(d => d.Id == "playback.waveformFidelity") as ChoiceSetting<WaveformFidelity>;
         Assert.IsNotNull(fidelity, "Waveform detail sits in Playback like Chart Packer's playback.waveformFidelity.");

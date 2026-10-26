@@ -11,9 +11,11 @@ using ChartBuilder.Resources;
 using ChartBuilder.ViewModels;
 using ChartBuilder.Views;
 using ChartShared.Audio.Playback;
+using ChartShared.Core;
 using ChartShared.Core.Charting;
 using ChartShared.Core.Charting.Recovery;
 using ChartShared.Core.Charts;
+using ChartShared.Core.Generation;
 using ChartShared.Core.Input;
 using ChartShared.Core.Launching;
 using ChartShared.Core.Scanning;
@@ -66,6 +68,14 @@ namespace ChartBuilder.Services
 
         // The Input devices window, while it's open.
         private InputDevicesWindow? _inputDevices;
+
+        // The generator models both apps share (issue #154). The dialog manages the shared
+        // folder and the models in it; later the generation dialogs will open it too.
+        private readonly GeneratorModelStore _generatorModels = new(
+            new GeneratorModelFolderFile(UserConfigPaths.GeneratorModelSettingsFile),
+            UserConfigPaths.GeneratorModelsFolder);
+
+        private AvaloniaGeneratorModelsWindowService? _generatorModelsWindow;
 
         // The Editor window, made as the app starts; what its Editors work with, the same for every one opened in it; and
         // its authoring dialogs, whose preview window follows the Editor open.
@@ -421,10 +431,26 @@ namespace ChartBuilder.Services
         private AvaloniaSettingsWindowService SettingsWindowFor(Window owner) => new(
             () => owner,
             settingsPicker => new SettingsWindowViewModel(
-                BuilderSettingsCatalog.Create(settings, latency, () => _ = ShowCalibrationAsync(), () => _ = ShowReductionDefaultsAsync(), ShowInputDevices, ResetBindings), settingsPicker, settings.Save),
+                BuilderSettingsCatalog.Create(settings, latency, () => _ = ShowCalibrationAsync(), () => _ = ShowReductionDefaultsAsync(), ShowInputDevices, ResetBindings, ManageGeneratorModels, _generatorModels), settingsPicker, settings.Save),
             settings.Settings,
             settings.Save,
             Strings.AppName);
+
+        /// <summary>Opens the shared generator model storage dialog (issue #154) over the window in front.</summary>
+        private async Task ShowGeneratorModelsAsync()
+        {
+            try
+            {
+                _generatorModelsWindow ??= new AvaloniaGeneratorModelsWindowService(() => desktop.MainWindow, _generatorModels);
+                await _generatorModelsWindow.ShowAsync(desktop.Windows.LastOrDefault(w => w.IsActive) ?? desktop.MainWindow);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Opening the generator models dialog failed");
+            }
+        }
+
+        private void ManageGeneratorModels() => _ = ShowGeneratorModelsAsync();
 
         /// <summary>Puts every profile's bindings back to the keyboard's defaults, keeping each device's settings.</summary>
         private void ResetBindings()
