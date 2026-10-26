@@ -88,7 +88,7 @@ namespace ChartBuilder.ViewModels
             IsLeftPanelAutoHide = saved.EditorLeftPanelAutoHide ?? false;
             IsRightPanelAutoHide = saved.EditorRightPanelAutoHide ?? false;
             PanelLayout = PanelLayoutStore.From(saved);
-            Editor = new ChartEditorViewModel(song, _undo, Playback, Audio, settings, services.Confirmations, Messages, LaneDockLayout.FromState(saved.EditorLanes) ?? LaneDockLayout.CreateDefault(), services.Authoring, services.Input);
+            Editor = new ChartEditorViewModel(song, _undo, Playback, Audio, settings, services.Confirmations, Messages, LaneDockLayout.FromState(saved.EditorLanes) ?? LaneDockLayout.CreateDefault(), services.Authoring, services.Input, services.GeneratorModels);
             Audio.AudibleChanged += OnAudibleChanged;
             Audio.Start();
             Findings = new FindingsViewModel(song, _undo, Editor);

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
+using ChartBuilder.ViewModels;
 using ChartShared.Core.Charting.Authoring;
 using ChartShared.Core.Charting.Layout;
 using ChartShared.Core.Jobs;
@@ -16,6 +17,7 @@ namespace ChartBuilder.Services
     [JsonSerializable(typeof(Dictionary<string, List<string>>))]
     [JsonSerializable(typeof(ReductionDefaults))]
     [JsonSerializable(typeof(OverwritePolicy))]
+    [JsonSerializable(typeof(NeuralReduceMethodViewModel.NeuralMethodSettings))]
     internal sealed partial class BuilderSettingsJsonContext : JsonSerializerContext
     {
     }

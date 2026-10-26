@@ -106,4 +106,40 @@ public sealed class DifficultyGeneratorTests
         [.. Enumerable.Range(0, count).Select(i => new EditableNote(i * step, 1, i % lanes))];
 
     private static List<long> Ticks(EditableTrack track) => [.. track.Notes.AsSpan().ToArray().Select(n => n.Tick).Distinct()];
+
+    /// <summary>A generator that never runs: every step falls back to the rules with a reason (§3.7).</summary>
+    private sealed class RefusingGenerator : IDifficultyGenerator
+    {
+        public string MethodId => "test-refuses";
+        public bool CanRunFor(ChartInstrumentKind kind) => true;
+
+        public ReductionResult? Draft(
+            EditableChart chart, ChartInstrument part, ChartDifficulty from, ChartDifficulty to,
+            GenerationOptions options, (long From, long To)? range, ChartReadOptions? readOptions,
+            out string? fallbackReason)
+        {
+            fallbackReason = $"test refuses {to}";
+            return null;
+        }
+    }
+
+    [TestMethod]
+    public void AGeneratorThatCannotRunFallsBackToRulesWithReasons()
+    {
+        var chart = Guitar();
+        new AddNotes(ChartInstrument.Guitar, Expert, Run(64, step: 120)).Apply(chart);
+        var rules = ReductionDefaults.Shipped;
+        var plain = DifficultyGenerator.Generate(chart, ChartInstrument.Guitar, [Hard, Medium, Easy], rules, DrumsVariant.Pro);
+        var fallbacks = new Dictionary<ChartDifficulty, string>();
+
+        var generated = DifficultyGenerator.Generate(chart, ChartInstrument.Guitar, [Hard, Medium, Easy], rules, DrumsVariant.Pro, options: null, new RefusingGenerator(), GenerationOptions.Default, fallbacks);
+
+        Assert.HasCount(3, generated.Drafts);
+        Assert.HasCount(3, fallbacks);
+        foreach (var (expected, made) in plain.Drafts.Zip(generated.Drafts))
+        {
+            Assert.AreEqual(expected.Target, made.Target);
+            Assert.AreSequenceEqual(expected.Result.Notes.ToList(), [.. made.Result.Notes]);
+        }
+    }
 }

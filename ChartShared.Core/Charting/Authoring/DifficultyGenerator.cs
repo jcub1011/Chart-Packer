@@ -86,7 +86,24 @@ public static class DifficultyGenerator
     /// <returns>The drafts; none when there's nothing to reduce.</returns>
     /// <exception cref="InvalidOperationException">A draft can't be added to the chart.</exception>
     /// <exception cref="ArgumentException">A draft can't be added to the chart.</exception>
-    public static GeneratedDifficulties Generate(EditableChart chart, ChartInstrument part, IReadOnlyCollection<ChartDifficulty> targets, ReductionDefaults rules, DrumsVariant variant, ChartReadOptions? options = null)
+    public static GeneratedDifficulties Generate(EditableChart chart, ChartInstrument part, IReadOnlyCollection<ChartDifficulty> targets, ReductionDefaults rules, DrumsVariant variant, ChartReadOptions? options = null) =>
+        Generate(chart, part, targets, rules, variant, options, generator: null, generationOptions: null, fallbackReasons: null);
+
+    /// <summary>
+    /// Fills <paramref name="targets"/> with a learned <paramref name="generator"/> where it can run,
+    /// falling back to <paramref name="rules"/> per part with <paramref name="fallbackReasons"/> saying
+    /// why (spec §3.7, §4.4). Null generator is plain Rules.
+    /// </summary>
+    public static GeneratedDifficulties Generate(
+        EditableChart chart,
+        ChartInstrument part,
+        IReadOnlyCollection<ChartDifficulty> targets,
+        ReductionDefaults rules,
+        DrumsVariant variant,
+        ChartReadOptions? options,
+        IDifficultyGenerator? generator,
+        GenerationOptions? generationOptions,
+        IDictionary<ChartDifficulty, string>? fallbackReasons)
     {
         ArgumentNullException.ThrowIfNull(chart);
         ArgumentNullException.ThrowIfNull(targets);
@@ -97,8 +114,31 @@ public static class DifficultyGenerator
 
         List<(ChartDifficulty? From, ChartDifficulty To)> steps = [.. targets.Select(static t => ((ChartDifficulty?)null, t))];
         return kind == ChartInstrumentKind.Drums
-            ? Draft(chart, part, steps, (c, f, t) => Reducer.Reduce(c, f, t, rules.DrumsFor(t), variant))
-            : Draft(chart, part, steps, (c, f, t) => Reducer.Reduce(c, part, f, t, rules.FretsFor(kind, t), options: options));
+            ? Draft(chart, part, steps, (c, f, t) => ReduceWithFallback(c, part, f, t, generator, generationOptions, fallbackReasons,
+                (rulesChart, from, to) => Reducer.Reduce(rulesChart, from, to, rules.DrumsFor(to), variant)))
+            : Draft(chart, part, steps, (c, f, t) => ReduceWithFallback(c, part, f, t, generator, generationOptions, fallbackReasons,
+                (rulesChart, from, to) => Reducer.Reduce(rulesChart, part, from, to, rules.FretsFor(kind, to), options: options)));
+    }
+
+    private static ReductionResult ReduceWithFallback(
+        EditableChart chart,
+        ChartInstrument part,
+        ChartDifficulty from,
+        ChartDifficulty to,
+        IDifficultyGenerator? generator,
+        GenerationOptions? options,
+        IDictionary<ChartDifficulty, string>? fallbackReasons,
+        Func<EditableChart, ChartDifficulty, ChartDifficulty, ReductionResult> rules)
+    {
+        if (generator is not null && generator.CanRunFor(ChartInstruments.KindOf(part)))
+        {
+            var draft = generator.Draft(chart, part, from, to, options ?? GenerationOptions.Default, range: null, readOptions: null, out string? reason);
+            if (draft is not null)
+                return draft;
+            fallbackReasons?.Add(to, reason ?? $"Rules filled {to} (the generator doesn't run here).");
+        }
+
+        return rules(chart, from, to);
     }
 
     /// <summary>

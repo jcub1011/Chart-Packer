@@ -1,6 +1,7 @@
 using System;
 using ChartShared.Audio.Playback;
 using ChartShared.Core.Charting.Recovery;
+using ChartShared.Core.Generation;
 using ChartShared.UI.Services;
 
 namespace ChartBuilder.Services
@@ -26,6 +27,7 @@ namespace ChartBuilder.Services
     /// <param name="Input">The instrument devices and their bindings, for playtest and record mode (charter-spec C19).</param>
     /// <param name="OpenInputDevices">Opens the Input devices window, where the bindings are set.</param>
     /// <param name="Reveal">Shows the song's folder or <c>.sng</c> in the file manager, from the title bar.</param>
+    /// <param name="GeneratorModels">The shared generator-model store; null where models aren't managed.</param>
     public sealed record EditorServices(
         BuilderSettingsService Settings,
         ISettingsWindowService SettingsWindow,
@@ -46,5 +48,6 @@ namespace ChartBuilder.Services
         IEditorWindowService Editors,
         InputService Input,
         Action OpenInputDevices,
-        IFileRevealService Reveal);
+        IFileRevealService Reveal,
+        IGeneratorModelStore? GeneratorModels = null);
 }

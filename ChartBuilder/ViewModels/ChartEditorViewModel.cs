@@ -14,6 +14,7 @@ using ChartShared.Core.Charting.Commands;
 using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charting.Layout;
 using ChartShared.Core.Charts;
+using ChartShared.Core.Generation;
 using ChartShared.UI.Controls.Highway;
 using ChartShared.UI.Services;
 using ChartShared.UI.ViewModels;
@@ -67,16 +68,21 @@ namespace ChartBuilder.ViewModels
         // The frame the playhead was last followed in.
         private TimeSpan? _followed;
 
+        /// <summary>The shared generator-model store for learned generators; null where there is none.</summary>
+        public IGeneratorModelStore? GeneratorModels { get; }
+
         /// <param name="messages">Where what the editor has to say goes, for the window's message bar.</param>
         /// <param name="audio">The song's audio as the lanes draw and analyse it.</param>
         /// <param name="dialogs">Shows the authoring tools' dialogs; null where there are none to show.</param>
         /// <param name="input">The instrument devices and their bindings, for playtest and record mode; null where there are none.</param>
-        public ChartEditorViewModel(EditorSong song, ChartUndoStack undo, PlaybackViewModel playback, EditorAudio audio, BuilderSettingsService settings, IConfirmationService confirmations, EditorMessages messages, LaneDockLayout layout, IAuthoringDialogService? dialogs = null, InputService? input = null)
+        /// <param name="generatorModels">The shared generator-model store for learned generators; null where there is none.</param>
+        public ChartEditorViewModel(EditorSong song, ChartUndoStack undo, PlaybackViewModel playback, EditorAudio audio, BuilderSettingsService settings, IConfirmationService confirmations, EditorMessages messages, LaneDockLayout layout, IAuthoringDialogService? dialogs = null, InputService? input = null, IGeneratorModelStore? generatorModels = null)
         {
             _settings = settings;
             _confirmations = confirmations;
             _dialogs = dialogs;
             _input = input;
+            GeneratorModels = generatorModels;
             Song = song;
             Playback = playback;
             Audio = audio;

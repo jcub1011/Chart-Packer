@@ -7,9 +7,12 @@ using System.Threading.Tasks;
 using Avalonia.Threading;
 using ChartBuilder.Resources;
 using ChartBuilder.Services;
+using ChartShared.Core.Charting;
 using ChartShared.Core.Charting.Authoring;
 using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charts;
+using ChartShared.Core.Generation;
+using ChartShared.Core.Generation.Neural;
 using ChartShared.Core.Validation;
 using ChartShared.UI.Services;
 using ChartShared.UI.ViewModels;
@@ -65,13 +68,15 @@ namespace ChartBuilder.ViewModels
         private bool _done;
         private int _checks;
 
-        private ReduceViewModel(BuilderSettingsService settings, ChartEditorViewModel? editor, ChartInstrument part, ChartInstrumentKind kind)
+        private ReduceViewModel(BuilderSettingsService settings, ChartEditorViewModel? editor, ChartInstrument part, ChartInstrumentKind kind, IGeneratorModelStore? models)
         {
             _settings = settings;
             _editor = editor;
             _part = part;
             RulesMethod = new RulesReduceMethodViewModel(settings.ReductionRules.Load(), kind, ChartDifficulty.Hard);
             RulesMethod.Changed += (_, _) => ScheduleRedraw();
+            NeuralMethod = new NeuralReduceMethodViewModel(settings, models ?? editor?.GeneratorModels);
+            NeuralMethod.Changed += (_, _) => ScheduleRedraw();
             if (editor is not null)
             {
                 _redraw = new DispatcherTimer { Interval = RedrawDelay };
@@ -89,7 +94,7 @@ namespace ChartBuilder.ViewModels
         /// </summary>
         public static ReduceViewModel ForRun(ChartEditorViewModel editor, BuilderSettingsService settings, ChartTrackKey lane, bool all = false)
         {
-            var vm = new ReduceViewModel(settings, editor, lane.Instrument, ChartInstruments.KindOf(lane.Instrument));
+            var vm = new ReduceViewModel(settings, editor, lane.Instrument, ChartInstruments.KindOf(lane.Instrument), editor.GeneratorModels);
             var session = editor.Session;
             var part = session.Chart.PartOf(lane.Instrument);
             var to = lane.Difficulty == ChartDifficulty.Expert ? ChartDifficulty.Hard : lane.Difficulty;
@@ -122,9 +127,9 @@ namespace ChartBuilder.ViewModels
         }
 
         /// <summary>The defaults in Settings, which every run starts from.</summary>
-        public static ReduceViewModel ForDefaults(BuilderSettingsService settings)
+        public static ReduceViewModel ForDefaults(BuilderSettingsService settings, IGeneratorModelStore? models = null)
         {
-            var vm = new ReduceViewModel(settings, null, ChartInstrument.Guitar, ChartInstrumentKind.FiveFret);
+            var vm = new ReduceViewModel(settings, null, ChartInstrument.Guitar, ChartInstrumentKind.FiveFret, models);
             vm.ToChoices = [.. Lower.Select(d => new TargetChoice(d, ChartLabels.DifficultyName(d)))];
             vm._loading = true;
             vm.SelectedMethod = vm.MethodChoices.FirstOrDefault(m => m.Id == settings.Settings.ReduceMethodId) ?? vm.MethodChoices[0];
@@ -158,19 +163,27 @@ namespace ChartBuilder.ViewModels
         /// <summary>The default reduction method's rules, as fields; a run's changes are its own.</summary>
         public RulesReduceMethodViewModel RulesMethod { get; }
 
-        /// <summary>How the lower difficulties are made; only the default reduction so far.</summary>
+        /// <summary>The neural method's options; a run's changes are its own.</summary>
+        public NeuralReduceMethodViewModel NeuralMethod { get; }
+
+        /// <summary>How the lower difficulties are made: the default reduction, and the neural network.</summary>
         public IReadOnlyList<ReduceMethodChoice> MethodChoices { get; } =
         [
             new ReduceMethodChoice(RulesReduceMethodViewModel.MethodId, Strings.ReduceMethodRules),
+            new ReduceMethodChoice(NeuralReduceMethodViewModel.MethodId, Strings.ReduceMethodNeural),
         ];
 
         /// <summary>The method the draft is made by.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(IsRulesMethod))]
+        [NotifyPropertyChangedFor(nameof(IsNeuralMethod))]
         public partial ReduceMethodChoice? SelectedMethod { get; set; }
 
         /// <summary>Whether the default reduction method is picked, so its rules are shown.</summary>
         public bool IsRulesMethod => SelectedMethod?.Id == RulesReduceMethodViewModel.MethodId;
+
+        /// <summary>Whether the neural method is picked, so its pack and options are shown.</summary>
+        public bool IsNeuralMethod => SelectedMethod?.Id == NeuralReduceMethodViewModel.MethodId;
 
         public IReadOnlyList<FamilyChoice> FamilyChoices => ReductionRulesViewModel.FamilyChoices;
 
@@ -384,7 +397,8 @@ namespace ChartBuilder.ViewModels
             _redraw.Start();
         }
 
-        // The draft over the target, or over each target ticked, by the rules as they are now.
+        // The draft over the target, or over each target ticked, by the method picked. A learned
+        // method drafts through the generator seam, falling back to the rules per part (§3.7).
         private void Redraw()
         {
             _redraw?.Stop();
@@ -399,7 +413,9 @@ namespace ChartBuilder.ViewModels
             var reduce = editor.Session.Reduce;
             var range = SelectedScope?.Range;
             bool started;
-            if (IsAll)
+            if (IsNeuralMethod && editor.GeneratorModels is { } models)
+                started = StartNeural(editor, models, reduce, range, to);
+            else if (IsAll)
             {
                 var defaults = RulesMethod.Defaults;
                 var targets = Toggles.Where(static t => t.IsChecked).Select(static t => t.Difficulty).ToList();
@@ -441,9 +457,56 @@ namespace ChartBuilder.ViewModels
                 ChartLabels.DifficultyName(d.Source),
                 ChartLabels.DifficultyName(d.Target.Difficulty),
                 d.Result.Notes.Count,
-                d.Result.Removed))];
+                d.Result.Removed)),
+                .. reduce.FallbackReasons.Select(kv => $"{ChartLabels.DifficultyName(kv.Key)}: {kv.Value}")];
             Preview?.OnDrafted(RunOf(editor.Session, reduce));
             _ = CheckAsync(editor, reduce);
+        }
+
+        // A neural run: each target drafted by the pack, falling back to the rules per part (§3.7).
+        // Reduce all chains from the difficulty above by default, or each from Expert when asked (§3.6).
+        // The generator is kept for the dialog's life, so installed packs load once.
+        private NeuralDifficultyGenerator? _neural;
+        private IGeneratorModelStore? _neuralStore;
+
+        private bool StartNeural(ChartEditorViewModel editor, IGeneratorModelStore models, ReduceProposals reduce, (long From, long To)? range, TargetChoice to)
+        {
+            var options = NeuralMethod.Options();
+            if (_neural is null || !ReferenceEquals(_neuralStore, models))
+            {
+                _neural = new NeuralDifficultyGenerator(
+                    models, target => RulesMethod.Defaults.FretsFor(RulesMethod.Kind, target));
+                _neuralStore = models;
+            }
+            var readOptions = editor.Session.ReadOptions;
+            var variant = editor.Session.DrumsVariantShown;
+            ReductionResult Rules(EditableChart chart, ChartDifficulty from, ChartDifficulty target) =>
+                RulesMethod.IsDrums
+                    ? Reducer.Reduce(chart, from, target, RulesMethod.DrumRules(), variant, range)
+                    : Reducer.Reduce(chart, _part, from, target, RulesMethod.Defaults.FretsFor(RulesMethod.Kind, target), range, readOptions);
+
+            if (IsAll)
+            {
+                var targets = Toggles.Where(static t => t.IsChecked).Select(static t => t.Difficulty).ToList();
+                if (targets.Count == 0)
+                {
+                    reduce.Cancel();
+                    ClearCheck();
+                    SummaryLines = [Strings.ReduceNoTargets];
+                    Preview?.Clear(Strings.ReduceNoTargets);
+                    return false;
+                }
+
+                bool expertCharted = editor.Session.Chart.PartOf(_part) is { } whole && whole[ChartDifficulty.Expert].Notes.Count > 0;
+                List<(ChartDifficulty? From, ChartDifficulty To)> steps = options.Chained || !expertCharted
+                    ? [.. targets.Select(static t => ((ChartDifficulty?)null, t))]
+                    : [.. targets.Select(static t => ((ChartDifficulty?)ChartDifficulty.Expert, t))];
+                return reduce.StartWithGenerator(_part, range, steps, Rules, _neural, options);
+            }
+
+            if (SelectedFrom is { } from && to.Difficulty is { } target)
+                return reduce.StartWithGenerator(_part, range, [(from.Difficulty, target)], Rules, _neural, options);
+            return false;
         }
 
         // The draft's findings and ratings, worked out off the UI thread; a newer draft's check replaces it.

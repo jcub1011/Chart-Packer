@@ -181,7 +181,8 @@ namespace ChartBuilder.Services
             this,
             input,
             ShowInputDevices,
-            new FileRevealService(() => editor));
+            new FileRevealService(() => editor),
+            _generatorModels);
 
         /// <summary>
         /// Opens the Editor <paramref name="create"/> makes in the Editor window in place of what's open, letting go of that
@@ -465,7 +466,7 @@ namespace ChartBuilder.Services
         private async Task ShowReductionDefaultsAsync()
         {
             var owner = desktop.Windows.LastOrDefault(w => w.IsActive) ?? desktop.MainWindow;
-            await new AvaloniaAuthoringDialogService(() => owner).ShowReduceAsync(ReduceViewModel.ForDefaults(settings));
+            await new AvaloniaAuthoringDialogService(() => owner).ShowReduceAsync(ReduceViewModel.ForDefaults(settings, _generatorModels));
         }
     }
 }

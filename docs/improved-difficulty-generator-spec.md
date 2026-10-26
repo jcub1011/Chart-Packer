@@ -648,6 +648,10 @@ The design questions are settled as follows.
 | Tier | Optional. The trainer includes it when asked, and the pack says whether it uses it (§3.3). |
 | Any style | Offered by every pack with styles, learned in training by hiding the style on a share of examples. It's the default style (§3.3). |
 | Learned voicing and sustains | A later milestone, M7 (§10). |
+| Training stack | TorchSharp with GPU acceleration where present (spec §6.5), CPU otherwise. Batched, bucketed full-sequence CRF NLL with Adam; reproducible from a seed. |
+| App inference | Hand-written managed C# BiGRU+CRF in PyTorch GRU convention (parity 1e-4, checked by the trainer's `selftest`; measured 1.7e-6). ONNX Runtime is not used in the apps (§7: no new native dependencies, AOT). |
+| Pack storage | One pack is one `NeuralDifficulty` model in the shared generator-model store (`IGeneratorModelStore`), file `NeuralDifficulty{name}.neuralpack`. |
 
-Still to be chosen when the work starts: the pack repository's name and address (for the Get packs
-link), the pack file's extension, and the parity tolerance of §3.3.
+Chosen when the work started: the pack file's extension is `.neuralpack`, and the parity
+tolerance of §3.3 is 1e-4. Still to be chosen: the pack repository's name and address
+(for the Get packs link).

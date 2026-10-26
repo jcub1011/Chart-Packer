@@ -13,6 +13,7 @@ public static class GeneratorModelNaming
     public static string GetExtension(GeneratorType type) => type switch
     {
         GeneratorType.Difficulty => "json",
+        GeneratorType.NeuralDifficulty => "neuralpack",
         _ => "json",
     };
 

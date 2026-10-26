@@ -1,0 +1,49 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ChartBuilder.ViewModels"
+             xmlns:res="using:ChartBuilder.Resources"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="308" d:DesignHeight="240"
+             x:Class="ChartBuilder.Views.NeuralReduceMethodView"
+             x:DataType="vm:NeuralReduceMethodViewModel">
+    <!-- The neural method's controls (NeuralReduceMethodViewModel): the pack, the style it imitates,
+         the fewer/more notes slider, and Reduce-all chaining. With no pack installed it says so, and
+         drafts use Rules meanwhile (spec §3.7, §4.1). -->
+    <StackPanel Spacing="12">
+        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12" RowDefinitions="Auto,Auto" RowSpacing="8">
+            <TextBlock Grid.Row="0" Grid.Column="0" Classes="caption" VerticalAlignment="Center"
+                       Text="{x:Static res:Strings.NeuralPackLabel}" />
+            <ComboBox Grid.Row="0" Grid.Column="1" HorizontalAlignment="Stretch"
+                      ItemsSource="{Binding Packs}"
+                      SelectedItem="{Binding SelectedPack}"
+                      AutomationProperties.Name="{x:Static res:Strings.NeuralPackLabel}" />
+            <TextBlock Grid.Row="1" Grid.Column="0" Classes="caption" VerticalAlignment="Center"
+                       Text="{x:Static res:Strings.NeuralStyleLabel}" />
+            <ComboBox Grid.Row="1" Grid.Column="1" HorizontalAlignment="Stretch"
+                      ItemsSource="{Binding Styles}"
+                      SelectedItem="{Binding SelectedStyle}"
+                      AutomationProperties.Name="{x:Static res:Strings.NeuralStyleLabel}" />
+        </Grid>
+
+        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+            <TextBlock Grid.Column="0" Classes="caption" VerticalAlignment="Center"
+                       Text="{x:Static res:Strings.NeuralDensityFewer}" />
+            <Slider Grid.Column="1" VerticalAlignment="Center"
+                    Minimum="-1" Maximum="1" TickFrequency="0.25" IsSnapToTickEnabled="True"
+                    Value="{Binding Density}"
+                    AutomationProperties.Name="{x:Static res:Strings.NeuralDensityLabel}" />
+            <TextBlock Grid.Column="2" Classes="caption" VerticalAlignment="Center"
+                       Text="{x:Static res:Strings.NeuralDensityMore}" />
+        </Grid>
+
+        <CheckBox IsChecked="{Binding Chained}"
+                  Content="{x:Static res:Strings.NeuralChainedLabel}"
+                  ToolTip.Tip="{x:Static res:Strings.NeuralFromExpertLabel}" />
+
+        <CheckBox IsChecked="{Binding CapLanes}"
+                  Content="{x:Static res:Strings.NeuralCapLanesLabel}" />
+
+        <TextBlock Classes="note" TextWrapping="Wrap" Text="{Binding StatusText}" />
+    </StackPanel>
+</UserControl>

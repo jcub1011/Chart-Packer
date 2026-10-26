@@ -130,6 +130,9 @@
                         <Panel IsVisible="{Binding IsRulesMethod}">
                             <local:RulesReduceMethodView DataContext="{Binding RulesMethod}" />
                         </Panel>
+                        <Panel IsVisible="{Binding IsNeuralMethod}">
+                            <local:NeuralReduceMethodView DataContext="{Binding NeuralMethod}" />
+                        </Panel>
                     </StackPanel>
                 </ScrollViewer>
             </Border>

@@ -9,4 +9,7 @@ public enum GeneratorType
 {
     /// <summary>Placeholder for the future lower-difficulty models.</summary>
     Difficulty,
+
+    /// <summary>BiGRU + CRF neural lower-difficulty packs (improved-difficulty-generator-spec §3.3, §5).</summary>
+    NeuralDifficulty,
 }
