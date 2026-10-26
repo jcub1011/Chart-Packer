@@ -134,6 +134,37 @@ public static class Reducer
 
         var spacing = SpacingOf(rules.ThinningDivision, rules.BurstDivision, rules.MaxBurst, chart.Resolution);
         var kept = Thin(chords, scores, spacing, whole.Phrases, Outside(target.Notes, range), riffs);
+        return Voice(chart, source, target, chords, phrases, kept, rules, range, options, ghl, inRange.Length);
+    }
+
+    /// <summary>
+    /// A draft of <paramref name="to"/> of the 5-fret or GHL <paramref name="part"/>, from <paramref name="from"/>, keeping
+    /// the source's chords at <paramref name="keep"/> and voicing them as <see cref="Reduce(EditableChart, ChartInstrument,
+    /// ChartDifficulty, ChartDifficulty, FretReductionRules, (long From, long To)?, ChartReadOptions?)"/> does: the learned
+    /// generators choose which chords are kept, and Rules plays them (improved-difficulty-generator-spec §3.4 steps 5–6).
+    /// Ticks the source has no chord at, or outside <paramref name="range"/>, are passed over.
+    /// </summary>
+    internal static ReductionResult Voice(EditableChart chart, ChartInstrument part, ChartDifficulty from, ChartDifficulty to, FretReductionRules rules, IReadOnlySet<long> keep, (long From, long To)? range = null, ChartReadOptions? options = null)
+    {
+        ArgumentNullException.ThrowIfNull(chart);
+        ArgumentNullException.ThrowIfNull(rules);
+        ArgumentNullException.ThrowIfNull(keep);
+        var source = SourceOf(chart, part, from, to);
+        if (source.Kind == ChartInstrumentKind.Drums)
+            throw new ArgumentException("Drums are reduced by the drum rules.", nameof(part));
+        var target = chart.PartOf(part)![to];
+        var inRange = Inside(source.Notes, range);
+        var chords = ChordsOf(inRange);
+        var phrases = Phrases(chords, SectionTicks(chart), chart.Resolution);
+        var kept = Enumerable.Range(0, chords.Count).Where(i => keep.Contains(chords[i].Tick)).ToList();
+        return Voice(chart, source, target, chords, phrases, kept, rules, range, options, source.Kind == ChartInstrumentKind.SixFret, inRange.Length);
+    }
+
+    // The kept chords of the source, voiced by the rules: chords narrowed, each phrase fitted to the lane range, opens
+    // as the rules say, sustains and HOPOs as the source plays them.
+    private static ReductionResult Voice(EditableChart chart, EditableTrack source, EditableTrack target, List<(long Tick, EditableNote[] Notes)> chords, List<(int Start, int End)> phrases, List<int> kept, FretReductionRules rules, (long From, long To)? range, ChartReadOptions? options, bool ghl, int sourceNotes)
+    {
+        int Column(EditableNote n) => ghl ? n.Lane % 3 : n.Lane;
 
         // Each chord's fret columns, one bit each (none for opens alone), and whether it has an open.
         var shape = new int[chords.Count];
@@ -273,7 +304,7 @@ public static class Reducer
             flags = PlayedAs(wanted, notes, flags, chart.Resolution, read);
         }
 
-        return new ReductionResult(notes, flags, [], inRange.Length - made);
+        return new ReductionResult(notes, flags, [], sourceNotes - made);
     }
 
     /// <summary>
@@ -860,17 +891,9 @@ public static class Reducer
             while (end < chords.Count && chords[end].Tick < to)
                 end++;
 
-            key.Clear().Append(to - from);
-            for (int i = start; i < end; i++)
-            {
-                key.Append(';').Append(chords[i].Tick - from).Append(chords[i].Notes.Any(n => n.Length >= resolution) ? 'S' : ':');
-                foreach (var note in chords[i].Notes.OrderBy(static n => n.Lane))
-                    key.Append(note.Lane).Append(',').Append((int)note.Dynamics).Append(note.DoubleKick ? '+' : ',');
-            }
-
             if (end - start > 1)
             {
-                string riff = key.ToString();
+                string riff = MeasureKey(key, chords, start, end, from, to - from, resolution);
                 if (!riffs.TryGetValue(riff, out var found))
                     riffs[riff] = found = (end - start, []);
                 found.Starts.Add(start);
@@ -893,6 +916,25 @@ public static class Reducer
         }
 
         return repeated;
+    }
+
+    /// <summary>
+    /// What a measure <paramref name="length"/> ticks long from <paramref name="from"/> is charted as, the same for any two
+    /// charted the same: its chords <paramref name="start"/> to before <paramref name="end"/>, each at its place with its
+    /// notes and whether it holds a sustain of a beat (<paramref name="resolution"/>) or longer. Written in
+    /// <paramref name="key"/>, which it clears first.
+    /// </summary>
+    internal static string MeasureKey(StringBuilder key, IReadOnlyList<(long Tick, EditableNote[] Notes)> chords, int start, int end, long from, long length, int resolution)
+    {
+        key.Clear().Append(length);
+        for (int i = start; i < end; i++)
+        {
+            key.Append(';').Append(chords[i].Tick - from).Append(chords[i].Notes.Any(n => n.Length >= resolution) ? 'S' : ':');
+            foreach (var note in chords[i].Notes.OrderBy(static n => n.Lane))
+                key.Append(note.Lane).Append(',').Append((int)note.Dynamics).Append(note.DoubleKick ? '+' : ',');
+        }
+
+        return key.ToString();
     }
 
     // The chords kept: the best of each star power phrase and solo the spacing allows first, then the rest by score, then

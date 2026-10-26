@@ -27,11 +27,12 @@ namespace ChartBuilder.Services
     {
         private readonly JsonSettingsFile<BuilderSettings> _file;
 
-        private BuilderSettingsService(JsonSettingsFile<BuilderSettings> file, BuilderSettings settings, ReductionRulesFile reductionRules)
+        private BuilderSettingsService(JsonSettingsFile<BuilderSettings> file, BuilderSettings settings, ReductionRulesFile reductionRules, GenerationDefaultsFile generation)
         {
             _file = file;
             Settings = settings;
             ReductionRules = reductionRules;
+            Generation = generation;
         }
 
         public BuilderSettings Settings { get; }
@@ -42,14 +43,22 @@ namespace ChartBuilder.Services
         /// </summary>
         public ReductionRulesFile ReductionRules { get; }
 
+        /// <summary>
+        /// The generator Reduce starts from and its options (improved-difficulty-generator-spec §4.4):
+        /// <c>generation-defaults.json</c> beside the settings file, which Chart Packer reads too.
+        /// </summary>
+        public GenerationDefaultsFile Generation { get; }
+
         /// <summary>Loads settings from <paramref name="filePath"/>, falling back to defaults when it's missing or unreadable.</summary>
         public static BuilderSettingsService Load(string filePath)
         {
             var file = new JsonSettingsFile<BuilderSettings>(filePath, BuilderSettingsJsonContext.Default.BuilderSettings);
             var settings = file.Load();
             Sanitize(settings);
-            string rules = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(filePath)) ?? "", Path.GetFileName(UserConfigPaths.ReductionRulesFile));
-            return new BuilderSettingsService(file, settings, new ReductionRulesFile(rules, filePath));
+            string folder = Path.GetDirectoryName(Path.GetFullPath(filePath)) ?? "";
+            string rules = Path.Combine(folder, Path.GetFileName(UserConfigPaths.ReductionRulesFile));
+            string generation = Path.Combine(folder, Path.GetFileName(UserConfigPaths.GenerationDefaultsFile));
+            return new BuilderSettingsService(file, settings, new ReductionRulesFile(rules, filePath), new GenerationDefaultsFile(generation));
         }
 
         /// <summary>Writes the settings changed in this run to the file, keeping other processes' changes to the rest.</summary>
@@ -105,11 +114,6 @@ namespace ChartBuilder.Services
             settings.PreviewLookAhead = double.IsFinite(settings.PreviewLookAhead) ? Math.Clamp(settings.PreviewLookAhead, 0.5, 4) : 1.4;
             settings.ReducePreviewCategories &= ReductionChangeCategories.All;
             settings.ReducePreviewLookAhead = BuilderSettings.SnapReducePreviewLookAhead(settings.ReducePreviewLookAhead);
-            if (string.IsNullOrWhiteSpace(settings.ReduceMethodId))
-                settings.ReduceMethodId = BuilderSettings.DefaultReduceMethodId;
-            settings.ReduceMethodSettings = settings.ReduceMethodSettings?.Where(kv => !string.IsNullOrWhiteSpace(kv.Key) && kv.Value is not null).ToDictionary(kv => kv.Key, kv => kv.Value);
-            if (settings.ReduceMethodSettings?.Count == 0)
-                settings.ReduceMethodSettings = null;
             settings.PlaytestEarlyMs = Math.Clamp(settings.PlaytestEarlyMs, (int)HitWindow.MinMs, (int)HitWindow.MaxMs);
             settings.PlaytestLateMs = Math.Clamp(settings.PlaytestLateMs, (int)HitWindow.MinMs, (int)HitWindow.MaxMs);
             if (!Enum.IsDefined(settings.GuitarRecordStyle))

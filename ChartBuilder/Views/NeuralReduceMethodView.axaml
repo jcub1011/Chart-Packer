@@ -39,7 +39,7 @@
 
         <CheckBox IsChecked="{Binding Chained}"
                   Content="{x:Static res:Strings.NeuralChainedLabel}"
-                  ToolTip.Tip="{x:Static res:Strings.NeuralFromExpertLabel}" />
+                  ToolTip.Tip="{x:Static res:Strings.NeuralChainedTip}" />
 
         <CheckBox IsChecked="{Binding CapLanes}"
                   Content="{x:Static res:Strings.NeuralCapLanesLabel}" />

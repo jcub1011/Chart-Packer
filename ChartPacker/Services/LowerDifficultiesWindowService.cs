@@ -7,6 +7,7 @@ using ChartPacker.Views;
 using ChartShared.Audio.Playback;
 using ChartShared.Core.Charting.Saving;
 using ChartShared.Core.Scanning;
+using ChartShared.Core.Generation;
 using ChartShared.Core.Settings;
 using ChartShared.UI.Views;
 
@@ -34,6 +35,8 @@ namespace ChartPacker.Services
     /// <param name="reductionRules">The rules the difficulties are made by, shared with Chart Builder.</param>
     /// <param name="locks">The songs this process holds and watches, shared with the main window (charter-spec §4.8).</param>
     /// <param name="latency">The calibrated audio latency, which the preview's highways allow for.</param>
+    /// <param name="generation">The generator the difficulties are drafted by, shared with Chart Builder; Rules alone when null.</param>
+    /// <param name="generatorModels">The generator models both apps share, the neural packs among them.</param>
     public sealed class AvaloniaLowerDifficultiesWindowService(
         Func<Window?> owner,
         MetadataDraftStore drafts,
@@ -44,7 +47,9 @@ namespace ChartPacker.Services
         GeneratedChartStash? generated,
         ReductionRulesFile reductionRules,
         SongLocks? locks = null,
-        AudioLatencyFile? latency = null) : ILowerDifficultiesWindowService
+        AudioLatencyFile? latency = null,
+        GenerationDefaultsFile? generation = null,
+        IGeneratorModelStore? generatorModels = null) : ILowerDifficultiesWindowService
     {
         public bool IsAvailable => generated is not null;
 
@@ -58,7 +63,7 @@ namespace ChartPacker.Services
             var player = new PlayerViewModel(settings, openOutput, latency);
             try
             {
-                using var viewModel = new LowerDifficultiesViewModel(entries, drafts, stash, reductionRules, new DraftSaver(songFiles), player, parallelism, locks);
+                using var viewModel = new LowerDifficultiesViewModel(entries, drafts, stash, reductionRules, new DraftSaver(songFiles), player, parallelism, locks, generation, generatorModels);
                 var dialog = new LowerDifficultiesWindow { DataContext = viewModel };
 
                 // The main panel lets go of its songs' files, as the window may save them, and its player stops.

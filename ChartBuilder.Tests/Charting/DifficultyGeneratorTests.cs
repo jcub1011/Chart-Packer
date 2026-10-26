@@ -123,6 +123,24 @@ public sealed class DifficultyGeneratorTests
         }
     }
 
+    /// <summary>A generator that drafts as the rules would, recording each step's source and noting how it drafted.</summary>
+    private sealed class RecordingGenerator(bool runs = true) : IDifficultyGenerator
+    {
+        public List<(ChartDifficulty From, ChartDifficulty To)> Steps { get; } = [];
+        public string MethodId => "test-records";
+        public bool CanRunFor(ChartInstrumentKind kind) => runs;
+
+        public ReductionResult? Draft(
+            EditableChart chart, ChartInstrument part, ChartDifficulty from, ChartDifficulty to,
+            GenerationOptions options, (long From, long To)? range, ChartReadOptions? readOptions,
+            out string? note)
+        {
+            Steps.Add((from, to));
+            note = $"drafted {to} from {from}";
+            return Reducer.Reduce(chart, part, from, to, FretReductionRules.Default(ChartInstrumentKind.FiveFret, to), range, readOptions);
+        }
+    }
+
     [TestMethod]
     public void AGeneratorThatCannotRunFallsBackToRulesWithReasons()
     {
@@ -141,5 +159,35 @@ public sealed class DifficultyGeneratorTests
             Assert.AreEqual(expected.Target, made.Target);
             Assert.AreSequenceEqual(expected.Result.Notes.ToList(), [.. made.Result.Notes]);
         }
+    }
+
+    [TestMethod]
+    public void AGeneratorChainsUnlessToldToReduceFromExpert()
+    {
+        var chart = Guitar();
+        new AddNotes(ChartInstrument.Guitar, Expert, Run(64, step: 120)).Apply(chart);
+        var chained = new RecordingGenerator();
+        var fromExpert = new RecordingGenerator();
+        var notes = new Dictionary<ChartDifficulty, string>();
+
+        DifficultyGenerator.Generate(chart, ChartInstrument.Guitar, [Hard, Medium, Easy], ReductionDefaults.Shipped, DrumsVariant.Pro, null, chained, GenerationOptions.Default, notes);
+        DifficultyGenerator.Generate(chart, ChartInstrument.Guitar, [Hard, Medium, Easy], ReductionDefaults.Shipped, DrumsVariant.Pro, null, fromExpert, new GenerationOptions(Chained: false), null);
+
+        Assert.AreSequenceEqual([(Expert, Hard), (Hard, Medium), (Medium, Easy)], chained.Steps);
+        Assert.AreSequenceEqual([(Expert, Hard), (Expert, Medium), (Expert, Easy)], fromExpert.Steps);
+        Assert.AreEqual("drafted Medium from Hard", notes[Medium], "A draft's note is kept, not only a fallback's.");
+    }
+
+    [TestMethod]
+    public void AGeneratorThatDoesNotRunForThePartSaysSo()
+    {
+        var chart = Guitar();
+        new AddNotes(ChartInstrument.Guitar, Expert, Run(64, step: 120)).Apply(chart);
+        var notes = new Dictionary<ChartDifficulty, string>();
+
+        var generated = DifficultyGenerator.Generate(chart, ChartInstrument.Guitar, [Hard], ReductionDefaults.Shipped, DrumsVariant.Pro, null, new RecordingGenerator(runs: false), GenerationOptions.Default, notes);
+
+        Assert.HasCount(1, generated.Drafts);
+        StringAssert.Contains(notes[Hard], "Rules");
     }
 }

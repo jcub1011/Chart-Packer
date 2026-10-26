@@ -17,9 +17,10 @@ public interface IDifficultyGenerator
     bool CanRunFor(ChartInstrumentKind kind);
 
     /// <summary>
-    /// Drafts <paramref name="to"/> from <paramref name="from"/>. Returns null with
-    /// <paramref name="fallbackReason"/> when the generator can't run for this part: the caller
-    /// falls back to Rules (§3.7).
+    /// Drafts <paramref name="to"/> from <paramref name="from"/>. Returns null with <paramref name="note"/> saying why
+    /// when the generator can't run for this part: the caller falls back to Rules (§3.7). A draft can come with a
+    /// <paramref name="note"/> too, saying how it was made (for example, from a pair the pack has in place of one it
+    /// lacks, §3.6).
     /// </summary>
     ReductionResult? Draft(
         EditableChart chart,
@@ -29,10 +30,11 @@ public interface IDifficultyGenerator
         GenerationOptions options,
         (long From, long To)? range,
         ChartReadOptions? readOptions,
-        out string? fallbackReason);
+        out string? note);
 }
 
 /// <summary>Per-run options shared by the learned generators (§3.4–§3.6).</summary>
+/// <param name="MinGapTicks">The run's minimum gap between kept chords, in 48ths of a beat; 0 for the pack's own.</param>
 public sealed record GenerationOptions(
     string Style = "Any",
     double DensityBias = 0,
@@ -72,9 +74,9 @@ public sealed class RulesDifficultyGenerator : IDifficultyGenerator
         GenerationOptions options,
         (long From, long To)? range,
         ChartReadOptions? readOptions,
-        out string? fallbackReason)
+        out string? note)
     {
-        fallbackReason = null;
+        note = null;
         var kind = ChartInstruments.KindOf(part);
         if (kind == ChartInstrumentKind.Drums)
             return Reducer.Reduce(chart, from, to, _drumRules ?? DrumReductionRules.Default(to), _drumsVariant, range);

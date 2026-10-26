@@ -1,5 +1,3 @@
-using ChartShared.Core.Charts;
-
 namespace ChartShared.Core.Generation.Neural;
 
 /// <summary>
@@ -9,13 +7,16 @@ namespace ChartShared.Core.Generation.Neural;
 /// </summary>
 public sealed class BiGruCrf
 {
-    public const string ArchitectureName = "bigru-crf-v1";
+    public const string ArchitectureName = "bigru-crf-v2";
 
     /// <summary>Default hidden size per direction; stays under ~500k parameters (§3.3).</summary>
     public const int DefaultHiddenSize = 64;
 
-    /// <summary>Default embedding size for source pattern, style and target ids.</summary>
+    /// <summary>Default embedding size for the source pattern, style, pair and instrument ids.</summary>
     public const int DefaultEmbeddingSize = 16;
+
+    /// <summary>The embeddings each beat reads, in order: source pattern, style, pair, instrument.</summary>
+    public const int EmbeddingCount = 4;
 
     private readonly NeuralPack _pack;
     private readonly int _vocab;
@@ -32,35 +33,71 @@ public sealed class BiGruCrf
         _features = FeatureSize(pack.Manifest);
     }
 
-    /// <summary>Per-beat input width: source + style + target embeddings + scalar features.</summary>
-    public static int FeatureSize(PackManifest manifest) => manifest.Inputs.EmbeddingSize * 3 + ScalarFeatureCount;
-
-    /// <summary>Scalar per-beat features after the embeddings (§3.3 inputs).</summary>
-    public const int ScalarFeatureCount = 9;
+    /// <summary>Per-beat input width: the four embeddings and the scalar features (<see cref="BeatFeatures"/>).</summary>
+    public static int FeatureSize(PackManifest manifest) => (manifest.Inputs.EmbeddingSize * EmbeddingCount) + BeatFeatures.Count;
 
     /// <summary>
-    /// Emission scores for every beat × vocabulary pattern. Masked out (NaN-safe −inf) where the
-    /// candidate is not in the beat's candidate set — pass null masks to score all.
+    /// Emission scores for every beat × vocabulary pattern. Masked out (−∞) where the candidate is not in the beat's
+    /// candidate set — pass null masks to score all.
     /// </summary>
     public float[,] Emissions(
         IReadOnlyList<BeatFrame> beats, RunConditioning conditioning, IReadOnlyList<HashSet<int>>? candidateSets = null)
     {
         ArgumentNullException.ThrowIfNull(beats);
         ArgumentNullException.ThrowIfNull(conditioning);
-        int n = beats.Count;
+        var manifest = _pack.Manifest;
+        return Emissions(
+            [.. beats.Select(static b => b.SourcePatternId)],
+            [.. beats.Select(static b => b.Scalars)],
+            conditioning.StyleId,
+            Math.Max(0, NeuralConditioning.PairIndex(manifest.Pairs, conditioning.Source, conditioning.Target)),
+            Math.Max(0, NeuralConditioning.InstrumentIndex(manifest.Instruments, conditioning.Instrument)),
+            conditioning.SourceRank,
+            candidateSets);
+    }
+
+    /// <summary>
+    /// Emission scores from the beats' inputs as the trainer keeps them: each beat's source pattern and scalars, and the
+    /// run's style, pair and instrument as indexes into the manifest's lists.
+    /// </summary>
+    public float[,] Emissions(
+        int[] sourcePatterns,
+        BeatScalars[] scalars,
+        int styleId,
+        int pairIndex,
+        int instrumentIndex,
+        double? sourceRank,
+        IReadOnlyList<HashSet<int>>? candidateSets = null)
+    {
+        ArgumentNullException.ThrowIfNull(sourcePatterns);
+        ArgumentNullException.ThrowIfNull(scalars);
+        int n = sourcePatterns.Length;
         var emission = new float[n, _vocab];
         if (n == 0)
             return emission;
 
         var inputs = new float[n * _features];
+        var manifest = _pack.Manifest;
+        var weights = _pack.Weights;
+        int style = Math.Clamp(styleId, 0, Math.Max(1, manifest.Styles.Count) - 1) * _embed;
+        int pair = Math.Clamp(pairIndex, 0, Math.Max(1, manifest.Pairs.Count) - 1) * _embed;
+        int instrument = Math.Clamp(instrumentIndex, 0, Math.Max(1, manifest.Instruments.Count) - 1) * _embed;
         for (int i = 0; i < n; i++)
-            WriteFeatures(beats[i], conditioning, inputs.AsSpan(i * _features, _features));
+        {
+            var dest = inputs.AsSpan(i * _features, _features);
+            int src = Math.Clamp(sourcePatterns[i], 0, _vocab - 1) * _embed;
+            weights.SourceEmbedding.AsSpan(src, _embed).CopyTo(dest);
+            weights.StyleEmbedding.AsSpan(style, _embed).CopyTo(dest[_embed..]);
+            weights.PairEmbedding.AsSpan(pair, _embed).CopyTo(dest[(2 * _embed)..]);
+            weights.InstrumentEmbedding.AsSpan(instrument, _embed).CopyTo(dest[(3 * _embed)..]);
+            BeatFeatures.Write(scalars[i], sourceRank, manifest.Inputs.UseRank, dest[(EmbeddingCount * _embed)..]);
+        }
 
-        var forward = RunGru(_pack.Weights.Forward, inputs, n, _features, _hidden, forward: true);
-        var backward = RunGru(_pack.Weights.Backward, inputs, n, _features, _hidden, forward: false);
+        var forward = RunGru(weights.Forward, inputs, n, _features, _hidden, forward: true);
+        var backward = RunGru(weights.Backward, inputs, n, _features, _hidden, forward: false);
 
-        var w = _pack.Weights.OutputWeight;
-        var b = _pack.Weights.OutputBias;
+        var w = weights.OutputWeight;
+        var b = weights.OutputBias;
         int outSize = _hidden * 2;
         var context = new float[outSize];
         for (int i = 0; i < n; i++)
@@ -90,56 +127,6 @@ public sealed class BiGruCrf
         }
 
         return emission;
-    }
-
-    private void WriteFeatures(BeatFrame beat, RunConditioning conditioning, Span<float> dest)
-    {
-        var weights = _pack.Weights;
-        int vocab = _vocab;
-        int p = 0;
-
-        // Source pattern embedding.
-        int src = Math.Clamp(beat.SourcePatternId, 0, vocab - 1) * _embed;
-        for (int k = 0; k < _embed; k++)
-            dest[p++] = weights.SourceEmbedding[src + k];
-
-        // Style embedding (Any = 0 when the pack offers it, §3.3).
-        int styles = Math.Max(1, _pack.Manifest.Styles.Count);
-        int style = Math.Clamp(conditioning.StyleId, 0, styles - 1) * _embed;
-        for (int k = 0; k < _embed; k++)
-            dest[p++] = weights.StyleEmbedding[style + k];
-
-        // Target embedding.
-        int targets = Math.Max(1, _pack.Manifest.Inputs.Targets.Length);
-        int targetIndex = TargetIndex(conditioning.Target, targets);
-        for (int k = 0; k < _embed; k++)
-            dest[p++] = weights.TargetEmbedding[targetIndex * _embed + k];
-
-        // Scalar features, each roughly in [-1, 1].
-        dest[p++] = beat.BeatInMeasure / 4f;
-        dest[p++] = beat.GapBucket / 7f * 2f - 1f;
-        dest[p++] = beat.PhraseStart ? 1f : -1f;
-        dest[p++] = beat.SectionStart ? 1f : -1f;
-        dest[p++] = beat.HasSustain ? 1f : -1f;
-        dest[p++] = beat.StarPower ? 1f : -1f;
-        dest[p++] = beat.Solo ? 1f : -1f;
-        dest[p++] = Math.Clamp(beat.RiffRepeat, 0, 7) / 7f * 2f - 1f;
-        // Tier: 0–6 as a value, 7 (unknown) as its own point; packs without tier read 0.
-        dest[p++] = !_pack.Manifest.Inputs.UseTier ? 0f
-            : conditioning.TierBucket >= 7 ? 1f
-            : conditioning.TierBucket / 7f * 2f - 1f;
-    }
-
-    private static int TargetIndex(ChartDifficulty target, int count)
-    {
-        int index = target switch
-        {
-            ChartDifficulty.Easy => 0,
-            ChartDifficulty.Medium => 1,
-            ChartDifficulty.Hard => 2,
-            _ => 0,
-        };
-        return count == 0 ? 0 : index % count;
     }
 
     /// <summary>Runs one GRU layer over the sequence; returns n × hidden states.</summary>
@@ -235,11 +222,11 @@ public sealed class BiGruCrf
     private static float Sigmoid(float x) => 1f / (1f + MathF.Exp(-x));
 
     /// <summary>Counts parameters for a default-shaped pack (spec §3.3 size requirement).</summary>
-    public static int EstimateParameters(int vocab, int styleCount, int targetCount, int hidden, int embed)
+    public static int EstimateParameters(int vocab, int styleCount, int pairCount, int instrumentCount, int hidden, int embed)
     {
-        int features = embed * 3 + ScalarFeatureCount;
-        int gru = 3 * (hidden * features + hidden * hidden + hidden);
-        return vocab * embed + styleCount * embed + targetCount * embed
-            + 2 * gru + (hidden * 2 * vocab) + vocab + vocab * vocab + 2 * vocab;
+        int features = (embed * EmbeddingCount) + BeatFeatures.Count;
+        int gru = 3 * ((hidden * features) + (hidden * hidden) + (2 * hidden));
+        return ((vocab + styleCount + pairCount + instrumentCount) * embed)
+            + (2 * gru) + (hidden * 2 * vocab) + vocab + (vocab * vocab) + (2 * vocab);
     }
 }

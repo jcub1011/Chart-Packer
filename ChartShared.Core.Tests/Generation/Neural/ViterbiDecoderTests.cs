@@ -6,20 +6,22 @@ namespace ChartShared.Core.Tests.Generation;
 [TestClass]
 public sealed class ViterbiDecoderTests
 {
-    private const int Vocab = 3;
+    private static int Vocab => BeatPattern.Vocabulary.Length;
 
-    private static ViterbiDecoder.DecodeConstraints Constraints(
-        float[,] emissions, int n, long floor = 0, bool sp = false, string riffKey = "")
+    // Beats of "1 &" (candidates -, 1, &, 1 &), each its own riff unless riffKey is given.
+    private static (List<BeatFrame> Beats, List<HashSet<int>> Candidates) Beats(int n, string? riffKey = null)
     {
-        var beats = new List<BeatFrame>();
-        var candidates = new List<HashSet<int>>();
-        for (int i = 0; i < n; i++)
-        {
-            beats.Add(new BeatFrame(i * 100, 0, i % 4, 1, [0], [i * 100], 3, false, false, false, false, false, riffKey + i, 0));
-            candidates.Add([0, 1, 2]);
-        }
+        var beats = Enumerable.Range(0, n).Select(i => NeuralTestPacks.Beat(i * 480L, [0, 24], riffKey ?? "k" + i)).ToList();
+        return (beats, [.. beats.Select(static b => BeatPattern.CandidatesFor(b.SourceOffsets48).ToHashSet())]);
+    }
 
-        return new ViterbiDecoder.DecodeConstraints(floor, sp, 0, candidates, beats);
+    private static float[,] Emissions(Random random, List<HashSet<int>> candidates)
+    {
+        var emissions = new float[candidates.Count, Vocab];
+        for (int i = 0; i < candidates.Count; i++)
+            for (int v = 0; v < Vocab; v++)
+                emissions[i, v] = candidates[i].Contains(v) ? (float)(random.NextDouble() * 4 - 2) : float.NegativeInfinity;
+        return emissions;
     }
 
     private static (float[] Trans, float[] Start, float[] End) Weights(Random random)
@@ -31,8 +33,9 @@ public sealed class ViterbiDecoderTests
             [.. Enumerable.Range(0, Vocab).Select(_ => Next())]);
     }
 
-    private static double BruteForceBest(float[,] emissions, float[] trans, float[] start, float[] end, int n)
+    private static double BruteForceBest(float[,] emissions, List<HashSet<int>> candidates, float[] trans, float[] start, float[] end)
     {
+        int n = candidates.Count;
         double best = double.NegativeInfinity;
         var choice = new int[n];
         void Recurse(int i, double score)
@@ -43,11 +46,10 @@ public sealed class ViterbiDecoderTests
                 return;
             }
 
-            for (int v = 0; v < Vocab; v++)
+            foreach (int v in candidates[i])
             {
                 choice[i] = v;
-                double s = score + emissions[i, v] + (i == 0 ? start[v] : trans[choice[i - 1] * Vocab + v]);
-                Recurse(i + 1, s);
+                Recurse(i + 1, score + emissions[i, v] + (i == 0 ? start[v] : trans[(choice[i - 1] * Vocab) + v]));
             }
         }
 
@@ -59,9 +61,12 @@ public sealed class ViterbiDecoderTests
     {
         double score = start[choice[0]] + emissions[0, choice[0]];
         for (int i = 1; i < choice.Length; i++)
-            score += trans[choice[i - 1] * Vocab + choice[i]] + emissions[i, choice[i]];
+            score += trans[(choice[i - 1] * Vocab) + choice[i]] + emissions[i, choice[i]];
         return score + end[choice[^1]];
     }
+
+    private static List<long> Kept(List<BeatFrame> beats, int[] choice) =>
+        [.. beats.SelectMany((b, i) => ViterbiDecoder.KeptTicks(b, choice[i])).Order()];
 
     [TestMethod]
     public void DecodeMatchesBruteForce()
@@ -69,61 +74,64 @@ public sealed class ViterbiDecoderTests
         var random = new Random(11);
         for (int trial = 0; trial < 20; trial++)
         {
-            int n = 2 + trial % 4;
-            var emissions = new float[n, Vocab];
-            for (int i = 0; i < n; i++)
-                for (int v = 0; v < Vocab; v++)
-                    emissions[i, v] = (float)(random.NextDouble() * 4 - 2);
+            int n = 2 + (trial % 4);
+            var (beats, candidates) = Beats(n);
+            var emissions = Emissions(random, candidates);
             var (trans, start, end) = Weights(random);
-            var constraints = Constraints(emissions, n);
 
-            int[] choice = ViterbiDecoder.Decode(emissions, trans, start, end, constraints);
+            int[] choice = ViterbiDecoder.Decode(emissions, trans, start, end, new ViterbiDecoder.DecodeConstraints(0, false, 0, candidates, beats));
 
-            Assert.AreEqual(BruteForceBest(emissions, trans, start, end, n), ScoreOf(choice, emissions, trans, start, end), 1e-4, $"Trial {trial}.");
+            Assert.AreEqual(BruteForceBest(emissions, candidates, trans, start, end), ScoreOf(choice, emissions, trans, start, end), 1e-4, $"Trial {trial}.");
         }
     }
 
     [TestMethod]
-    public void MinGapFloorDropsTheWeakerOfAClosePair()
+    public void MinGapFloorDropsTheLaterOfAClosePair()
     {
-        // Beat 0 keeps an onset at tick 0, beat 1 at tick 100; floor 480 drops beat 1's onset.
-        // Give beat 1 a strong emission so the decoder wants it, then check repair drops it.
-        var emissions = new float[2, Vocab];
-        emissions[0, 1] = 5;
-        emissions[1, 1] = 5;
-        var beats = new List<BeatFrame>
-        {
-            new(0, 0, 0, 1, [0], [0], 3, false, false, false, false, false, "a", 0),
-            new(100, 0, 1, 1, [0], [100], 3, false, false, false, false, false, "b", 0),
-        };
-        List<HashSet<int>> candidates = [[0, 1, 2], [0, 1, 2]];
-        var constraints = new ViterbiDecoder.DecodeConstraints(480, false, 0, candidates, beats);
+        // Every beat wants "1 &"; a floor of a beat keeps one onset a beat.
+        var (beats, candidates) = Beats(4);
+        var emissions = new float[4, Vocab];
+        for (int i = 0; i < 4; i++)
+            for (int v = 0; v < Vocab; v++)
+                emissions[i, v] = !candidates[i].Contains(v) ? float.NegativeInfinity : v == 3 ? 5 : 0;
         var (trans, start, end) = Weights(new Random(3));
 
-        int[] choice = ViterbiDecoder.Decode(emissions, trans, start, end, constraints);
-        var kept = beats.Select((b, i) => (b, i)).Where(t => choice[t.i] != BeatPattern.EmptyId)
-            .Select(t => t.b.SourceTicks[0]).Order().ToList();
+        int[] choice = ViterbiDecoder.Decode(emissions, trans, start, end, new ViterbiDecoder.DecodeConstraints(480, false, 0, candidates, beats));
+        var kept = Kept(beats, choice);
 
+        Assert.IsNotEmpty(kept);
         for (int i = 1; i < kept.Count; i++)
             Assert.IsGreaterThanOrEqualTo(480L, kept[i] - kept[i - 1], "Kept onsets honor the floor.");
     }
 
     [TestMethod]
-    public void RiffRepeatsTakeTheSamePattern()
+    public void TheFloorHoldsAgainstTheTargetOutsideTheRange()
     {
+        // Decoding beats 1–2 only (ticks 480, 720, 960, 1200), with the target keeping tick 400 before them and 1440 after.
+        var (beats, candidates) = Beats(4);
         var emissions = new float[4, Vocab];
-        var random = new Random(5);
         for (int i = 0; i < 4; i++)
             for (int v = 0; v < Vocab; v++)
-                emissions[i, v] = (float)(random.NextDouble() * 2 - 1);
-        var beats = new List<BeatFrame>();
-        for (int i = 0; i < 4; i++)
-            beats.Add(new BeatFrame(i * 100, 0, 0, 1, [0], [i * 100], 3, false, false, false, false, false, "same-riff", 0));
-        List<HashSet<int>> candidates = [[0, 1, 2], [0, 1, 2], [0, 1, 2], [0, 1, 2]];
-        var constraints = new ViterbiDecoder.DecodeConstraints(0, false, 0, candidates, beats);
-        var (trans, start, end) = Weights(random);
+                emissions[i, v] = !candidates[i].Contains(v) ? float.NegativeInfinity : v == 3 ? 5 : 0;
+        var (trans, start, end) = Weights(new Random(4));
+        var constraints = new ViterbiDecoder.DecodeConstraints(240, false, 0, candidates, beats, (480, 1439), [400, 1440]);
 
         int[] choice = ViterbiDecoder.Decode(emissions, trans, start, end, constraints);
+        var kept = Kept(beats, choice);
+
+        // Nothing outside the range; 480 is closer than the floor to the target's 400; 1200 is a floor from 1440.
+        CollectionAssert.AreEqual(new long[] { 720, 960, 1200 }, kept);
+    }
+
+    [TestMethod]
+    public void RiffRepeatsTakeTheSamePattern()
+    {
+        var random = new Random(5);
+        var (beats, candidates) = Beats(4, riffKey: "same-riff");
+        var emissions = Emissions(random, candidates);
+        var (trans, start, end) = Weights(random);
+
+        int[] choice = ViterbiDecoder.Decode(emissions, trans, start, end, new ViterbiDecoder.DecodeConstraints(0, false, 0, candidates, beats));
 
         Assert.AreEqual(choice[0], choice[1]);
         Assert.AreEqual(choice[0], choice[2]);
@@ -131,20 +139,36 @@ public sealed class ViterbiDecoderTests
     }
 
     [TestMethod]
-    public void StarPowerPhrasesAreNeverLeftEmpty()
+    public void StarPowerPhrasesKeepOneNoteNotEveryBeat()
     {
-        var emissions = new float[1, Vocab];
-        emissions[0, 0] = 10; // strongly prefers empty
-        var beats = new List<BeatFrame>
-        {
-            new(0, 0, 0, 1, [0], [0], 3, false, false, false, true, false, "a", 0),
-        };
-        List<HashSet<int>> candidates = [[0, 1]];
-        var constraints = new ViterbiDecoder.DecodeConstraints(0, true, 0, candidates, beats);
+        // Four beats of one phrase that strongly prefer empty: the phrase keeps one onset, as Rules does (AC C9.3).
+        var beats = Enumerable.Range(0, 4).Select(i => NeuralTestPacks.Beat(i * 480L, [0, 24], "k" + i, starPower: 0)).ToList();
+        var candidates = beats.Select(static b => BeatPattern.CandidatesFor(b.SourceOffsets48).ToHashSet()).ToList();
+        var emissions = new float[4, Vocab];
+        for (int i = 0; i < 4; i++)
+            for (int v = 0; v < Vocab; v++)
+                emissions[i, v] = !candidates[i].Contains(v) ? float.NegativeInfinity : v == BeatPattern.EmptyId ? 10 : 0;
         var (trans, start, end) = Weights(new Random(9));
 
-        int[] choice = ViterbiDecoder.Decode(emissions, trans, start, end, constraints);
+        int[] choice = ViterbiDecoder.Decode(emissions, trans, start, end, new ViterbiDecoder.DecodeConstraints(0, true, 0, candidates, beats));
 
-        Assert.AreNotEqual(BeatPattern.EmptyId, choice[0]);
+        Assert.HasCount(1, Kept(beats, choice));
+    }
+
+    [TestMethod]
+    public void TheDensityBiasLeansDenser()
+    {
+        var (beats, candidates) = Beats(4);
+        var emissions = new float[4, Vocab];
+        for (int i = 0; i < 4; i++)
+            for (int v = 0; v < Vocab; v++)
+                emissions[i, v] = !candidates[i].Contains(v) ? float.NegativeInfinity : v == 1 ? 1 : 0;
+        var zero = new float[Vocab * Vocab];
+        var none = new float[Vocab];
+
+        int sparse = Kept(beats, ViterbiDecoder.Decode(emissions, zero, none, none, new ViterbiDecoder.DecodeConstraints(0, false, 0, candidates, beats))).Count;
+        int dense = Kept(beats, ViterbiDecoder.Decode(emissions, zero, none, none, new ViterbiDecoder.DecodeConstraints(0, false, 2, candidates, beats))).Count;
+
+        Assert.IsGreaterThan(sparse, dense);
     }
 }

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using ChartBuilder.Services;
+using ChartShared.Core.Settings;
 using ChartShared.Core.Charting.Authoring;
 using ChartShared.Core.Charts;
 using ChartShared.UI.ViewModels;
@@ -17,7 +18,7 @@ namespace ChartBuilder.ViewModels
     public sealed partial class RulesReduceMethodViewModel : ViewModelBase
     {
         /// <summary>The method's id, as <see cref="BuilderSettings"/> persists it.</summary>
-        public const string MethodId = BuilderSettings.DefaultReduceMethodId;
+        public const string MethodId = GenerationDefaults.RulesMethodId;
 
         private bool _loading;
 

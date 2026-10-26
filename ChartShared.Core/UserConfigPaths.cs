@@ -35,6 +35,12 @@ public static class UserConfigPaths
     public static string ReductionRulesFile => Path.Combine(ConfigFolder, "reduction-rules.json");
 
     /// <summary>
+    /// The generator lower difficulties are drafted by and its options (improved-difficulty-generator-spec §4.4), read by
+    /// both apps beside <see cref="ReductionRulesFile"/>: written by Chart Builder's Reduce defaults.
+    /// </summary>
+    public static string GenerationDefaultsFile => Path.Combine(ConfigFolder, "generation-defaults.json");
+
+    /// <summary>
     /// The audio/visual latency per output device, written by Chart Builder's calibration tool and read
     /// by both apps (charter-spec C11, §10).
     /// </summary>

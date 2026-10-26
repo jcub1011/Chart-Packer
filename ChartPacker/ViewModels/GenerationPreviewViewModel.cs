@@ -39,6 +39,7 @@ namespace ChartPacker.ViewModels
         private static readonly ReductionPreviewMemory PreviewSettings = new();
 
         private readonly Func<ReductionDefaults> _rules;
+        private readonly Func<GenerateDifficultiesSong, ReductionDefaults, GenerateDifficultiesSong>? _method;
         private readonly PlayerViewModel _player;
         private readonly PlayerPreviewPlayback _playback;
         private readonly DispatcherTimer _redraw;
@@ -65,12 +66,15 @@ namespace ChartPacker.ViewModels
         /// <param name="rules">The rules to generate by, as they are now.</param>
         /// <param name="nothing">What it says when the song has nothing to generate.</param>
         /// <param name="pickSong">What it says with no song shown.</param>
-        public GenerationPreviewViewModel(PlayerViewModel player, Func<ReductionDefaults> rules, string nothing, string pickSong)
+        /// <param name="method">The song as it's generated, with the generator the run uses (<see cref="GenerateDifficultiesSong.WithMethod"/>)
+        /// and the rules it voices by and falls back to; null for the rules alone.</param>
+        public GenerationPreviewViewModel(PlayerViewModel player, Func<ReductionDefaults> rules, string nothing, string pickSong, Func<GenerateDifficultiesSong, ReductionDefaults, GenerateDifficultiesSong>? method = null)
         {
             ArgumentNullException.ThrowIfNull(player);
             ArgumentNullException.ThrowIfNull(rules);
             _player = player;
             _rules = rules;
+            _method = method;
             _nothing = nothing;
             _pickSong = pickSong;
             _playback = new PlayerPreviewPlayback(player);
@@ -181,7 +185,8 @@ namespace ChartPacker.ViewModels
                     return;
                 LoadPlayer(song, read);
 
-                var (generation, checks, ladders) = await Task.Run(() => Work(song, read, rules), token);
+                var drafted = _method?.Invoke(song, rules) ?? song;
+                var (generation, checks, ladders) = await Task.Run(() => Work(drafted, read, rules), token);
                 if (redraw != _previews || token.IsCancellationRequested)
                     return;
                 _shown = (song, read, generation, checks);
@@ -281,6 +286,9 @@ namespace ChartPacker.ViewModels
                 var findings = check.Findings.Count == 0
                     ? Strings.GenerateDifficultiesNoFindings
                     : string.Format(CultureInfo.CurrentCulture, Strings.GenerateDifficultiesFindingsFormat, check.Findings.Count);
+                if (generation.GeneratorNotes?.GetValueOrDefault(part) is { } notes
+                    && GenerateDifficultiesSong.DescribeNotes(new Dictionary<ChartInstrument, IReadOnlyDictionary<ChartDifficulty, string>> { [part] = notes }) is { } said)
+                    findings += Environment.NewLine + said;
                 var drafted = generated.Drafts.Select(static d => d.Target.Difficulty).ToList();
                 ladders.Add(new GenerateDifficultiesPartPreview(part, ChartLabels.InstrumentName(part), DifficultyLadder.Of(check, drafted), findings));
             }

@@ -71,7 +71,7 @@ public sealed class UserConfigGuard
         [
             UserConfigPaths.SettingsFile, UserConfigPaths.BuilderSettingsFile, UserConfigPaths.ReductionRulesFile,
             UserConfigPaths.AudioLatencyFile, UserConfigPaths.InputBindingsFile, UserConfigPaths.UpdateSettingsFile,
-            UserConfigPaths.GeneratorModelSettingsFile,
+            UserConfigPaths.GeneratorModelSettingsFile, UserConfigPaths.GenerationDefaultsFile,
         ];
         string recovery = Path.GetRelativePath(folder, UserConfigPaths.RecoveryFolder) + Path.DirectorySeparatorChar;
         string models = Path.GetRelativePath(folder, UserConfigPaths.GeneratorModelsFolder) + Path.DirectorySeparatorChar;

@@ -2458,6 +2458,10 @@ Each song is rechecked first. Changed songs, or ones whose kept copy is missing,
   <data name="GenerateDifficultiesNoFindings" xml:space="preserve">
     <value>No findings on the new difficulties.</value>
   </data>
+  <data name="GenerateDifficultiesNoteFormat" xml:space="preserve">
+    <value>{0} {1}: {2}</value>
+    <comment>What the generator said about one new difficulty. {0} is the part, {1} the difficulty, {2} the generator's note, e.g. why it fell back to the default reduction.</comment>
+  </data>
   <data name="GenerateDifficultiesSaveDefaultsButton" xml:space="preserve">
     <value>Save as defaults</value>
   </data>
@@ -2604,6 +2608,10 @@ Each song is rechecked first. Changed songs, or ones whose kept copy is missing,
   </data>
   <data name="LowerDifficultiesGenerated" xml:space="preserve">
     <value>Generated, not saved yet</value>
+  </data>
+  <data name="LowerDifficultiesGeneratedNotesFormat" xml:space="preserve">
+    <value>Generated, not saved yet. {0}</value>
+    <comment>A song generated where the generator had something to say. {0} is what it said, a line a difficulty.</comment>
   </data>
   <data name="LowerDifficultiesSaved" xml:space="preserve">
     <value>Saved</value>

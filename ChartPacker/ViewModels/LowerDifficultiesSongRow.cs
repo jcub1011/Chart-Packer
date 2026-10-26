@@ -279,11 +279,13 @@ namespace ChartPacker.ViewModels
                 ? song with { Targets = _plan.Where(static p => p.Targets.Count > 0).ToDictionary(static p => p.Part, static p => p.Targets), Scope = scope }
                 : null;
 
-        /// <summary>Its new difficulties are in its draft.</summary>
-        public void Generated()
+        /// <summary>Its new difficulties are in its draft, with what their generator said about them, if anything.</summary>
+        public void Generated(string? notes = null)
         {
             Parts = [.. _plan.Select(static p => PartPips.Of(p, generated: true))];
-            StatusText = Strings.LowerDifficultiesGenerated;
+            StatusText = notes is null
+                ? Strings.LowerDifficultiesGenerated
+                : string.Format(System.Globalization.CultureInfo.CurrentCulture, Strings.LowerDifficultiesGeneratedNotesFormat, notes);
             State = LowerDifficultiesState.Done;
         }
 

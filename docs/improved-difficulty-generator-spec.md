@@ -109,7 +109,7 @@ the whole part as a sequence.
 - the source's pattern in the next beat;
 - the beat's place in its measure;
 - the style;
-- the tier, when the pack uses it (§3.3);
+- the source's difficulty rank, when the pack uses it (§3.3);
 - the target, source and instrument.
 
 Which features a pack uses, and in what order of importance, is part of the pack (§5.2). The
@@ -137,14 +137,22 @@ sequence layer (a linear-chain CRF), from a neural pack.
 
 - the source pattern, as a learned embedding;
 - per-beat features: place in measure, gap since the previous onset, whether the beat starts a
-  phrase or section, sustains in the beat, star power and solo membership, and riff membership with
-  its repeat number;
-- conditioning, shared by every beat of a run: target, source, instrument and style.
+  phrase or section, sustains in the beat, star power and solo membership, riff membership with
+  its repeat number (counted in measures), the beat's length in seconds (the tempo: a sixteenth at
+  80 BPM is not one at 200), how many onsets it has, whether it has a chord, and whether the melody
+  turns in it (Rules' turn: the fretted chords either side both higher or both lower);
+- conditioning, shared by every beat of a run: the source–target pair (Hard→Medium is not
+  Expert→Medium), the instrument and the style, each a learned embedding.
 
-**Tier** is optional. The trainer can include it, and the pack's manifest says whether it does
-(§5.2). The study found it adds little once the source is known, but a pack trained on other data
-may gain from it. A pack that uses tier treats a part with no tier as "unknown", which it learns as
-a value of its own.
+All the per-beat features are written by one encoder that both the apps and the trainer use, so they
+can't scale them differently.
+
+**The source's difficulty rank** is optional. The trainer can include it, and the pack's manifest says
+whether it does (§5.2). It is the source difficulty's rank by the difficulty model
+([C18](charter-spec-v1.md#c18-preview)), worked out the same way in training and in the apps, not the
+song.ini tier: charters' and studios' house rules for tiers differ, and community charts' tiers are
+less reliable still, while the model, if imperfect, is consistent. A source the model can't rate
+(fewer than two chords) reads as the middle of the range.
 
 **Any style.** A pack trained with styles also learns a blend of them. During training, the style is
 hidden on a share of the examples, so the model learns what to do without one. **Any** is then a
@@ -172,16 +180,20 @@ Patterns and Neural run the same pipeline. Only the scorer differs.
 1. **Beats.** The source part is split into beats by the chart's time signatures, and each beat's
    onsets are written as a pattern. Beats the source doesn't play in are passed over, but still count
    as context (an empty previous beat is information).
-2. **Candidates.** Each beat's candidates are the subsets of its onsets that the pack's vocabulary
-   contains, plus keeping nothing. A beat with more onsets than the vocabulary covers uses its
-   candidates' nearest supported shapes. Rare onsets (shifted or off the 48th grid) keep their own
-   position.
+2. **Candidates.** Each onset is placed on the nearest 48th of its beat, so a note a tick or two off
+   the grid is on it. Each beat's candidates are the subsets of its onsets that the pack's vocabulary
+   contains, plus keeping nothing. Vocabulary v2 (beat schema 2) has every subset of the beat's four
+   sixteenths and every subset of its triplet with or without the downbeat, so a full triplet can be
+   kept whole. A beat with more onsets than the vocabulary covers uses its candidates' nearest
+   supported shapes.
 3. **Scoring** by the pack (§3.2, §3.3).
 4. **Decoding.** The decoder finds the highest-scoring sequence over the part inside the hard limits
-   (§3.5). Its state is the last few chosen patterns, as many as the scorer's context uses.
-5. **Voicing.** Kept chords are voiced by Rules' existing logic: phrases fitted to the target's lane
-   range with their shape kept, chords narrowed to the target's width, opens handled as the rules
-   say. The keys ranges of §3.1 apply. Learned voicing replaces this in M7.
+   (§3.5). Its state is the last few chosen patterns, as many as the scorer's context uses. The
+   network always reads the whole part, so a range is drafted with the song around it as context.
+5. **Voicing.** Kept chords are voiced by Rules' existing logic, the same code Rules' own draft goes
+   through after thinning: phrases fitted to the target's lane range with their shape kept, chords
+   narrowed to the target's width, opens handled as the rules say. Given the chords Rules keeps, the
+   voicing is Rules' note for note. The keys ranges of §3.1 apply. Learned voicing replaces this in M7.
 6. **Attributes.** HOPOs and taps are played as the source plays them, and sustains follow the
    target's rules, as in Rules. Learned sustains replace this in M7.
 7. **Result.** The draft is the same kind of result Rules produces, so the preview, diff, check and
@@ -204,9 +216,13 @@ Learned generators are never trusted with playability. Their drafts always meet:
   carries defaults for it, measured from its training charts, and the dialog can change them per
   run;
 - **at least one note in every star power phrase and solo** that has notes on the source, as Rules
-  guarantees ([AC C9.3](charter-spec-v1.md#c9-difficulty-authoring));
-- **riffs reduced the same:** measures charted the same on the source get the same patterns, as Rules
-  does now. The decoder treats each riff's repeats as one decision.
+  guarantees ([AC C9.3](charter-spec-v1.md#c9-difficulty-authoring)): one per phrase, not one per
+  beat of it. Where the decoded draft leaves a phrase empty, its best-scoring single onset that keeps
+  the minimum gap is kept;
+- **riffs reduced the same:** measures charted the same on the source (the same chords at the same
+  places, as Rules' riffs are keyed) get the same patterns, as Rules does now. Each beat of a riff
+  scores as the mean over its repeats, the part is decoded beat by beat, and each riff place then
+  takes the choice most of its repeats have.
 
 A limit the decoder can't meet (for example, a star power phrase whose only notes are closer than
 the floor) is met as nearly as it can be, and reported in the dialog's check.
@@ -309,10 +325,14 @@ lower difficulties, it shows directly how close each generator gets.
   (drums, GHL) show Rules only.
 - On a fresh install, every family's default generator is Rules. After the first pack of a kind is
   imported, Settings offers to make its generator the default for the families it supports.
-- These are shared by both apps, beside the default reduction rules.
-- Chart Packer's Validator, which generates a song's missing difficulties
+- These are shared by both apps, beside the default reduction rules: `generation-defaults.json`
+  holds the method, the pack, the style, the density and the Reduce all and lane-range defaults.
+  Chart Builder's Reduce defaults (in Settings) write it; a run in the Reduce dialog starts from it and
+  its changes are its own.
+- Chart Packer's Generate Lower Difficulties, which fills a song's missing difficulties
   ([C16](charter-spec-v1.md#c16-chart-lint)), uses the default generator, with the same fallback
-  (§3.7). Its report names the generator and pack each difficulty came from.
+  (§3.7). Each song's row, and the preview's findings, say where a difficulty fell back to Rules or
+  was drafted from a pair the pack lacks.
 
 ### 4.5 The evaluation command
 
@@ -352,7 +372,7 @@ Every pack describes itself:
 | Styles | Each style label with a description, and whether it offers **Any** (§3.3) |
 | Part families and instruments | Which parts it can reduce |
 | Source–target pairs | Which reductions it was trained on (§3.6) |
-| Inputs | Which context features it uses, including whether it uses tier |
+| Inputs | Which context features it uses, including whether it reads the source's difficulty rank, and its layer sizes |
 | Hard-limit defaults | Minimum gaps per target (§3.5) |
 | Density range | The ends of the density slider for each target (§3.4) |
 | Pattern vocabulary | The beat patterns it knows |
@@ -373,7 +393,10 @@ Every pack describes itself:
 
 ### 5.4 Versions
 
-- The apps read the current pack format and the one before it.
+- The apps read the current pack format and the one before it. Format 2 (beat schema 2) added the
+  pair and instrument embeddings, the tempo, chord, turn and onset-count features, the source rank in
+  place of tier, and vocabulary v2; format 1 packs are refused, and must be trained again. A pack's
+  vocabulary must be the app's exactly.
 - A pack whose **beat schema** differs from the app's is refused with an explanation: its features
   would mean something else. A model can be moved to a new schema only by training it again.
 - Every format change is described in this spec's change notes, with what it means for existing
@@ -430,9 +453,13 @@ pack), then release the pack file and its report in the pack repository.
 - **Styles.** By default, a song's style label is its charter field, matched against a list the user
   gives. A mapping file can assign styles to songs or charters directly, so a user can train "my
   style", one charter's style, or a studio's.
-- **Tier** is included as an input only when asked for (§3.3).
+- **The source's difficulty rank** is included as an input unless turned off (§3.3). Charts are read
+  with their song.ini's settings, as the apps read them.
+- **Rules' draft** of every part is kept beside the official one, labelled the same way, as the
+  evaluation's baseline (§6.6).
 - **Splitting.** A held-out share of songs is set aside for evaluation, split by song (normalised
-  artist and title), so the same song charted in two places is never on both sides.
+  artist and title), so the same song charted in two places is never on both sides. Songs are picked
+  by a stable hash of that key, not alphabetically.
 - **Duplicates.** Parts whose source and target notes are identical to another part's are counted once.
 - **Guidance.** The trainer warns when the data is thin for what's asked of it: a pattern pack's
   contexts mostly unseen, or a neural pack with too few parts for its size. The study's corpus,
@@ -454,6 +481,9 @@ the smoothing are options, with the default configuration of §3.2.
   is used only by the trainer.
 - It runs on a CPU, and uses an NVIDIA GPU when one is present.
 - Training is reproducible from a seed. It stops early when the held-out score stops improving.
+- Batches are padded and **packed**, so the backward direction of each sequence starts at its own
+  last beat, as in the apps, never on padding. The loss is the CRF's negative log-likelihood per beat,
+  so long and short songs weigh the same per beat.
 - **Any style** is trained in by hiding the style on a share of the examples (§3.3). The share is an
   option, with a default.
 - The trained network is exported into the pack format, and the apps' managed inference reads it
@@ -469,7 +499,15 @@ the smoothing are options, with the default configuration of §3.2.
 Every trained pack is evaluated on its held-out songs against Rules, and against Patterns when a
 pattern pack is given. The results are written as a report and summarised in the pack's manifest
 (§5.2). The report also measures the density spread that sets the pack's slider range (§3.4), and
-the minimum gaps that become its hard-limit defaults (§3.5). Two figures are always reported:
+the minimum gaps that become its hard-limit defaults (§3.5): the first percentile of the gaps between
+the official target's kept onsets, in 48ths of a beat, within a beat as well as across beats.
+
+For each source–target pair, on the beats the source plays, the pack's decoded drafts and Rules'
+drafts are each compared with the official chart: the share of beats whose kept pattern matches, the
+precision, recall and F1 of the kept onsets, and the density against the official chart's. Both are
+measured on the same held-out beats, so the difference is the pack's gain over Rules.
+
+Two figures are always reported:
 
 - **decoded**, where each beat's context is the generator's own earlier choices, which is what the
   apps do;
@@ -645,7 +683,7 @@ The design questions are settled as follows.
 | Chained or from Expert for Reduce all? | Decided by measuring how far official difficulties nest, before M3. Packs support both (§3.6). |
 | Minimum gaps | Each pack's own defaults, measured from its training charts, editable per run (§3.5). |
 | The density control | A centred **fewer notes ↔ more notes** slider, limited to the pack's evaluated spread (§3.4). |
-| Tier | Optional. The trainer includes it when asked, and the pack says whether it uses it (§3.3). |
+| Tier | The song.ini tier isn't used: packs read the source's rank by the difficulty model instead, which is consistent where tiers follow house rules (§3.3). It's on by default, and the pack says whether it uses it. |
 | Any style | Offered by every pack with styles, learned in training by hiding the style on a share of examples. It's the default style (§3.3). |
 | Learned voicing and sustains | A later milestone, M7 (§10). |
 | Training stack | TorchSharp with GPU acceleration where present (spec §6.5), CPU otherwise. Batched, bucketed full-sequence CRF NLL with Adam; reproducible from a seed. |

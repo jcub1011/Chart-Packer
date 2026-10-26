@@ -1,12 +1,11 @@
-using ChartShared.Core.Charts;
 using ChartShared.Core.Generation.Neural;
 
 namespace DifficultyTrainer;
 
 /// <summary>
-/// Self-test (spec §3.3 parity, §9): the trainer's TorchSharp model and the apps' managed C#
-/// inference must agree within tolerance on the same inputs, after export into a pack.
-/// Also smokes one training step (loss must fall). Not shipped with the apps.
+/// Self-test (spec §3.3 parity, §9): the trainer's TorchSharp model and the apps' managed C# inference
+/// must agree within tolerance on the same inputs, after export into a pack — for sequences of different lengths batched
+/// together, as training pads and packs them. Also smokes one training step (loss must fall). Not shipped with the apps.
 /// </summary>
 internal static class SelfTest
 {
@@ -15,34 +14,20 @@ internal static class SelfTest
 
     public static int Run(string[] args)
     {
-        const int vocab = 4, hidden = 8, embed = 4, styles = 2, targets = 2, n = 6;
+        int vocab = BeatPattern.Vocabulary.Length;
+        const int hidden = 8, embed = 4;
+        string[] styles = ["Any", "S"];
+        string[] pairs = ["Expert->Easy", "Hard->Medium"];
+        string[] instruments = ["Guitar", "Bass"];
         var random = new Random(1234);
-        using var trainer = new NeuralTrainer(vocab, styles, targets, hidden, embed, seed: 7);
+        using var trainer = new NeuralTrainer(vocab, styles.Length, pairs.Length, instruments.Length, hidden, embed, seed: 7, learningRate: 1e-2);
         Console.WriteLine($"Device: {trainer.Device}.");
 
-        // One random sequence; every beat keeps two candidates so the CRF has alternatives.
-        var source = new int[n];
-        var candidates = new int[n][];
-        var scalars = new sbyte[n * 8];
-        var labels = new int[n];
-        for (int i = 0; i < n; i++)
-        {
-            source[i] = random.Next(vocab);
-            int a = random.Next(vocab);
-            int b = (a + 1 + random.Next(vocab - 1)) % vocab;
-            candidates[i] = [a, b];
-            labels[i] = random.Next(2) == 0 ? a : b;
-            for (int k = 0; k < 8; k++)
-                scalars[i * 8 + k] = (sbyte)random.Next(0, 4);
-        }
+        // Two sequences of different lengths, with different conditioning: exercises padded, packed batching.
+        var first = Sequence(random, 7, style: 1, pair: 0, instrument: 1, rank: 3.4);
+        var second = Sequence(random, 4, style: 0, pair: 1, instrument: 0, rank: null);
+        var batch = new List<BatchItem> { first.Item, second.Item };
 
-        // The loop learns: one Adam step must reduce the loss on its own batch.
-        // Two sequences of different lengths: exercises padded batching, not just batch 1.
-        var item = new BatchItem(source, candidates, scalars, labels, 1, 0, 3);
-        var scalars2 = new sbyte[4 * 8];
-        Array.Copy(scalars, scalars2, scalars2.Length);
-        var item2 = new BatchItem(source[..4], [.. candidates.Take(4)], scalars2, labels[..4], 0, 1, 0);
-        var batch = new List<BatchItem> { item, item2 };
         double before = trainer.EvalBatch(batch);
         trainer.TrainBatch(batch);
         double after = trainer.EvalBatch(batch);
@@ -53,39 +38,46 @@ internal static class SelfTest
             return 1;
         }
 
-        // Parity: export the trained weights and compare TorchSharp vs managed C# emissions.
-        var weights = trainer.Export();
+        // Parity: export the trained weights through the pack format and compare TorchSharp vs managed C# emissions.
         var manifest = new PackManifest(
             NeuralPack.FormatVersion,
             BiGruCrf.ArchitectureName,
             BeatPipeline.BeatSchemaVersion,
             "parity", "selftest", "Parity fixture.",
             [new PackStyle(0, "Any", "d"), new PackStyle(1, "S", "d")],
-            ["Guitar"],
-            ["Expert->Easy"],
-            new PackInputs(true, true, hidden, embed, ["Easy", "Medium"], ["Any", "S"]),
+            [.. instruments],
+            [.. pairs],
+            new PackInputs(true, true, hidden, embed),
             new Dictionary<string, long> { ["Easy"] = 12 },
             new Dictionary<string, double[]> { ["Easy"] = [0.5, 2.0] },
-            ["-", "1", "&", "1 &"],
+            [.. BeatPattern.Vocabulary],
             new PackTrainingSummary(0, 0, "d", "d", "d", null),
             "test");
-        var pack = new NeuralPack { Manifest = manifest, Weights = weights };
+        NeuralPack pack;
+        try
+        {
+            pack = NeuralPack.LoadFromBytes(new NeuralPack { Manifest = manifest, Weights = trainer.Export() }.ToBytes(), "parity");
+        }
+        catch (PackValidationException ex)
+        {
+            Console.Error.WriteLine($"SELF-TEST FAILED: the exported pack doesn't load ({ex.Message}).");
+            return 1;
+        }
 
-        var torchEmissions = trainer.ComputeEmissions(source, scalars, 1, 0, 3, useTier: true);
+        var torchEmissions = trainer.ComputeEmissions(batch);
         var app = new BiGruCrf(pack);
-        var beats = source.Select((s, i) => new BeatFrame(
-            i, 0, scalars[i * 8], s,
-            [0], [i], scalars[i * 8 + 1],
-            scalars[i * 8 + 2] != 0, scalars[i * 8 + 3] != 0, scalars[i * 8 + 4] != 0,
-            scalars[i * 8 + 5] != 0, scalars[i * 8 + 6] != 0, "", scalars[i * 8 + 7])).ToList();
-        var conditioning = new RunConditioning(ChartDifficulty.Easy, ChartDifficulty.Expert, ChartInstrumentKind.FiveFret, 1, 3);
-        var sets = candidates.Select(static c => c.ToHashSet()).ToList();
-        var appEmissions = app.Emissions(beats, conditioning, sets);
-
         double worst = 0;
-        for (int i = 0; i < n; i++)
-            foreach (int v in sets[i])
-                worst = Math.Max(worst, Math.Abs(torchEmissions[i, v] - appEmissions[i, v]));
+        foreach (var (sequence, index) in new[] { first, second }.Select((s, i) => (s, i)))
+        {
+            var sets = sequence.Item.Candidates.Select(static c => c.ToHashSet()).ToList();
+            var appEmissions = app.Emissions(sequence.Item.Source, sequence.Scalars, sequence.Item.StyleId, sequence.Item.PairIndex, sequence.Item.InstrumentIndex, sequence.Rank, sets);
+            for (int i = 0; i < sequence.Item.Length; i++)
+            {
+                foreach (int v in sets[i])
+                    worst = Math.Max(worst, Math.Abs(torchEmissions[index][i, v] - appEmissions[i, v]));
+            }
+        }
+
         Console.WriteLine($"Parity worst abs diff: {worst:E3} (tolerance {ParityTolerance:E0}).");
         if (worst > ParityTolerance || double.IsNaN(worst))
         {
@@ -95,5 +87,31 @@ internal static class SelfTest
 
         Console.WriteLine("SELF-TEST PASSED.");
         return 0;
+    }
+
+    // A random sequence: its beats' scalars and their features, every beat with at least two candidates.
+    private static (BatchItem Item, BeatScalars[] Scalars, double? Rank) Sequence(Random random, int n, int style, int pair, int instrument, double? rank)
+    {
+        int vocab = BeatPattern.Vocabulary.Length;
+        var source = new int[n];
+        var candidates = new int[n][];
+        var labels = new int[n];
+        var scalars = new BeatScalars[n];
+        var features = new float[n * BeatFeatures.Count];
+        for (int i = 0; i < n; i++)
+        {
+            source[i] = random.Next(vocab);
+            int a = random.Next(vocab);
+            int b = (a + 1 + random.Next(vocab - 1)) % vocab;
+            candidates[i] = [a, b];
+            labels[i] = random.Next(2) == 0 ? a : b;
+            scalars[i] = new BeatScalars(
+                random.Next(4), random.Next(8), random.Next(2) == 0, random.Next(2) == 0, random.Next(2) == 0,
+                random.Next(2) == 0, random.Next(2) == 0, random.Next(5), random.Next(6), random.Next(2) == 0,
+                random.Next(2) == 0, (float)(0.2 + random.NextDouble()));
+            BeatFeatures.Write(scalars[i], rank, true, features.AsSpan(i * BeatFeatures.Count, BeatFeatures.Count));
+        }
+
+        return (new BatchItem(source, candidates, features, labels, style, pair, instrument), scalars, rank);
     }
 }

@@ -1,8 +1,13 @@
 using ChartBuilder.Services;
+using ChartShared.Core.Generation.Neural;
+using ChartShared.Core.Settings;
 
 namespace ChartBuilder.Tests.Editing;
 
-/// <summary>The Reduce dialog's method, as saved in Chart Builder's settings, always in a temp folder.</summary>
+/// <summary>
+/// The Reduce dialog's default method, kept in <c>generation-defaults.json</c> beside Chart Builder's settings, which Chart
+/// Packer reads too; always in a temp folder.
+/// </summary>
 [TestClass]
 public sealed class ReduceMethodSettingTests
 {
@@ -22,43 +27,21 @@ public sealed class ReduceMethodSettingTests
     [TestMethod]
     public void AMissingFileHasTheRulesMethod()
     {
-        Assert.AreEqual(BuilderSettings.DefaultReduceMethodId, BuilderSettingsService.Load(_path).Settings.ReduceMethodId);
+        Assert.AreEqual(GenerationDefaults.RulesMethodId, BuilderSettingsService.Load(_path).Generation.Load().MethodId);
     }
 
     [TestMethod]
-    public void ABlankMethodFallsBackToRules()
-    {
-        File.WriteAllText(_path, """{ "ReduceMethodId": "" }""");
-        Assert.AreEqual(BuilderSettings.DefaultReduceMethodId, BuilderSettingsService.Load(_path).Settings.ReduceMethodId);
-    }
-
-    [TestMethod]
-    public void AMethodReadsBack()
+    public void TheDefaultsLiveBesideTheSettingsFile()
     {
         var service = BuilderSettingsService.Load(_path);
-        service.Settings.ReduceMethodId = BuilderSettings.DefaultReduceMethodId;
-        service.Save();
+        var defaults = service.Generation.Load();
+        defaults.MethodId = NeuralDifficultyGenerator.NeuralMethodId;
+        defaults.Pack = "studio";
+        service.Generation.Save(defaults);
 
-        Assert.AreEqual(BuilderSettings.DefaultReduceMethodId, BuilderSettingsService.Load(_path).Settings.ReduceMethodId);
-    }
-
-    [TestMethod]
-    public void MethodSettingsReadBack()
-    {
-        var service = BuilderSettingsService.Load(_path);
-        service.Settings.ReduceMethodSettings = new Dictionary<string, string> { ["neural.model"] = "bigru-crf" };
-        service.Save();
-
-        Assert.AreEqual("bigru-crf", BuilderSettingsService.Load(_path).Settings.ReduceMethodSettings!["neural.model"]);
-    }
-
-    [TestMethod]
-    public void BlankMethodSettingsKeysAreDropped()
-    {
-        File.WriteAllText(_path, """{ "ReduceMethodSettings": { "": "x", "neural.model": "bigru-crf" } }""");
-        var settings = BuilderSettingsService.Load(_path).Settings;
-
-        Assert.IsFalse(settings.ReduceMethodSettings!.ContainsKey(""));
-        Assert.AreEqual("bigru-crf", settings.ReduceMethodSettings["neural.model"]);
+        Assert.IsTrue(File.Exists(Path.Combine(_root.FullName, "generation-defaults.json")));
+        var read = new GenerationDefaultsFile(Path.Combine(_root.FullName, "generation-defaults.json")).Load();
+        Assert.IsTrue(read.IsNeural);
+        Assert.AreEqual("studio", read.Pack);
     }
 }

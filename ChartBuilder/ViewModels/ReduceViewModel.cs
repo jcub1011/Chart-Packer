@@ -13,6 +13,7 @@ using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charts;
 using ChartShared.Core.Generation;
 using ChartShared.Core.Generation.Neural;
+using ChartShared.Core.Settings;
 using ChartShared.Core.Validation;
 using ChartShared.UI.Services;
 using ChartShared.UI.ViewModels;
@@ -64,6 +65,7 @@ namespace ChartBuilder.ViewModels
         private readonly BuilderSettingsService _settings;
         private readonly ChartInstrument _part;
         private readonly DispatcherTimer? _redraw;
+        private readonly GenerationDefaults _generation;
         private bool _loading;
         private bool _done;
         private int _checks;
@@ -75,7 +77,8 @@ namespace ChartBuilder.ViewModels
             _part = part;
             RulesMethod = new RulesReduceMethodViewModel(settings.ReductionRules.Load(), kind, ChartDifficulty.Hard);
             RulesMethod.Changed += (_, _) => ScheduleRedraw();
-            NeuralMethod = new NeuralReduceMethodViewModel(settings, models ?? editor?.GeneratorModels);
+            _generation = settings.Generation.Load();
+            NeuralMethod = new NeuralReduceMethodViewModel(_generation, models ?? editor?.GeneratorModels);
             NeuralMethod.Changed += (_, _) => ScheduleRedraw();
             if (editor is not null)
             {
@@ -111,7 +114,7 @@ namespace ChartBuilder.ViewModels
             vm.ScopeChoices = scopes;
 
             vm._loading = true;
-            vm.SelectedMethod = vm.MethodChoices.FirstOrDefault(m => m.Id == settings.Settings.ReduceMethodId) ?? vm.MethodChoices[0];
+            vm.SelectedMethod = vm.MethodChoices.FirstOrDefault(m => m.Id == vm._generation.MethodId) ?? vm.MethodChoices[0];
             vm.SelectedTo = vm.ToChoices.First(c => c.Difficulty == (all ? null : to));
             vm.RulesMethod.SelectedRulesFor = vm.RulesMethod.RulesForChoices.First(c => c.Difficulty == to);
             vm.RulesMethod.ShowRulesForPicker = vm.IsAll;
@@ -132,7 +135,7 @@ namespace ChartBuilder.ViewModels
             var vm = new ReduceViewModel(settings, null, ChartInstrument.Guitar, ChartInstrumentKind.FiveFret, models);
             vm.ToChoices = [.. Lower.Select(d => new TargetChoice(d, ChartLabels.DifficultyName(d)))];
             vm._loading = true;
-            vm.SelectedMethod = vm.MethodChoices.FirstOrDefault(m => m.Id == settings.Settings.ReduceMethodId) ?? vm.MethodChoices[0];
+            vm.SelectedMethod = vm.MethodChoices.FirstOrDefault(m => m.Id == vm._generation.MethodId) ?? vm.MethodChoices[0];
             vm.SelectedFamily = vm.FamilyChoices[0];
             vm.SelectedTo = vm.ToChoices[0];
             if (vm.SelectedTo.Difficulty is { } toDifficulty)
@@ -302,6 +305,9 @@ namespace ChartBuilder.ViewModels
             else
             {
                 _settings.ReductionRules.Save(RulesMethod.Defaults);
+                NeuralMethod.WriteTo(_generation);
+                _generation.MethodId = SelectedMethod?.Id ?? GenerationDefaults.RulesMethodId;
+                _settings.Generation.Save(_generation);
             }
 
             Finish();
@@ -341,10 +347,9 @@ namespace ChartBuilder.ViewModels
 
         partial void OnSelectedMethodChanged(ReduceMethodChoice? value)
         {
+            // The method picked applies to this run; the defaults change only in Settings (spec §4.1).
             if (_loading || value is null)
                 return;
-            _settings.Settings.ReduceMethodId = value.Id;
-            _settings.Save();
             ScheduleRedraw();
         }
 
@@ -413,7 +418,10 @@ namespace ChartBuilder.ViewModels
             var reduce = editor.Session.Reduce;
             var range = SelectedScope?.Range;
             bool started;
-            if (IsNeuralMethod && editor.GeneratorModels is { } models)
+            string? methodNote = null;
+            if (IsNeuralMethod && RulesMethod.IsDrums)
+                methodNote = Strings.ReduceNeuralNoDrums;
+            if (IsNeuralMethod && methodNote is null && editor.GeneratorModels is { } models)
                 started = StartNeural(editor, models, reduce, range, to);
             else if (IsAll)
             {
@@ -458,33 +466,19 @@ namespace ChartBuilder.ViewModels
                 ChartLabels.DifficultyName(d.Target.Difficulty),
                 d.Result.Notes.Count,
                 d.Result.Removed)),
-                .. reduce.FallbackReasons.Select(kv => $"{ChartLabels.DifficultyName(kv.Key)}: {kv.Value}")];
+                .. reduce.GeneratorNotes.Select(kv => $"{ChartLabels.DifficultyName(kv.Key)}: {kv.Value}"),
+                .. methodNote is null ? Array.Empty<string>() : [methodNote]];
             Preview?.OnDrafted(RunOf(editor.Session, reduce));
             _ = CheckAsync(editor, reduce);
         }
 
-        // A neural run: each target drafted by the pack, falling back to the rules per part (§3.7).
-        // Reduce all chains from the difficulty above by default, or each from Expert when asked (§3.6).
-        // The generator is kept for the dialog's life, so installed packs load once.
-        private NeuralDifficultyGenerator? _neural;
-        private IGeneratorModelStore? _neuralStore;
-
+        // A neural run over a fret part: each target drafted by the pack, voiced and, where the pack can't run, drafted by the
+        // same rules the Rules method would use: the fields' for one target, each target's defaults for Reduce all (§3.7).
+        // Reduce all chains from the difficulty above, or reduces each from Expert when asked (§3.6).
         private bool StartNeural(ChartEditorViewModel editor, IGeneratorModelStore models, ReduceProposals reduce, (long From, long To)? range, TargetChoice to)
         {
             var options = NeuralMethod.Options();
-            if (_neural is null || !ReferenceEquals(_neuralStore, models))
-            {
-                _neural = new NeuralDifficultyGenerator(
-                    models, target => RulesMethod.Defaults.FretsFor(RulesMethod.Kind, target));
-                _neuralStore = models;
-            }
             var readOptions = editor.Session.ReadOptions;
-            var variant = editor.Session.DrumsVariantShown;
-            ReductionResult Rules(EditableChart chart, ChartDifficulty from, ChartDifficulty target) =>
-                RulesMethod.IsDrums
-                    ? Reducer.Reduce(chart, from, target, RulesMethod.DrumRules(), variant, range)
-                    : Reducer.Reduce(chart, _part, from, target, RulesMethod.Defaults.FretsFor(RulesMethod.Kind, target), range, readOptions);
-
             if (IsAll)
             {
                 var targets = Toggles.Where(static t => t.IsChecked).Select(static t => t.Difficulty).ToList();
@@ -497,15 +491,27 @@ namespace ChartBuilder.ViewModels
                     return false;
                 }
 
+                var defaults = RulesMethod.Defaults;
+                FretReductionRules RulesFor(ChartDifficulty target) => defaults.FretsFor(RulesMethod.Kind, target);
                 bool expertCharted = editor.Session.Chart.PartOf(_part) is { } whole && whole[ChartDifficulty.Expert].Notes.Count > 0;
                 List<(ChartDifficulty? From, ChartDifficulty To)> steps = options.Chained || !expertCharted
                     ? [.. targets.Select(static t => ((ChartDifficulty?)null, t))]
                     : [.. targets.Select(static t => ((ChartDifficulty?)ChartDifficulty.Expert, t))];
-                return reduce.StartWithGenerator(_part, range, steps, Rules, _neural, options);
+                return reduce.StartWithGenerator(
+                    _part, range, steps,
+                    (chart, from, target) => Reducer.Reduce(chart, _part, from, target, RulesFor(target), range, readOptions),
+                    new NeuralDifficultyGenerator(models, (_, target) => RulesFor(target)), options);
             }
 
-            if (SelectedFrom is { } from && to.Difficulty is { } target)
-                return reduce.StartWithGenerator(_part, range, [(from.Difficulty, target)], Rules, _neural, options);
+            if (SelectedFrom is { } source && to.Difficulty is { } only)
+            {
+                var rules = RulesMethod.FretRules();
+                return reduce.StartWithGenerator(
+                    _part, range, [(source.Difficulty, only)],
+                    (chart, from, target) => Reducer.Reduce(chart, _part, from, target, rules, range, readOptions),
+                    new NeuralDifficultyGenerator(models, (_, _) => rules), options);
+            }
+
             return false;
         }
 

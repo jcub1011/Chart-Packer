@@ -94,10 +94,17 @@ namespace ChartPacker
                 }
 
                 var reductionRules = new ReductionRulesFile(UserConfigPaths.ReductionRulesFile, UserConfigPaths.BuilderSettingsFile);
+                var generationDefaults = new GenerationDefaultsFile(UserConfigPaths.GenerationDefaultsFile);
+
+                // The generator models both apps share (issue #154): the Generator models dialog manages the shared folder
+                // and the models in it, and Generate Lower Difficulties drafts with its neural packs.
+                var generatorModels = new GeneratorModelStore(
+                    new GeneratorModelFolderFile(UserConfigPaths.GeneratorModelSettingsFile),
+                    UserConfigPaths.GeneratorModelsFolder);
                 var validatorWindow = new AvaloniaValidatorWindowService(
                     () => window, drafts, job, settings, audio.Open, detail, videoProbe, notice, songFiles, locks, latency, generated);
                 var lowerDifficultiesWindow = new AvaloniaLowerDifficultiesWindowService(
-                    () => window, drafts, settings, audio.Open, detail, songFiles, generated, reductionRules, locks, latency);
+                    () => window, drafts, settings, audio.Open, detail, songFiles, generated, reductionRules, locks, latency, generationDefaults, generatorModels);
                 var chartBuilder = new ChartBuilderLauncher();
                 var library = new LibraryViewModel(
                     folderPicker, settings, drafts, job, player, mergeWindowFor(() => window), dedupWindow, validatorWindow, reveal, downloads, chartBuilder, notice,
@@ -132,11 +139,6 @@ namespace ChartPacker
 
                 void Calibrate() => _ = CalibrateAsync();
 
-                // The generator models both apps share (issue #154). The dialog manages the shared
-                // folder and the models in it; later the generation windows will open it too.
-                var generatorModels = new GeneratorModelStore(
-                    new GeneratorModelFolderFile(UserConfigPaths.GeneratorModelSettingsFile),
-                    UserConfigPaths.GeneratorModelsFolder);
                 var generatorModelsWindow = new AvaloniaGeneratorModelsWindowService(() => window, generatorModels);
                 async Task ManageGeneratorModelsAsync()
                 {

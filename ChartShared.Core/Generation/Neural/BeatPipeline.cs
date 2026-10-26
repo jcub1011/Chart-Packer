@@ -1,13 +1,24 @@
+using System.Text;
 using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Authoring;
 using ChartShared.Core.Charts;
 
 namespace ChartShared.Core.Generation.Neural;
 
 /// <summary>
 /// One beat of the source part as the network reads it (spec §3.3): the source pattern plus
-/// per-beat features. Conditioning shared by a run (target, source, instrument, style, tier)
+/// per-beat features. Conditioning shared by a run (pair, instrument, style, source rating)
 /// travels separately in <see cref="RunConditioning"/>.
 /// </summary>
+/// <param name="StarPowerPhrase">The index of the part's star power phrase covering one of the beat's onsets; -1 for none.</param>
+/// <param name="SoloPhrase">The index of the part's solo covering one of the beat's onsets; -1 for none.</param>
+/// <param name="RiffKey">The beat's place in its measure and what the measure is charted as (Rules' riff key): beats with
+/// the same key are the same beat of a riff.</param>
+/// <param name="RiffRepeat">How many measures charted the same came before the beat's own.</param>
+/// <param name="SecondsPerBeat">How long the beat lasts, in seconds.</param>
+/// <param name="HasChord">Whether a chord in the beat presses two or more frets.</param>
+/// <param name="MelodyTurn">Whether the melody turns in the beat: a fretted chord whose fretted neighbours are both
+/// higher, or both lower.</param>
 public sealed record BeatFrame(
     long BeatStartTick,
     int MeasureIndex,
@@ -19,18 +30,36 @@ public sealed record BeatFrame(
     bool PhraseStart,
     bool SectionStart,
     bool HasSustain,
-    bool StarPower,
-    bool Solo,
+    int StarPowerPhrase,
+    int SoloPhrase,
     string RiffKey,
-    int RiffRepeat);
+    int RiffRepeat,
+    double SecondsPerBeat,
+    bool HasChord,
+    bool MelodyTurn)
+{
+    /// <summary>Whether a star power phrase covers one of the beat's onsets.</summary>
+    public bool StarPower => StarPowerPhrase >= 0;
 
-/// <summary>Run-level conditioning, shared by every beat (§3.3).</summary>
+    /// <summary>Whether a solo covers one of the beat's onsets.</summary>
+    public bool Solo => SoloPhrase >= 0;
+
+    /// <summary>The beat's per-beat scalar inputs (<see cref="BeatFeatures"/>).</summary>
+    public BeatScalars Scalars => new(
+        BeatInMeasure, GapBucket, PhraseStart, SectionStart, HasSustain, StarPower, Solo, RiffRepeat,
+        SourceTicks.Length, HasChord, MelodyTurn, (float)SecondsPerBeat);
+}
+
+/// <summary>
+/// Run-level conditioning, shared by every beat (§3.3): the source–target pair, the part, the style, and the source's
+/// rank by the difficulty model (<see cref="NeuralConditioning.SourceRank"/>; null when it can't be rated).
+/// </summary>
 public sealed record RunConditioning(
-    ChartDifficulty Target,
     ChartDifficulty Source,
-    ChartInstrumentKind Kind,
+    ChartDifficulty Target,
+    ChartInstrument Instrument,
     int StyleId,
-    int TierBucket = 7);
+    double? SourceRank);
 
 /// <summary>
 /// Splits the source part into beats by the chart's time signatures and encodes each beat's
@@ -40,18 +69,13 @@ public sealed record RunConditioning(
 public static class BeatPipeline
 {
     /// <summary>Beat schema version the packs are trained on; must match the app's (§5.4).</summary>
-    public const int BeatSchemaVersion = 1;
+    public const int BeatSchemaVersion = 2;
 
     /// <summary>
-    /// Extracts every beat from the source's first onset to its last, in order. When
-    /// <paramref name="range"/> is given, only beats overlapping it are returned (plus one
-    /// context beat before, when there is one).
+    /// Every beat of the source from its first onset to its last, in order. A range run reads the whole part too: the
+    /// network's context is the song, and only decoding and voicing keep to the range (§3.6).
     /// </summary>
-    public static IReadOnlyList<BeatFrame> Extract(
-        EditableChart chart,
-        ChartInstrument part,
-        ChartDifficulty source,
-        (long From, long To)? range = null)
+    public static IReadOnlyList<BeatFrame> Extract(EditableChart chart, ChartInstrument part, ChartDifficulty source)
     {
         ArgumentNullException.ThrowIfNull(chart);
         var whole = chart.PartOf(part);
@@ -64,65 +88,85 @@ public static class BeatPipeline
         if (signatures.Count == 0)
             return [];
 
-        long[] ticks = [.. track.Notes.Select(static n => n.Tick).Distinct().Order()];
-        var byTick = track.Notes.GroupBy(static n => n.Tick).ToDictionary(static g => g.Key, static g => g.ToArray());
-
-        long lo = range?.From ?? ticks[0];
-        long hi = range?.To ?? ticks[^1];
-
-        var onsetsInScope = ticks.Where(t => t >= lo - map.Resolution * 4 && t <= hi).ToList();
-        if (onsetsInScope.Count == 0)
-            return [];
-
-        long firstBeat = BeatStartOf(signatures, map.Resolution, onsetsInScope[0]);
-        long lastBeat = BeatStartOf(signatures, map.Resolution, hi);
-        if (range is not null)
-            firstBeat = BeatStartOf(signatures, map.Resolution, Math.Max(0, lo - map.Resolution));
-
-        var sections = new HashSet<long>(SectionTicks(chart));
+        int resolution = map.Resolution;
+        bool ghl = ChartInstruments.KindOf(part) == ChartInstrumentKind.SixFret;
+        int Column(EditableNote n) => ghl ? n.Lane % 3 : n.Lane;
+        var chords = Reducer.ChordsOf([.. track.Notes]);
+        var turns = Turns(chords, Column);
+        var sections = Reducer.SectionTicks(chart).Order().ToArray();
         var phrases = whole!.Phrases.AsSpan().ToArray();
+        var starPower = phrases.Where(static p => p.Kind == PhraseKind.StarPower).OrderBy(static p => p.Tick).ToArray();
+        var solos = phrases.Where(static p => p.Kind == PhraseKind.Solo).OrderBy(static p => p.Tick).ToArray();
 
         var frames = new List<BeatFrame>();
+        var key = new StringBuilder();
+        var riffCounts = new Dictionary<string, int>(StringComparer.Ordinal);
+        long measureFrom = long.MinValue;
+        string measureKey = "";
+        int measureRepeat = 0;
+        int next = 0, measureStart = 0, section = 0, sp = 0, solo = 0;
         long prevOnset = -1;
-        var riffCounts = new Dictionary<string, int>();
-        var riffKeysInOrder = new List<string>();
+        long last = chords[^1].Tick;
 
-        for (long beat = firstBeat; beat <= lastBeat; beat += BeatLengthAt(signatures, map.Resolution, beat))
+        for (long beat = BeatStartOf(signatures, resolution, chords[0].Tick); beat <= last;)
         {
-            long beatEnd = beat + BeatLengthAt(signatures, map.Resolution, beat);
-            var onsetTicks = onsetsInScope.Where(t => t >= beat && t < beatEnd).Order().ToList();
-            var offsets = new List<int>();
-            var srcTicks = new List<long>();
-            foreach (long t in onsetTicks)
+            var (sig, nextSig) = SignatureAt(signatures, beat);
+            long beatLength = BeatLengthOf(sig, resolution);
+            long beatEnd = Math.Min(beat + beatLength, nextSig ?? long.MaxValue);
+
+            // The beat's chords: the walk through them never goes back.
+            int first = next;
+            while (next < chords.Count && chords[next].Tick < beatEnd)
+                next++;
+            var srcTicks = new long[next - first];
+            var offsets = new int[next - first];
+            bool sustain = false, chord = false, turn = false;
+            for (int i = first; i < next; i++)
             {
-                srcTicks.Add(t);
-                offsets.Add((int)((t - beat) * BeatPattern.UnitsPerBeat / BeatLengthAt(signatures, map.Resolution, beat)));
+                srcTicks[i - first] = chords[i].Tick;
+                offsets[i - first] = BeatPattern.OffsetOf(chords[i].Tick - beat, beatLength);
+                sustain |= chords[i].Notes.Any(n => n.Length >= resolution);
+                chord |= chords[i].Notes.Where(static n => n.Lane != ChartNote.OpenLane).Select(Column).Distinct().Count() > 1;
+                turn |= turns[i];
             }
 
-            // Measure position.
-            var (measureIndex, beatInMeasure) = MeasurePosition(signatures, map.Resolution, beat);
+            // The measure's riff key, worked out once per measure.
+            long measureLength = beatLength * Math.Max(1, sig.Numerator);
+            long from = sig.Tick + (Math.Max(0, beat - sig.Tick) / measureLength * measureLength);
+            if (from != measureFrom)
+            {
+                long to = Math.Min(from + measureLength, nextSig ?? long.MaxValue);
+                while (measureStart < chords.Count && chords[measureStart].Tick < from)
+                    measureStart++;
+                int measureEnd = measureStart;
+                while (measureEnd < chords.Count && chords[measureEnd].Tick < to)
+                    measureEnd++;
+                measureFrom = from;
+                measureKey = Reducer.MeasureKey(key, chords, measureStart, measureEnd, from, to - from, resolution);
+                measureRepeat = riffCounts.GetValueOrDefault(measureKey);
+                riffCounts[measureKey] = measureRepeat + 1;
+            }
 
-            int patternId = offsets.Count == 0 ? BeatPattern.EmptyId : BeatPattern.EncodeSource(offsets);
+            int measureIndex = (int)(Math.Max(0, beat - sig.Tick) / measureLength);
+            int beatInMeasure = (int)((beat - from) / beatLength);
 
-            int gapBucket = prevOnset < 0 ? 0 : GapBucketOf(onsetTicks.Count > 0 ? onsetTicks[0] - prevOnset : beatEnd - prevOnset, chart.Resolution);
-            bool phraseStart = onsetTicks.Count > 0 && (prevOnset < 0 || onsetTicks[0] - prevOnset >= chart.Resolution);
-            bool sectionStart = sections.Any(s => s >= beat && s < beatEnd);
-            bool sustain = onsetTicks.Any(t => byTick[t].Any(n => n.Length >= chart.Resolution));
-            bool sp = phrases.Any(p => p.Kind == PhraseKind.StarPower && onsetTicks.Any(p.Covers));
-            bool solo = phrases.Any(p => p.Kind == PhraseKind.Solo && onsetTicks.Any(p.Covers));
+            int gapBucket = prevOnset < 0 ? 0 : GapBucketOf((srcTicks.Length > 0 ? srcTicks[0] : beatEnd) - prevOnset, resolution);
+            bool phraseStart = srcTicks.Length > 0 && (prevOnset < 0 || srcTicks[0] - prevOnset >= resolution);
+            while (section < sections.Length && sections[section] < beat)
+                section++;
+            bool sectionStart = section < sections.Length && sections[section] < beatEnd;
 
-            string riffKey = RiffKeyOf(signatures, map.Resolution, beat, onsetsInScope);
-            if (!riffCounts.TryGetValue(riffKey, out int repeat))
-                repeat = 0;
-            riffCounts[riffKey] = repeat + 1;
-            riffKeysInOrder.Add(riffKey);
+            frames.Add(new BeatFrame(
+                beat, measureIndex, beatInMeasure,
+                offsets.Length == 0 ? BeatPattern.EmptyId : BeatPattern.EncodeSource(offsets),
+                offsets, srcTicks, gapBucket, phraseStart, sectionStart, sustain,
+                PhraseOf(starPower, ref sp, beat, srcTicks), PhraseOf(solos, ref solo, beat, srcTicks),
+                $"{measureKey}@{beatInMeasure}", measureRepeat,
+                map.SecondsAt(beat + beatLength) - map.SecondsAt(beat), chord, turn));
 
-            frames.Add(new BeatFrame(beat, measureIndex, beatInMeasure, patternId,
-                [.. offsets], [.. srcTicks], gapBucket, phraseStart, sectionStart,
-                sustain, sp, solo, riffKey, repeat));
-
-            if (onsetTicks.Count > 0)
-                prevOnset = onsetTicks[^1];
+            if (srcTicks.Length > 0)
+                prevOnset = srcTicks[^1];
+            beat = beatEnd;
         }
 
         return frames;
@@ -149,67 +193,71 @@ public static class BeatPipeline
         return 7;
     }
 
-    /// <summary>Tier 0–6 to buckets; parts with no tier are their own bucket (§3.3).</summary>
-    public static int TierBucketOf(int? tier) => tier is not { } t ? 7 : Math.Clamp(t, 0, 6);
+    // The index of the first of phrases (in tick order) covering one of ticks, or -1; next is where the walk is, and the
+    // phrases that end before the beat are passed for good.
+    private static int PhraseOf(Phrase[] phrases, ref int next, long beat, long[] ticks)
+    {
+        while (next < phrases.Length && phrases[next].CoverEnd <= beat)
+            next++;
+        if (ticks.Length == 0)
+            return -1;
+        for (int p = next; p < phrases.Length && phrases[p].Tick <= ticks[^1]; p++)
+        {
+            foreach (long t in ticks)
+            {
+                if (phrases[p].Covers(t))
+                    return p;
+            }
+        }
+
+        return -1;
+    }
+
+    // Whether each chord is a turn of the melody: the fretted chords either side of it are both higher, or both lower
+    // (Reducer.Scores' test, over the whole part).
+    private static bool[] Turns(IReadOnlyList<(long Tick, EditableNote[] Notes)> chords, Func<EditableNote, int> column)
+    {
+        var turns = new bool[chords.Count];
+        var frets = new List<(int Index, int Anchor)>();
+        for (int i = 0; i < chords.Count; i++)
+        {
+            var pressed = chords[i].Notes.Where(static n => n.Lane != ChartNote.OpenLane).ToList();
+            if (pressed.Count > 0)
+                frets.Add((i, pressed.Min(column)));
+        }
+
+        for (int k = 1; k < frets.Count - 1; k++)
+        {
+            int before = Math.Sign(frets[k].Anchor - frets[k - 1].Anchor);
+            int after = Math.Sign(frets[k + 1].Anchor - frets[k].Anchor);
+            turns[frets[k].Index] = before != 0 && after != 0 && before != after;
+        }
+
+        return turns;
+    }
 
     private static long BeatStartOf(IReadOnlyList<TimeSignature> signatures, int resolution, long tick)
     {
-        var sig = SignatureAt(signatures, tick);
+        var (sig, _) = SignatureAt(signatures, tick);
         long beat = BeatLengthOf(sig, resolution);
         long offset = Math.Max(0, tick - sig.Tick);
         return sig.Tick + (offset / beat * beat);
     }
 
-    private static long BeatLengthAt(IReadOnlyList<TimeSignature> signatures, int resolution, long tick) =>
-        BeatLengthOf(SignatureAt(signatures, tick), resolution);
-
     private static long BeatLengthOf(TimeSignature sig, int resolution) =>
         Math.Max(1, resolution * 4L / Math.Max(1, sig.Denominator));
 
-    private static TimeSignature SignatureAt(IReadOnlyList<TimeSignature> signatures, long tick)
+    // The time signature in effect at tick, and where the next one starts, if any.
+    private static (TimeSignature Signature, long? Next) SignatureAt(IReadOnlyList<TimeSignature> signatures, long tick)
     {
         var current = signatures[0];
         foreach (var s in signatures)
         {
             if (s.Tick > tick)
-                break;
+                return (current, s.Tick);
             current = s;
         }
 
-        return current;
-    }
-
-    private static (int Measure, int BeatInMeasure) MeasurePosition(
-        IReadOnlyList<TimeSignature> signatures, int resolution, long beat)
-    {
-        var sig = SignatureAt(signatures, beat);
-        long beatLen = BeatLengthOf(sig, resolution);
-        long measureLen = beatLen * Math.Max(1, sig.Numerator);
-        long offset = Math.Max(0, beat - sig.Tick);
-        return ((int)(offset / measureLen), (int)((offset % measureLen) / beatLen));
-    }
-
-    private static string RiffKeyOf(
-        IReadOnlyList<TimeSignature> signatures, int resolution, long beat, List<long> onsets)
-    {
-        var sig = SignatureAt(signatures, beat);
-        long beatLen = BeatLengthOf(sig, resolution);
-        long measureLen = beatLen * Math.Max(1, sig.Numerator);
-        long from = sig.Tick + (Math.Max(0, beat - sig.Tick) / measureLen * measureLen);
-        var inMeasure = onsets.Where(t => t >= from && t < from + measureLen)
-            .Select(t => (t - from) * BeatPattern.UnitsPerBeat / beatLen).Order().ToList();
-        return $"{measureLen}:{string.Join(",", inMeasure)}";
-    }
-
-    private static IReadOnlyList<long> SectionTicks(EditableChart chart)
-    {
-        var sections = new List<long>();
-        foreach (var e in chart.Events.AsSpan().ToArray())
-        {
-            if (e.Text.StartsWith("[section", StringComparison.OrdinalIgnoreCase))
-                sections.Add(e.Tick);
-        }
-
-        return sections;
+        return (current, null);
     }
 }

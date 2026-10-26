@@ -11,6 +11,7 @@ using ChartPacker.Services;
 using ChartShared.Core.Charting.Authoring;
 using ChartShared.Core.Charting.Saving;
 using ChartShared.Core.Charts;
+using ChartShared.Core.Generation;
 using ChartShared.Core.Metadata;
 using ChartShared.Core.Scanning;
 using ChartShared.Core.Settings;
@@ -109,6 +110,8 @@ namespace ChartPacker.ViewModels
         private readonly DraftSaver _saver;
         private readonly SongLocks? _locks;
         private readonly ReductionRulesFile _rulesFile;
+        private readonly GenerationDefaults? _generation;
+        private readonly IGeneratorModelStore? _models;
         private readonly int _parallelism;
         private readonly UiBatchQueue<SurveyedSong> _read;
         private readonly DispatcherTimer _searchTimer;
@@ -127,6 +130,8 @@ namespace ChartPacker.ViewModels
         /// <param name="rules">The default rules, which it starts from and can save.</param>
         /// <param name="player">Plays the song picked, for the preview; the window's own, which the caller disposes.</param>
         /// <param name="parallelism">How many songs are read, and generated, at once.</param>
+        /// <param name="generation">The generator the difficulties are drafted by, read as the window opens; Rules alone when null.</param>
+        /// <param name="models">The generator models both apps share, the neural packs among them.</param>
         public LowerDifficultiesViewModel(
             IReadOnlyList<SongEntry> entries,
             MetadataDraftStore drafts,
@@ -135,7 +140,9 @@ namespace ChartPacker.ViewModels
             DraftSaver saver,
             PlayerViewModel player,
             int parallelism,
-            SongLocks? locks = null)
+            SongLocks? locks = null,
+            GenerationDefaultsFile? generation = null,
+            IGeneratorModelStore? models = null)
         {
             ArgumentNullException.ThrowIfNull(entries);
             ArgumentNullException.ThrowIfNull(drafts);
@@ -149,6 +156,8 @@ namespace ChartPacker.ViewModels
             _saver = saver;
             _locks = locks;
             _rulesFile = rules;
+            _generation = generation?.Load();
+            _models = models;
             _parallelism = parallelism;
 
             // Each song's draft is copied here, on the UI thread the drafts live on, for its chart to be read through.
@@ -168,7 +177,9 @@ namespace ChartPacker.ViewModels
             _scope = ScopeOf();
 
             Rules = new ReductionRulesViewModel(rules.Load(), ChartInstrumentKind.FiveFret, ChartDifficulty.Hard);
-            Generation = new GenerationPreviewViewModel(player, () => Rules.Defaults, Strings.LowerDifficultiesNothing, Strings.LowerDifficultiesPickSong);
+            Generation = new GenerationPreviewViewModel(
+                player, () => Rules.Defaults, Strings.LowerDifficultiesNothing, Strings.LowerDifficultiesPickSong,
+                (song, defaults) => song.WithMethod(_generation, _models, defaults));
             Rules.Changed += (_, _) =>
             {
                 RulesSaveStatus = "";
@@ -703,7 +714,7 @@ namespace ChartPacker.ViewModels
             // Each song as drafted now, its draft copied, as the work is done off the UI thread the drafts live on.
             var requests = _rows
                 .Where(static r => r.WillGenerate)
-                .Select(r => (Row: r, Draft: _drafts.HasDrafts(r.Path) ? _drafts.Get(r.Path).Clone() : null, r.SongFor(scope)!.Work))
+                .Select(r => (Row: r, Draft: _drafts.HasDrafts(r.Path) ? _drafts.Get(r.Path).Clone() : null, r.SongFor(scope)!.WithMethod(_generation, _models, rules).Work))
                 .ToList();
             if (requests.Count == 0)
                 return;
@@ -790,7 +801,7 @@ namespace ChartPacker.ViewModels
                 return;
             }
 
-            row.Generated();
+            row.Generated(GenerateDifficultiesSong.DescribeNotes(chart.GeneratorNotes));
         }
 
         // Whether the song's new difficulties are in its draft, waiting to be saved.

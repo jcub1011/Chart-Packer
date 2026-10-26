@@ -262,22 +262,6 @@ namespace ChartBuilder.Services
         /// </summary>
         public ReductionDefaults? ReductionRules { get; set; }
 
-        /// <summary>The id of the default Reduce method (the rule-based reducer).</summary>
-        public const string DefaultReduceMethodId = "rules";
-
-        /// <summary>
-        /// The Reduce dialog's method last picked, by id. The rules
-        /// method's own settings live in <c>reduction-rules.json</c>; a future method's live in
-        /// <see cref="ReduceMethodSettings"/>. Unknown ids fall back to the rules method where it's read.
-        /// </summary>
-        public string ReduceMethodId { get; set; } = DefaultReduceMethodId;
-
-        /// <summary>
-        /// Each Reduce method's own settings besides the rules, by method id, as opaque values that method defines.
-        /// Null for none yet.
-        /// </summary>
-        public Dictionary<string, string>? ReduceMethodSettings { get; set; }
-
         /// <summary>How many seconds ahead the highway preview shows (charter-spec C18), as its slider last left it.</summary>
         public double PreviewLookAhead { get; set; } = 1.4;
 

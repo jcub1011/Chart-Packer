@@ -41,12 +41,17 @@ internal static class Draft
             new GeneratorModelFolderFile(UserConfigPaths.GeneratorModelSettingsFile),
             UserConfigPaths.GeneratorModelsFolder);
         var kind = ChartInstruments.KindOf(part);
-        var generator = new NeuralDifficultyGenerator(store, t => FretReductionRules.Default(kind, t));
+        var generator = new NeuralDifficultyGenerator(store, (_, t) => FretReductionRules.Default(kind, t));
 
+        // The chart as the games read it, with the song.ini beside it, as the apps and Prepare read it.
+        string ini = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(mid)) ?? "", "song.ini");
+        var readOptions = File.Exists(ini)
+            ? ChartReadOptions.From([.. File.ReadAllLines(ini).Select(static l => l.Split('=', 2)).Where(static b => b.Length == 2).Select(static b => KeyValuePair.Create(b[0].Trim(), b[1].Trim()))])
+            : ChartReadOptions.Default;
         EditableChart chart;
         try
         {
-            chart = MidiChartLoader.Load(File.ReadAllBytes(mid), ChartReadOptions.Default).Chart;
+            chart = MidiChartLoader.Load(File.ReadAllBytes(mid), readOptions).Chart;
         }
         catch (Exception ex)
         {
@@ -55,12 +60,15 @@ internal static class Draft
         }
 
         var options = new GenerationOptions(Style: style, DensityBias: density, ModelName: model);
-        var result = generator.Draft(chart, part, from, to, options, range: null, ChartReadOptions.Default, out string? reason);
+        var result = generator.Draft(chart, part, from, to, options, range: null, readOptions, out string? note);
         if (result is null)
         {
-            Console.WriteLine($"Fell back to Rules: {reason}");
+            Console.WriteLine($"Fell back to Rules: {note}");
             return 0;
         }
+
+        if (note is not null)
+            Console.WriteLine(note);
 
         var source = chart.PartOf(part)![from];
         var sourceTicks = source.Notes.AsSpan().ToArray().Select(static n => n.Tick).Order().ToArray();

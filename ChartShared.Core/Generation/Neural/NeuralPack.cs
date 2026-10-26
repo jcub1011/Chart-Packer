@@ -13,10 +13,10 @@ namespace ChartShared.Core.Generation.Neural;
 public sealed class NeuralPack
 {
     /// <summary>Current pack format version (§5.4).</summary>
-    public const int FormatVersion = 1;
+    public const int FormatVersion = 2;
 
     /// <summary>Previous readable format version (§5.4).</summary>
-    public const int PreviousFormatVersion = 1;
+    public const int PreviousFormatVersion = 2;
 
     /// <summary>Largest pack accepted, in bytes (§5.3).</summary>
     public const long MaxPackBytes = 64L * 1024 * 1024;
@@ -45,6 +45,47 @@ public sealed class NeuralPack
         {
             throw new PackValidationException($"Neural pack '{id.Name}' is not installed.", ex);
         }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            throw new PackValidationException($"Neural pack '{id.Name}' can't be read ({ex.Message}).", ex);
+        }
+
+        return LoadFromBytes(bytes, id.Name);
+    }
+
+    /// <summary>Loads and fully validates a pack from the store, synchronously (§5.3). Never half-used.</summary>
+    /// <exception cref="PackValidationException">The pack is missing, unreadable, damaged or unsupported.</exception>
+    public static NeuralPack Load(IGeneratorModelStore store, GeneratorModelId id)
+    {
+        ArgumentNullException.ThrowIfNull(store);
+        if (id.Type != GeneratorType.NeuralDifficulty)
+            throw new PackValidationException($"Model '{id.Name}' is not a neural pack.");
+
+        byte[] bytes;
+        try
+        {
+            using var stream = store.OpenRead(id);
+            using var copy = new MemoryStream();
+            // Read no further than the size limit, so an oversized file is refused without reading all of it.
+            var buffer = new byte[81920];
+            int read;
+            while ((read = stream.Read(buffer, 0, buffer.Length)) > 0)
+            {
+                copy.Write(buffer, 0, read);
+                if (copy.Length > MaxPackBytes)
+                    throw new PackValidationException($"Neural pack '{id.Name}' is larger than the limit of {MaxPackBytes} bytes.");
+            }
+
+            bytes = copy.ToArray();
+        }
+        catch (FileNotFoundException ex)
+        {
+            throw new PackValidationException($"Neural pack '{id.Name}' is not installed.", ex);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            throw new PackValidationException($"Neural pack '{id.Name}' can't be read ({ex.Message}).", ex);
+        }
 
         return LoadFromBytes(bytes, id.Name);
     }
@@ -61,7 +102,7 @@ public sealed class NeuralPack
         {
             file = JsonSerializer.Deserialize(bytes, NeuralPackJsonContext.Default.NeuralPackFile);
         }
-        catch (JsonException ex)
+        catch (Exception ex) when (ex is JsonException or NotSupportedException)
         {
             throw new PackValidationException($"Neural pack '{name}' is not readable.", ex);
         }
@@ -132,34 +173,48 @@ public sealed record PackManifest(
     string License,
     string Checksum = "")
 {
+    /// <summary>Largest hidden or embedding size accepted: a sanity bound before the parameter count is known.</summary>
+    public const int MaxLayerSize = 1024;
+
     public void Validate(string name)
     {
-        if (FormatVersion is not (NeuralPack.FormatVersion or NeuralPack.PreviousFormatVersion))
-            throw new PackValidationException($"Neural pack '{name}' is format {FormatVersion}; this app reads {NeuralPack.PreviousFormatVersion}–{NeuralPack.FormatVersion}.");
+        // Read from JSON, any member can be missing (null) whatever its type says.
+        if (FormatVersion < NeuralPack.PreviousFormatVersion || FormatVersion > NeuralPack.FormatVersion)
+            throw new PackValidationException($"Neural pack '{name}' is format {FormatVersion}; this app reads {NeuralPack.PreviousFormatVersion}–{NeuralPack.FormatVersion}. Retrain it with the current trainer.");
         if (BeatSchemaVersion != BeatPipeline.BeatSchemaVersion)
             throw new PackValidationException($"Neural pack '{name}' uses beat schema {BeatSchemaVersion}; this app uses {BeatPipeline.BeatSchemaVersion}. Retrain the model for the new schema.");
         if (!string.Equals(Architecture, BiGruCrf.ArchitectureName, StringComparison.OrdinalIgnoreCase))
             throw new PackValidationException($"Neural pack '{name}' is a '{Architecture}' model; this app runs '{BiGruCrf.ArchitectureName}'.");
-        if (Styles.Count == 0)
+        if (Styles is null || Instruments is null || Pairs is null || Inputs is null || MinGapTicks is null || Vocabulary is null)
+            throw new PackValidationException($"Neural pack '{name}' has an incomplete manifest.");
+        if (Styles.Count == 0 || Styles.Any(static s => s is null))
             throw new PackValidationException($"Neural pack '{name}' names no styles.");
-        if (Vocabulary.Count == 0)
-            throw new PackValidationException($"Neural pack '{name}' has an empty vocabulary.");
-        if (Pairs.Count == 0)
+        if (Styles.Where((s, i) => s.Id != i).Any())
+            throw new PackValidationException($"Neural pack '{name}' numbers its styles out of order.");
+        if (Instruments.Count == 0 || Instruments.Any(string.IsNullOrWhiteSpace))
+            throw new PackValidationException($"Neural pack '{name}' names no instruments.");
+        if (Pairs.Count == 0 || Pairs.Any(string.IsNullOrWhiteSpace))
             throw new PackValidationException($"Neural pack '{name}' supports no source–target pairs.");
+        if (!Vocabulary.SequenceEqual(BeatPattern.Vocabulary))
+            throw new PackValidationException($"Neural pack '{name}' has a vocabulary this app doesn't read. Retrain the model for the new schema.");
+        if (Inputs.HiddenSize is <= 0 or > MaxLayerSize || Inputs.EmbeddingSize is <= 0 or > MaxLayerSize)
+            throw new PackValidationException($"Neural pack '{name}' has layer sizes this app doesn't run.");
     }
 }
 
 /// <summary>A style label the pack was trained to imitate; id 0 is always Any (§3.3).</summary>
 public sealed record PackStyle(int Id, string Label, string Description);
 
-/// <summary>Which context features the pack uses, including whether it uses tier (§5.2).</summary>
+/// <summary>
+/// Which context features the pack uses, including whether it reads the source's rank by the difficulty model (§5.2).
+/// The pair and instrument embeddings are one row for each of the manifest's <see cref="PackManifest.Pairs"/> and
+/// <see cref="PackManifest.Instruments"/>, in order.
+/// </summary>
 public sealed record PackInputs(
-    bool UseTier,
+    bool UseRank,
     bool UseStyle,
     int HiddenSize,
-    int EmbeddingSize,
-    string[] Targets,
-    string[] Styles);
+    int EmbeddingSize);
 
 /// <summary>What the pack was trained on — counts and labels, never chart content (§6.3).</summary>
 public sealed record PackTrainingSummary(
@@ -170,12 +225,13 @@ public sealed record PackTrainingSummary(
     string TrainerVersion,
     string? Evaluation = null);
 
-/// <summary>The trained weights: embedding, BiGRU, projection, CRF transitions.</summary>
+/// <summary>The trained weights: embeddings, BiGRU, projection, CRF transitions.</summary>
 public sealed class PackWeights
 {
     public required float[] SourceEmbedding { get; init; }
     public required float[] StyleEmbedding { get; init; }
-    public required float[] TargetEmbedding { get; init; }
+    public required float[] PairEmbedding { get; init; }
+    public required float[] InstrumentEmbedding { get; init; }
     public required GruWeights Forward { get; init; }
     public required GruWeights Backward { get; init; }
     public required float[] OutputWeight { get; init; }
@@ -185,7 +241,7 @@ public sealed class PackWeights
     public required float[] EndTransition { get; init; }
 
     public int ParameterCount =>
-        SourceEmbedding.Length + StyleEmbedding.Length + TargetEmbedding.Length
+        SourceEmbedding.Length + StyleEmbedding.Length + PairEmbedding.Length + InstrumentEmbedding.Length
         + Forward.ParameterCount + Backward.ParameterCount
         + OutputWeight.Length + OutputBias.Length + Transition.Length
         + StartTransition.Length + EndTransition.Length;
@@ -195,8 +251,10 @@ public sealed class PackWeights
         int vocab = manifest.Vocabulary.Count;
         int hidden = manifest.Inputs.HiddenSize;
         int outSize = hidden * 2;
-        void Check(float[] values, int expected, string what)
+        void Check(float[]? values, int expected, string what)
         {
+            if (values is null)
+                throw new PackValidationException($"Neural pack '{name}' has no {what}.");
             if (values.Length != expected)
                 throw new PackValidationException($"Neural pack '{name}' has {values.Length} {what}; expected {expected}.");
             foreach (float v in values)
@@ -206,12 +264,14 @@ public sealed class PackWeights
             }
         }
 
+        if (Forward is null || Backward is null)
+            throw new PackValidationException($"Neural pack '{name}' has no recurrent layer.");
         int featureSize = BiGruCrf.FeatureSize(manifest);
-        int styleCount = manifest.Styles.Count;
-        int targetCount = manifest.Inputs.Targets.Length;
-        Check(SourceEmbedding, vocab * manifest.Inputs.EmbeddingSize, "source embedding values");
-        Check(StyleEmbedding, styleCount * manifest.Inputs.EmbeddingSize, "style embedding values");
-        Check(TargetEmbedding, Math.Max(1, targetCount) * manifest.Inputs.EmbeddingSize, "target embedding values");
+        int embed = manifest.Inputs.EmbeddingSize;
+        Check(SourceEmbedding, vocab * embed, "source embedding values");
+        Check(StyleEmbedding, manifest.Styles.Count * embed, "style embedding values");
+        Check(PairEmbedding, manifest.Pairs.Count * embed, "pair embedding values");
+        Check(InstrumentEmbedding, manifest.Instruments.Count * embed, "instrument embedding values");
         Forward.Validate(name, featureSize, hidden, "forward GRU");
         Backward.Validate(name, featureSize, hidden, "backward GRU");
         Check(OutputWeight, outSize * vocab, "output weights");
@@ -246,8 +306,10 @@ public sealed class GruWeights
 
     public void Validate(string name, int inputSize, int hidden, string what)
     {
-        void Check(float[] values, int expected, string field)
+        void Check(float[]? values, int expected, string field)
         {
+            if (values is null)
+                throw new PackValidationException($"Neural pack '{name}' has no {what} {field}.");
             if (values.Length != expected)
                 throw new PackValidationException($"Neural pack '{name}' has {values.Length} {what} {field}; expected {expected}.");
             foreach (float v in values)

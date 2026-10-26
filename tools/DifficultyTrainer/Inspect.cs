@@ -25,7 +25,7 @@ internal static class Inspect
             Console.WriteLine($"Styles:      {string.Join(", ", m.Styles.Select(static s => s.Label))}");
             Console.WriteLine($"Instruments: {string.Join(", ", m.Instruments)}");
             Console.WriteLine($"Pairs:       {string.Join(", ", m.Pairs)}");
-            Console.WriteLine($"Inputs:      hidden={m.Inputs.HiddenSize} embed={m.Inputs.EmbeddingSize} tier={m.Inputs.UseTier} style={m.Inputs.UseStyle}");
+            Console.WriteLine($"Inputs:      hidden={m.Inputs.HiddenSize} embed={m.Inputs.EmbeddingSize} rank={m.Inputs.UseRank} style={m.Inputs.UseStyle}");
             Console.WriteLine($"Vocabulary:  {string.Join(" ", m.Vocabulary)}");
             Console.WriteLine($"Gaps (48ths/beat): {string.Join(", ", m.MinGapTicks.Select(static kv => kv.Key + "=" + kv.Value))}");
             Console.WriteLine($"Training:    {m.Training.Songs} songs, {m.Training.Parts} parts, {m.Training.Studios}, {m.Training.Date}, {m.Training.TrainerVersion}");

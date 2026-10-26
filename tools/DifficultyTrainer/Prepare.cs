@@ -40,7 +40,7 @@ internal static class Prepare
         bool excludeGenerated = Arg(args, "--exclude-generated", "off") == "on";
         if (string.IsNullOrWhiteSpace(songs) || !Directory.Exists(songs))
         {
-            Console.Error.WriteLine("Usage: prepare --songs <folder> --out <training-set.json> [--style-by studio|charter] [--styles map.txt] [--held-out 0.2]");
+            Console.Error.WriteLine("Usage: prepare --songs <folder> --out <training-set.json> [--style-by studio|charter] [--styles map.txt] [--held-out 0.2] [--exclude-generated on]");
             return 2;
         }
 
@@ -69,11 +69,13 @@ internal static class Prepare
                 ? MapStyle(charter, styleMap) ?? charter
                 : studio;
 
+            // The song is read as the games read it, with its song.ini's settings, as the apps do (§3.3).
+            var readOptions = ChartReadOptions.From([.. ini.Select(static kv => KeyValuePair.Create(kv.Key, kv.Value))]);
             EditableChart chart;
             try
             {
                 byte[] midi = File.ReadAllBytes(Path.Combine(dir, "notes.mid"));
-                chart = MidiChartLoader.Load(midi, ChartReadOptions.Default).Chart;
+                chart = MidiChartLoader.Load(midi, readOptions).Chart;
             }
             catch (Exception ex)
             {
@@ -86,6 +88,7 @@ internal static class Prepare
                 var whole = chart.PartOf(part);
                 if (whole is null)
                     continue;
+                IReadOnlyDictionary<ChartDifficulty, double>? ranks = null;
                 foreach (var (from, to) in Pairs)
                 {
                     if (whole[from].Notes.Count == 0 || whole[to].Notes.Count == 0)
@@ -93,13 +96,26 @@ internal static class Prepare
                     string dedupe = DedupeKey(whole[from], whole[to]);
                     if (!seen.Add(part + "|" + from + "|" + to + "|" + dedupe))
                         continue;
-                    if (excludeGenerated && LooksGenerated(chart, part, from, to))
+
+                    PreparedPart? example;
+                    try
                     {
-                        partsSkipped++;
+                        var rules = RulesTicks(chart, part, from, to, readOptions);
+                        if (excludeGenerated && rules is not null && LooksGenerated(rules, whole[to]))
+                        {
+                            partsSkipped++;
+                            continue;
+                        }
+
+                        ranks ??= NeuralConditioning.SourceRanks(chart, part, readOptions);
+                        example = BuildExample(chart, part, from, to, songKey, style, ranks.TryGetValue(from, out double rank) ? rank : null, rules ?? []);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.Error.WriteLine($"Skipping {dir} {part} {from}->{to}: {ex.Message}");
                         continue;
                     }
 
-                    var example = BuildExample(chart, part, from, to, songKey, style, TierOf(ini, part));
                     if (example is not null && example.SourcePatterns.Length > 0)
                     {
                         examples.Add(example);
@@ -112,18 +128,20 @@ internal static class Prepare
                 Console.WriteLine($"  ... {songsSeen} songs, {partsUsed} parts");
         }
 
-        // Split by song so the same song is never on both sides (§4, §6.2).
-        var bySong = examples.GroupBy(static e => e.SongKey).OrderBy(static g => g.Key, StringComparer.Ordinal).ToList();
-        int heldOutSongs = Math.Max(1, (int)(bySong.Count * heldOut));
-        var heldOutKeys = bySong.Take(heldOutSongs).Select(static g => g.Key).ToHashSet(StringComparer.Ordinal);
+        // Split by song so the same song is never on both sides (§4, §6.2), by a stable hash of its key rather than
+        // alphabetically, so the held-out songs aren't all one end of the alphabet.
+        var songKeys = examples.Select(static e => e.SongKey).Distinct(StringComparer.Ordinal).ToList();
+        var heldOutKeys = songKeys.Where(k => StableHash(k) % 10_000 < heldOut * 10_000).ToHashSet(StringComparer.Ordinal);
+        if (heldOutKeys.Count == 0 && songKeys.Count > 1)
+            heldOutKeys.Add(songKeys.OrderBy(StableHash).First());
 
         var stylesUsed = examples.Select(static e => e.Style).Distinct().OrderBy(static s => s, StringComparer.OrdinalIgnoreCase).ToArray();
+        var instrumentsUsed = FiveFretParts.Select(static p => p.ToString()).Where(p => examples.Any(e => e.Instrument == p)).ToArray();
         var set = new TrainingSet(
             BeatPipeline.BeatSchemaVersion,
             ["Any", .. stylesUsed],
-            ["Easy", "Medium", "Hard"],
-            Pairs.Select(static p => $"{p.From}->{p.To}").ToArray(),
-            ["Guitar", "Bass", "Keys", "Rhythm"],
+            [.. Pairs.Select(static p => NeuralConditioning.PairName(p.From, p.To))],
+            instrumentsUsed,
             examples,
             $"DifficultyTrainer {ThisVersion}");
 
@@ -131,7 +149,7 @@ internal static class Prepare
             JsonSerializer.Serialize(stream, set, TrainingSetJsonContext.Default.TrainingSet);
 
         Console.WriteLine($"Songs: {songsSeen}; usable parts: {partsUsed}; skipped as generated: {partsSkipped}.");
-        Console.WriteLine($"Held-out songs: {heldOutSongs} of {bySong.Count} (split recorded in {output}.heldout).");
+        Console.WriteLine($"Held-out songs: {heldOutKeys.Count} of {songKeys.Count} (split recorded in {output}.heldout).");
         File.WriteAllLines(output + ".heldout", heldOutKeys.Order(StringComparer.Ordinal));
         Console.WriteLine($"Wrote {output} ({new FileInfo(output).Length / 1024 / 1024} MB).");
         // Every label must be one of its beat's candidates, or decoding could never
@@ -140,10 +158,11 @@ internal static class Prepare
         long totalLabels = 0;
         foreach (var e in examples)
         {
+            var candidates = e.Candidates();
             for (int i = 0; i < e.Labels.Length; i++)
             {
                 totalLabels++;
-                if (!e.Candidates[i].Contains(e.Labels[i]))
+                if (!candidates[i].Contains(e.Labels[i]) || !candidates[i].Contains(e.RulesLabels[i]))
                     badLabels++;
             }
         }
@@ -155,108 +174,95 @@ internal static class Prepare
 
     private static PreparedPart? BuildExample(
         EditableChart chart, ChartInstrument part, ChartDifficulty from, ChartDifficulty to,
-        string songKey, string style, int? tier)
+        string songKey, string style, double? sourceRank, long[] rulesTicks)
     {
-        var whole = chart.PartOf(part)!;
-        var sourceTrack = whole[from];
-        var targetTrack = whole[to];
-
         var beats = BeatPipeline.Extract(chart, part, from);
         if (beats.Count == 0)
             return null;
 
-        var targetByTick = targetTrack.Notes.GroupBy(static n => n.Tick).ToDictionary(static g => g.Key, static g => g.ToArray());
-        var targetTicks = new HashSet<long>(targetByTick.Keys);
-        var source = new List<int>();
-        var candidates = new List<int[]>();
-        var scalars = new List<sbyte>();
-        var labels = new List<int>();
+        long[] targetTicks = [.. chart.PartOf(part)![to].Notes.AsSpan().ToArray().Select(static n => n.Tick).Distinct().Order()];
+        long tolerance = Math.Max(1, chart.Resolution / 8); // within a 32nd: shifted (§5.1).
 
-        int resolution = chart.Resolution;
-        long tolerance = Math.Max(1, resolution / 8); // within a 32nd: shifted (§5.1).
-
-        foreach (var beat in beats)
+        int n = beats.Count;
+        var scalars = new sbyte[n * PreparedPart.ScalarsPerBeat];
+        var riffIds = new Dictionary<string, int>(StringComparer.Ordinal);
+        var riffGroups = new int[n];
+        for (int i = 0; i < n; i++)
         {
-            source.Add(beat.SourcePatternId);
-            var beatCandidates = BeatPattern.CandidatesFor(beat.SourceOffsets48);
-            candidates.Add([.. beatCandidates]);
-            scalars.Add((sbyte)beat.GapBucket);
+            PreparedParts.Pack(beats[i], scalars.AsSpan(i * PreparedPart.ScalarsPerBeat, PreparedPart.ScalarsPerBeat));
+            if (!riffIds.TryGetValue(beats[i].RiffKey, out int id))
+                riffIds[beats[i].RiffKey] = id = riffIds.Count;
+            riffGroups[i] = id;
+        }
 
-            // The label: the reference's kept pattern in this beat, snapped to source onsets.
+        return new PreparedPart(
+            songKey, style, sourceRank, part.ToString(),
+            NeuralConditioning.PairName(from, to),
+            [.. beats.Select(static b => b.SourcePatternId)],
+            [.. beats.Select(static b => b.SourceOffsets48)],
+            scalars,
+            [.. beats.Select(static b => (float)b.SecondsPerBeat)],
+            riffGroups,
+            [.. beats.Select(static b => b.StarPowerPhrase)],
+            [.. beats.Select(static b => b.SoloPhrase)],
+            LabelsOf(beats, targetTicks, tolerance),
+            LabelsOf(beats, rulesTicks, tolerance));
+    }
+
+    /// <summary>
+    /// Each beat's label: the source onsets with a chord of <paramref name="kept"/> (sorted) within
+    /// <paramref name="tolerance"/>, as the nearest of the beat's candidates, so every label is decodable.
+    /// </summary>
+    private static int[] LabelsOf(IReadOnlyList<BeatFrame> beats, long[] kept, long tolerance)
+    {
+        var labels = new int[beats.Count];
+        for (int i = 0; i < beats.Count; i++)
+        {
+            var beat = beats[i];
             var keptSlots = new List<int>();
-            foreach (long tick in beat.SourceTicks)
+            for (int k = 0; k < beat.SourceTicks.Length; k++)
             {
-                bool kept = targetTicks.Any(tt => Math.Abs(tt - tick) <= tolerance);
-                if (kept)
-                {
-                    for (int k = 0; k < beat.SourceOffsets48.Length && k < beat.SourceTicks.Length; k++)
-                    {
-                        if (beat.SourceTicks[k] == tick)
-                            keptSlots.Add(beat.SourceOffsets48[k]);
-                    }
-                }
+                if (Near(kept, beat.SourceTicks[k], tolerance))
+                    keptSlots.Add(beat.SourceOffsets48[k]);
             }
 
-            // The label: the reference's kept pattern in this beat, snapped to source onsets
-            // and mapped onto the beat's own candidates, so every label is decodable.
-            int label = keptSlots.Count == 0
+            labels[i] = keptSlots.Count == 0
                 ? BeatPattern.EmptyId
-                : BeatPattern.NearestCandidate(beatCandidates, keptSlots);
-            labels.Add(label);
+                : BeatPattern.NearestCandidate(BeatPattern.CandidatesFor(beat.SourceOffsets48), keptSlots);
         }
 
-        var riffGroups = RiffGroupIds(beats);
-        var scalarBytes = new sbyte[beats.Count * 8];
-        for (int i = 0; i < beats.Count; i++)
-        {
-            var b = beats[i];
-            scalarBytes[i * 8 + 0] = (sbyte)Math.Clamp(b.BeatInMeasure, -100, 100);
-            scalarBytes[i * 8 + 1] = (sbyte)b.GapBucket;
-            scalarBytes[i * 8 + 2] = (sbyte)(b.PhraseStart ? 1 : 0);
-            scalarBytes[i * 8 + 3] = (sbyte)(b.SectionStart ? 1 : 0);
-            scalarBytes[i * 8 + 4] = (sbyte)(b.HasSustain ? 1 : 0);
-            scalarBytes[i * 8 + 5] = (sbyte)(b.StarPower ? 1 : 0);
-            scalarBytes[i * 8 + 6] = (sbyte)(b.Solo ? 1 : 0);
-            scalarBytes[i * 8 + 7] = (sbyte)Math.Clamp(b.RiffRepeat, 0, 100);
-        }
-
-        return new PreparedPart(songKey, style, tier, part.ToString(), $"{from}->{to}",
-            [.. source], [.. candidates], scalarBytes, riffGroups, [.. labels]);
+        return labels;
     }
 
-    private static int[] RiffGroupIds(IReadOnlyList<BeatFrame> beats)
+    // Whether sorted holds a tick within tolerance of tick.
+    private static bool Near(long[] sorted, long tick, long tolerance)
     {
-        var ids = new Dictionary<string, int>(StringComparer.Ordinal);
-        var result = new int[beats.Count];
-        for (int i = 0; i < beats.Count; i++)
-        {
-            if (!ids.TryGetValue(beats[i].RiffKey, out int id))
-                ids[beats[i].RiffKey] = id = ids.Count;
-            result[i] = id;
-        }
-
-        return result;
+        int index = Array.BinarySearch(sorted, tick);
+        if (index >= 0)
+            return true;
+        index = ~index;
+        return (index < sorted.Length && sorted[index] - tick <= tolerance)
+            || (index > 0 && tick - sorted[index - 1] <= tolerance);
     }
 
-    /// <summary>Whether the target looks generated rather than hand-made (§6.2): identical to Rules' draft.</summary>
-    private static bool LooksGenerated(EditableChart chart, ChartInstrument part, ChartDifficulty from, ChartDifficulty to)
+    /// <summary>The chords Rules' draft keeps, by the shipped rules for the target (the evaluation's baseline, §6.6).</summary>
+    private static long[]? RulesTicks(EditableChart chart, ChartInstrument part, ChartDifficulty from, ChartDifficulty to, ChartReadOptions readOptions)
     {
         try
         {
             var kind = ChartInstruments.KindOf(part);
-            var draft = Reducer.Reduce(chart, part, from, to, FretReductionRules.Default(kind, to));
-            var actual = chart.PartOf(part)![to].Notes;
-            if (draft.Notes.Count != actual.Count)
-                return false;
-            var a = draft.Notes.Select(static n => n.Tick).Order().ToArray();
-            var b = actual.AsSpan().ToArray().Select(static n => n.Tick).Order().ToArray();
-            return a.SequenceEqual(b);
+            var draft = Reducer.Reduce(chart, part, from, to, FretReductionRules.Default(kind, to), options: readOptions);
+            return [.. draft.Notes.Select(static n => n.Tick).Distinct().Order()];
         }
-        catch
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
         {
-            return false;
+            return null;
         }
     }
+
+    /// <summary>Whether the target looks generated rather than hand-made (§6.2): its chords are Rules' draft's.</summary>
+    private static bool LooksGenerated(long[] rulesTicks, EditableTrack actual) =>
+        rulesTicks.SequenceEqual(actual.Notes.AsSpan().ToArray().Select(static n => n.Tick).Distinct().Order());
 
     private static string DedupeKey(EditableTrack a, EditableTrack b)
     {
@@ -272,24 +278,22 @@ internal static class Prepare
         }
     }
 
+    // FNV-1a over the key's characters: the same on every run and machine, unlike string.GetHashCode.
+    private static uint StableHash(string key)
+    {
+        unchecked
+        {
+            uint hash = 2166136261;
+            foreach (char c in key)
+                hash = (hash ^ c) * 16777619;
+            return hash;
+        }
+    }
+
     private static string SongKeyOf(string artist, string title)
     {
         static string Norm(string s) => new string(s.ToLowerInvariant().Where(char.IsLetterOrDigit).ToArray());
         return Norm(artist) + "|" + Norm(title);
-    }
-
-    private static int? TierOf(Dictionary<string, string> ini, ChartInstrument part)
-    {
-        string key = part switch
-        {
-            ChartInstrument.Bass => "diff_bass",
-            ChartInstrument.Keys => "diff_keys",
-            ChartInstrument.Rhythm => "diff_rhythm",
-            _ => "diff_guitar",
-        };
-        if (ini.TryGetValue(key, out string? value) && int.TryParse(value.Split(' ')[0], out int tier))
-            return tier;
-        return null;
     }
 
     private static Dictionary<string, string> ReadSongIni(string path)
@@ -356,5 +360,5 @@ internal static class Prepare
         return fallback;
     }
 
-    private const string ThisVersion = "1.0";
+    private const string ThisVersion = "2.0";
 }

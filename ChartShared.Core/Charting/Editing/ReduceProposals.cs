@@ -169,9 +169,8 @@ public sealed class ReduceProposals
     }
 
     /// <summary>
-    /// Starts a run with a learned generator (spec §4.1): each step is drafted by
-    /// <paramref name="generator"/>, falling back to Rules per part with
-    /// <see cref="FallbackReasons"/> saying why (§3.7).
+    /// Starts a run with a learned generator (spec §4.1): each step is drafted by <paramref name="generator"/>, falling back
+    /// to <paramref name="rules"/> per difficulty, with <see cref="GeneratorNotes"/> saying why or how it drafted (§3.7).
     /// </summary>
     /// <returns>Whether there was anything to reduce.</returns>
     public bool StartWithGenerator(
@@ -185,8 +184,8 @@ public sealed class ReduceProposals
         return StartCore(part, range, steps, rules, generator, options);
     }
 
-    /// <summary>Why each drafted step fell back to Rules, by target difficulty (§3.7).</summary>
-    public IReadOnlyDictionary<ChartDifficulty, string> FallbackReasons { get; private set; } =
+    /// <summary>What the run's generator said about each step, by target difficulty: why it fell back to Rules, or how it drafted (§3.7).</summary>
+    public IReadOnlyDictionary<ChartDifficulty, string> GeneratorNotes { get; private set; } =
         new Dictionary<ChartDifficulty, string>();
 
     private bool StartCore(
@@ -199,7 +198,7 @@ public sealed class ReduceProposals
     {
         _session.Tools.Cancel();
         Cancel();
-        FallbackReasons = new Dictionary<ChartDifficulty, string>();
+        GeneratorNotes = new Dictionary<ChartDifficulty, string>();
         if (_session.Chart.PartOf(part) is null)
         {
             _session.Status = NoSourceNotes;
@@ -207,24 +206,12 @@ public sealed class ReduceProposals
         }
 
         GeneratedDifficulties generated;
-        var fallbacks = new Dictionary<ChartDifficulty, string>();
+        var notes = new Dictionary<ChartDifficulty, string>();
         try
         {
             generated = DifficultyGenerator.Draft(
                 _session.Chart, part, steps,
-                (chart, f, t) =>
-                {
-                    if (generator is not null && generator.CanRunFor(ChartInstruments.KindOf(part)))
-                    {
-                        var draft = generator.Draft(chart, part, f, t, options ?? GenerationOptions.Default, range, _session.ReadOptions, out string? reason);
-                        if (draft is not null)
-                            return draft;
-                        if (reason is not null)
-                            fallbacks[t] = reason;
-                    }
-
-                    return rules(chart, f, t);
-                },
+                (chart, f, t) => DifficultyGenerator.ReduceWith(chart, part, f, t, generator, options, range, _session.ReadOptions, notes, rules),
                 range);
         }
         catch (Exception e) when (EditorSession.IsRefusal(e))
@@ -243,7 +230,7 @@ public sealed class ReduceProposals
         Range = range;
         Drafts = generated.Drafts;
         Drafted = generated.Drafted;
-        FallbackReasons = fallbacks;
+        GeneratorNotes = notes;
         _session.Status = null;
         _session.RaiseState();
         return true;
@@ -255,7 +242,7 @@ public sealed class ReduceProposals
         Range = null;
         Drafts = [];
         Drafted = null;
-        FallbackReasons = new Dictionary<ChartDifficulty, string>();
+        GeneratorNotes = new Dictionary<ChartDifficulty, string>();
         _session.RaiseState();
     }
 }

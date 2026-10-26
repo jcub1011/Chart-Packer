@@ -14,8 +14,8 @@ public static class BeatPattern
     public const int EmptyId = 0;
 
     /// <summary>
-    /// The pack vocabulary v1: the commonest shapes. Index 0 is empty; the rest are fixed shapes.
-    /// Covers ~95% of official Easy beats; anything else maps to its nearest shape (§3.4 step 2).
+    /// The pack vocabulary v2: every subset of the beat's sixteenths, and every subset of its triplet with or without the
+    /// downbeat. Index 0 is empty. Anything else maps to its nearest shape (§3.4 step 2).
     /// </summary>
     public static readonly string[] Vocabulary =
     [
@@ -34,7 +34,13 @@ public static class BeatPattern
         "1 e & a",  // 12
         "t",        // 13: triplet partial
         "T",        // 14: triplet partial
-        "t T",      // 15: triplet full
+        "t T",      // 15: triplet, no downbeat
+        "1 t",      // 16
+        "1 T",      // 17
+        "1 t T",    // 18: full triplet
+        "e a",      // 19
+        "1 e a",    // 20
+        "e & a",    // 21
     ];
 
     /// <summary>The 48th-offsets of each vocabulary pattern's slots.</summary>
@@ -56,11 +62,24 @@ public static class BeatPattern
         [16],
         [32],
         [16, 32],
+        [0, 16],
+        [0, 32],
+        [0, 16, 32],
+        [12, 36],
+        [0, 12, 36],
+        [12, 24, 36],
     ];
 
     /// <summary>How many chords each vocabulary pattern keeps (for the density control, §3.4).</summary>
     public static IReadOnlyList<int> ChordsKept { get; } =
-        VocabularyOffsets.Select(static o => o.Length == 0 ? 0 : o.Length).ToList();
+        VocabularyOffsets.Select(static o => o.Length).ToList();
+
+    /// <summary>
+    /// The 48th of a beat <paramref name="beatLength"/> ticks long that a tick <paramref name="sinceBeat"/> after its start
+    /// is nearest: a note a tick or two off the grid is on it (§3.4 step 2). Never past the beat's last 48th.
+    /// </summary>
+    public static int OffsetOf(long sinceBeat, long beatLength) =>
+        (int)Math.Clamp(Math.Round((double)sinceBeat * UnitsPerBeat / Math.Max(1, beatLength), MidpointRounding.AwayFromZero), 0, UnitsPerBeat - 1);
 
     /// <summary>Encodes the source onsets in a beat (48th offsets) as the nearest vocabulary id.</summary>
     public static int EncodeSource(IReadOnlyList<int> offsets48)
@@ -123,6 +142,8 @@ public static class BeatPattern
 
         return best;
     }
+
+    /// <summary>The slots of <paramref name="patternId"/> the source plays in the beat.</summary>
     public static IReadOnlyList<int> MapToSource(IReadOnlyList<int> sourceOffsets48, int patternId)
     {
         var source = new HashSet<int>(sourceOffsets48);

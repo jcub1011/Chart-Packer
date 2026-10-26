@@ -3,32 +3,41 @@ using ChartShared.Core.Generation.Neural;
 
 namespace DifficultyTrainer;
 
-/// <summary>Evaluate (spec §4.5, §6.6): decoded + teacher-forced figures per pack, target and style.</summary>
+/// <summary>
+/// Evaluate (spec §4.5, §6.6, M4): on the held-out songs, how close the pack's decoded drafts and Rules' drafts each come
+/// to the official charts, beat for beat on the same beats: which pattern each beat keeps, and which onsets.
+/// </summary>
 internal static class Evaluate
 {
+    /// <summary>The grid the prepared beats are laid out on for decoding: any resolution works, the gaps scale with it.</summary>
+    private const int Resolution = 480;
+
     public static int Run(string[] args)
     {
         string input = Arg(args, "--in", "training-set.json");
         string packPath = Arg(args, "--pack", "");
+        int maxParts = int.TryParse(Arg(args, "--max-parts", "0"), out int mp) ? mp : 0;
+        bool styles = Arg(args, "--styles", "off") == "on";
         if (!File.Exists(input))
         {
-            Console.Error.WriteLine("Usage: evaluate --in <training-set.json> [--pack <pack.neuralpack>]");
+            Console.Error.WriteLine("Usage: evaluate --in <training-set.json> [--pack <pack.neuralpack>] [--max-parts N] [--styles on]");
             return 2;
         }
 
         TrainingSet set;
         using (var stream = File.OpenRead(input))
             set = JsonSerializer.Deserialize(stream, TrainingSetJsonContext.Default.TrainingSet)!;
+        if (set.BeatSchemaVersion != BeatPipeline.BeatSchemaVersion)
+        {
+            Console.Error.WriteLine($"The training set is beat schema {set.BeatSchemaVersion}; this trainer is {BeatPipeline.BeatSchemaVersion}. Run prepare again.");
+            return 1;
+        }
 
-        var heldOut = new HashSet<string>(StringComparer.Ordinal);
-        string heldOutPath = input + ".heldout";
-        if (File.Exists(heldOutPath))
-            heldOut = [.. File.ReadAllLines(heldOutPath).Where(static l => l.Length > 0)];
-
+        var heldOut = Train.HeldOutKeys(input);
         var parts = set.Examples.Where(e => heldOut.Contains(e.SongKey)).ToList();
         if (parts.Count == 0)
         {
-            Console.WriteLine("No held-out parts; evaluating on all parts.");
+            Console.WriteLine("No held-out parts; evaluating on all parts (the figures are then on training data).");
             parts = set.Examples;
         }
 
@@ -46,75 +55,94 @@ internal static class Evaluate
             }
         }
 
-        Console.WriteLine($"Evaluating {parts.Count} held-out parts.");
-        foreach (var target in new[] { "Easy", "Medium", "Hard" })
+        var model = pack is null ? null : new BiGruCrf(pack);
+        Console.WriteLine($"Evaluating {parts.Count} held-out parts{(styles ? ", each in its prepared style" : ", style Any")}.");
+        Console.WriteLine("Against the official chart, on beats the source plays: pattern = the beat's kept pattern matches; onsets = precision / recall / F1 of kept onsets; density = kept onsets ÷ official.");
+        foreach (var target in new[] { "Hard", "Medium", "Easy" })
         {
-            var slice = parts.Where(p => p.Pair.EndsWith("->" + target)).ToList();
-            if (slice.Count == 0)
+            foreach (var pair in set.Pairs.Where(p => p.EndsWith("->" + target, StringComparison.Ordinal)))
             {
-                Console.WriteLine($"{target}: no held-out parts.");
-                continue;
-            }
-
-            // Teacher-forced: labels vs nearest-count baseline + model argmax where available.
-            long beats = slice.Sum(p => (long)p.Labels.Length);
-            long empty = slice.Sum(p => (long)p.Labels.Count(l => l == BeatPattern.EmptyId));
-            long sub = slice.Sum(p => (long)p.SourcePatterns.Zip(p.Labels, static (s, l) => s == l && l != BeatPattern.EmptyId ? 1 : 0).Sum());
-            Console.WriteLine($"{target}: {slice.Count} parts, {beats} beats ({100.0 * empty / beats:F1}% empty reference, {100.0 * sub / beats:F1}% source-kept).");
-
-            if (pack is not null)
-            {
-                var model = new BiGruCrf(pack);
-                long agree = 0;
-                long total = 0;
-                foreach (var part in slice.Take(200))
+                var slice = parts.Where(p => p.Pair == pair).ToList();
+                if (maxParts > 0)
+                    slice = slice.Take(maxParts).ToList();
+                if (slice.Count == 0)
                 {
-                    int[] pred = Predict(model, pack, part, set);
-                    for (int i = 0; i < part.Labels.Length && i < pred.Length; i++)
-                    {
-                        if (pred[i] == part.Labels[i])
-                            agree++;
-                        total++;
-                    }
+                    Console.WriteLine($"{pair}: no held-out parts.");
+                    continue;
                 }
 
-                Console.WriteLine($"  neural decoded pattern agreement: {100.0 * agree / Math.Max(1, total):F1}% (Viterbi-decoded, §6.6).");
+                var rules = new Score();
+                var neural = new Score();
+                foreach (var part in slice)
+                {
+                    rules.Add(part, part.RulesLabels);
+                    if (model is not null)
+                        neural.Add(part, Predict(model, pack!, part, set, target, styles));
+                }
+
+                Console.WriteLine($"{pair}: {slice.Count} parts, {rules.Beats} beats.");
+                Console.WriteLine($"  Rules   {rules}");
+                if (model is not null)
+                    Console.WriteLine($"  Neural  {neural}   ({neural.Compare(rules)})");
             }
         }
 
-        Console.WriteLine("Note: Rules baselines come from the proposals study (§5.6, §5.9): Hard 71.0%, Medium 45.7%, Easy 62.2% pattern accuracy.");
         return 0;
     }
 
-    private static int[] Predict(BiGruCrf model, NeuralPack pack, PreparedPart part, TrainingSet set)
+    private static int[] Predict(BiGruCrf model, NeuralPack pack, PreparedPart part, TrainingSet set, string target, bool styles)
     {
-        // Full Viterbi path decode (spec §6.6 "decoded"): the model's own earlier choices as
-        // context, with riff tying and the pack's min-gap floor — not teacher-forced argmax.
-        int n = part.SourcePatterns.Length;
-        var conditioning = new ChartShared.Core.Generation.Neural.RunConditioning(
-            part.Pair.EndsWith("Easy") ? ChartShared.Core.Charts.ChartDifficulty.Easy
-            : part.Pair.EndsWith("Medium") ? ChartShared.Core.Charts.ChartDifficulty.Medium
-            : ChartShared.Core.Charts.ChartDifficulty.Hard,
-            ChartShared.Core.Charts.ChartDifficulty.Expert,
-            ChartShared.Core.Charts.ChartInstrumentKind.FiveFret,
-            Math.Max(0, Array.IndexOf(set.Styles, part.Style)),
-            BeatPipeline.TierBucketOf(part.Tier));
-        const int resolution = 480;
-        var beats = part.SourcePatterns.Select((s, i) => new BeatFrame(
-            i * resolution, 0, Math.Clamp((int)part.Scalars[i * 8], 0, 3), s,
-            [0], [i * resolution], part.Scalars[i * 8 + 1],
-            part.Scalars[i * 8 + 2] != 0, part.Scalars[i * 8 + 3] != 0, part.Scalars[i * 8 + 4] != 0,
-            part.Scalars[i * 8 + 5] != 0, part.Scalars[i * 8 + 6] != 0, "g" + part.RiffGroups[i], part.Scalars[i * 8 + 7])).ToList();
-        var candidateSets = part.Candidates.Select(static c => c.ToHashSet()).ToList();
-        var emissions = model.Emissions(beats, conditioning, candidateSets);
-        long floor = 0;
-        string target = part.Pair.Split("->").Last();
-        if (pack.Manifest.MinGapTicks.TryGetValue(target, out long gap48))
-            floor = gap48 * resolution / BeatPattern.UnitsPerBeat;
-        var constraints = new ViterbiDecoder.DecodeConstraints(floor, true, 0, candidateSets, beats);
-        int[] packed = ViterbiDecoder.Decode(emissions, pack.Weights.Transition, pack.Weights.StartTransition, pack.Weights.EndTransition, constraints);
-        // Back to BeatPattern ids (§3.4 candidates): pack vocab v1 shares the order.
-        return packed;
+        // Full Viterbi path decode (spec §6.6 "decoded"): riff tying, the pack's min-gap floor and star power, on the
+        // part's own onsets — what the apps draft, before voicing.
+        var manifest = pack.Manifest;
+        var frames = part.Frames(Resolution);
+        var candidateSets = part.Candidates().Select(static c => c.ToHashSet()).ToList();
+        int style = styles ? Math.Max(0, manifest.Styles.FindIndex(s => string.Equals(s.Label, part.Style, StringComparison.OrdinalIgnoreCase))) : 0;
+        int pair = Math.Max(0, manifest.Pairs.FindIndex(p => string.Equals(p, part.Pair, StringComparison.OrdinalIgnoreCase)));
+        int instrument = Math.Max(0, manifest.Instruments.FindIndex(i => string.Equals(i, part.Instrument, StringComparison.OrdinalIgnoreCase)));
+        var emissions = model.Emissions(part.SourcePatterns, part.AllScalars(), style, pair, instrument, part.SourceRank, candidateSets);
+        long floor = manifest.MinGapTicks.TryGetValue(target, out long gap48) ? gap48 * Resolution / BeatPattern.UnitsPerBeat : 0;
+        var constraints = new ViterbiDecoder.DecodeConstraints(floor, true, 0, candidateSets, frames);
+        return ViterbiDecoder.Decode(emissions, pack.Weights.Transition, pack.Weights.StartTransition, pack.Weights.EndTransition, constraints);
+    }
+
+    // How close one generator's labels come to the official ones, summed over parts.
+    private sealed class Score
+    {
+        public long Beats { get; private set; }
+        private long _patterns;
+        private long _kept;
+        private long _official;
+        private long _hits;
+
+        public void Add(PreparedPart part, int[] labels)
+        {
+            for (int i = 0; i < part.Labels.Length && i < labels.Length; i++)
+            {
+                if (part.Offsets[i].Length == 0)
+                    continue;
+                Beats++;
+                if (labels[i] == part.Labels[i])
+                    _patterns++;
+                var mine = BeatPattern.VocabularyOffsets[labels[i]];
+                var theirs = BeatPattern.VocabularyOffsets[part.Labels[i]];
+                _kept += mine.Length;
+                _official += theirs.Length;
+                _hits += mine.Count(theirs.Contains);
+            }
+        }
+
+        private double Pattern => 100.0 * _patterns / Math.Max(1, Beats);
+        private double Precision => 100.0 * _hits / Math.Max(1, _kept);
+        private double Recall => 100.0 * _hits / Math.Max(1, _official);
+        private double F1 => Precision + Recall == 0 ? 0 : 2 * Precision * Recall / (Precision + Recall);
+        private double Density => (double)_kept / Math.Max(1, _official);
+
+        public string Compare(Score rules) =>
+            $"pattern {Pattern - rules.Pattern:+0.0;-0.0} pts, F1 {F1 - rules.F1:+0.0;-0.0} pts vs Rules";
+
+        public override string ToString() =>
+            $"pattern {Pattern,5:F1}%   onsets P {Precision,5:F1}%  R {Recall,5:F1}%  F1 {F1,5:F1}%   density {Density:F2}";
     }
 
     private static string Arg(string[] args, string name, string fallback)

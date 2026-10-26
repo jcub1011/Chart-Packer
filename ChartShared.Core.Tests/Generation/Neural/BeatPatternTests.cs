@@ -5,6 +5,8 @@ namespace ChartShared.Core.Tests.Generation;
 [TestClass]
 public sealed class BeatPatternTests
 {
+    private static int Id(string pattern) => Array.IndexOf(BeatPattern.Vocabulary, pattern);
+
     [TestMethod]
     public void EmptyIsAlwaysACandidate()
     {
@@ -32,19 +34,43 @@ public sealed class BeatPatternTests
     }
 
     [TestMethod]
-    public void SixteenthsKeepTheirSlots()
+    public void EverySubsetOfTheSixteenthsCanBeKept()
     {
         var candidates = BeatPattern.CandidatesFor([0, 12, 24, 36]);
 
-        Assert.IsTrue(candidates.Contains(12)); // 1 e & a
-        Assert.IsTrue(candidates.Contains(6)); // 1 e
+        // All sixteen subsets, empty among them: "e a" and "1 e a" too.
+        Assert.HasCount(16, candidates);
+        Assert.IsTrue(candidates.Contains(Id("e a")));
+        Assert.IsTrue(candidates.Contains(Id("1 e a")));
+        Assert.IsTrue(candidates.Contains(Id("e & a")));
+    }
+
+    [TestMethod]
+    public void AFullTripletKeepsItsDownbeat()
+    {
+        // The reference keeping all three triplet notes is labelled as all three, not "t T" without the downbeat.
+        var candidates = BeatPattern.CandidatesFor([0, 16, 32]);
+
+        Assert.AreEqual(Id("1 t T"), BeatPattern.NearestCandidate(candidates, [0, 16, 32]));
+        Assert.AreEqual(Id("1 t"), BeatPattern.NearestCandidate(candidates, [0, 16]));
+    }
+
+    [TestMethod]
+    public void OnsetsSnapToTheNearest48th()
+    {
+        // A note a tick early is on the grid, not a 48th before it; a note just before the next beat stays in this one.
+        Assert.AreEqual(24, BeatPattern.OffsetOf(239, 480));
+        Assert.AreEqual(24, BeatPattern.OffsetOf(241, 480));
+        Assert.AreEqual(0, BeatPattern.OffsetOf(0, 480));
+        Assert.AreEqual(47, BeatPattern.OffsetOf(479, 480));
+        Assert.AreEqual(16, BeatPattern.OffsetOf(160, 480));
     }
 
     [TestMethod]
     public void MapToSourceKeepsOnlySourceOnsets()
     {
         // Pattern "1 & a" mapped onto a beat that only plays 1 &: the a is dropped.
-        var mapped = BeatPattern.MapToSource([0, 24], 11);
+        var mapped = BeatPattern.MapToSource([0, 24], Id("1 & a"));
 
         CollectionAssert.AreEquivalent(new[] { 0, 24 }, mapped.ToList());
     }

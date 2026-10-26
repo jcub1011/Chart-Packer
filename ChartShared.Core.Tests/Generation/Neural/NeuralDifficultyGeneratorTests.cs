@@ -34,48 +34,17 @@ public sealed class NeuralDifficultyGeneratorTests
         return chart;
     }
 
-    private static NeuralPack DownbeatPack()
+    // Every beat scores "1" (the downbeat) highest and nothing else: official Easy is mostly "1" (§5.2).
+    private static NeuralPack DownbeatPack(string[]? instruments = null, string[]? pairs = null)
     {
-        int vocab = BeatPattern.Vocabulary.Length;
-        var manifest = new PackManifest(
-            NeuralPack.FormatVersion,
-            BiGruCrf.ArchitectureName,
-            BeatPipeline.BeatSchemaVersion,
-            "test", "tests", "Downbeat test pack.",
-            [new PackStyle(0, "Any", "Blend."), new PackStyle(1, "Harmonix", "H.")],
-            ["Guitar"],
-            ["Expert->Easy", "Expert->Medium", "Expert->Hard"],
-            new PackInputs(true, true, 4, 2, ["Easy", "Medium", "Hard"], ["Any", "Harmonix"]),
-            new Dictionary<string, long> { ["Easy"] = 12, ["Medium"] = 12, ["Hard"] = 12 },
-            new Dictionary<string, double[]> { ["Easy"] = [0.5, 2.0], ["Medium"] = [0.5, 2.0], ["Hard"] = [0.5, 2.0] },
-            [.. BeatPattern.Vocabulary],
-            new PackTrainingSummary(1, 1, "tests", "2026-10-26", "tests"),
-            "test");
-        var bias = new float[vocab];
-        bias[1] = 5; // keep the downbeat (§5.2: official Easy is mostly "1")
-        var zero = new float[0];
-        var weights = new PackWeights
-        {
-            SourceEmbedding = new float[vocab * 2],
-            StyleEmbedding = new float[2 * 2],
-            TargetEmbedding = new float[3 * 2],
-            Forward = ZeroGru(15, 4),
-            Backward = ZeroGru(15, 4),
-            OutputWeight = new float[8 * vocab],
-            OutputBias = bias,
-            Transition = new float[vocab * vocab],
-            StartTransition = new float[vocab],
-            EndTransition = new float[vocab],
-        };
-        return new NeuralPack { Manifest = manifest, Weights = weights };
+        var manifest = NeuralTestPacks.Manifest(styles: ["Any", "Harmonix"], instruments: instruments, pairs: pairs);
+        var bias = new float[BeatPattern.Vocabulary.Length];
+        bias[1] = 5;
+        return NeuralTestPacks.Pack(manifest, NeuralTestPacks.BiasWeights(manifest, bias));
     }
 
-    private static GruWeights ZeroGru(int input, int hidden) => new()
-    {
-        Wz = new float[hidden * input], Wr = new float[hidden * input], Wh = new float[hidden * input],
-        Uz = new float[hidden * hidden], Ur = new float[hidden * hidden], Uh = new float[hidden * hidden],
-        BzIh = new float[hidden], BzHh = new float[hidden], BrIh = new float[hidden], BrHh = new float[hidden], BnIh = new float[hidden], BnHh = new float[hidden],
-    };
+    private static readonly Func<ChartInstrument, ChartDifficulty, FretReductionRules> Shipped =
+        static (part, target) => FretReductionRules.Default(ChartInstruments.KindOf(part), target);
 
     private async Task InstallAsync(GeneratorModelStore store, NeuralPack pack, string name)
     {
@@ -88,7 +57,7 @@ public sealed class NeuralDifficultyGeneratorTests
     {
         var store = Store();
         await InstallAsync(store, DownbeatPack(), "test");
-        var generator = new NeuralDifficultyGenerator(store, static target => FretReductionRules.Default(ChartInstrumentKind.FiveFret, target));
+        var generator = new NeuralDifficultyGenerator(store, Shipped);
         var chart = Chart();
 
         var result = generator.Draft(chart, ChartInstrument.Guitar, ChartDifficulty.Expert, ChartDifficulty.Easy,
@@ -110,7 +79,7 @@ public sealed class NeuralDifficultyGeneratorTests
     {
         var store = Store();
         await InstallAsync(store, DownbeatPack(), "test");
-        var generator = new NeuralDifficultyGenerator(store, static target => FretReductionRules.Default(ChartInstrumentKind.FiveFret, target));
+        var generator = new NeuralDifficultyGenerator(store, Shipped);
 
         var first = generator.Draft(Chart(), ChartInstrument.Guitar, ChartDifficulty.Expert, ChartDifficulty.Easy,
             new GenerationOptions(Style: "Any"), null, ChartReadOptions.Default, out _);
@@ -132,7 +101,7 @@ public sealed class NeuralDifficultyGeneratorTests
         var chart = Chart();
         var task = InstallAsync(store, DownbeatPack(), "test");
         task.GetAwaiter().GetResult();
-        var generator = new NeuralDifficultyGenerator(store, static target => FretReductionRules.Default(ChartInstrumentKind.FiveFret, target));
+        var generator = new NeuralDifficultyGenerator(store, Shipped);
 
         var result = generator.Draft(chart, ChartInstrument.Guitar, ChartDifficulty.Expert, ChartDifficulty.Easy,
             new GenerationOptions(Style: "Any", ModelName: "test"), (960, 1919), ChartReadOptions.Default, out string? reason);
@@ -159,7 +128,7 @@ public sealed class NeuralDifficultyGeneratorTests
     private static NeuralDifficultyGenerator CappedGenerator(GeneratorModelStore store, bool capLanes, out GenerationOptions options)
     {
         options = new GenerationOptions(Style: "Any", ModelName: "test", CapLanes: capLanes);
-        return new NeuralDifficultyGenerator(store, static target => FretReductionRules.Default(ChartInstrumentKind.FiveFret, target));
+        return new NeuralDifficultyGenerator(store, Shipped);
     }
 
     [TestMethod]
@@ -195,6 +164,72 @@ public sealed class NeuralDifficultyGeneratorTests
     }
 
     [TestMethod]
+    public void KeptChordsAreVoicedAsRulesVoicesThem()
+    {
+        // Spec §3.4 steps 5–6: the network picks the onsets, Rules plays them. Given the chords Rules keeps, the voicing is
+        // Rules' own, note for note.
+        var chart = HighChart();
+        var rules = FretReductionRules.Default(ChartInstrumentKind.FiveFret, ChartDifficulty.Easy);
+        var byRules = Reducer.Reduce(chart, ChartInstrument.Guitar, ChartDifficulty.Expert, ChartDifficulty.Easy, rules);
+
+        var voiced = Reducer.Voice(chart, ChartInstrument.Guitar, ChartDifficulty.Expert, ChartDifficulty.Easy, rules,
+            byRules.Notes.Select(static n => n.Tick).ToHashSet());
+
+        CollectionAssert.AreEqual(
+            byRules.Notes.Select(static n => (n.Tick, n.Lane, n.Length)).ToList(),
+            voiced.Notes.Select(static n => (n.Tick, n.Lane, n.Length)).ToList());
+        CollectionAssert.AreEqual(byRules.Flags.ToList(), voiced.Flags.ToList());
+        Assert.AreEqual(byRules.Removed, voiced.Removed);
+    }
+
+    [TestMethod]
+    public async Task APartThePackWasNotTrainedOnFallsBack()
+    {
+        var store = Store();
+        await InstallAsync(store, DownbeatPack(instruments: ["Bass"]), "test");
+        var generator = new NeuralDifficultyGenerator(store, Shipped);
+
+        var result = generator.Draft(Chart(), ChartInstrument.Guitar, ChartDifficulty.Expert, ChartDifficulty.Easy,
+            new GenerationOptions(ModelName: "test"), null, ChartReadOptions.Default, out string? note);
+
+        Assert.IsNull(result);
+        StringAssert.Contains(note, "Guitar");
+    }
+
+    [TestMethod]
+    public async Task APairThePackLacksDraftsAsFromExpertAndSaysSo()
+    {
+        var store = Store();
+        await InstallAsync(store, DownbeatPack(), "test");
+        var generator = new NeuralDifficultyGenerator(store, Shipped);
+        var chart = Chart();
+        new AddNotes(ChartInstrument.Guitar, ChartDifficulty.Hard,
+            chart.PartOf(ChartInstrument.Guitar)![ChartDifficulty.Expert].Notes.AsSpan().ToArray()).Apply(chart);
+
+        var result = generator.Draft(chart, ChartInstrument.Guitar, ChartDifficulty.Hard, ChartDifficulty.Easy,
+            new GenerationOptions(ModelName: "test"), null, ChartReadOptions.Default, out string? note);
+
+        Assert.IsNotNull(result, note);
+        Assert.IsNotNull(note, "The dialog says when the pair isn't one the pack has (§3.6).");
+        StringAssert.Contains(note, "Hard->Easy");
+    }
+
+    [TestMethod]
+    public async Task ADamagedPackFallsBackInsteadOfThrowing()
+    {
+        var store = Store();
+        using (var stream = new MemoryStream("{\"Manifest\":{\"FormatVersion\":2},\"Weights\":{}}"u8.ToArray()))
+            await store.SaveAsync(new GeneratorModelId(GeneratorType.NeuralDifficulty, "broken"), stream, overwrite: true);
+        var generator = new NeuralDifficultyGenerator(store, Shipped);
+
+        var result = generator.Draft(Chart(), ChartInstrument.Guitar, ChartDifficulty.Expert, ChartDifficulty.Easy,
+            new GenerationOptions(ModelName: "broken"), null, ChartReadOptions.Default, out string? note);
+
+        Assert.IsNull(result);
+        StringAssert.Contains(note, "Rules");
+    }
+
+    [TestMethod]
     public async Task CappedPhrasesKeepTheirShape()
     {
         var store = Store();
@@ -215,7 +250,7 @@ public sealed class NeuralDifficultyGeneratorTests
     [TestMethod]
     public void MissingPackFallsBackToRulesWithAReason()
     {
-        var generator = new NeuralDifficultyGenerator(Store(), static target => FretReductionRules.Default(ChartInstrumentKind.FiveFret, target));
+        var generator = new NeuralDifficultyGenerator(Store(), Shipped);
 
         var result = generator.Draft(Chart(), ChartInstrument.Guitar, ChartDifficulty.Expert, ChartDifficulty.Easy,
             new GenerationOptions(Style: "Any"), null, ChartReadOptions.Default, out string? reason);
@@ -228,7 +263,7 @@ public sealed class NeuralDifficultyGeneratorTests
     [TestMethod]
     public void DrumsFallBackToRules()
     {
-        var generator = new NeuralDifficultyGenerator(Store(), static target => FretReductionRules.Default(ChartInstrumentKind.FiveFret, target));
+        var generator = new NeuralDifficultyGenerator(Store(), Shipped);
 
         Assert.IsFalse(generator.CanRunFor(ChartInstrumentKind.Drums));
         var result = generator.Draft(Chart(), ChartInstrument.Drums, ChartDifficulty.Expert, ChartDifficulty.Easy,

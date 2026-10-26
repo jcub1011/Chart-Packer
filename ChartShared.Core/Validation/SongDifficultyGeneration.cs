@@ -15,7 +15,15 @@ namespace ChartShared.Core.Validation;
 /// <param name="Difficulties">Whether every part's missing difficulties are filled.</param>
 /// <param name="StarPower">The parts to generate star power for, each that still has none (<see cref="StarPowerGenerator"/>).</param>
 /// <param name="Scope">Which difficulties are filled; null for every missing one (<see cref="LowerDifficultyScope.Missing"/>).</param>
-public sealed record SongGenerationWork(bool Difficulties, IReadOnlyCollection<ChartInstrument> StarPower, LowerDifficultyScope? Scope = null)
+/// <param name="Generator">The learned generator the difficulties are drafted by where it can run, Rules elsewhere
+/// (improved-difficulty-generator-spec §4.4); null for Rules alone.</param>
+/// <param name="Options">The generator's options; its defaults when null.</param>
+public sealed record SongGenerationWork(
+    bool Difficulties,
+    IReadOnlyCollection<ChartInstrument> StarPower,
+    LowerDifficultyScope? Scope = null,
+    IDifficultyGenerator? Generator = null,
+    GenerationOptions? Options = null)
 {
     /// <summary>Only the missing difficulties.</summary>
     public static SongGenerationWork DifficultiesOnly { get; } = new(true, []);
@@ -35,13 +43,16 @@ public sealed record SongGenerationWork(bool Difficulties, IReadOnlyCollection<C
 /// </param>
 /// <param name="RemoveChart">The <c>notes.chart</c> the new <c>notes.mid</c> takes the place of; null when the song plays a <c>notes.mid</c>.</param>
 /// <param name="StarPower">Each part given star power, and its phrases; none when only difficulties were filled.</param>
+/// <param name="GeneratorNotes">What the work's generator said about each part's difficulties: why one fell back to
+/// Rules, or how it was drafted (§3.7, §4.4); none without a generator.</param>
 public sealed record SongGeneration(
     IReadOnlyDictionary<ChartInstrument, GeneratedDifficulties> Parts,
     EditableChart Drafted,
     ChartReadOptions After,
     IReadOnlyList<PendingSongIniChange> SongIniChanges,
     string? RemoveChart,
-    IReadOnlyDictionary<ChartInstrument, IReadOnlyList<Phrase>>? StarPower = null)
+    IReadOnlyDictionary<ChartInstrument, IReadOnlyList<Phrase>>? StarPower = null,
+    IReadOnlyDictionary<ChartInstrument, IReadOnlyDictionary<ChartDifficulty, string>>? GeneratorNotes = null)
 {
     /// <summary>Whether nothing was filled or generated.</summary>
     public bool IsEmpty => Parts.Values.All(static p => p.Drafts.Count == 0) && StarPower is not { Count: > 0 };
@@ -67,7 +78,13 @@ public sealed record SongChartRead(ChartLoadResult Load, ChartReadOptions Option
 /// <param name="Length">Its size in bytes.</param>
 /// <param name="RemoveChart">The <c>notes.chart</c> it takes the place of; null for none.</param>
 /// <param name="SongIniChanges">What saving it changes in <c>song.ini</c> (<see cref="SongGeneration.SongIniChanges"/>).</param>
-public sealed record GeneratedChart(string StagedPath, long Length, string? RemoveChart, IReadOnlyList<PendingSongIniChange> SongIniChanges)
+/// <param name="GeneratorNotes">What the work's generator said about each part's difficulties (<see cref="SongGeneration.GeneratorNotes"/>).</param>
+public sealed record GeneratedChart(
+    string StagedPath,
+    long Length,
+    string? RemoveChart,
+    IReadOnlyList<PendingSongIniChange> SongIniChanges,
+    IReadOnlyDictionary<ChartInstrument, IReadOnlyDictionary<ChartDifficulty, string>>? GeneratorNotes = null)
 {
     /// <summary>
     /// Stages the chart, the removal of the one it replaces, and its <c>song.ini</c> changes in <paramref name="draft"/>,
@@ -187,7 +204,8 @@ public static class SongDifficultyGeneration
     /// <summary>
     /// Does <paramref name="work"/> to <paramref name="read"/>'s chart: star power generated for each of its parts that
     /// still has none, with the defaults (<see cref="StarPowerOptions.Default"/>), then, when it asks, every missing
-    /// difficulty in its scope filled (<see cref="DifficultyGenerator.TargetsFor"/>) by <paramref name="rules"/>. Nothing is written,
+    /// difficulty in its scope filled (<see cref="DifficultyGenerator.TargetsFor"/>) by the work's generator where it runs and
+    /// <paramref name="rules"/> elsewhere. Nothing is written,
     /// and the chart read is left as it was. It can run off the UI thread.
     /// </summary>
     /// <param name="pairs">The song's <c>song.ini</c> as drafted.</param>
@@ -219,10 +237,14 @@ public static class SongDifficultyGeneration
 
         var variant = DifficultyGenerator.DrumsVariantOf(chart, options);
         var parts = new Dictionary<ChartInstrument, GeneratedDifficulties>();
+        var notes = new Dictionary<ChartInstrument, IReadOnlyDictionary<ChartDifficulty, string>>();
         foreach (var (part, targets) in work.Difficulties ? DifficultyGenerator.TargetsFor(chart, work.Scope ?? LowerDifficultyScope.Missing) : new Dictionary<ChartInstrument, IReadOnlyList<ChartDifficulty>>())
         {
-            var generated = DifficultyGenerator.Generate(chart, part, targets, rules, variant, options);
+            var said = new Dictionary<ChartDifficulty, string>();
+            var generated = DifficultyGenerator.Generate(chart, part, targets, rules, variant, options, work.Generator, work.Options, said);
             parts[part] = generated;
+            if (said.Count > 0)
+                notes[part] = said;
             chart = generated.Drafted;
         }
 
@@ -230,7 +252,7 @@ public static class SongDifficultyGeneration
         var changes = PendingSongIniChanges.Of(chart, new PendingSongIniInputs(loaded, pairs) { Import = import });
         var after = MidiChartWriter.SettingsAfterSave(chart, ChartReadOptions.From(PendingSongIniChanges.Apply(pairs, changes)));
         string? removeChart = chartName.Equals(ChartFiles.MidiName, StringComparison.OrdinalIgnoreCase) ? null : chartName;
-        return new SongGeneration(parts, chart, after, changes, removeChart, starPower);
+        return new SongGeneration(parts, chart, after, changes, removeChart, starPower, notes);
     }
 
     /// <summary>
@@ -250,7 +272,7 @@ public static class SongDifficultyGeneration
         if (!written.IsValid)
             throw new InvalidDataException("The chart with its new difficulties didn't read back as it was written, so it isn't kept.");
         string path = await stash.KeepAsync(written.Bytes, cancellationToken).ConfigureAwait(false);
-        return new GeneratedChart(path, written.Bytes.Length, generation.RemoveChart, generation.SongIniChanges);
+        return new GeneratedChart(path, written.Bytes.Length, generation.RemoveChart, generation.SongIniChanges, generation.GeneratorNotes);
     }
 
     /// <summary>
