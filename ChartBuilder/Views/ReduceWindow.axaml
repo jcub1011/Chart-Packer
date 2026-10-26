@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:ChartBuilder.ViewModels"
+        xmlns:local="using:ChartBuilder.Views"
         xmlns:svm="using:ChartShared.UI.ViewModels"
         xmlns:sv="using:ChartShared.UI.Views"
         xmlns:res="using:ChartBuilder.Resources"
@@ -114,20 +115,21 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
 
-                        <!-- The rules, for the target, or in Reduce all for the difficulty picked. -->
-                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" Margin="0,6,0,0">
-                            <TextBlock Classes="heading" VerticalAlignment="Center" Text="{x:Static res:Strings.ReduceRulesHeading}" />
-                            <ComboBox Grid.Column="1" Width="132"
-                                      IsVisible="{Binding IsAll}"
-                                      ItemsSource="{Binding RulesForChoices}"
-                                      SelectedItem="{Binding SelectedRulesFor}"
-                                      DisplayMemberBinding="{Binding Label, x:DataType=svm:DifficultyChoice}"
-                                      ToolTip.Tip="{x:Static res:Strings.ReduceRulesForLabel}"
-                                      AutomationProperties.Name="{x:Static res:Strings.ReduceRulesForLabel}" />
+                        <!-- How the lower difficulties are made; each method shows its own controls below. -->
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                            <TextBlock Grid.Column="0" Classes="caption" VerticalAlignment="Center"
+                                       Text="{x:Static res:Strings.ReduceMethodLabel}" />
+                            <ComboBox Grid.Column="1" HorizontalAlignment="Stretch"
+                                      ItemsSource="{Binding MethodChoices}"
+                                      SelectedItem="{Binding SelectedMethod}"
+                                      DisplayMemberBinding="{Binding Label, x:DataType=vm:ReduceMethodChoice}"
+                                      AutomationProperties.Name="{x:Static res:Strings.ReduceMethodLabel}" />
                         </Grid>
 
-                        <!-- The rules themselves, as Chart Packer's Generate difficulties shows them too. -->
-                        <sv:ReductionRulesView DataContext="{Binding Rules}" />
+                        <!-- The picked method's own controls. -->
+                        <Panel IsVisible="{Binding IsRulesMethod}">
+                            <local:RulesReduceMethodView DataContext="{Binding RulesMethod}" />
+                        </Panel>
                     </StackPanel>
                 </ScrollViewer>
             </Border>

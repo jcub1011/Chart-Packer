@@ -2607,6 +2607,12 @@ Saving also changes song.ini:
   <data name="ReduceRulesHeading" xml:space="preserve">
     <value>Rules</value>
   </data>
+  <data name="ReduceMethodLabel" xml:space="preserve">
+    <value>Method</value>
+  </data>
+  <data name="ReduceMethodRules" xml:space="preserve">
+    <value>Default reduction</value>
+  </data>
   <data name="ReduceDraftHeading" xml:space="preserve">
     <value>Draft</value>
   </data>

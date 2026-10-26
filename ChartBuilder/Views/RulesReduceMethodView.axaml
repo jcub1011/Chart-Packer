@@ -1,0 +1,30 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ChartBuilder.ViewModels"
+             xmlns:svm="using:ChartShared.UI.ViewModels"
+             xmlns:sv="using:ChartShared.UI.Views"
+             xmlns:res="using:ChartBuilder.Resources"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="308" d:DesignHeight="240"
+             x:Class="ChartBuilder.Views.RulesReduceMethodView"
+             x:DataType="vm:RulesReduceMethodViewModel">
+    <!-- The default reduction method's controls (RulesReduceMethodViewModel): the rules for the target, or in Reduce
+         all for the difficulty picked. Future methods add their own view and view model, shown by the Reduce dialog
+         for their ReduceMethodChoice. -->
+    <StackPanel Spacing="12">
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" Margin="0,6,0,0">
+            <TextBlock Classes="heading" VerticalAlignment="Center" Text="{x:Static res:Strings.ReduceRulesHeading}" />
+            <ComboBox Grid.Column="1" Width="132"
+                      IsVisible="{Binding ShowRulesForPicker}"
+                      ItemsSource="{Binding RulesForChoices}"
+                      SelectedItem="{Binding SelectedRulesFor}"
+                      DisplayMemberBinding="{Binding Label, x:DataType=svm:DifficultyChoice}"
+                      ToolTip.Tip="{x:Static res:Strings.ReduceRulesForLabel}"
+                      AutomationProperties.Name="{x:Static res:Strings.ReduceRulesForLabel}" />
+        </Grid>
+
+        <!-- The rules themselves, as Chart Packer's Generate difficulties shows them too. -->
+        <sv:ReductionRulesView DataContext="{Binding Rules}" />
+    </StackPanel>
+</UserControl>
