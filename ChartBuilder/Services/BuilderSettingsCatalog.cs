@@ -4,6 +4,7 @@ using System.Linq;
 using ChartBuilder.Resources;
 using ChartShared.Audio.Waveforms;
 using ChartShared.Core.Charting;
+using ChartShared.Core.Generation;
 using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charting.Layout;
 using ChartShared.Core.Charting.Playtest;
@@ -25,11 +26,12 @@ namespace ChartBuilder.Services
         /// <param name="editReductionRules">Opens the Reduce dialog's Settings mode, which edits the default rules (charter-spec C9).</param>
         /// <param name="openInputDevices">Opens the Input devices window, which edits the instrument bindings (charter-spec C19).</param>
         /// <param name="resetBindings">Puts every instrument profile's bindings back to the keyboard's defaults.</param>
-        public static SettingsCatalog Create(BuilderSettingsService settings, AudioLatencyService latency, Action calibrate, Action editReductionRules, Action openInputDevices, Action resetBindings)
+        public static SettingsCatalog Create(BuilderSettingsService settings, AudioLatencyService latency, Action calibrate, Action editReductionRules, Action openInputDevices, Action resetBindings, Action manageGeneratorModels, IGeneratorModelStore models)
         {
             var charter = new SettingCategory("charter", Strings.SettingsCategoryCharter);
             var newCharts = new SettingCategory("charter.newCharts", Strings.SettingsCategoryNewCharts, charter);
             var editing = new SettingCategory("charter.editing", Strings.SettingsCategoryEditing, charter);
+            var generatorModels = new SettingCategory("charter.generatorModels", SharedStrings.GeneratorModelsCategory, charter);
             var playback = new SettingCategory("playback", Strings.SettingsCategoryPlayback);
             var audio = new SettingCategory("playback.audio", Strings.SettingsCategoryAudio, playback);
             var visualizers = new SettingCategory("playback.visualizers", Strings.SettingsCategoryVisualizers, playback);
@@ -38,7 +40,7 @@ namespace ChartBuilder.Services
             var logging = new SettingCategory("general.logging", SharedStrings.SettingsCategoryLogging, general);
 
             return new SettingsCatalog(
-                [charter, newCharts, editing, playback, audio, visualizers, input, general, logging],
+                [charter, newCharts, editing, generatorModels, playback, audio, visualizers, input, general, logging],
                 [
                     // The bindings are per device and control, so they're set in the Input devices window (charter-spec C19 item 2).
                     new ActionSetting
@@ -367,6 +369,16 @@ namespace ChartBuilder.Services
                         Maximum = BuilderSettings.MaxSpectrogramBudgetMb,
                         Get = () => settings.Settings.SpectrogramBudgetMb,
                         Set = megabytes => settings.Settings.SpectrogramBudgetMb = megabytes,
+                    },
+                    // The models live in one folder both apps share (issue #154); the dialog changes it and migrates what's stored.
+                    new ActionSetting
+                    {
+                        Id = "charter.generatorModels",
+                        Category = generatorModels,
+                        Label = SharedStrings.GeneratorModelsLabel,
+                        Description = string.Format(CultureInfo.CurrentCulture, SharedStrings.GeneratorModelsSettingsDescriptionFormat, models.ResolvedFolder),
+                        Keywords = SettingKeywords.Split(SharedStrings.GeneratorModelsKeywords),
+                        Actions = [new SettingAction(SharedStrings.GeneratorModelsManageButton, manageGeneratorModels)],
                     },
                     AppLog.CreateSetting(logging, () => settings.Settings.LoggingEnabled, enabled => settings.Settings.LoggingEnabled = enabled),
                     .. UpdateCheck.CreateSettings(general),

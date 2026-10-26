@@ -5,6 +5,7 @@ using ChartPacker.Resources;
 using ChartPacker.ViewModels;
 using ChartShared.Audio.Waveforms;
 using ChartShared.Core.Dedup;
+using ChartShared.Core.Generation;
 using ChartShared.Core.Jobs;
 using ChartShared.Core.Settings;
 using ChartShared.UI;
@@ -30,11 +31,14 @@ namespace ChartPacker.Services
             HighwayViewModel highway,
             DownloadService downloads,
             SettingsService settings,
-            Action calibrate)
+            Action calibrate,
+            Action manageGeneratorModels,
+            IGeneratorModelStore models)
         {
             var libraryCategory = new SettingCategory("library", Strings.SettingsCategoryLibrary);
             var scanning = new SettingCategory("library.scanning", Strings.SettingsCategoryScanning, libraryCategory);
             var duplicates = new SettingCategory("library.dedup", Strings.SettingsCategoryDuplicates, libraryCategory);
+            var generatorModels = new SettingCategory("library.generatorModels", SharedStrings.GeneratorModelsCategory, libraryCategory);
             var output = new SettingCategory("output", Strings.SettingsCategoryOutput);
             var packing = new SettingCategory("output.packing", Strings.SettingsCategoryPacking, output);
             var downloadsCategory = new SettingCategory("output.downloads", Strings.SettingsCategoryDownloads, output);
@@ -47,7 +51,7 @@ namespace ChartPacker.Services
             var logging = new SettingCategory("general.logging", SharedStrings.SettingsCategoryLogging, general);
 
             return new SettingsCatalog(
-                [libraryCategory, scanning, duplicates, output, packing, downloadsCategory, playback, audio, visualizers, scrubbing, general, appearance, logging],
+                [libraryCategory, scanning, duplicates, generatorModels, output, packing, downloadsCategory, playback, audio, visualizers, scrubbing, general, appearance, logging],
                 [
                     new IntegerSetting
                     {
@@ -90,6 +94,16 @@ namespace ChartPacker.Services
                         ],
                         Get = () => library.DedupKeepPreference,
                         Set = preference => library.DedupKeepPreference = preference,
+                    },
+                    // The models live in one folder both apps share (issue #154); the dialog changes it and migrates what's stored.
+                    new ActionSetting
+                    {
+                        Id = "library.generatorModels",
+                        Category = generatorModels,
+                        Label = SharedStrings.GeneratorModelsLabel,
+                        Description = string.Format(CultureInfo.CurrentCulture, SharedStrings.GeneratorModelsSettingsDescriptionFormat, models.ResolvedFolder),
+                        Keywords = SettingKeywords.Split(SharedStrings.GeneratorModelsKeywords),
+                        Actions = [new SettingAction(SharedStrings.GeneratorModelsManageButton, manageGeneratorModels)],
                     },
                     new FolderSetting
                     {

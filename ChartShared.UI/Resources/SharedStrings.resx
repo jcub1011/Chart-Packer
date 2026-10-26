@@ -1163,4 +1163,142 @@
   <data name="ReductionPreviewToolTip" xml:space="preserve">
     <value>Show the draft against its source, with the song, marking where it changed</value>
   </data>
+  <data name="GeneratorModelsCategory" xml:space="preserve">
+    <value>Generator models</value>
+  </data>
+  <data name="GeneratorModelsLabel" xml:space="preserve">
+    <value>Generator models</value>
+  </data>
+  <data name="GeneratorModelsDescription" xml:space="preserve">
+    <value>Where generator models are stored. Manage opens the storage, to change the folder and import, export, rename and delete models.</value>
+  </data>
+  <data name="GeneratorModelsSettingsDescriptionFormat" xml:space="preserve">
+    <value>Stored in {0}. Manage opens the storage dialog, to change the folder and import, export, rename and delete models.</value>
+  </data>
+  <data name="GeneratorModelsKeywords" xml:space="preserve">
+    <value>models weights storage folder import export delete rename migrate</value>
+  </data>
+  <data name="GeneratorModelsManageButton" xml:space="preserve">
+    <value>Manage models…</value>
+  </data>
+  <data name="GeneratorModelsTitle" xml:space="preserve">
+    <value>Generator Models</value>
+  </data>
+  <data name="GeneratorModelsFolderLabel" xml:space="preserve">
+    <value>Storage folder</value>
+  </data>
+  <data name="GeneratorModelsChangeFolder" xml:space="preserve">
+    <value>Change…</value>
+  </data>
+  <data name="GeneratorModelsOpenFolder" xml:space="preserve">
+    <value>Open</value>
+  </data>
+  <data name="GeneratorModelsImport" xml:space="preserve">
+    <value>Import…</value>
+  </data>
+  <data name="GeneratorModelsExport" xml:space="preserve">
+    <value>Export…</value>
+  </data>
+  <data name="GeneratorModelsDelete" xml:space="preserve">
+    <value>Delete</value>
+  </data>
+  <data name="GeneratorModelsRename" xml:space="preserve">
+    <value>Rename</value>
+  </data>
+  <data name="GeneratorModelsRefresh" xml:space="preserve">
+    <value>Refresh</value>
+  </data>
+  <data name="GeneratorModelsCloseButton" xml:space="preserve">
+    <value>Close</value>
+  </data>
+  <data name="GeneratorModelsNameLabel" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="GeneratorModelsEmpty" xml:space="preserve">
+    <value>No models stored.</value>
+  </data>
+  <data name="GeneratorModelsPickImportTitle" xml:space="preserve">
+    <value>Import generator models</value>
+  </data>
+  <data name="GeneratorModelsPickExportTitle" xml:space="preserve">
+    <value>Export model to</value>
+  </data>
+  <data name="GeneratorModelsPickFolderTitle" xml:space="preserve">
+    <value>Choose generator model storage</value>
+  </data>
+  <data name="GeneratorModelsSelectFirst" xml:space="preserve">
+    <value>Select a model first.</value>
+  </data>
+  <data name="GeneratorModelsNameBlank" xml:space="preserve">
+    <value>Give the model a name.</value>
+  </data>
+  <data name="GeneratorModelsImportedFormat" xml:space="preserve">
+    <value>Imported {0}; skipped {1}.</value>
+  </data>
+  <data name="GeneratorModelsExportedFormat" xml:space="preserve">
+    <value>Exported {0}.</value>
+  </data>
+  <data name="GeneratorModelsDeletedFormat" xml:space="preserve">
+    <value>Deleted {0}.</value>
+  </data>
+  <data name="GeneratorModelsRenamedFormat" xml:space="preserve">
+    <value>Renamed to {0}.</value>
+  </data>
+  <data name="GeneratorModelsMigratedFormat" xml:space="preserve">
+    <value>Now storing in {0}. Copied {1}; skipped {2}.</value>
+  </data>
+  <data name="GeneratorModelsFolderChangedFormat" xml:space="preserve">
+    <value>Now storing in {0}.</value>
+  </data>
+  <data name="GeneratorModelsDeleteTitle" xml:space="preserve">
+    <value>Delete model?</value>
+  </data>
+  <data name="GeneratorModelsDeleteFormat" xml:space="preserve">
+    <value>Delete the {0} model "{1}"? It can't be undone.</value>
+  </data>
+  <data name="GeneratorModelsOverwriteTitle" xml:space="preserve">
+    <value>Already stored</value>
+  </data>
+  <data name="GeneratorModelsOverwriteFormat" xml:space="preserve">
+    <value>A {0} model named "{1}" is already stored. Overwrite it?</value>
+  </data>
+  <data name="GeneratorModelsExportExistsFormat" xml:space="preserve">
+    <value>"{0}" already exists. Overwrite it?</value>
+  </data>
+  <data name="GeneratorModelsMigrateTitle" xml:space="preserve">
+    <value>Copy stored models?</value>
+  </data>
+  <data name="GeneratorModelsMigrateFormat" xml:space="preserve">
+    <value>Copy the {0} stored model(s) to the new folder? The old folder keeps its files.</value>
+  </data>
+  <data name="GeneratorModelsMigrateCollisionsFormat" xml:space="preserve">
+    <value>{0} already exist in the new folder. Overwrite them?</value>
+  </data>
+  <data name="GeneratorModelsFailedFormat" xml:space="preserve">
+    <value>Couldn't {0}: {1}</value>
+  </data>
+  <data name="GeneratorModelsSizeBytesFormat" xml:space="preserve">
+    <value>{0} B</value>
+  </data>
+  <data name="GeneratorModelsSizeKbFormat" xml:space="preserve">
+    <value>{0:0.#} KB</value>
+  </data>
+  <data name="GeneratorModelsSizeMbFormat" xml:space="preserve">
+    <value>{0:0.#} MB</value>
+  </data>
+  <data name="GeneratorModelsSizeGbFormat" xml:space="preserve">
+    <value>{0:0.##} GB</value>
+  </data>
+  <data name="GeneratorModelsOverwriteConfirm" xml:space="preserve">
+    <value>Overwrite</value>
+  </data>
+  <data name="GeneratorModelsRefreshAction" xml:space="preserve">
+    <value>list the models</value>
+  </data>
+  <data name="GeneratorModelsMigrateCopy" xml:space="preserve">
+    <value>Copy</value>
+  </data>
+  <data name="GeneratorModelsMigrateLeave" xml:space="preserve">
+    <value>Don't copy</value>
+  </data>
 </root>

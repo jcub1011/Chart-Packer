@@ -53,6 +53,15 @@ public static class UserConfigPaths
     public static string UpdateSettingsFile => Path.Combine(ConfigFolder, "update-settings.json");
 
     /// <summary>
+    /// The default generator model storage: <c>GeneratorModels</c> in <see cref="ConfigFolder"/>
+    /// (issue #154), shared by both apps. The folder is configurable; see <see cref="Settings.GeneratorModelFolderFile"/>.
+    /// </summary>
+    public static string GeneratorModelsFolder => Path.Combine(ConfigFolder, "GeneratorModels");
+
+    /// <summary>Where the generator model storage location is kept, when it isn't the default.</summary>
+    public static string GeneratorModelSettingsFile => Path.Combine(ConfigFolder, "generator-model-settings.json");
+
+    /// <summary>
     /// Where Chart Builder autosaves the chart open, for recovery after a crash (charter-spec C15 item 6,
     /// <c>RecoveryStore</c>). Never inside a song.
     /// </summary>
