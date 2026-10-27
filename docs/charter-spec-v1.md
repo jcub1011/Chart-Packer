@@ -1263,18 +1263,24 @@ Acceptance criteria:
      fill drawn at or after `[coda]` is made a big rock ending (item 4). Pro drums also offer disco
      flip ([C6](#c6-drums-4-lane-pro-and-5-lane) item 7). When the focus moves to a part that can't
      have the kind picked, or the drums stop being Pro, it goes back to star power. New rolls and
-     trills reach Expert only ([C6](#c6-drums-4-lane-pro-and-5-lane) item 6).
+     trills reach Expert only ([C6](#c6-drums-4-lane-pro-and-5-lane) item 6). In the phrase rail, the
+     kind of its row under the pointer is the kind drawn, for the preview and for the drag, whatever
+     the picker says; the picker itself stays as it was.
    - *Settled in CM3:* each lane draws its part's phrases as bars in a **phrase rail**: right of a
      highway's forcing marks, and above a timeline's. The rail has a row for each kind the part can
      have, in the picker's order, so overlapping phrases don't hide each other; a drums big rock
-     ending is in the fills' row. With any tool, pressing a bar selects its phrase (Shift adds it or
-     takes it away). Dragging a bar's body moves the selected phrases in time to the grid, keeping
-     their lengths; dragging within a few pixels of an end moves that end to the grid, never closer
-     than a grid step to the other. Each drag is one undoable step. Delete removes the selected
-     phrases, with any selected notes and tempo markers, in one step. Selecting notes or tempo markers
-     drops the selected phrases, and the other way round, unless Shift adds them. On drums, a last
-     row holds the lane's difficulty's disco flip ranges ([C6](#c6-drums-4-lane-pro-and-5-lane)
-     item 7), which are edited the same way.
+     ending is in the fills' row. Each row's background is a dark shade of its own kind's colour,
+     naming that kind in a tooltip while the pointer is over it. With any tool, pressing a bar selects
+     its phrase (Shift adds it or takes it away). Dragging a bar's body moves the selected phrases in
+     time to the grid, keeping their lengths; dragging within a few pixels of an end moves that end to
+     the grid, never closer than a grid step to the other. Each drag is one undoable step. Delete
+     removes the selected phrases, with any selected notes and tempo markers, in one step. Selecting
+     notes or tempo markers drops the selected phrases, and the other way round, unless Shift adds
+     them. With the Select, Place or Phrase tool, dragging an empty part of a row draws a phrase of
+     that row's kind, as the Phrase tool does in the lanes; the placement line across the lanes and
+     the mark in the row show where, and the pointer is a cross there. Over a bar's body it is a move
+     arrow, and over an end a resize arrow. On drums, a last row holds the lane's difficulty's disco
+     flip ranges ([C6](#c6-drums-4-lane-pro-and-5-lane) item 7), which are edited the same way.
    - *Settled in CM3:* star power and solos also tint the lanes faintly behind the notes. Fills, big
      rock endings, rolls and trills are drawn only in the rail.
    - *Settled in CM3:* `S` ([§9](#9-keyboard-shortcuts)) puts star power over the selected notes:

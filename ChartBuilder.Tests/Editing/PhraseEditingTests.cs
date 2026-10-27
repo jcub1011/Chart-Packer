@@ -25,6 +25,16 @@ public sealed class PhraseEditingTests
         from kind in new[] { PhraseKind.StarPower, PhraseKind.Solo, PhraseKind.DrumFill, PhraseKind.Roll, PhraseKind.Trill }
         select new object[] { view, kind };
 
+    public static IEnumerable<object[]> RailDrawTools =>
+        from view in new[] { LaneView.Highway, LaneView.Timeline }
+        from tool in new[] { EditorTool.Select, EditorTool.Place }
+        select new object[] { tool, view };
+
+    public static IEnumerable<object[]> RailDrawingTools =>
+        from view in new[] { LaneView.Highway, LaneView.Timeline }
+        from tool in new[] { EditorTool.Select, EditorTool.Place, EditorTool.Phrase }
+        select new object[] { tool, view };
+
     // The Phrase tool.
 
     [TestMethod]
@@ -71,6 +81,19 @@ public sealed class PhraseEditingTests
         ChartDifficulty? lowest = kind is PhraseKind.Roll or PhraseKind.Trill ? ChartDifficulty.Expert : null;
         Assert.AreSequenceEqual([new Phrase(kind, 0, 480, lowest)], Phrases(session, ChartInstrument.Drums));
         Assert.IsNull(session.Status);
+    }
+
+    [TestMethod]
+    [DynamicData(nameof(DrumKinds))]
+    public void TheSelectToolDrawsEveryDrumRowsKindInTheRail(LaneView view, PhraseKind kind)
+    {
+        var session = Of(Drums(), focused: DrumsExpert);
+        session.Tool = EditorTool.Select;
+
+        DragFromTo(session, RailAt(session, 0, kind, view, DrumsExpert), RailAt(session, 480, kind, view, DrumsExpert));
+
+        ChartDifficulty? lowest = kind is PhraseKind.Roll or PhraseKind.Trill ? ChartDifficulty.Expert : null;
+        Assert.AreSequenceEqual([new Phrase(kind, 0, 480, lowest)], Phrases(session, ChartInstrument.Drums));
     }
 
     [TestMethod]
@@ -217,7 +240,14 @@ public sealed class PhraseEditingTests
         var solo = new Phrase(PhraseKind.Solo, 480, 960);
         Add(session, ChartInstrument.Guitar, solo);
 
-        Assert.IsNull(session.Tools.PhraseDrawStart(At(session, 130, 1, view)), "Only the Phrase tool draws.");
+        Assert.IsNull(session.Tools.PhraseDrawStart(At(session, 130, 1, view)), "Only the Phrase tool draws in the lanes.");
+
+        session.Tool = EditorTool.Select;
+        Assert.AreEqual(1920L, session.Tools.PhraseDrawStart(RailAt(session, 1910, PhraseKind.Solo, view)), "The Select tool draws in an empty part of the rail.");
+        Assert.IsNull(session.Tools.PhraseDrawStart(At(session, 130, 1, view)), "It doesn't draw in the lanes.");
+
+        session.Tool = EditorTool.Place;
+        Assert.AreEqual(1920L, session.Tools.PhraseDrawStart(RailAt(session, 1910, PhraseKind.Solo, view)), "As the Place tool does.");
 
         session.Tool = EditorTool.Phrase;
         Assert.AreEqual(120L, session.Tools.PhraseDrawStart(At(session, 130, 1, view)));
@@ -466,7 +496,7 @@ public sealed class PhraseEditingTests
 
     [TestMethod]
     [DynamicData(nameof(Views))]
-    public void ThePhraseToolDrawsInAnEmptyPartOfTheRail(LaneView view)
+    public void ThePhraseToolDrawsTheHoveredRowsKindInAnEmptyPartOfTheRail(LaneView view)
     {
         var session = Of(Guitar());
         session.Tool = EditorTool.Phrase;
@@ -474,7 +504,61 @@ public sealed class PhraseEditingTests
 
         DragFromTo(session, RailAt(session, 480, PhraseKind.StarPower, view), RailAt(session, 960, PhraseKind.StarPower, view));
 
-        Assert.AreSequenceEqual([new Phrase(PhraseKind.Solo, 480, 480)], Phrases(session, ChartInstrument.Guitar));
+        Assert.AreSequenceEqual([new Phrase(PhraseKind.StarPower, 480, 480)], Phrases(session, ChartInstrument.Guitar));
+        Assert.AreEqual(PhraseKind.Solo, session.PhraseKind, "The picker stays as it was.");
+    }
+
+    [TestMethod]
+    [DynamicData(nameof(RailDrawTools))]
+    public void DraggingAnEmptyRailRowWithoutThePhraseToolDrawsThatRowsKind(EditorTool tool, LaneView view)
+    {
+        var session = Of(Guitar());
+        session.Tool = tool;
+        session.PhraseKind = PhraseKind.StarPower;
+
+        DragFromTo(session, RailAt(session, 480, PhraseKind.Solo, view), RailAt(session, 960, PhraseKind.Solo, view));
+
+        var drawn = new Phrase(PhraseKind.Solo, 480, 480);
+        Assert.AreSequenceEqual([drawn], Phrases(session, ChartInstrument.Guitar));
+        Assert.AreEqual(1, session.UndoStack.UndoCount);
+        Assert.AreSequenceEqual([drawn], session.Selection.Phrases.ToList());
+    }
+
+    [TestMethod]
+    [DynamicData(nameof(RailDrawTools))]
+    public void ClickingAnEmptyRailRowWithoutThePhraseToolStillClearsTheSelection(EditorTool tool, LaneView view)
+    {
+        var session = Of(Guitar());
+        var phrase = new Phrase(PhraseKind.Solo, 0, 960);
+        Add(session, ChartInstrument.Guitar, phrase);
+        session.Selection.SelectPhrases(ChartInstrument.Guitar, [phrase]);
+        session.Tool = tool;
+
+        Click(session, RailAt(session, 1920, PhraseKind.StarPower, view));
+
+        Assert.AreSequenceEqual([phrase], Phrases(session, ChartInstrument.Guitar));
+        Assert.IsFalse(session.Selection.HasPhrases);
+        Assert.AreEqual(0, session.UndoStack.UndoCount);
+    }
+
+    [TestMethod]
+    [DynamicData(nameof(RailDrawingTools))]
+    public void TakingBackARailDrawLeavesThePhrasesSelectedAsTheyWere(EditorTool tool, LaneView view)
+    {
+        var session = Of(Guitar());
+        var phrase = new Phrase(PhraseKind.Solo, 0, 960);
+        Add(session, ChartInstrument.Guitar, phrase);
+        session.Selection.SelectPhrases(ChartInstrument.Guitar, [phrase]);
+        session.Tool = tool;
+
+        session.Tools.Press(RailAt(session, 960, PhraseKind.StarPower, view));
+        session.Tools.Drag(RailAt(session, 1920, PhraseKind.StarPower, view));
+        session.Tools.Cancel();
+
+        Assert.AreSequenceEqual([phrase], Phrases(session, ChartInstrument.Guitar));
+        Assert.AreSequenceEqual([phrase], session.Selection.Phrases.ToList());
+        Assert.IsFalse(session.HasPreview);
+        Assert.AreEqual(0, session.UndoStack.UndoCount);
     }
 
     [TestMethod]

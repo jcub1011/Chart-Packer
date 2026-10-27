@@ -164,7 +164,7 @@ public sealed partial class EditorTools
             EditorTool.Select => PressSelect(point, shift),
             EditorTool.Place => PressPlace(point, alt: modifiers.HasFlag(EditorModifiers.Alt)),
             EditorTool.Erase => new EraseGesture(this, point),
-            EditorTool.Phrase => PhraseDrawStart(point) is { } from ? PressDraw(point.Track, from) : null,
+            EditorTool.Phrase => PhraseDrawAt(point) is { } draw ? PressDraw(point.Track, draw) : null,
             EditorTool.Tempo => PressTempo(point),
             _ => null,
         };
@@ -1162,8 +1162,9 @@ public sealed partial class EditorTools
     /// A press in the phrase rail, with any tool: on a proposed phrase's ghost, while Generate fills or Generate star power
     /// runs, it keeps or drops the phrase (charter-spec C6 item 5, C8 item 1), before any bar under it. On a phrase's bar it
     /// selects the phrase (Shift adds it or takes it away), and a drag moves it, or resizes it by the end grabbed; the same
-    /// on a disco flip section's bar. Elsewhere in the rail, the Phrase tool draws, and the others select no phrases or
-    /// sections.
+    /// on a disco flip section's bar. Elsewhere in the rail, the Select, Place and Phrase tools draw a phrase of the row's
+    /// kind, a click that draws nothing clearing the selection, and the others select no phrases or sections; Shift lends
+    /// the select tool's press there too.
     /// </summary>
     private Gesture? PressRail(ChartPoint point, bool shift)
     {
@@ -1179,8 +1180,16 @@ public sealed partial class EditorTools
             return PressDiscoFlip(point, flip, shift);
         if (PhraseRail.HitTest(part, point) is not { } hit)
         {
-            if (_session.Tool == EditorTool.Phrase)
-                return PressDraw(point.Track, Snap.Nearest(point.Tick, Map));
+            if (!shift && PhraseDrawAt(point) is { } draw)
+            {
+                if (DrawsIn(point.Track, draw.Kind))
+                    return PressDraw(point.Track, draw, fromRail: true);
+
+                // The Phrase tool says why a row it can't draw in is refused; the others leave the rail as a click does.
+                if (_session.Tool == EditorTool.Phrase)
+                    return PressDraw(point.Track, draw, fromRail: true);
+            }
+
             if (!shift)
             {
                 selection.ClearPhrases();
@@ -1220,48 +1229,62 @@ public sealed partial class EditorTools
     }
 
     /// <summary>
-    /// Where a press with the Phrase tool at <paramref name="point"/> starts drawing: the grid step nearest it, in the lanes
-    /// or in an empty part of the rail. Null with another tool, or where a press does something else: on a phrase's bar, a
-    /// disco flip section's or a proposed phrase's ghost, as <see cref="PressRail"/> tells them apart.
+    /// What a press at <paramref name="point"/> would draw: the grid step nearest it and the kind. In the lanes the Phrase
+    /// tool draws the kind picked; in an empty part of the rail the Select, Place and Phrase tools draw the row's kind. Null
+    /// where there's nothing to draw: with another tool, outside the lanes and the rail, or where a press does something
+    /// else, such as on a phrase's bar, a disco flip section's or a proposed phrase's ghost, as <see cref="PressRail"/>
+    /// tells them apart.
     /// </summary>
-    public long? PhraseDrawStart(ChartPoint point)
+    public PhraseDraw? PhraseDrawAt(ChartPoint point)
     {
-        if (_session.Tool != EditorTool.Phrase || Chart.PartOf(point.Track.Instrument) is not { } part)
+        if (Chart.PartOf(point.Track.Instrument) is not { } part)
             return null;
-        if (point.Rail is null ? point.Lane is null
-            : _session.Proposals?.HitTest(point) is not null
-                || PhraseRail.HitTestDiscoFlip(point.Track.Difficulty, _session.DiscoFlipRangesOf(point.Track), point) is not null
-                || PhraseRail.HitTest(part, point) is not null)
+        if (point.Rail is null)
+        {
+            if (_session.Tool != EditorTool.Phrase || point.Lane is null)
+                return null;
+            return new PhraseDraw(Snap.Nearest(point.Tick, Map), _session.PhraseKind);
+        }
+
+        if (_session.Tool is not (EditorTool.Select or EditorTool.Place or EditorTool.Phrase))
+            return null;
+        if (_session.Proposals?.HitTest(point) is not null
+            || PhraseRail.HitTestDiscoFlip(point.Track.Difficulty, _session.DiscoFlipRangesOf(point.Track), point) is not null
+            || PhraseRail.HitTest(part, point) is not null)
         {
             return null;
         }
 
-        return Snap.Nearest(point.Tick, Map);
+        return new PhraseDraw(Snap.Nearest(point.Tick, Map), point.Rail.Value);
     }
 
     /// <summary>
-    /// A press with the Phrase tool where it draws, from <paramref name="from"/>: a phrase of the kind picked, or a disco
-    /// flip section on the lane's difficulty, which only Pro drums have.
+    /// Where a press at <paramref name="point"/> starts drawing a phrase or disco flip section, in the lanes or in an empty
+    /// part of the rail (<see cref="PhraseDrawAt"/>), or null where a press does something else.
     /// </summary>
-    private Gesture? PressDraw(ChartTrackKey track, long from)
+    public long? PhraseDrawStart(ChartPoint point) => PhraseDrawAt(point)?.Tick;
+
+    /// <summary>
+    /// A press where it draws, as <see cref="PhraseDrawAt"/> gives it: a phrase of the kind drawn, or a disco flip section
+    /// on the lane's difficulty, which only Pro drums have. <paramref name="fromRail"/> is whether the press was in the
+    /// rail, where a click that draws nothing clears the selection there.
+    /// </summary>
+    private Gesture? PressDraw(ChartTrackKey track, PhraseDraw draw, bool fromRail = false)
     {
-        if (_session.PhraseKind.Phrase is { } kind)
-            return new PhraseDrawGesture(this, track, from, kind);
-        if (!DrawsIn(track))
+        if (draw.Kind.Phrase is { } kind)
+            return new PhraseDrawGesture(this, track, draw.Tick, kind, fromRail);
+        if (!DrawsIn(track, draw.Kind))
         {
             _session.Status = DiscoFlipOffPro;
             return null;
         }
 
-        return new DiscoFlipDrawGesture(this, track, from);
+        return new DiscoFlipDrawGesture(this, track, draw.Tick, fromRail);
     }
 
-    /// <summary>
-    /// Whether the Phrase tool draws what's picked in <paramref name="track"/>'s lanes: any phrase kind, but a disco flip
-    /// section only on Pro drums.
-    /// </summary>
-    public bool DrawsIn(ChartTrackKey track) =>
-        _session.PhraseKind.Phrase is not null
+    /// <summary>Whether <paramref name="kind"/> can be drawn in <paramref name="track"/>'s lanes: a disco flip section only on Pro drums.</summary>
+    public bool DrawsIn(ChartTrackKey track, RailKind kind) =>
+        kind.Phrase is not null
         || (ChartInstruments.KindOf(track.Instrument) == ChartInstrumentKind.Drums && _session.IsProDrums);
 
     /// <summary>The lanes <paramref name="notes"/> of <paramref name="key"/>'s track are drawn in (<see cref="EditorSession.ShownLane(ChartTrackKey, EditableNote)"/>).</summary>
@@ -1762,14 +1785,18 @@ public sealed partial class EditorTools
         private readonly ChartInstrument _part;
         private readonly PhraseKind _kind;
         private readonly long _from;
+
+        // Whether the press was in the rail, where a click clears the disco flip sections selected as well.
+        private readonly bool _fromRail;
         private Phrase? _tried;
 
-        public PhraseDrawGesture(EditorTools tools, ChartTrackKey track, long from, PhraseKind kind)
+        public PhraseDrawGesture(EditorTools tools, ChartTrackKey track, long from, PhraseKind kind, bool fromRail)
             : base(tools)
         {
             _part = track.Instrument;
             _kind = kind;
             _from = from;
+            _fromRail = fromRail;
         }
 
         public override void Drag(ChartPoint point)
@@ -1795,7 +1822,11 @@ public sealed partial class EditorTools
             if (Session.CommitPreview() is AddPhrase added)
                 Session.Selection.SelectPhrases(_part, [added.Phrase]);
             else if (_tried is null)
+            {
                 Session.Selection.ClearPhrases();
+                if (_fromRail)
+                    Session.Selection.ClearDiscoFlips();
+            }
         }
     }
 
@@ -1927,13 +1958,17 @@ public sealed partial class EditorTools
     {
         private readonly ChartTrackKey _track;
         private readonly long _from;
+
+        // Whether the press was in the rail, where a click clears the phrases selected as well.
+        private readonly bool _fromRail;
         private (long Tick, long EndTick)? _tried;
 
-        public DiscoFlipDrawGesture(EditorTools tools, ChartTrackKey track, long from)
+        public DiscoFlipDrawGesture(EditorTools tools, ChartTrackKey track, long from, bool fromRail)
             : base(tools)
         {
             _track = track;
             _from = from;
+            _fromRail = fromRail;
         }
 
         public override void Drag(ChartPoint point)
@@ -1957,7 +1992,11 @@ public sealed partial class EditorTools
             if (Session.CommitPreview() is AddDiscoFlip added && Tools.SectionAt(added.Difficulty, added.Tick) is { } section)
                 Session.Selection.SelectDiscoFlips([section]);
             else if (_tried is null)
+            {
+                if (_fromRail)
+                    Session.Selection.ClearPhrases();
                 Session.Selection.ClearDiscoFlips();
+            }
         }
     }
 

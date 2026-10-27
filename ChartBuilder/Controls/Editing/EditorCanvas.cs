@@ -145,7 +145,6 @@ namespace ChartBuilder.Controls.Editing
         private static readonly IBrush DefaultAccentBrush = new ImmutableSolidColorBrush(Color.FromRgb(0x7C, 0xB4, 0xFF));
         private static readonly IBrush StrikeBandBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x90, 0x00, 0x00, 0x00));
         private static readonly IPen StrikeEdgePen = new ImmutablePen(Color.FromArgb(0x8C, 0xFF, 0xFF, 0xFF).ToUInt32(), 1);
-        private static readonly IBrush PhraseRowBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x12, 0xFF, 0xFF, 0xFF));
         private static readonly Color SoloColor = PhraseColors.Solo;
         private static readonly IBrush StarPowerTintBrush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(HighwayPalette.StarPower, 0x16));
         private static readonly IBrush SoloTintBrush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(SoloColor, 0x1A));
@@ -532,6 +531,9 @@ namespace ChartBuilder.Controls.Editing
             context.FillRectangle(LanesBrush, LanesOf(projection, slots));
             DrawLaneDividers(context, projection, slots);
             DrawBackdrop(context, size, projection, rows.Count);
+
+            // The rail's rows are tinted under whatever is marked across them, such as a timeline's section lines.
+            DrawPhraseRailBackground(context, rows, projection);
             FindPhrasesShown(part, fromTick, toTick);
             DrawPhraseTints(context, session, projection);
             DrawProposalBands(context, session, key, projection, fromTick, toTick);
@@ -712,10 +714,13 @@ namespace ChartBuilder.Controls.Editing
 
         /// <summary>
         /// Whether the place tool's ghost, the erase tool's red or the Phrase tool's line is shown under the pointer, which
-        /// follow the song as it moves under it; or, with a synchronized region drawn, its X and hover, which do too.
+        /// follow the song as it moves under it; or a Select tool's rail hover, whose placement line does too; or, with a
+        /// synchronized region drawn, its X and hover, which do too.
         /// </summary>
-        private bool IsHoverShown => _hover is not null && !_isPressed
-            && (Session?.Tool is EditorTool.Place or EditorTool.Erase or EditorTool.Phrase || Session?.Sync.IsActive == true);
+        private bool IsHoverShown => _hover is { } hover && !_isPressed
+            && (Session?.Tool is EditorTool.Place or EditorTool.Erase or EditorTool.Phrase
+                || Session?.Sync.IsActive == true
+                || (Session?.Tool == EditorTool.Select && PointAt(hover) is { Rail: not null }));
 
         /// <summary>
         /// Follows the cursor: the song and the notes are moved, as far as their page reaches, and drawn again around the
@@ -1284,8 +1289,9 @@ namespace ChartBuilder.Controls.Editing
         }
 
         /// <summary>
-        /// Shows a resize arrow over a phrase or disco flip bar's end in the rail, and a hand over its body, or over a
-        /// proposed fill's ghost, which is clicked to keep or drop it; and over a bar, a tip saying what it is.
+        /// Shows a tooltip naming the phrase rail's row or bar under the pointer; a resize arrow over a phrase or disco flip
+        /// bar's end and a move arrow over its body, or a hand over a proposed fill's ghost, which is clicked to keep or drop
+        /// it; and a cross over an empty row where a drag would draw a phrase of its kind.
         /// </summary>
         private void ShowRailCursor(Point position)
         {
@@ -1293,27 +1299,33 @@ namespace ChartBuilder.Controls.Editing
             string? tip = null;
             if (PointAt(position) is { Rail: not null } point && Session is { } session)
             {
-                PhraseGrip? grip = null;
+                tip = ChartEditorViewModel.PhraseKindName(point.Rail.Value);
                 if (session.Proposals is { } run && run.HitTest(point) is not null)
                 {
                     wanted = StandardCursorType.Hand;
                     tip = string.Format(CultureInfo.CurrentCulture, Strings.ProposalGhostToolTipFormat, ChartEditorViewModel.PhraseKindName(run.Kind).ToLower(CultureInfo.CurrentCulture));
                 }
-                else if (session.Chart.PartOf(point.Track.Instrument) is { } part && PhraseRail.HitTest(part, point) is { } phrase)
+                else
                 {
-                    (grip, tip) = (phrase.Grip, ChartEditorViewModel.PhraseKindName(phrase.Phrase.Kind));
-                }
-                else if (PhraseRail.HitTestDiscoFlip(point.Track.Difficulty, session.DiscoFlipRangesOf(point.Track), point) is { } flip)
-                {
-                    (grip, tip) = (flip.Grip, ChartEditorViewModel.PhraseKindName(RailKind.DiscoFlip));
-                }
+                    PhraseGrip? grip = null;
+                    if (session.Chart.PartOf(point.Track.Instrument) is { } part && PhraseRail.HitTest(part, point) is { } phrase)
+                        grip = phrase.Grip;
+                    else if (PhraseRail.HitTestDiscoFlip(point.Track.Difficulty, session.DiscoFlipRangesOf(point.Track), point) is { } flip)
+                        grip = flip.Grip;
 
-                // The erase tool erases a bar rather than grabbing it, as its red shows.
-                if (grip is { } grabbed && (session.Tool != EditorTool.Erase || (_keys & KeyModifiers.Shift) != 0))
-                {
-                    wanted = grabbed == PhraseGrip.Body ? StandardCursorType.Hand
-                        : View == LaneView.Highway ? StandardCursorType.SizeNorthSouth
-                        : StandardCursorType.SizeWestEast;
+                    // The erase tool erases a bar rather than grabbing it, as its red shows.
+                    if (grip is { } grabbed && (session.Tool != EditorTool.Erase || (_keys & KeyModifiers.Shift) != 0))
+                    {
+                        wanted = grabbed == PhraseGrip.Body ? StandardCursorType.SizeAll
+                            : View == LaneView.Highway ? StandardCursorType.SizeNorthSouth
+                            : StandardCursorType.SizeWestEast;
+                    }
+                    else if (grip is null && (_keys & KeyModifiers.Shift) == 0
+                        && session.Tools.PhraseDrawAt(point) is { } draw
+                        && session.Tools.DrawsIn(point.Track, draw.Kind))
+                    {
+                        wanted = StandardCursorType.Cross;
+                    }
                 }
             }
 
@@ -1860,18 +1872,25 @@ namespace ChartBuilder.Controls.Editing
         }
 
         /// <summary>
-        /// The phrase rail (charter-spec C8): a row for each kind the part can have, with each phrase a bar in its kind's
-        /// row, so phrases that overlap don't hide each other. The selected ones are lit and outlined.
+        /// The phrase rail's rows, each a dark shade of its kind's colour (charter-spec C8). Drawn under the rest of the
+        /// song so the marks across the rail, as a timeline's section lines, still show in it.
         /// </summary>
-        private void DrawPhraseRail(DrawingContext context, EditorSession session, EditablePart part, IReadOnlyList<RailKind> rows, LaneProjection projection)
+        private void DrawPhraseRailBackground(DrawingContext context, IReadOnlyList<RailKind> rows, LaneProjection projection)
         {
             double along1 = projection.TimeFrom, along2 = projection.TimeFrom + projection.TimeLength;
             for (int i = 0; i < rows.Count; i++)
             {
                 var (from, to) = PhraseRowOf(projection, rows.Count, i);
-                context.FillRectangle(PhraseRowBrush, Box(along1, along2, from, to));
+                context.FillRectangle(_gems.Brush(PhraseColors.RailBackground(rows[i])), Box(along1, along2, from, to));
             }
+        }
 
+        /// <summary>
+        /// The phrase rail (charter-spec C8): a row for each kind the part can have, with each phrase a bar in its kind's
+        /// row, so phrases that overlap don't hide each other. The selected ones are lit and outlined.
+        /// </summary>
+        private void DrawPhraseRail(DrawingContext context, EditorSession session, EditablePart part, IReadOnlyList<RailKind> rows, LaneProjection projection)
+        {
             var selection = session.Selection;
             var accent = ((AccentBrush ?? DefaultAccentBrush) as ISolidColorBrush)?.Color ?? Color.FromRgb(0x7C, 0xB4, 0xFF);
             foreach (var phrase in _phrasesShown)
@@ -2428,23 +2447,25 @@ namespace ChartBuilder.Controls.Editing
         }
 
         /// <summary>
-        /// Where a press of the Phrase tool would start drawing, on the grid: a line across the lanes in the colour of the
-        /// kind picked, and a mark in its row of the rail. None where a press does something else, such as on a phrase's
-        /// bar, or in the lanes with Shift held, which lends the Phrase tool the select tool's press; nor where a press is
-        /// refused, as a disco flip section is off Pro drums.
+        /// Where a press would start drawing, on the grid: a line across the lanes in the colour of the kind drawn, and a
+        /// mark in its row of the rail. The Phrase tool draws where a press does in the lanes; the Select, Place and Phrase
+        /// tools draw in an empty part of the rail, where the row's kind is drawn whatever's picked. None where a press does
+        /// something else, such as on a phrase's bar or a proposed phrase's ghost, with Shift held, which lends the select
+        /// tool's press; nor where a press is refused, as a disco flip section is off Pro drums.
         /// </summary>
         private void DrawPhraseHover(DrawingContext context, EditorSession session, ChartTrackKey key, EditablePart part, IReadOnlyList<RailKind> rows, LaneProjection projection, LaneSlots slots)
         {
-            if (_hover is not { } hover || _isPressed || session.Tool != EditorTool.Phrase || !session.Tools.DrawsIn(key) || PointAt(hover) is not { } point)
+            if (_hover is not { } hover || _isPressed || (_keys & KeyModifiers.Shift) != 0 || PointAt(hover) is not { } point)
                 return;
-            if ((point.Rail is null && (_keys & KeyModifiers.Shift) != 0) || session.Tools.PhraseDrawStart(point) is not { } tick)
+            if (point.Rail is null && session.Tool != EditorTool.Phrase)
+                return;
+            if (session.Tools.PhraseDrawAt(point) is not { } draw || !session.Tools.DrawsIn(key, draw.Kind))
                 return;
 
-            var kind = session.PhraseKind;
-            var brush = _gems.Brush(kind.Phrase is { } phrase ? PhraseColor(phrase) : DiscoFlipColor);
-            double along = projection.AlongOf(session.AudioAt(tick));
+            var brush = _gems.Brush(draw.Kind.Phrase is { } phrase ? PhraseColor(phrase) : DiscoFlipColor);
+            double along = projection.AlongOf(session.AudioAt(draw.Tick));
             context.FillRectangle(brush, Box(along - 1, along + 1, projection.LaneFrom, projection.LaneFrom + (projection.LaneSize * slots.Slots.Count)));
-            int row = IndexOf(rows, kind.Phrase is { } drawn ? PhraseRail.RowOf(part.Kind, drawn) : RailKind.DiscoFlip);
+            int row = IndexOf(rows, draw.Kind.Phrase is { } drawn ? PhraseRail.RowOf(part.Kind, drawn) : RailKind.DiscoFlip);
             if (row < 0)
                 return;
             var (across1, across2) = PhraseRowOf(projection, rows.Count, row);

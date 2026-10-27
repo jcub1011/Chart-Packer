@@ -177,6 +177,9 @@ public enum PhraseGrip
     End,
 }
 
+/// <summary>A phrase or disco flip section a press at <paramref name="Tick"/> would draw, of <paramref name="Kind"/> (<see cref="EditorTools.PhraseDrawAt"/>).</summary>
+public readonly record struct PhraseDraw(long Tick, RailKind Kind);
+
 /// <summary>A phrase's bar in the rail under the pointer (<see cref="PhraseRail.HitTest"/>).</summary>
 public readonly record struct PhraseHit(Phrase Phrase, PhraseGrip Grip);
 
