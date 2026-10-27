@@ -855,7 +855,7 @@ namespace ChartShared.UI.Controls.Highway
                 // An open note or a kick: a flat bar across the highway.
                 double barHeight = Math.Max(4, gem * 0.45);
                 var bar = new Rect(bounds.X + 4, at - (barHeight / 2), bounds.Width - 8, barHeight);
-                _gems.DrawBar(context, note, color, bar, outlined);
+                _gems.DrawBar(context, lane.Kind, note, color, bar, outlined);
                 return bar;
             }
 
