@@ -36,6 +36,8 @@
         <SolidColorBrush x:Key="ExcludeTextBrush" Color="#FDA4AF" />
         <!-- The part of the waveform still to be played; the part played is AccentTextBrush. -->
         <SolidColorBrush x:Key="WaveformBrush" Color="#5B5E78" />
+        <!-- The loop region's start and end on the timeline, in a blue apart from the playhead's and the span box's. -->
+        <SolidColorBrush x:Key="LoopRegionLineBrush" Color="#4C8DFF" />
         <!-- Behind the tip strip along the bottom of the details panel: 90% opaque, so the rows only faintly show past it. -->
         <SolidColorBrush x:Key="ToolTipStripBrush" Color="#E61D1E29" />
         <!-- The spectrum behind the details panel while a song plays: a shade for each bar, stepped from rose at

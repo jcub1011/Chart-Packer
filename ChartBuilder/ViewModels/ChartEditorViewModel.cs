@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
@@ -42,6 +43,10 @@ namespace ChartBuilder.ViewModels
         // Tap tempo's message, which each tap updates.
         private const string TapTempoMessageKey = "tap-tempo";
 
+        // How long L may be held and still be a tap of the Loop tool rather than holding it: a tap turns what repeating
+        // the loop region does on or off (C10 item 2), a longer press only uses the tool.
+        private static readonly TimeSpan LoopTapTime = TimeSpan.FromMilliseconds(400);
+
         // The Phrase tool's kinds, for 5-fret and GHL, for 4-lane and 5-lane drums, and for Pro drums, which have disco flip.
         private static readonly IReadOnlyList<PhraseKindChoice> FretPhraseChoices = PhraseChoicesOf(ChartInstrumentKind.FiveFret, proDrums: false);
         private static readonly IReadOnlyList<PhraseKindChoice> DrumPhraseChoices = PhraseChoicesOf(ChartInstrumentKind.Drums, proDrums: false);
@@ -66,6 +71,9 @@ namespace ChartBuilder.ViewModels
 
         // The frame the playhead was last followed in.
         private TimeSpan? _followed;
+
+        // When L was pressed, to tell a tap of it from the tool's being held.
+        private long _loopHeldAt;
 
         /// <param name="messages">Where what the editor has to say goes, for the window's message bar.</param>
         /// <param name="audio">The song's audio as the lanes draw and analyse it.</param>
@@ -96,6 +104,7 @@ namespace ChartBuilder.ViewModels
             Properties = new PropertiesViewModel(this);
             Session.Onsets = new LaneOnsetSource(this);
             Session.VisibleTracks = () => [.. Lanes.Layout.Lanes.Select(l => l.Part.Track).OfType<ChartTrackKey>()];
+            Session.Loop = Playback;
             AudioAssist = new AudioAssistViewModel(this);
             Preview = new PreviewViewModel(this, settings);
             Difficulty = new DifficultyViewModel(this);
@@ -249,6 +258,38 @@ namespace ChartBuilder.ViewModels
         {
             get => Session.Tool == EditorTool.Sync || (IsCtrlHeld && IsShiftHeld);
             set => SetTool(EditorTool.Sync, value);
+        }
+
+        /// <summary>
+        /// Whether the Loop tool's button is down: the tool is picked, or L is held, which holds it on for as long as it
+        /// is. A loop region drawn is kept whatever tool is picked (charter-spec C10 item 2), and only its X, or the
+        /// middle button with the tool active, takes it away.
+        /// </summary>
+        public bool IsLoopTool
+        {
+            get => Session.Tool == EditorTool.Loop || Session.LoopToolHeld;
+            set => SetTool(EditorTool.Loop, value);
+        }
+
+        /// <summary>Holds the Loop tool on while L is down: the toolbar's button is lit meanwhile.</summary>
+        public void HoldLoopTool(bool held)
+        {
+            if (held)
+                _loopHeldAt = Stopwatch.GetTimestamp();
+            Session.LoopToolHeld = held;
+        }
+
+        /// <summary>
+        /// Lets the Loop tool go as L is released. A tap of L (a press held no longer than <see cref="LoopTapTime"/>) that
+        /// drew, moved, resized or cleared nothing turns what repeating the region does on or off (charter-spec C10 item
+        /// 2); a longer press is the tool held, which only lets it go.
+        /// </summary>
+        public void ReleaseLoopTool()
+        {
+            bool tapped = Stopwatch.GetElapsedTime(_loopHeldAt) <= LoopTapTime;
+            if (tapped && Session.LoopToolHeld && !Session.LoopTouched && Playback.HasLoop)
+                Playback.IsLooping = !Playback.IsLooping;
+            Session.LoopToolHeld = false;
         }
 
         /// <summary>
@@ -499,19 +540,10 @@ namespace ChartBuilder.ViewModels
                 Playback.PlayPauseCommand.Execute(null);
         }
 
-        /// <summary>Plays the selection's span, then pauses (Shift+Space).</summary>
-        public void PlaySelection()
-        {
-            if (Session.Selection.Span is not { } span)
-            {
-                Session.Status = Strings.NothingToPlayStatus;
-                return;
-            }
-
-            Playback.PlayRegion(Session.AudioAt(span.From), Session.AudioAt(span.To));
-        }
-
-        /// <summary>Sets the loop region to the selection's span (L).</summary>
+        /// <summary>
+        /// Sets the loop region to the selection's span: what preview practice starts from when there's no region yet
+        /// (charter-spec C18 item 2). The Loop tool and L are how a region is drawn by hand (C10 item 2).
+        /// </summary>
         public void SetLoopFromSelection()
         {
             if (Session.Selection.Span is not { } span)
@@ -681,6 +713,7 @@ namespace ChartBuilder.ViewModels
             OnPropertyChanged(nameof(IsPhraseTool));
             OnPropertyChanged(nameof(IsTempoTool));
             OnPropertyChanged(nameof(IsSyncTool));
+            OnPropertyChanged(nameof(IsLoopTool));
             OnPropertyChanged(nameof(IsRecording));
             OnPropertyChanged(nameof(RecordToolTip));
 

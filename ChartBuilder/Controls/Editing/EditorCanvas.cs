@@ -79,7 +79,11 @@ namespace ChartBuilder.Controls.Editing
         private static readonly IPen TempoPen = new ImmutablePen(Color.FromArgb(0xB0, 0xFF, 0xB0, 0x40).ToUInt32(), 1.5);
         private static readonly IBrush TempoBrush = new ImmutableSolidColorBrush(Color.FromRgb(0xFF, 0xB0, 0x40));
         private static readonly IBrush SpanBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x26, 0x6E, 0x9C, 0xFF));
-        private static readonly IBrush LoopBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x18, 0x3C, 0xD2, 0x78));
+        // The loop region (charter-spec C10 item 2): a light green box across the lanes, whose ends a drag resizes and whose
+        // body a drag moves with the Loop tool; and where a press of the tool would start drawing one.
+        private static readonly IBrush LoopBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x22, 0x3C, 0xD2, 0x78));
+        private static readonly IPen LoopPen = new ImmutablePen(Color.FromArgb(0xD0, 0x3C, 0xD2, 0x78).ToUInt32(), 1.5);
+        private static readonly IBrush LoopLineBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xD0, 0x3C, 0xD2, 0x78));
         private static readonly IBrush BoxBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x30, 0x6E, 0x9C, 0xFF));
         private static readonly IPen BoxPen = new ImmutablePen(Color.FromArgb(0xC0, 0x6E, 0x9C, 0xFF).ToUInt32(), 1);
 
@@ -100,7 +104,7 @@ namespace ChartBuilder.Controls.Editing
 
         // How far apart a region nothing matched's hash lines are drawn, in pixels, and how long a side of its X is.
         private const double SyncHashGap = 7;
-        private const double SyncCloseSize = 13;
+        private const double CloseSize = 13;
         private static readonly IBrush WaveformPeakBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x24, 0xC8, 0xD2, 0xFF));
         private static readonly IBrush WaveformLoudBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x48, 0xC8, 0xD2, 0xFF));
         private static readonly IBrush FullWaveformPeakBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x70, 0xC8, 0xD2, 0xFF));
@@ -605,8 +609,9 @@ namespace ChartBuilder.Controls.Editing
 
         /// <summary>
         /// What follows the pointer and the focus: the place tool's ghost, what the erase tool would take away, where the
-        /// Phrase tool would start drawing, where the Tempo tool would add a marker, where the Sync tool would start
-        /// drawing a region, the synchronized region's notes, its X and what of it the pointer would take hold of, the
+        /// Phrase tool would start drawing, where the Tempo tool would add a marker, where the Loop tool would start
+        /// drawing a region, where the Sync tool would start drawing one, the synchronized region's notes, its X and what
+        /// of it the pointer would take hold of, the loop region's X and what of it the pointer would take hold of, the
         /// cursor, a box being drawn, and the focus's edge.
         /// </summary>
         private void RenderOverlay(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, EditablePart part, IReadOnlyList<RailKind> rows, LaneSlots slots, LaneProjection screen)
@@ -621,8 +626,10 @@ namespace ChartBuilder.Controls.Editing
             DrawEraseHover(context, session, key, track, part, rows, screen, slots);
             DrawPhraseHover(context, session, key, part, rows, screen, slots);
             DrawTempoHover(context, session, screen, slots);
+            DrawLoopLine(context, session, screen, slots);
             DrawSyncLine(context, session, screen, slots);
             DrawSyncHover(context, session, key, screen, slots);
+            DrawLoopHover(context, session, screen, slots);
 
             DrawCursor(context, session, screen, lanes);
             DrawBox(context, screen);
@@ -716,11 +723,12 @@ namespace ChartBuilder.Controls.Editing
         /// <summary>
         /// Whether the place tool's ghost, the erase tool's red, the Phrase tool's line or the Tempo tool's marker preview
         /// is shown under the pointer, which follow the song as it moves under it; or a Select tool's rail hover, whose
-        /// placement line does too; or, with a synchronized region drawn, its X and hover, which do too.
+        /// placement line does too; or, with a synchronized region or the loop region drawn, its X and hover, which do too.
         /// </summary>
         private bool IsHoverShown => _hover is { } hover && !_isPressed
             && (Session?.Tool is EditorTool.Place or EditorTool.Erase or EditorTool.Phrase or EditorTool.Tempo
                 || Session?.Sync.IsActive == true
+                || Session?.Loop?.Span is not null
                 || (Session?.Tool == EditorTool.Select && PointAt(hover) is { Rail: not null }));
 
         /// <summary>
@@ -925,6 +933,16 @@ namespace ChartBuilder.Controls.Editing
             _pressDragged = false;
             ShowTip(null);
 
+            // The small X at the loop region's top right clears it, whatever the tool, in a vocal part's lane too.
+            if (button == MouseButton.Left && LoopCloseAt(current.Position))
+            {
+                session.ClearLoop();
+                Focus();
+                e.Handled = true;
+                _overlay.Redraw();
+                return;
+            }
+
             if (_lane is { Vocal: not null })
             {
                 PressVocals(session, current.Position, e);
@@ -959,9 +977,9 @@ namespace ChartBuilder.Controls.Editing
             _lastPoint = point;
 
             // A box is drawn from a press in the lanes that's on no note, with the select tool or Shift, which lends any tool
-            // the select tool's press. The Sync tool's press draws no box.
+            // the select tool's press. The Sync and Loop tools' presses draw no box.
             bool sync = session.Tools.IsSyncPress(ModifiersOf(e.KeyModifiers));
-            bool selecting = !sync && (session.Tool == EditorTool.Select || (e.KeyModifiers & KeyModifiers.Shift) != 0);
+            bool selecting = !sync && !session.Tools.LoopActive && (session.Tool == EditorTool.Select || (e.KeyModifiers & KeyModifiers.Shift) != 0);
             _boxFrom = button == MouseButton.Left && selecting && point.Rail is null && session.TrackOf(point.Track) is not null && session.Tools.HitTest(point) is null
                 ? current.Position
                 : null;
@@ -1022,10 +1040,10 @@ namespace ChartBuilder.Controls.Editing
             {
                 if (_lane is { Vocal: not null })
                 {
-                    if (!ShowVocalTempoCursor(position))
+                    if (!ShowLoopCursor(position) && !ShowVocalTempoCursor(position))
                         ShowVocalCursor(position);
                 }
-                else if (!ShowSyncCursor(position) && !ShowTempoCursor(position))
+                else if (!ShowLoopCursor(position) && !ShowSyncCursor(position) && !ShowTempoCursor(position))
                 {
                     ShowRailCursor(position);
                 }
@@ -1242,6 +1260,34 @@ namespace ChartBuilder.Controls.Editing
         }
 
         /// <summary>
+        /// Shows what the pointer would take hold of on the loop region: a hand over its X, which clears it whatever the
+        /// tool; and with the Loop tool picked, or L held, a resize arrow over an end and a hand over its body to move it;
+        /// each with a tip saying what it does. Whether it showed anything.
+        /// </summary>
+        private bool ShowLoopCursor(Point position)
+        {
+            if (Loop is not { } loop || CurrentProjection() is not { } projection)
+                return false;
+            var band = LoopBandOf(projection, loop);
+            if (CloseRectOf(band, LanesOf(projection, projection.Slots)).Inflate(ClickSlop).Contains(position))
+            {
+                SetCursor(StandardCursorType.Hand);
+                ShowTip(Strings.LoopClearToolTip);
+                return true;
+            }
+
+            if (Session is not { Tools.LoopActive: true } session || !band.Contains(position))
+                return false;
+            if (BandTickAt(projection, position) is not { } at || session.Tools.LoopGripAt(at.Tick, at.Tolerance) is not { } grip)
+                return false;
+            SetCursor(grip == LoopGrip.Body
+                ? StandardCursorType.Hand
+                : View == LaneView.Highway ? StandardCursorType.SizeNorthSouth : StandardCursorType.SizeWestEast);
+            ShowTip(grip == LoopGrip.Body ? Strings.LoopMoveToolTip : Strings.LoopResizeToolTip);
+            return true;
+        }
+
+        /// <summary>
         /// Shows what the pointer would take hold of on the synchronized region: a hand over its X, which clears it whatever
         /// the tool; and with the Sync tool picked, or Ctrl + Shift held, a resize arrow over an end, a hand over its body
         /// to move it, and over a passage synced with it to make it the source; each with a tip saying what it does.
@@ -1253,7 +1299,7 @@ namespace ChartBuilder.Controls.Editing
                 return false;
             if (CurrentProjection() is not { } projection || sync.Span is not var (from, to))
                 return false;
-            var close = SyncCloseRectOf(SyncBandOf(session, projection, from, to), LanesOf(projection, projection.Slots));
+            var close = CloseRectOf(SyncBandOf(session, projection, from, to), LanesOf(projection, projection.Slots));
             if (close.Inflate(ClickSlop).Contains(position))
             {
                 SetCursor(StandardCursorType.Hand);
@@ -1510,9 +1556,13 @@ namespace ChartBuilder.Controls.Editing
                     RequestFrame();
                     break;
                 case nameof(PlaybackViewModel.Waveform):
+                    _song.Redraw();
+                    break;
                 case nameof(PlaybackViewModel.Loop):
                 case nameof(PlaybackViewModel.IsLooping):
+                    // The region's box, its X and what the pointer would take hold of.
                     _song.Redraw();
+                    _overlay.Redraw();
                     break;
             }
         }
@@ -1815,14 +1865,29 @@ namespace ChartBuilder.Controls.Editing
             _redrawTimer.Start();
         }
 
-        /// <summary>The selected span, and the loop region.</summary>
+        /// <summary>
+        /// The loop region, boxed in light green across the lanes: drawn wherever a region is, whether or not the song is
+        /// repeating it just now (charter-spec C10 item 2). And the selected span.
+        /// </summary>
         private void DrawSpans(DrawingContext context, EditorSession session, LaneProjection projection)
         {
-            double across1 = projection.LaneFrom, across2 = projection.LaneFrom + (projection.LaneSize * projection.Slots.Slots.Count);
-            if (_editor?.Playback is { Loop: { } loop, IsLooping: true })
-                context.FillRectangle(LoopBrush, Box(projection.AlongOf(loop.Start), projection.AlongOf(loop.End), across1, across2));
+            if (Loop is { } loop)
+                context.DrawRectangle(LoopBrush, LoopPen, LoopBandOf(projection, loop));
             if (session.Selection.Range is { } range && range.To > range.From)
+            {
+                double across1 = projection.LaneFrom, across2 = projection.LaneFrom + (projection.LaneSize * projection.Slots.Slots.Count);
                 context.FillRectangle(SpanBrush, Box(projection.AlongOf(session.AudioAt(range.From)), projection.AlongOf(session.AudioAt(range.To)), across1, across2));
+            }
+        }
+
+        /// <summary>The loop region playback holds, in seconds of audio; null with none.</summary>
+        private LoopRegion? Loop => _editor?.Playback.Loop;
+
+        /// <summary>The band the loop region covers, from its start up to its end, across the lanes.</summary>
+        private Rect LoopBandOf(LaneProjection projection, LoopRegion loop)
+        {
+            double across1 = projection.LaneFrom, across2 = projection.LaneFrom + (projection.LaneSize * projection.Slots.Slots.Count);
+            return Box(projection.AlongOf(loop.Start), projection.AlongOf(loop.End), across1, across2);
         }
 
         /// <summary>
@@ -1868,13 +1933,13 @@ namespace ChartBuilder.Controls.Editing
         }
 
         /// <summary>
-        /// Where the small X that clears the synchronized region goes: at the top right of the band it covers, kept within
-        /// the lanes so it can always be reached.
+        /// Where the small X that clears the synchronized region or the loop region goes: at the top right of the band it
+        /// covers, kept within the lanes so it can always be reached.
         /// </summary>
-        private static Rect SyncCloseRectOf(Rect band, Rect lanes)
+        private static Rect CloseRectOf(Rect band, Rect lanes)
         {
-            double left = Math.Clamp(Math.Min(band.Right, lanes.Right) - SyncCloseSize, lanes.Left, Math.Max(lanes.Left, lanes.Right - SyncCloseSize));
-            return new(left, Math.Max(band.Top, lanes.Top), SyncCloseSize, SyncCloseSize);
+            double left = Math.Clamp(Math.Min(band.Right, lanes.Right) - CloseSize, lanes.Left, Math.Max(lanes.Left, lanes.Right - CloseSize));
+            return new(left, Math.Max(band.Top, lanes.Top), CloseSize, CloseSize);
         }
 
         /// <summary>Whether the pointer at <paramref name="position"/> is on the X that clears the synchronized region.</summary>
@@ -1884,7 +1949,7 @@ namespace ChartBuilder.Controls.Editing
                 return false;
             if (CurrentProjection() is not { } projection || sync.Span is not var (from, to))
                 return false;
-            var close = SyncCloseRectOf(SyncBandOf(session, projection, from, to), LanesOf(projection, projection.Slots));
+            var close = CloseRectOf(SyncBandOf(session, projection, from, to), LanesOf(projection, projection.Slots));
             return close.Inflate(ClickSlop).Contains(position);
         }
 
@@ -2574,7 +2639,7 @@ namespace ChartBuilder.Controls.Editing
                 return;
             var lanes = LanesOf(projection, slots);
             var band = SyncBandOf(session, projection, from, to);
-            var close = SyncCloseRectOf(band, lanes);
+            var close = CloseRectOf(band, lanes);
             if (!band.Inflate(2).Contains(hover) && !close.Inflate(ClickSlop).Contains(hover))
                 return;
             DrawSyncClose(context, close);
@@ -2605,13 +2670,85 @@ namespace ChartBuilder.Controls.Editing
             }
         }
 
-        /// <summary>Draws the small X at <paramref name="close"/> that clears the synchronized region.</summary>
+        /// <summary>Draws the small X at <paramref name="close"/> that clears the synchronized region, or the loop region.</summary>
         private void DrawSyncClose(DrawingContext context, Rect close)
         {
             context.DrawRectangle(SyncCloseBrush, null, close, 3, 3);
             var inner = close.Deflate(close.Width * 0.28);
             context.DrawLine(SyncClosePen, inner.TopLeft, inner.BottomRight);
             context.DrawLine(SyncClosePen, inner.TopRight, inner.BottomLeft);
+        }
+
+        /// <summary>
+        /// Where a press of the Loop tool would start drawing the loop region: a line across the lanes in the region's
+        /// green, on the grid step the press would snap to, as the Phrase tool's hover line is drawn. None where a press
+        /// does something else: on the region, on its X, or one that isn't the Loop tool's press.
+        /// </summary>
+        private void DrawLoopLine(DrawingContext context, EditorSession session, LaneProjection projection, LaneSlots slots)
+        {
+            if (_hover is not { } hover || _isPressed || !session.Tools.LoopActive || LoopCloseAt(hover))
+                return;
+            if (!LanesOf(projection, slots).Contains(hover) || BandTickAt(projection, hover) is not { } at)
+                return;
+            if (session.Tools.LoopDrawStart(at.Tick, at.Tolerance) is not { } tick)
+                return;
+            double along = projection.AlongOf(session.AudioAt(tick));
+            context.FillRectangle(LoopLineBrush, Box(along - 1, along + 1, projection.LaneFrom, projection.LaneFrom + (projection.LaneSize * slots.Slots.Count)));
+        }
+
+        /// <summary>
+        /// The small X at the loop region's top right, which clears it with a click whatever the tool, shown while the
+        /// pointer is over the region in this lane; and with the Loop tool picked, or L held, what the pointer would take
+        /// hold of: an end to resize, or the region's body to move it.
+        /// </summary>
+        private void DrawLoopHover(DrawingContext context, EditorSession session, LaneProjection projection, LaneSlots slots)
+        {
+            if (_hover is not { } hover || _isPressed || Loop is not { } loop)
+                return;
+            var lanes = LanesOf(projection, slots);
+            var band = LoopBandOf(projection, loop);
+            var close = CloseRectOf(band, lanes);
+            if (!band.Inflate(2).Contains(hover) && !close.Inflate(ClickSlop).Contains(hover))
+                return;
+            DrawSyncClose(context, close);
+            if (!session.Tools.LoopActive || BandTickAt(projection, hover) is not { } at || session.Tools.LoopGripAt(at.Tick, at.Tolerance) is not { } grip)
+                return;
+
+            switch (grip)
+            {
+                case LoopGrip.Start or LoopGrip.End:
+                {
+                    double edge = projection.AlongOf(grip == LoopGrip.Start ? loop.Start : loop.End);
+                    double across1 = projection.LaneFrom, across2 = projection.LaneFrom + (projection.LaneSize * slots.Slots.Count);
+                    context.FillRectangle(LoopBrush, Box(edge - 1.5, edge + 1.5, across1, across2));
+                    break;
+                }
+
+                case LoopGrip.Body:
+                    context.DrawRectangle(null, LoopPen, band.Inflate(1), 2, 2);
+                    break;
+            }
+        }
+
+        /// <summary>Whether the pointer at <paramref name="position"/> is on the X that clears the loop region.</summary>
+        private bool LoopCloseAt(Point position)
+        {
+            if (Loop is not { } loop || CurrentProjection() is not { } projection)
+                return false;
+            var close = CloseRectOf(LoopBandOf(projection, loop), LanesOf(projection, projection.Slots));
+            return close.Inflate(ClickSlop).Contains(position);
+        }
+
+        /// <summary>
+        /// The tick under <paramref name="position"/>, and how many ticks either way it reaches, in a highway's, a
+        /// timeline's or a vocal part's lane alike: what the Loop tool takes hold of there is where it is in the song.
+        /// </summary>
+        private (double Tick, double Tolerance)? BandTickAt(LaneProjection projection, Point position)
+        {
+            if (Session is not { } session)
+                return null;
+            double tick = session.TickAt(projection.SecondsAt(AlongOf(position)));
+            return (tick, Math.Max(1, projection.TicksOf(HitPixels, Math.Max(0, tick), session.TempoMap)));
         }
 
         /// <summary>The strike line's band, on the cursor, behind the notes: dark across the lanes, as in the games.</summary>

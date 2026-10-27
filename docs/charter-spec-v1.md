@@ -315,7 +315,7 @@ which already has speed, pitch correction (`Dsp/TimeStretcher`) and a heard `Pos
   of speed, playing or pausing. It maps output frames to the mix by a second `PositionMap` of the
   stretcher's nominal `SourcePosition`, which moves evenly at the speed. `Position` and the sounds laid
   over the mix stay on the grains played.
-- **Regions.** Play selection and the loop are a region that `StemPlayer` plays. A loop carries on
+- **Regions.** The loop is a region that `StemPlayer` plays. A loop carries on
   from the region's start without dropping the queue. Played as mixed, it turns on the region's end
   frame; stretched, within a chunk (20 ms) of it. A seek drops a region played once, but not a loop.
 
@@ -366,7 +366,7 @@ the chart is in **chart time**, from `TempoMap.SecondsAt`. They are related by
   lanes are built in code, so nothing needs a `ViewLocator` yet.
 - **Two custom-drawn canvases over one model**: `HighwayEditorCanvas` (vertical) and
   `TimelineEditorCanvas` (horizontal). They share one tool and hit-testing layer, `EditorTools`
-  (place, select, erase, sustain, phrase, tempo), so behaviour is the same in both.
+  (place, select, erase, sustain, phrase, tempo, sync, loop), so behaviour is the same in both.
   - *Settled in CM2:* `EditorTools` lives in Core (`Charting/Editing/`) with the rest of the
     editor's state, UI-free, so its tests need no canvas. The canvases only map the pointer to a
     tick and a lane, through `LaneProjection`.
@@ -861,7 +861,8 @@ Acceptance criteria:
      star power (as the games read it), solos and big rock endings on 5-fret and GHL; star power,
      solos, fills (with a big rock ending), rolls, trills and the difficulty's disco flips on drums.
      The sections' names are below the bands. The chart's tempo and time-signature changes are drawn
-     as amber lines down the strip, in the tempo markers' colour, whatever tool is active. While
+     as amber lines down the strip, in the tempo markers' colour, whatever tool is active, and the
+     loop region's start and end as blue lines ([C10](#c10-playback) item 2). While
      Generate fills or Generate star power runs, its ghosts are drawn over everything, whichever
      lane is in focus, so they can be found: a kept one as a faint amber column the height of the
      strip, capped in solid amber, a dropped one as a faint outline; each at least 2 px wide.
@@ -889,7 +890,9 @@ Acceptance criteria:
    where it happens. *Settled in CM2:* the Findings tab's title doesn't show the counts, as a
    collapsed panel's strip reads the titles only once. The counts are at the top of the panel.
 6. **Transport bar**: play and pause, position, speed, pitch correction, loop, metronome, hit
-   sounds, stem mute and solo, and the calibration value ([C11](#c11-calibration-tool)). Beside
+   sounds, stem mute and solo, and the calibration value ([C11](#c11-calibration-tool)). The loop
+   button repeats the loop region, which the toolbar's Loop tool draws ([C10](#c10-playback) item
+   2). Beside
    Record, the Playtest button (never on with Record; both can be off), the playtest's stats, the
    Problems list and Clear ([C19](#c19-playtest-and-instrument-input)).
 7. **Vocal lanes.** A lane showing `PART VOCALS` or `HARM1`–`HARM3` is always drawn along a
@@ -1637,8 +1640,19 @@ Acceptance criteria:
 1. Playback uses `StemPlayer`. It plays every stem sample-aligned, and has mute and solo per stem,
    volume, speed from 25% to 200% with **pitch correction** (on by default, as in the inspector),
    and sample-exact seeking.
-2. **Play from cursor** (Space), **play selection**, and a **loop region** for repeating a hard
-   passage at a lower speed.
+2. **Play from cursor** (Space), and a **loop region** for repeating a hard passage at a lower speed.
+   - The region is drawn with the toolbar's **Loop tool**, or with `L` held, which holds the tool on
+     while it's down: a drag over the lanes sets its start and end on the grid, never shorter than a
+     32nd note; a drag on either end resizes it; a drag on its body moves it keeping its length. A
+     region drawn goes back to the tool picked before it, as the Sync tool does.
+   - Drawing, moving or resizing the region doesn't start the song repeating it: whether it
+     repeats is turned on and off with the transport bar's **Loop** button, or with a quick tap of
+     `L` (a short press that touched nothing; held longer, `L` only holds the tool). The button is
+     disabled while there's no region, and turning repeating off keeps the region drawn.
+   - Every lane draws it as a light green box across it, whether or not the song repeats it just
+     now; the bottom timeline marks its start and end with blue lines.
+   - Hovering the region shows a small X at its top right, in the lane hovered, which clears it,
+     whatever tool is picked. The middle button clears it while the Loop tool is active.
 3. **Metronome**: a click on each beat, with an accented click on each measure, from the tempo
    map. It is mixed in after the time-stretcher ([§4.4.1](#441-playback-changes)), so it stays
    sharp and in time with the stems at any speed.
@@ -2979,7 +2993,6 @@ These are the defaults. Rebinding is future work.
 | `0` | Open note, or drum kick (as `1`–`5`, while the song plays) |
 | `Shift`+`0` | 2× kick (Expert drums; as `1`–`5`, while the song plays) |
 | `Space` | Play or pause from the cursor |
-| `Shift`+`Space` | Play the selection |
 | `↑` / `↓` (Highway), `→` / `←` (Timeline) | Move the cursor one grid step later or earlier |
 | `Alt`+arrows | Move the selection one grid step in time, or one lane across |
 | `Alt`+`Shift`+arrows across | Shift the selected notes a lane, each stopping at the edge |
@@ -3002,7 +3015,7 @@ These are the defaults. Rebinding is future work.
 | `C` | Toggle cymbal or tom (Pro drums, every difficulty at that tick) |
 | `A` / `Shift`+`A` | Toggle accent or ghost (drums) |
 | `S` | Star power phrase over the selection |
-| `L` | Set the loop region to the selection |
+| `L` | Hold for the Loop tool: drag out the loop region, or drag its ends or middle to resize or move it. Tapped briefly, having touched nothing, it turns repeating the region on or off ([C10](#c10-playback)) |
 | `R` | Record mode on or off, and playtest off: on, playing the song records a pass. Space ends a pass, and Esc cancels it |
 | `P` | Playtest on or off, and record mode off: on, playing the song playtests the lane ([C19](#c19-playtest-and-instrument-input)) |
 | `N` / `Shift`+`N` | Move the cursor to the playtest's next or previous problem |

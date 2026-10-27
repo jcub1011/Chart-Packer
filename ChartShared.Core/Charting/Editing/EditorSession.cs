@@ -17,6 +17,9 @@ public enum EditorTool
 
     /// <summary>Drags out a synchronized region (<see cref="SyncRegion"/>).</summary>
     Sync,
+
+    /// <summary>Draws out the loop region, and moves or resizes it (<see cref="ILoopSpan"/>).</summary>
+    Loop,
 }
 
 /// <summary>The modifier keys held with a click or a key.</summary>
@@ -234,6 +237,32 @@ public sealed class EditorSession
     public SyncRegion Sync { get; }
 
     /// <summary>
+    /// The loop region the Loop tool draws, moves and resizes (charter-spec C10 item 2): playback's, in seconds of audio,
+    /// or null without playback to hold one.
+    /// </summary>
+    public ILoopSpan? Loop { get; set; }
+
+    /// <summary>
+    /// Whether the Loop tool has drawn, moved or resized the region, or cleared it, since L was last pressed: a press of L
+    /// that hasn't touches nothing, so letting it go turns what repeating it does on or off instead.
+    /// </summary>
+    public bool LoopTouched { get; private set; }
+
+    /// <summary>Sets the loop region as a gesture ends, noting that the Loop tool has touched it.</summary>
+    public void DefineLoop(double start, double end)
+    {
+        LoopTouched = true;
+        Loop?.Define(start, end);
+    }
+
+    /// <summary>Takes the loop region away, noting that the Loop tool's X or middle button has touched it.</summary>
+    public void ClearLoop()
+    {
+        LoopTouched = true;
+        Loop?.Clear();
+    }
+
+    /// <summary>
     /// The notes drawn faintly over <paramref name="key"/>'s lane as a draft not yet added: a recording pass's, a Reduce
     /// run's, or null for none.
     /// </summary>
@@ -293,6 +322,8 @@ public sealed class EditorSession
             Tools.Cancel();
             if (value == EditorTool.Sync)
                 ToolBeforeSync = field;
+            if (value == EditorTool.Loop)
+                ToolBeforeLoop = field;
             field = value;
             RaiseState();
         }
@@ -300,6 +331,28 @@ public sealed class EditorSession
 
     /// <summary>The tool picked before the Sync tool, which a region drawn goes back to.</summary>
     internal EditorTool ToolBeforeSync { get; private set; }
+
+    /// <summary>The tool picked before the Loop tool, which a loop region drawn goes back to.</summary>
+    internal EditorTool ToolBeforeLoop { get; private set; }
+
+    /// <summary>
+    /// Whether the Loop tool is held on with L, for as long as the key is down: the toolbar's button is lit and a press
+    /// draws, moves or resizes the loop region, whatever tool is picked.
+    /// </summary>
+    public bool LoopToolHeld
+    {
+        get;
+        set
+        {
+            if (field == value)
+                return;
+            field = value;
+
+            // Held, or let go, it's a fresh press: what a press of L toggles depends on whether the region is touched after.
+            LoopTouched = false;
+            RaiseState();
+        }
+    }
 
     /// <summary>
     /// The kind of phrase the Phrase tool draws, of those offered for the focused part (<see cref="ToolKindsOf"/>), or disco

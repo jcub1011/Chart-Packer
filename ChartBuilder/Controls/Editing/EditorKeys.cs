@@ -182,9 +182,6 @@ namespace ChartBuilder.Controls.Editing
                 case PhysicalKey.Space when plain:
                     editor.PlayPause();
                     return true;
-                case PhysicalKey.Space when shift:
-                    editor.PlaySelection();
-                    return true;
                 case PhysicalKey.PageUp when plain:
                     tools.StepCursorMeasures(1);
                     return true;
@@ -242,9 +239,6 @@ namespace ChartBuilder.Controls.Editing
                     return true;
                 case PhysicalKey.B when plain:
                     editor.Tap();
-                    return true;
-                case PhysicalKey.L when plain:
-                    editor.SetLoopFromSelection();
                     return true;
                 case PhysicalKey.A when ctrl && !shift && !alt:
                     tools.SelectAll();

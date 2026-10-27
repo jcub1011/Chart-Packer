@@ -20,6 +20,7 @@ public sealed partial class EditorTools
     private const string DiscoFlipOffPro = "Only Pro drums have disco flip.";
     private const string DiscoFlipWithoutEnd = "This disco flip section never ends, as the file has it, so it can't be moved or have its start changed. Give it an end first.";
     private const string SyncToolKeeps = "The Sync tool doesn't delete anything; pick another tool to delete.";
+    private const string LoopToolKeeps = "The Loop tool doesn't delete anything; pick another tool to delete.";
 
     // The markings a chord's type is one of, natural having none (SetChordType).
     private static readonly ChordFlags[] ChordTypeFlags = [ChordFlags.ForceHopo, ChordFlags.ForceStrum, ChordFlags.Tap];
@@ -53,6 +54,12 @@ public sealed partial class EditorTools
     public bool IsSyncPress(EditorModifiers modifiers) =>
         (modifiers.HasFlag(EditorModifiers.Control) && modifiers.HasFlag(EditorModifiers.Shift))
         || (_session.Tool == EditorTool.Sync && !modifiers.HasFlag(EditorModifiers.Shift));
+
+    /// <summary>
+    /// Whether the Loop tool is active: picked, or held on with L (<see cref="EditorSession.LoopToolHeld"/>). It draws the
+    /// loop region out, and takes hold of its ends to resize it or its body to move it (charter-spec C10 item 2).
+    /// </summary>
+    public bool LoopActive => _session.Tool == EditorTool.Loop || _session.LoopToolHeld;
 
     private EditableChart Chart => _session.Chart;
 
@@ -106,9 +113,10 @@ public sealed partial class EditorTools
     /// tool, a gesture on the phrase there (charter-spec C8). Pressed on a selected note with Ctrl, a drag lengthens or
     /// shortens each selected note's sustain by the same grid steps; with Alt, it lays a run of each, as many steps as
     /// dragged. With Shift, any tool selects as the select tool does, the first press while Shift is held selecting afresh;
-    /// Ctrl + Shift held instead picks up the Sync tool's press for as long as they're held. The place tool puts a note
-    /// down as <see cref="EditorSession.Placing"/> has it, Alt swapping a fret for an open note or the kick, and Ctrl a run
-    /// for a sustain.
+    /// Ctrl + Shift held instead picks up the Sync tool's press for as long as they're held, and L held the Loop tool's
+    /// (<see cref="LoopActive"/>), which wins over every other tool's press since the region covers the whole song. The
+    /// place tool puts a note down as <see cref="EditorSession.Placing"/> has it, Alt swapping a fret for an open note or
+    /// the kick, and Ctrl a run for a sustain.
     /// </summary>
     public void Press(ChartPoint point, EditorModifiers modifiers = EditorModifiers.None)
     {
@@ -120,6 +128,16 @@ public sealed partial class EditorTools
             _shiftSelecting = false;
         if (_session.TrackOf(point.Track) is null)
             return;
+
+        // The Loop tool's press, or L held, which holds it on for as long as it's held. The region covers the whole song
+        // rather than one lane, so a press outside the lanes or in the phrase rail isn't its business, and it wins over
+        // the other tools' presses.
+        if (LoopActive)
+        {
+            _gesture = point.Rail is null && point.Lane is not null ? PressLoop(point.Tick, point.Tolerance) : null;
+            return;
+        }
+
         if (point.Rail is not null)
         {
             // The erase tool erases there too, as it shows; a proposed phrase's ghost is still kept or dropped.
@@ -222,9 +240,51 @@ public sealed partial class EditorTools
     }
 
     /// <summary>
+    /// A press with the Loop tool, or L held, in a lane: on the loop region's end, a drag resizes it; on its body, a drag
+    /// moves it; anywhere else, a drag draws a new region in place of any drawn, which the song repeats (charter-spec C10
+    /// item 2).
+    /// </summary>
+    private Gesture? PressLoop(double tick, double tolerance) => _session.Loop is null ? null : LoopGripAt(tick, tolerance) switch
+    {
+        LoopGrip.Start => new LoopResizeGesture(this, tick, tolerance, start: true),
+        LoopGrip.End => new LoopResizeGesture(this, tick, tolerance, start: false),
+        LoopGrip.Body => new LoopMoveGesture(this, tick, tolerance),
+        _ => new LoopGesture(this, tick, tolerance),
+    };
+
+    /// <summary>
+    /// What a press at <paramref name="tick"/> takes hold of on the loop region: an end to resize it, or its body to move
+    /// it. Null where there's nothing to take hold of, so a press draws a new region, or with no region drawn.
+    /// </summary>
+    public LoopGrip? LoopGripAt(double tick, double tolerance)
+    {
+        if (_session.Loop?.Span is not { } span)
+            return null;
+        double from = _session.TickAt(span.Start), to = _session.TickAt(span.End);
+        if (Math.Abs(tick - from) <= tolerance)
+            return LoopGrip.Start;
+        if (Math.Abs(tick - to) <= tolerance)
+            return LoopGrip.End;
+        return tick > from && tick < to ? LoopGrip.Body : null;
+    }
+
+    /// <summary>
+    /// Where a press at <paramref name="tick"/>, with the Loop tool picked or L held, starts drawing a new loop region: the
+    /// grid step nearest it. Null where a press does something else: one that takes hold of the region
+    /// (<see cref="LoopGripAt"/>), or one that isn't the Loop tool's press (<see cref="LoopActive"/>).
+    /// </summary>
+    public long? LoopDrawStart(double tick, double tolerance)
+    {
+        if (!LoopActive || _session.Loop is null)
+            return null;
+        return LoopGripAt(tick, tolerance) is null ? Snap.Nearest(tick, Map) : null;
+    }
+
+    /// <summary>
     /// Starts erasing at <paramref name="point"/>, as the middle button does: each note the pointer passes over goes, and
     /// in the phrase rail each phrase or disco flip section, as one step. With the Tempo tool, it removes the tempo marker
-    /// there instead. With the Sync tool active, it takes the synchronized region away rather than erasing anything.
+    /// there instead. With the Sync tool active, it takes the synchronized region away rather than erasing anything, and
+    /// with the Loop tool active, the loop region.
     /// </summary>
     public void PressErase(ChartPoint point)
     {
@@ -233,6 +293,14 @@ public sealed partial class EditorTools
         _session.Focused = point.Track;
         if (_session.TrackOf(point.Track) is null)
             return;
+
+        // The Loop tool's middle button takes the loop region away, as the Sync tool's does the synchronized region.
+        if (LoopActive)
+        {
+            _session.ClearLoop();
+            return;
+        }
+
         if (SyncActive)
         {
             _session.Sync.Clear();
@@ -322,7 +390,7 @@ public sealed partial class EditorTools
     /// Places a note in <paramref name="shown"/>'s column at the cursor of the focused lane, or removes the one there
     /// (charter-spec §9: 1–5, and 0 for an open note or the kick). Inside a disco flip section, it's the pad drawn in that
     /// column (C6 item 7), so 2 places red. A note placed leaves nothing selected. One there isn't removed while the Sync
-    /// tool is active.
+    /// or Loop tool is active.
     /// </summary>
     public void ToggleNoteAtCursor(int shown)
     {
@@ -332,9 +400,9 @@ public sealed partial class EditorTools
         int lane = _session.StoredLane(key, tick, shown);
         if (track.TryGetNote(tick, lane, doubleKick: false, out var note))
         {
-            if (SyncActive)
+            if (SyncActive || LoopActive)
             {
-                _session.Status = SyncToolKeeps;
+                _session.Status = SyncActive ? SyncToolKeeps : LoopToolKeeps;
                 return;
             }
 
@@ -399,13 +467,13 @@ public sealed partial class EditorTools
 
     /// <summary>
     /// Deletes the selected notes, phrases, disco flip sections and tempo markers (Delete), or a vocal part's notes and
-    /// phrases, as one step. Nothing is deleted while the Sync tool is active.
+    /// phrases, as one step. Nothing is deleted while the Sync or Loop tool is active.
     /// </summary>
     public void DeleteSelection()
     {
-        if (SyncActive)
+        if (SyncActive || LoopActive)
         {
-            _session.Status = SyncToolKeeps;
+            _session.Status = SyncActive ? SyncToolKeeps : LoopToolKeeps;
             return;
         }
 

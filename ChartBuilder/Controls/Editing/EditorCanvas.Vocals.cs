@@ -107,7 +107,7 @@ namespace ChartBuilder.Controls.Editing
             e.Pointer.Capture(this);
             _isPressed = true;
             _lastVocalPoint = point;
-            _boxFrom = _pressButton == MouseButton.Left && session.Tool == EditorTool.Select && !point.InPhrases && session.Tools.HitTest(point) is null ? position : null;
+            _boxFrom = _pressButton == MouseButton.Left && session.Tool == EditorTool.Select && !session.Tools.LoopActive && !point.InPhrases && session.Tools.HitTest(point) is null ? position : null;
             _boxTo = position;
             _boxFromSeconds = _boxFrom is not null && CurrentProjection() is { } anchorScreen
                 ? anchorScreen.SecondsAt(AlongOf(position))
@@ -423,7 +423,8 @@ namespace ChartBuilder.Controls.Editing
         }
 
         /// <summary>
-        /// What's on the strike line, lit; the place tool's ghost; the octaves' names at the rows' left edge; the cursor; a
+        /// What's on the strike line, lit; the place tool's ghost; the octaves' names at the rows' left edge; where the Loop
+        /// tool would start drawing the loop region, and its X and what of it the pointer would take hold of; the cursor; a
         /// box being drawn; and the focus's edge.
         /// </summary>
         private void RenderVocalOverlay(DrawingContext context, EditorSession session, VocalTrack vocal, VocalLane vocals, LaneProjection screen, Size size)
@@ -431,6 +432,8 @@ namespace ChartBuilder.Controls.Editing
             DrawVocalSinging(context, session, vocal, vocals, screen, size);
             DrawVocalHover(context, session, vocal, vocals, screen);
             DrawVocalTempoHover(context, session, screen);
+            DrawLoopLine(context, session, screen, screen.Slots);
+            DrawLoopHover(context, session, screen, screen.Slots);
             var pitches = vocals.Pitches;
             var brush = LabelBrush ?? DefaultLabelBrush;
             for (int i = 0; i < pitches.Count; i++)

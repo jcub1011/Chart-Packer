@@ -76,6 +76,9 @@ namespace ChartBuilder.Controls
         // The chart's tempo and time signature changes, in the tempo markers' amber, down the timeline.
         private static readonly IPen TempoPen = new ImmutablePen(Color.FromArgb(0xC0, 0xFF, 0xB0, 0x40).ToUInt32(), 1);
 
+        // The loop region's start and end, as lines down the timeline, in the brush it's given.
+        private const double LoopLineThickness = 2;
+
         // The synchronized region, outlined, and the passages synced with it, filled, behind the other marks.
         private static readonly IBrush SyncedBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x60, 0xFF, 0x7A, 0x1A));
         private static readonly IBrush SyncRegionBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x30, 0xFF, 0x7A, 0x1A));
@@ -108,6 +111,7 @@ namespace ChartBuilder.Controls
         private Pen? _beatPen;
         private Pen? _measurePen;
         private Pen? _waveformPen;
+        private Pen? _loopPen;
         private bool _frameRequested;
 
         // The wheel turn not yet taken as a notch.
@@ -182,11 +186,17 @@ namespace ChartBuilder.Controls
         public static readonly StyledProperty<IReadOnlyList<FindingMark>?> FindingMarksProperty =
             AvaloniaProperty.Register<TimelineView, IReadOnlyList<FindingMark>?>(nameof(FindingMarks));
 
-        // What the picture of the ruler, waveform, overview and beat lines shows: when one changes, it's drawn again.
+        public static readonly StyledProperty<LoopRegion?> LoopProperty =
+            AvaloniaProperty.Register<TimelineView, LoopRegion?>(nameof(Loop));
+
+        public static readonly StyledProperty<IBrush?> LoopBrushProperty =
+            AvaloniaProperty.Register<TimelineView, IBrush?>(nameof(LoopBrush));
+
+        // What the picture of the ruler, waveform, overview, beat lines and loop lines shows: when one changes, it's drawn again.
         private static readonly AvaloniaProperty[] ContentProperties =
         [
             LengthProperty, WaveformProperty, BeatsProperty, WaveformBrushProperty, TickBrushProperty, BeatBrushProperty, MeasureBrushProperty,
-            OverviewProperty, FindingMarksProperty,
+            OverviewProperty, FindingMarksProperty, LoopProperty, LoopBrushProperty,
         ];
 
         static TimelineView()
@@ -309,6 +319,20 @@ namespace ChartBuilder.Controls
             set => SetValue(SpanBrushProperty, value);
         }
 
+        /// <summary>The loop region, marked with blue lines at its start and end (charter-spec C10 item 2); null for none.</summary>
+        public LoopRegion? Loop
+        {
+            get => GetValue(LoopProperty);
+            set => SetValue(LoopProperty, value);
+        }
+
+        /// <summary>The line drawn at each end of the loop region.</summary>
+        public IBrush? LoopBrush
+        {
+            get => GetValue(LoopBrushProperty);
+            set => SetValue(LoopBrushProperty, value);
+        }
+
         protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
         {
             base.OnPropertyChanged(change);
@@ -321,6 +345,8 @@ namespace ChartBuilder.Controls
                 _measurePen = null;
             else if (change.Property == WaveformBrushProperty)
                 _waveformPen = null;
+            else if (change.Property == LoopBrushProperty)
+                _loopPen = null;
 
             // A tip given while a section's name is showing is the one to show again off it; the name stays for now.
             if (change.Property == ToolTip.TipProperty && _tipSection is not null && !_settingTip)
@@ -398,6 +424,7 @@ namespace ChartBuilder.Controls
                 DrawWaveform(context, bounds);
                 DrawOverview(context, bounds);
                 DrawBeats(context, bounds);
+                DrawLoop(context, bounds);
                 DrawRuler(context, bounds);
                 DrawFindingMarks(context, bounds);
             }
@@ -516,6 +543,24 @@ namespace ChartBuilder.Controls
                         context.DrawRectangle(null, DroppedProposalPen, column.Deflate(0.5));
                     }
                 }
+            }
+        }
+
+        /// <summary>
+        /// The loop region's start and end, as blue lines from the ruler down through the timeline (charter-spec C10 item
+        /// 2), so the stretch the song repeats is found at a glance.
+        /// </summary>
+        private void DrawLoop(DrawingContext context, Rect bounds)
+        {
+            if (Loop is not { } loop || LoopBrush is not { } brush)
+                return;
+            var pen = _loopPen ??= new Pen(brush, LoopLineThickness);
+            foreach (double seconds in (ReadOnlySpan<double>)[loop.Start, loop.End])
+            {
+                if (seconds < 0 || seconds > Length)
+                    continue;
+                double x = Math.Round(XOf(seconds, bounds.Width)) + 0.5;
+                context.DrawLine(pen, new Point(x, RulerHeight), new Point(x, bounds.Bottom));
             }
         }
 
