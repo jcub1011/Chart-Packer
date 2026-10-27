@@ -78,6 +78,7 @@ namespace ChartShared.UI.ViewModels
         /// <summary>The new-row editor is open.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(ShowAddRow))]
+        [NotifyPropertyChangedFor(nameof(ShowUsePlayheadForNew))]
         public partial bool IsAdding { get; set; }
 
         [ObservableProperty]
@@ -127,6 +128,18 @@ namespace ChartShared.UI.ViewModels
 
         /// <summary>No song has a <c>song_length</c> row, so Auto Set is offered beside Add row instead.</summary>
         public bool ShowAutoSetLengthFallback => CanEdit && AutoSetSongLengthCommand is not null && !Metadata.Any(r => r.IsSongLength);
+
+        /// <summary>Where the host's playhead is, for setting a time to it; null when there is none.</summary>
+        public TimeSpan? PlayheadPosition => _host.PlayheadPosition;
+
+        /// <summary>Whether the new row's key holds a time.</summary>
+        public bool IsNewKeyTime => MetadataTimes.IsTimeKey(NewKey.Trim());
+
+        /// <summary>The new row's value box watermark: the timecode form for a time key.</summary>
+        public string NewValuePlaceholder => IsNewKeyTime ? SharedStrings.TimecodeWatermark : SharedStrings.NewValueWatermark;
+
+        /// <summary>Whether the new row offers setting its value to the playhead: a single time being added.</summary>
+        public bool ShowUsePlayheadForNew => IsAdding && MetadataTimes.IsSingleTimeKey(NewKey.Trim()) && CanEdit;
 
         /// <summary>
         /// A row is being edited, or a key added, which a change from elsewhere shouldn't land under. An open new row with
@@ -222,8 +235,10 @@ namespace ChartShared.UI.ViewModels
             OnPropertyChanged(nameof(CanEdit));
             OnPropertyChanged(nameof(ShowAddRow));
             OnPropertyChanged(nameof(ShowAutoSetLengthFallback));
+            OnPropertyChanged(nameof(ShowUsePlayheadForNew));
             BeginAddCommand.NotifyCanExecuteChanged();
             CommitAddCommand.NotifyCanExecuteChanged();
+            UsePlayheadForNewCommand.NotifyCanExecuteChanged();
             foreach (var row in Metadata)
                 row.RefreshCommands();
             foreach (var instrument in Instruments)
@@ -280,7 +295,7 @@ namespace ChartShared.UI.ViewModels
         /// <summary>
         /// Puts the new row's key and value into the drafts, then empties the row for the next key; it stays open until
         /// closed. A key or value song.ini can't hold stays in the row with an error, and while the songs can't be edited,
-        /// what's typed stays for later.
+        /// what's typed stays for later. A time key's timecode is stored as the milliseconds it reads as.
         /// </summary>
         [RelayCommand(CanExecute = nameof(CanEdit))]
         private void CommitAdd()
@@ -301,6 +316,17 @@ namespace ChartShared.UI.ViewModels
                 return;
             }
 
+            if (MetadataTimes.IsTimeKey(key))
+            {
+                if (!MetadataTimes.TryNormalize(key, value, out string? canonical))
+                {
+                    NewRowError = SharedStrings.InvalidTimecode;
+                    return;
+                }
+
+                value = canonical;
+            }
+
             if (MetadataEditRules.ValidateValue(value) is { } valueError)
             {
                 NewRowError = valueError;
@@ -312,6 +338,32 @@ namespace ChartShared.UI.ViewModels
             NewRowError = null;
             _focusNewKeyOnRefresh = true;
             SetValue(key, value);
+        }
+
+        private bool CanUsePlayheadForNew() => CanEdit && IsAdding && MetadataTimes.IsSingleTimeKey(NewKey.Trim()) && PlayheadPosition is not null;
+
+        /// <summary>Puts the playhead position into the new row's value, as the timecode it reads as.</summary>
+        [RelayCommand(CanExecute = nameof(CanUsePlayheadForNew))]
+        private void UsePlayheadForNew()
+        {
+            if (PlayheadPosition is not { } position)
+                return;
+
+            NewValue = MetadataTimes.FormatMilliseconds((long)Math.Round(position.TotalMilliseconds, MidpointRounding.AwayFromZero));
+        }
+
+        partial void OnNewKeyChanged(string value)
+        {
+            OnPropertyChanged(nameof(IsNewKeyTime));
+            OnPropertyChanged(nameof(NewValuePlaceholder));
+            OnPropertyChanged(nameof(ShowUsePlayheadForNew));
+            UsePlayheadForNewCommand.NotifyCanExecuteChanged();
+        }
+
+        partial void OnIsAddingChanged(bool value)
+        {
+            OnPropertyChanged(nameof(ShowUsePlayheadForNew));
+            UsePlayheadForNewCommand.NotifyCanExecuteChanged();
         }
 
         [RelayCommand]
