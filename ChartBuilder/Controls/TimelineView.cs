@@ -21,9 +21,10 @@ using ChartShared.UI.Controls.Highway;
 namespace ChartBuilder.Controls
 {
     /// <summary>
-    /// The editor's timeline: second marks, the whole mix's waveform, the chart's beat and measure lines, and a playhead
-    /// that clicking or dragging moves (scrubbing), and the wheel moves a bar at a time. It's also the overview strip (charter-spec C3 item 2): the sections,
-    /// the notes, faded, star power and solos of the lane in focus, and a box round the span the lanes show.
+    /// The editor's timeline: second marks, the whole mix's waveform, the chart's beat and measure lines, its tempo and
+    /// time signature changes, and a playhead that clicking or dragging moves (scrubbing), and the wheel moves a bar at a
+    /// time. It's also the overview strip (charter-spec C3 item 2): the sections, the notes, faded, star power and solos
+    /// of the lane in focus, and a box round the span the lanes show.
     /// </summary>
     /// <remarks>
     /// <para>The playhead is drawn by a layer of its own over the rest, so it moves without the ruler, waveform and beat
@@ -71,6 +72,9 @@ namespace ChartBuilder.Controls
         private static readonly Dictionary<RailKind, IBrush> BandBrushes = [];
         private static readonly Dictionary<(uint Color, double Opacity), IBrush> NoteBrushes = [];
         private static readonly IPen SectionPen = new ImmutablePen(Color.FromArgb(0x90, 0xFF, 0xFF, 0xFF).ToUInt32(), 1);
+
+        // The chart's tempo and time signature changes, in the tempo markers' amber, down the timeline.
+        private static readonly IPen TempoPen = new ImmutablePen(Color.FromArgb(0xC0, 0xFF, 0xB0, 0x40).ToUInt32(), 1);
 
         // The synchronized region, outlined, and the passages synced with it, filled, behind the other marks.
         private static readonly IBrush SyncedBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x60, 0xFF, 0x7A, 0x1A));
@@ -434,9 +438,9 @@ namespace ChartBuilder.Controls
         }
 
         /// <summary>
-        /// The lane in focus over the whole song: its notes, a band of its phrases for each row of its phrase rail, and the
-        /// song's sections; the synchronized region and the passages synced with it; and over them all, the ghosts of a run
-        /// of Generate fills or Generate star power.
+        /// The lane in focus over the whole song: its notes, a band of its phrases for each row of its phrase rail, the
+        /// chart's tempo and time signature changes, and the song's sections; the synchronized region and the passages
+        /// synced with it; and over them all, the ghosts of a run of Generate fills or Generate star power.
         /// </summary>
         private void DrawOverview(DrawingContext context, Rect bounds)
         {
@@ -466,6 +470,8 @@ namespace ChartBuilder.Controls
                 double y = top + (row * (BandHeight + BandGap));
                 context.FillRectangle(BandBrush(phrase.Row), new Rect(XOf(phrase.Start, width), y, Math.Max(1, XOf(phrase.End, width) - XOf(phrase.Start, width)), BandHeight));
             }
+
+            DrawTempoChanges(context, overview, width, bounds);
 
             // Each section's line, from the row under the ruler down through the rest, and its name in that row, cut short
             // with an ellipsis before the next section's line; its whole name is the tip over its stretch of the row.
@@ -510,6 +516,19 @@ namespace ChartBuilder.Controls
                         context.DrawRectangle(null, DroppedProposalPen, column.Deflate(0.5));
                     }
                 }
+            }
+        }
+
+        /// <summary>
+        /// The chart's tempo and time signature changes, as lines in the tempo markers' amber from the ruler down through
+        /// the overview, so the whole song's timing can be found at a glance.
+        /// </summary>
+        private void DrawTempoChanges(DrawingContext context, OverviewData overview, double width, Rect bounds)
+        {
+            foreach (double seconds in overview.TempoChanges)
+            {
+                double x = Math.Round(XOf(seconds, width)) + 0.5;
+                context.DrawLine(TempoPen, new Point(x, RulerHeight), new Point(x, bounds.Bottom));
             }
         }
 

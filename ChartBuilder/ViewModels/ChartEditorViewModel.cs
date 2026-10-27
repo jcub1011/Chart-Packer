@@ -934,10 +934,12 @@ namespace ChartBuilder.ViewModels
     public readonly record struct OverviewNote(double Start, double End, int Row, Color Color, bool Top = false);
 
     /// <summary>
-    /// What the bottom timeline shows of the whole song (charter-spec C3 item 2): sections, the notes of the lane in focus,
-    /// every one of its phrases, a row for each of the phrase rail's rows, the ghosts of a run of Generate fills or Generate
-    /// star power going on, and the synchronized region and the passages synced with it, each as audio seconds.
+    /// What the bottom timeline shows of the whole song (charter-spec C3 item 2): sections, the chart's tempo and time
+    /// signature changes, the notes of the lane in focus, every one of its phrases, a row for each of the phrase rail's
+    /// rows, the ghosts of a run of Generate fills or Generate star power going on, and the synchronized region and the
+    /// passages synced with it, each as audio seconds.
     /// </summary>
+    /// <param name="TempoChanges">The chart's tempo and time signature changes, in audio seconds, each earliest first.</param>
     /// <param name="NoteRows">How many rows the notes are drawn in: a fret, pad or column each; none with no lane.</param>
     /// <param name="Notes">The notes of the lane in focus, as the games read them, in time order.</param>
     /// <param name="Rows">The rows of the phrase rail of the lane in focus, in order; none with no lane.</param>
@@ -952,6 +954,7 @@ namespace ChartBuilder.ViewModels
     /// </param>
     public sealed record OverviewData(
         IReadOnlyList<OverviewSection> Sections,
+        IReadOnlyList<double> TempoChanges,
         int NoteRows,
         IReadOnlyList<OverviewNote> Notes,
         IReadOnlyList<RailKind> Rows,
@@ -975,6 +978,8 @@ namespace ChartBuilder.ViewModels
                 if (SectionEvents.NameOf(e.Text) is { } name)
                     sections.Add(new OverviewSection(session.AudioAt(e.Tick), name));
             }
+
+            var tempoChanges = TempoMapRows.Of(chart.TempoMap).Select(row => session.AudioAt(row.Tick)).ToList();
 
             int noteRows = 0;
             var notes = new List<OverviewNote>();
@@ -1035,7 +1040,7 @@ namespace ChartBuilder.ViewModels
                     synced.Add((session.AudioAt(start), session.AudioAt(start + to - from), false, false));
             }
 
-            return new OverviewData(sections, noteRows, notes, rows, phrases, proposals, synced);
+            return new OverviewData(sections, tempoChanges, noteRows, notes, rows, phrases, proposals, synced);
         }
     }
 }

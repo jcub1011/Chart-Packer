@@ -25,7 +25,7 @@ namespace ChartBuilder.ViewModels
     {
         private readonly SectionsViewModel _owner;
         private string _name;
-        private string _tickText;
+        private decimal? _tickValue;
         private string _where;
 
         internal EventItem(SectionsViewModel owner, EventRow row, string where)
@@ -33,7 +33,7 @@ namespace ChartBuilder.ViewModels
             _owner = owner;
             Row = row;
             _name = NameOf(row);
-            _tickText = TickOf(row);
+            _tickValue = row.Event.Tick;
             _where = where;
             GoToCommand = new RelayCommand(() => owner.GoTo(this));
             DeleteCommand = new RelayCommand(() => owner.Delete(this));
@@ -45,6 +45,16 @@ namespace ChartBuilder.ViewModels
 
         /// <summary>Whether its fields are filled again at the next refresh whatever's typed in them, after an edit of its own.</summary>
         internal bool IsStale { get; set; }
+
+        /// <summary>Whether its tick scrubbed or typed is still to be applied, so a refresh leaves it alone.</summary>
+        internal bool IsTickPending { get; set; }
+
+        /// <summary>Shows the tick the chart has again, taking back one scrubbed or typed but not applied.</summary>
+        internal void RestoreTick()
+        {
+            _tickValue = Row.Event.Tick;
+            OnPropertyChanged(nameof(TickValue));
+        }
 
         public bool IsSection => Row.Kind == EventRowKind.Section;
 
@@ -81,17 +91,17 @@ namespace ChartBuilder.ViewModels
             }
         }
 
-        /// <summary>Its tick, which is typed to move it.</summary>
-        public string TickText
+        /// <summary>Its tick, which is scrubbed or typed to move it.</summary>
+        public decimal? TickValue
         {
-            get => _tickText;
+            get => _tickValue;
             set
             {
-                if (value == _tickText)
+                if (value == _tickValue)
                     return;
-                _tickText = value;
+                _tickValue = value;
                 OnPropertyChanged();
-                _owner.Move(this, value);
+                _owner.SetTick(this, value);
             }
         }
 
@@ -146,19 +156,17 @@ namespace ChartBuilder.ViewModels
                 OnPropertyChanged(nameof(Name));
             }
 
-            string tick = TickOf(row);
-            if (force || tick != TickOf(old))
+            decimal tickValue = row.Event.Tick;
+            if (!IsTickPending && (force || tickValue != old.Event.Tick))
             {
-                _tickText = tick;
-                OnPropertyChanged(nameof(TickText));
+                _tickValue = tickValue;
+                OnPropertyChanged(nameof(TickValue));
             }
 
             Where = where;
         }
 
         private static string NameOf(EventRow row) => row.SectionName ?? row.Event.Text;
-
-        private static string TickOf(EventRow row) => row.Event.Tick.ToString(CultureInfo.CurrentCulture);
     }
 
     /// <summary>The heading over the focused part's own text events in the Sections tab's list, e.g. "Text events on Drums".</summary>
@@ -199,6 +207,14 @@ namespace ChartBuilder.ViewModels
         private bool _scheduled;
         private bool _disposed;
 
+        // How long a tick typed or scrubbed is left alone before it's applied, so a drag is one undoable step.
+        private static readonly TimeSpan FieldTypingDelay = TimeSpan.FromMilliseconds(600);
+
+        // A tick scrubbed or typed, shown on the chart at once, and applied once it's been left alone.
+        private readonly DispatcherTimer _tickApply;
+        private (EventItem Item, decimal? Tick)? _pendingTick;
+        private bool _tickPreviewing;
+
         // A row inserted to be renamed, whose name is edited once it's listed.
         private (ChartInstrument? Part, TextEvent Event)? _editNext;
 
@@ -211,6 +227,8 @@ namespace ChartBuilder.ViewModels
         public SectionsViewModel(ChartEditorViewModel editor)
         {
             _editor = editor;
+            _tickApply = new DispatcherTimer(FieldTypingDelay, DispatcherPriority.Background, (_, _) => ApplyTick());
+            _tickApply.Stop();
             InsertSectionMenu =
             [
                 .. SectionEvents.CommonNames.Select(name => LaneMenuItem.Choice(name, false, () => Session.Tools.InsertSection(name))),
@@ -274,7 +292,10 @@ namespace ChartBuilder.ViewModels
 
         public void Dispose()
         {
+            ClearTickPreview();
             _disposed = true;
+            _tickApply.Stop();
+            _pendingTick = null;
             Session.ChartChanged -= OnChartChanged;
             Session.StateChanged -= OnSessionState;
             Session.SongSettingsChanged -= OnSongSettingsChanged;
@@ -282,10 +303,15 @@ namespace ChartBuilder.ViewModels
         }
 
         /// <summary>Moves the cursor to <paramref name="item"/>'s event. The focus stays where it is.</summary>
-        internal void GoTo(EventItem item) => Session.MoveCursorTo(item.Row.Event.Tick);
+        internal void GoTo(EventItem item)
+        {
+            CancelPendingTick(item);
+            Session.MoveCursorTo(item.Row.Event.Tick);
+        }
 
         internal void Delete(EventItem item)
         {
+            CancelPendingTick(item);
             if (!item.Row.IsPlaced)
                 Session.Tools.DeleteEvent(item.Row.Part, item.Row.Event);
         }
@@ -293,6 +319,7 @@ namespace ChartBuilder.ViewModels
         /// <summary>Renames <paramref name="item"/>'s event: a section by its name, another event by its whole text.</summary>
         internal void Rename(EventItem item, string text)
         {
+            CancelPendingTick(item);
             var row = item.Row;
             if (row.Kind == EventRowKind.SongEvent)
                 return;
@@ -302,13 +329,102 @@ namespace ChartBuilder.ViewModels
             Edited(item, now);
         }
 
-        /// <summary>Moves <paramref name="item"/>'s event to the tick typed; anything else typed is put back.</summary>
-        internal void Move(EventItem item, string text)
+        /// <summary>
+        /// Takes up the tick scrubbed or typed at <paramref name="item"/>'s row, to move its event once it's been left
+        /// alone, so a drag is one undoable step. A row changed before it's applied takes its own tick.
+        /// </summary>
+        internal void SetTick(EventItem item, decimal? tick)
         {
-            TextEvent? now = null;
-            if (!item.Row.IsPlaced && long.TryParse(text, NumberStyles.Integer, CultureInfo.CurrentCulture, out long tick))
-                now = Session.Tools.MoveEvent(item.Row.Part, item.Row.Event, tick);
-            Edited(item, now);
+            if (_pendingTick is { } pending && !ReferenceEquals(pending.Item, item))
+                ApplyTick();
+
+            _pendingTick = (item, tick);
+            item.IsTickPending = true;
+            PreviewTick(item, tick);
+            _tickApply.Stop();
+            _tickApply.Start();
+        }
+
+        // Shows the event at the tick scrubbed or typed on the chart, without putting it on the undo stack.
+        private void PreviewTick(EventItem item, decimal? tick)
+        {
+            ClearTickPreview();
+            if (tick is not { } value || value < 0 || value > long.MaxValue || value != Math.Floor(value))
+                return;
+
+            long to = (long)value;
+            if (item.Row.IsPlaced || to == item.Row.Event.Tick)
+                return;
+
+            if (Session.Tools.PreviewMoveEvent(item.Row.Part, item.Row.Event, to))
+                _tickPreviewing = true;
+        }
+
+        // Takes the shown tick off the chart again, leaving the event where it was.
+        private void ClearTickPreview()
+        {
+            if (!_tickPreviewing)
+                return;
+            _tickPreviewing = false;
+            Session.Preview(null);
+        }
+
+        // Moves the event to the tick scrubbed or typed: anything else is put back.
+        private void ApplyTick()
+        {
+            _tickApply.Stop();
+            if (_pendingTick is not { } pending)
+                return;
+            _pendingTick = null;
+            if (_disposed)
+                return;
+
+            var item = pending.Item;
+            item.IsTickPending = false;
+            if (pending.Tick is not { } value || value < 0 || value > long.MaxValue || value != Math.Floor(value))
+            {
+                ClearTickPreview();
+                Edited(item, null);
+                return;
+            }
+
+            long tick = (long)value;
+            if (item.Row.IsPlaced || tick == item.Row.Event.Tick)
+            {
+                ClearTickPreview();
+                Edited(item, null);
+                return;
+            }
+
+            // The tick shown is the one settled on: put it on the undo stack as one step.
+            if (_tickPreviewing)
+            {
+                _tickPreviewing = false;
+                if (Session.CommitPreview() is not null)
+                {
+                    Edited(item, item.Row.Event with { Tick = tick });
+                    return;
+                }
+            }
+
+            Edited(item, Session.Tools.MoveEvent(item.Row.Part, item.Row.Event, tick));
+        }
+
+        /// <summary>Takes back a tick scrubbed or typed but not yet applied, showing the tick the chart has.</summary>
+        internal void RevertTick(EventItem item) => CancelPendingTick(item);
+
+        // Forgets a tick scrubbed or typed in this row, so a button pressed next doesn't apply it afterwards. The list is
+        // refreshed as it then is, as a refresh asked for while the tick was pending was left to this.
+        private void CancelPendingTick(EventItem item)
+        {
+            if (_pendingTick is not { } pending || !ReferenceEquals(pending.Item, item))
+                return;
+            _pendingTick = null;
+            _tickApply.Stop();
+            item.IsTickPending = false;
+            ClearTickPreview();
+            item.RestoreTick();
+            Schedule();
         }
 
         /// <summary>
@@ -317,6 +433,7 @@ namespace ChartBuilder.ViewModels
         /// </summary>
         internal void MoveToPlayhead(EventItem item)
         {
+            CancelPendingTick(item);
             long tick = Session.CursorTick;
             if (item.Row.IsPlaced || tick == item.Row.Event.Tick)
                 return;
@@ -365,6 +482,11 @@ namespace ChartBuilder.ViewModels
 
         private void OnChartChanged(object? sender, EditorChartChangedEventArgs e)
         {
+            // A tick being scrubbed moves the row, which is put back in order once it settles; a refresh asked for
+            // meanwhile is made then, or when the tick is taken back.
+            if (_pendingTick is not null)
+                return;
+
             // EVENTS, the times (the tempo map) and the parts there are, or the focused part's own events.
             var affected = e.Affected;
             if ((affected.Song & (SongChanges.Events | SongChanges.TempoMap | SongChanges.Parts)) != 0
@@ -402,7 +524,8 @@ namespace ChartBuilder.ViewModels
         private void Refresh()
         {
             _scheduled = false;
-            if (_disposed)
+            // A tick being scrubbed is put back in order once it settles, or when it's taken back, which asks again.
+            if (_disposed || _pendingTick is not null)
                 return;
 
             var chart = Session.Chart;
