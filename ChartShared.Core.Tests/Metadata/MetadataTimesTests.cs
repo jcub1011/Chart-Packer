@@ -112,6 +112,7 @@ public sealed class MetadataTimesTests
     [DataRow("preview_start_time", "0:55.000", "55000")]
     [DataRow("delay", "-00:00:00:150", "-150")]
     [DataRow("delay", "-150", "-150")]
+    [DataRow("video_end_time", "-1", "-1")]
     [DataRow("preview", "00:00:55:000 00:01:25:000", "55000 85000")]
     [DataRow("preview", "0:55 1:25", "55000 85000")]
     public void NormalizesTimeKeys(string key, string text, string expected)
@@ -124,6 +125,7 @@ public sealed class MetadataTimesTests
     [DataRow("preview_start_time", "abc")]
     [DataRow("preview_start_time", "-5")]
     [DataRow("preview_start_time", "")]
+    [DataRow("video_end_time", "-2")]
     [DataRow("preview", "55000")]
     [DataRow("preview", "55000 -1")]
     [DataRow("name", "x")]

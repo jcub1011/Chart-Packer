@@ -14,6 +14,7 @@ namespace ChartShared.Core.Metadata;
 public static class MetadataTimes
 {
     private const string PreviewPairKey = "preview";
+    private const string VideoEndKey = "video_end_time";
     private const string PairSeparator = " – ";
 
     // Key → whether a negative value is meaningful. For the others a negative value isn't a time
@@ -25,7 +26,7 @@ public static class MetadataTimes
         ["preview_end_time"] = false,
         ["delay"] = true,
         ["video_start_time"] = true,
-        ["video_end_time"] = false,
+        [VideoEndKey] = false,
     };
 
     /// Whether <paramref name="key"/> holds a time in milliseconds: a single value, or two for <c>preview</c>.
@@ -60,6 +61,12 @@ public static class MetadataTimes
 
         if (MillisecondKeys.TryGetValue(key, out bool allowNegative))
         {
+            if (key.Equals(VideoEndKey, StringComparison.OrdinalIgnoreCase) && text.Trim() == "-1")
+            {
+                normalized = "-1";
+                return true;
+            }
+
             if (!TryParseTimecode(text, allowNegative, out long ms))
                 return false;
             normalized = ms.ToString(CultureInfo.InvariantCulture);
