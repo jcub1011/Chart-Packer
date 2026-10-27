@@ -1,12 +1,12 @@
 namespace ChartShared.Core.Generation;
 
 /// <summary>
-/// How generator models are named in storage (issue #154): <c>{GeneratorType}{ModelName}.{MODEL_EXT}</c>,
-/// where the extension belongs to the kind, so each kind can keep its own file type.
+/// How generator models are named in storage (issue #154): <c>{GeneratorType}\{ModelName}.{MODEL_EXT}</c>,
+/// where the type is a subfolder and the extension belongs to the kind, so each kind keeps its own file type.
 /// </summary>
 public static class GeneratorModelNaming
 {
-    /// <summary>The most characters a model name may hold; the kind prefix and extension add a little more.</summary>
+    /// <summary>The most characters a model name may hold; the type folder and extension add a little more.</summary>
     public const int MaxNameLength = 100;
 
     /// <summary>The file extension a kind's models are stored with, without the dot. Placeholder kinds use <c>json</c>.</summary>
@@ -21,12 +21,53 @@ public static class GeneratorModelNaming
     public static IReadOnlySet<string> KnownExtensions { get; } =
         Enum.GetValues<GeneratorType>().Select(GetExtension).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>The file name <paramref name="id"/> is stored under.</summary>
+    /// <summary>The file name <paramref name="id"/> is stored under within its type folder.</summary>
     /// <exception cref="ArgumentException"><paramref name="id"/>'s name isn't a valid model name.</exception>
     public static string FileNameFor(GeneratorModelId id)
     {
         ArgumentNullException.ThrowIfNull(id);
-        return $"{id.Type}{ValidateName(id.Name)}.{GetExtension(id.Type)}";
+        return $"{ValidateName(id.Name)}.{GetExtension(id.Type)}";
+    }
+
+    /// <summary>The storage-relative path <paramref name="id"/> is stored at: its type folder and file name.</summary>
+    /// <exception cref="ArgumentException"><paramref name="id"/>'s name isn't a valid model name.</exception>
+    public static string RelativePathFor(GeneratorModelId id)
+    {
+        ArgumentNullException.ThrowIfNull(id);
+        return Path.Combine(id.Type.ToString(), FileNameFor(id));
+    }
+
+    /// <summary>The generator type a file extension belongs to, or null when no kind uses it.</summary>
+    public static GeneratorType? DefaultTypeForExtension(string? extension)
+    {
+        if (string.IsNullOrWhiteSpace(extension))
+            return null;
+
+        string ext = extension.Trim().TrimStart('.');
+        foreach (var type in Enum.GetValues<GeneratorType>())
+        {
+            if (string.Equals(ext, GetExtension(type), StringComparison.OrdinalIgnoreCase))
+                return type;
+        }
+
+        return null;
+    }
+
+    /// <summary>A storage name suggested for an import source: the file's stem, sanitized.</summary>
+    public static string SuggestName(string sourcePath)
+    {
+        string stem = (Path.GetFileNameWithoutExtension(sourcePath) ?? "").Trim();
+        foreach (var type in Enum.GetValues<GeneratorType>().OrderByDescending(t => t.ToString().Length))
+        {
+            string prefix = type.ToString();
+            if (stem.StartsWith(prefix, StringComparison.Ordinal) && stem.Length > prefix.Length)
+            {
+                stem = stem[prefix.Length..];
+                break;
+            }
+        }
+
+        return SanitizeName(stem.Trim());
     }
 
     /// <summary>
@@ -61,33 +102,32 @@ public static class GeneratorModelNaming
     }
 
     /// <summary>
-    /// Reads <paramref name="fileName"/> (with or without its folder) as a stored model, or false
-    /// when it isn't one: the extension must be its kind's, and the name after the kind prefix must
-    /// be a valid model name. The longest kind prefix wins.
+    /// Reads a stored model path (with or without its storage root) as a stored model, or false
+    /// when it isn't one: the parent folder must be the kind's, the extension must be the kind's,
+    /// and the stem must be a valid model name. Flat files with no type folder never parse.
     /// </summary>
-    public static bool TryParseFileName(string fileName, out GeneratorModelId? id)
+    public static bool TryParseStoredPath(string path, out GeneratorModelId? id)
     {
         id = null;
-        if (string.IsNullOrWhiteSpace(fileName))
+        if (string.IsNullOrWhiteSpace(path))
             return false;
 
-        string name = Path.GetFileName(fileName);
-        string extension = Path.GetExtension(name);
-        if (string.IsNullOrEmpty(extension))
+        string file = Path.GetFileName(path);
+        string? folder = Path.GetFileName(Path.GetDirectoryName(path));
+        if (string.IsNullOrEmpty(file) || string.IsNullOrEmpty(folder))
             return false;
 
-        string stem = Path.GetFileNameWithoutExtension(name);
-        foreach (var type in Enum.GetValues<GeneratorType>().OrderByDescending(t => t.ToString().Length))
+        foreach (var type in Enum.GetValues<GeneratorType>())
         {
-            string prefix = type.ToString();
-            if (!stem.StartsWith(prefix, StringComparison.Ordinal)
-                || !string.Equals(extension.TrimStart('.'), GetExtension(type), StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(folder, type.ToString(), StringComparison.Ordinal))
+                continue;
+            if (!string.Equals(Path.GetExtension(file), "." + GetExtension(type), StringComparison.OrdinalIgnoreCase))
                 continue;
 
-            string rest = stem[prefix.Length..];
-            if (!string.IsNullOrEmpty(rest) && SanitizeName(rest) == rest)
+            string stem = Path.GetFileNameWithoutExtension(file);
+            if (!string.IsNullOrEmpty(stem) && SanitizeName(stem) == stem)
             {
-                id = new GeneratorModelId(type, rest);
+                id = new GeneratorModelId(type, stem);
                 return true;
             }
         }

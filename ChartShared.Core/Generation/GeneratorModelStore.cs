@@ -13,7 +13,7 @@ public sealed record GeneratorModelMigrationResult(int Copied, int Skipped, IRea
 
 /// <summary>
 /// Reads and writes the generator models both apps share (issue #154): large model/weight
-/// files in one folder, each named <c>{GeneratorType}{ModelName}.{MODEL_EXT}</c>.
+/// files in one folder, each stored as <c>{GeneratorType}\{ModelName}.{MODEL_EXT}</c>.
 /// Files stream, and saves land atomically (a temp file renamed into place), so a crash
 /// never leaves half a model where a whole one was.
 /// </summary>
@@ -49,13 +49,13 @@ public sealed class GeneratorModelStore(GeneratorModelFolderFile folders, string
     public string ResolvePath(GeneratorModelId id)
     {
         ArgumentNullException.ThrowIfNull(id);
-        return Path.Combine(ResolvedFolder, GeneratorModelNaming.FileNameFor(id));
+        return Path.Combine(ResolvedFolder, GeneratorModelNaming.RelativePathFor(id));
     }
 
     /// <summary>Whether the current folder holds any models (temp files don't count).</summary>
     public bool HasModels() => List().Count > 0;
 
-    /// <summary>Every model in the current folder, by kind then name. None when the folder is missing.</summary>
+    /// <summary>Every model in the current folder's type subfolders, by kind then name. None when the folder is missing.</summary>
     public IReadOnlyList<GeneratorModelInfo> List()
     {
         string folder = ResolvedFolder;
@@ -63,25 +63,32 @@ public sealed class GeneratorModelStore(GeneratorModelFolderFile folders, string
             return [];
 
         var found = new List<GeneratorModelInfo>();
-        foreach (string path in Directory.EnumerateFiles(folder))
+        foreach (var type in Enum.GetValues<GeneratorType>())
         {
-            if (IsTemp(path) || !GeneratorModelNaming.TryParseFileName(path, out var id) || id is null)
+            string dir = Path.Combine(folder, type.ToString());
+            if (!Directory.Exists(dir))
                 continue;
 
-            long size = -1;
-            DateTimeOffset modified = DateTimeOffset.MinValue;
-            try
+            foreach (string path in Directory.EnumerateFiles(dir))
             {
-                var info = new FileInfo(path);
-                size = info.Length;
-                modified = info.LastWriteTimeUtc;
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                Trace.TraceWarning($"Couldn't read model file '{path}': {ex.Message}");
-            }
+                if (IsTemp(path) || !GeneratorModelNaming.TryParseStoredPath(path, out var id) || id is null)
+                    continue;
 
-            found.Add(new GeneratorModelInfo(id, path, size, modified));
+                long size = -1;
+                DateTimeOffset modified = DateTimeOffset.MinValue;
+                try
+                {
+                    var info = new FileInfo(path);
+                    size = info.Length;
+                    modified = info.LastWriteTimeUtc;
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    Trace.TraceWarning($"Couldn't read model file '{path}': {ex.Message}");
+                }
+
+                found.Add(new GeneratorModelInfo(id, path, size, modified));
+            }
         }
 
         return [.. found.OrderBy(m => m.Id.Type).ThenBy(m => m.Id.Name, StringComparer.OrdinalIgnoreCase)];
@@ -204,21 +211,31 @@ public sealed class GeneratorModelStore(GeneratorModelFolderFile folders, string
     public GeneratorModelId Rename(GeneratorModelId id, string newName, bool overwrite)
     {
         ArgumentNullException.ThrowIfNull(id);
+        return Move(id, id.Type, newName, overwrite);
+    }
+
+    /// <summary>Moves <paramref name="id"/> to <paramref name="newType"/> and <paramref name="newName"/>.</summary>
+    /// <exception cref="FileNotFoundException">The model isn't stored.</exception>
+    /// <exception cref="IOException">A model is already stored there, without <paramref name="overwrite"/>.</exception>
+    public GeneratorModelId Move(GeneratorModelId id, GeneratorType newType, string newName, bool overwrite)
+    {
+        ArgumentNullException.ThrowIfNull(id);
         string validated = GeneratorModelNaming.ValidateName(newName);
-        var renamed = id with { Name = validated };
-        if (string.Equals(id.Name, renamed.Name, StringComparison.Ordinal))
-            return renamed;
+        var moved = new GeneratorModelId(newType, validated);
+        if (id == moved)
+            return moved;
 
         string from = ResolvePath(id);
         if (!File.Exists(from))
             throw new FileNotFoundException($"No stored {id.Type} model is named '{id.Name}'.", from);
 
-        string to = ResolvePath(renamed);
+        string to = ResolvePath(moved);
         if (!overwrite && File.Exists(to))
-            throw new IOException($"A {id.Type} model named '{renamed.Name}' is already stored.");
+            throw new IOException($"A {moved.Type} model named '{moved.Name}' is already stored.");
 
+        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(to))!);
         File.Move(from, to, overwrite);
-        return renamed;
+        return moved;
     }
 
     /// <summary>
@@ -241,13 +258,10 @@ public sealed class GeneratorModelStore(GeneratorModelFolderFile folders, string
             return new GeneratorModelMigrationResult(0, 0, []);
 
         Directory.CreateDirectory(to);
-        foreach (string path in Directory.EnumerateFiles(from))
+        foreach (var info in List())
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (IsTemp(path) || !GeneratorModelNaming.TryParseFileName(path, out _))
-                continue;
-
-            string dest = Path.Combine(to, Path.GetFileName(path));
+            string dest = Path.Combine(to, GeneratorModelNaming.RelativePathFor(info.Id));
             if (!overwrite && File.Exists(dest))
             {
                 skipped++;
@@ -256,7 +270,8 @@ public sealed class GeneratorModelStore(GeneratorModelFolderFile folders, string
 
             try
             {
-                await using var source = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read,
+                Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(dest))!);
+                await using var source = new FileStream(info.Path, FileMode.Open, FileAccess.Read, FileShare.Read,
                     CopyBufferSize, FileOptions.Asynchronous | FileOptions.SequentialScan);
                 await using var destStream = new FileStream(dest, overwrite ? FileMode.Create : FileMode.CreateNew,
                     FileAccess.Write, FileShare.None, CopyBufferSize, FileOptions.Asynchronous | FileOptions.SequentialScan);
@@ -266,7 +281,7 @@ public sealed class GeneratorModelStore(GeneratorModelFolderFile folders, string
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                errors.Add((Path.GetFileName(path), ex.Message));
+                errors.Add((GeneratorModelNaming.RelativePathFor(info.Id), ex.Message));
             }
         }
 

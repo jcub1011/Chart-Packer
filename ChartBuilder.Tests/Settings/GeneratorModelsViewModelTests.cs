@@ -34,15 +34,18 @@ public sealed class GeneratorModelsViewModelTests
 
     private GeneratorModelsViewModel Dialog() => new(_store, _files, _folders, _confirmations, _reveal);
 
-    private async Task<GeneratorModelId> SaveModelAsync(string name, int size = 64)
+    private async Task<GeneratorModelId> SaveModelAsync(GeneratorType type, string name, int size = 64)
     {
-        var id = new GeneratorModelId(GeneratorType.Difficulty, name);
+        var id = new GeneratorModelId(type, name);
         var bytes = new byte[size];
         new Random(154).NextBytes(bytes);
         await using var source = new MemoryStream(bytes, writable: false);
         await _store.SaveAsync(id, source, overwrite: false);
         return id;
     }
+
+    private Task<GeneratorModelId> SaveModelAsync(string name, int size = 64) =>
+        SaveModelAsync(GeneratorType.Difficulty, name, size);
 
     [TestMethod]
     public void ListsWhatsStored()
@@ -54,7 +57,7 @@ public sealed class GeneratorModelsViewModelTests
         var dialog = Dialog();
         Assert.AreEqual(1, dialog.Models.Count);
         Assert.AreEqual("First", dialog.Models[0].Name);
-        Assert.AreEqual("DifficultyFirst.json", dialog.Models[0].FileName);
+        Assert.AreEqual("First.json", dialog.Models[0].FileName);
         Assert.IsFalse(string.IsNullOrEmpty(dialog.Models[0].SizeText));
     }
 
@@ -68,9 +71,24 @@ public sealed class GeneratorModelsViewModelTests
 
         await dialog.RenameCommand.ExecuteAsync(null);
 
-        Assert.IsTrue(File.Exists(Path.Combine(_store.ResolvedFolder, "DifficultyNew.json")));
-        Assert.IsFalse(File.Exists(Path.Combine(_store.ResolvedFolder, "DifficultyOld.json")));
+        Assert.IsTrue(File.Exists(Path.Combine(_store.ResolvedFolder, "Difficulty", "New.json")));
+        Assert.IsFalse(File.Exists(Path.Combine(_store.ResolvedFolder, "Difficulty", "Old.json")));
         Assert.AreEqual("New", dialog.SelectedModel?.Name);
+    }
+
+    [TestMethod]
+    public async Task RetypeMovesTheSelectedModelToTheOtherKind()
+    {
+        var id = await SaveModelAsync("Pack");
+        var dialog = Dialog();
+        dialog.SelectedModel = dialog.Models.Single(m => m.Id == id);
+        dialog.NewType = GeneratorType.NeuralDifficulty;
+
+        await dialog.RenameCommand.ExecuteAsync(null);
+
+        Assert.IsFalse(File.Exists(Path.Combine(_store.ResolvedFolder, "Difficulty", "Pack.json")));
+        Assert.IsTrue(File.Exists(Path.Combine(_store.ResolvedFolder, "NeuralDifficulty", "Pack.neuralpack")));
+        Assert.AreEqual(new GeneratorModelId(GeneratorType.NeuralDifficulty, "Pack"), dialog.SelectedModel?.Id);
     }
 
     [TestMethod]
@@ -82,6 +100,21 @@ public sealed class GeneratorModelsViewModelTests
         var dialog = Dialog();
         dialog.SelectedModel = dialog.Models.Single(m => m.Id == first);
         dialog.NewName = "Second";
+
+        await dialog.RenameCommand.ExecuteAsync(null);
+
+        Assert.AreEqual(2, _store.List().Count);
+    }
+
+    [TestMethod]
+    public async Task RetypeOntoAnotherModelWithoutConfirmingKeepsBoth()
+    {
+        var first = await SaveModelAsync(GeneratorType.Difficulty, "Pack");
+        await SaveModelAsync(GeneratorType.NeuralDifficulty, "Pack");
+        _confirmations.Confirm = false;
+        var dialog = Dialog();
+        dialog.SelectedModel = dialog.Models.Single(m => m.Id == first);
+        dialog.NewType = GeneratorType.NeuralDifficulty;
 
         await dialog.RenameCommand.ExecuteAsync(null);
 
@@ -118,6 +151,48 @@ public sealed class GeneratorModelsViewModelTests
     }
 
     [TestMethod]
+    public async Task ImportNeuralPackOffersNeuralFirst()
+    {
+        string source = Path.Combine(_root.FullName, "my-pack.neuralpack");
+        await File.WriteAllBytesAsync(source, [1, 2, 3]);
+        _files.Picked = [source];
+        _confirmations.Choice = ConfirmChoice.First;
+        var dialog = Dialog();
+
+        await dialog.ImportCommand.ExecuteAsync(null);
+
+        Assert.AreEqual(new GeneratorModelId(GeneratorType.NeuralDifficulty, "my-pack"), dialog.Models.Single().Id);
+    }
+
+    [TestMethod]
+    public async Task ImportLetsTheUserPickTheOtherKind()
+    {
+        string source = Path.Combine(_root.FullName, "my-pack.neuralpack");
+        await File.WriteAllBytesAsync(source, [1, 2, 3]);
+        _files.Picked = [source];
+        _confirmations.Choice = ConfirmChoice.Second;
+        var dialog = Dialog();
+
+        await dialog.ImportCommand.ExecuteAsync(null);
+
+        Assert.AreEqual(new GeneratorModelId(GeneratorType.Difficulty, "my-pack"), dialog.Models.Single().Id);
+    }
+
+    [TestMethod]
+    public async Task ImportCancelledKindSkipsTheFile()
+    {
+        string source = Path.Combine(_root.FullName, "my-pack.neuralpack");
+        await File.WriteAllBytesAsync(source, [1, 2, 3]);
+        _files.Picked = [source];
+        _confirmations.Choice = ConfirmChoice.Cancel;
+        var dialog = Dialog();
+
+        await dialog.ImportCommand.ExecuteAsync(null);
+
+        Assert.AreEqual(0, dialog.Models.Count);
+    }
+
+    [TestMethod]
     public async Task ImportWithoutConfirmingAnOverwriteKeepsTheStoredModel()
     {
         var id = await SaveModelAsync("First", size: 8);
@@ -144,7 +219,7 @@ public sealed class GeneratorModelsViewModelTests
 
         await dialog.ExportCommand.ExecuteAsync(null);
 
-        Assert.IsTrue(File.Exists(Path.Combine(dest, "DifficultyFirst.json")));
+        Assert.IsTrue(File.Exists(Path.Combine(dest, "First.json")));
     }
 
     [TestMethod]
@@ -159,8 +234,8 @@ public sealed class GeneratorModelsViewModelTests
         await dialog.ChangeFolderCommand.ExecuteAsync(null);
 
         Assert.AreEqual(Path.GetFullPath(dest), _store.ResolvedFolder);
-        Assert.IsTrue(File.Exists(Path.Combine(dest, "DifficultyFirst.json")));
-        Assert.AreEqual(1, Directory.EnumerateFiles(Path.Combine(_root.FullName, "GeneratorModels")).Count());
+        Assert.IsTrue(File.Exists(Path.Combine(dest, "Difficulty", "First.json")));
+        Assert.IsTrue(File.Exists(Path.Combine(_root.FullName, "GeneratorModels", "Difficulty", "First.json")));
     }
 
     [TestMethod]

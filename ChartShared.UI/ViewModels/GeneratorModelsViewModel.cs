@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
@@ -80,6 +81,9 @@ public sealed partial class GeneratorModelsViewModel : ViewModelBase
 
     public ObservableCollection<GeneratorModelRowViewModel> Models { get; } = [];
 
+    /// <summary>The kinds an import or retype can assign; the storage folder holds one subfolder per kind.</summary>
+    public IReadOnlyList<GeneratorType> AvailableTypes { get; } = Enum.GetValues<GeneratorType>();
+
     /// <summary>The listed model acted on; null for none.</summary>
     [ObservableProperty]
     public partial GeneratorModelRowViewModel? SelectedModel { get; set; }
@@ -87,6 +91,10 @@ public sealed partial class GeneratorModelsViewModel : ViewModelBase
     /// <summary>The name a rename gives the selected model.</summary>
     [ObservableProperty]
     public partial string NewName { get; set; } = "";
+
+    /// <summary>The kind a rename moves the selected model to.</summary>
+    [ObservableProperty]
+    public partial GeneratorType NewType { get; set; } = GeneratorType.NeuralDifficulty;
 
     /// <summary>What the dialog last did or failed, shown under the list.</summary>
     [ObservableProperty]
@@ -102,6 +110,7 @@ public sealed partial class GeneratorModelsViewModel : ViewModelBase
     partial void OnSelectedModelChanged(GeneratorModelRowViewModel? value)
     {
         NewName = value?.Name ?? "";
+        NewType = value?.Id.Type ?? NewType;
         ExportCommand.NotifyCanExecuteChanged();
         DeleteCommand.NotifyCanExecuteChanged();
         RenameCommand.NotifyCanExecuteChanged();
@@ -138,7 +147,7 @@ public sealed partial class GeneratorModelsViewModel : ViewModelBase
         RenameCommand.NotifyCanExecuteChanged();
     }
 
-    /// <summary>Copies picked files into storage, asking before overwriting what's stored.</summary>
+    /// <summary>Copies picked files into storage, asking which kind each belongs to and before overwriting what's stored.</summary>
     [RelayCommand(CanExecute = nameof(CanAct))]
     private async Task ImportAsync()
     {
@@ -153,33 +162,32 @@ public sealed partial class GeneratorModelsViewModel : ViewModelBase
             int skipped = 0;
             foreach (string path in paths)
             {
-                GeneratorModelId id;
-                if (GeneratorModelNaming.TryParseFileName(path, out var parsed) && parsed is not null)
+                string name = GeneratorModelNaming.SuggestName(path);
+                if (string.IsNullOrEmpty(name))
                 {
-                    id = parsed;
+                    skipped++;
+                    continue;
                 }
-                else
+
+                // The user picks the kind; the extension only decides which answer is offered first.
+                // ChooseAsync offers two actions, one per current kind.
+                GeneratorType first = GeneratorModelNaming.DefaultTypeForExtension(Path.GetExtension(path))
+                    ?? GeneratorType.NeuralDifficulty;
+                GeneratorType second = first == GeneratorType.Difficulty
+                    ? GeneratorType.NeuralDifficulty
+                    : GeneratorType.Difficulty;
+                var kind = await _confirmations.ChooseAsync(
+                    SharedStrings.GeneratorModelsImportAsTitle,
+                    string.Format(CultureInfo.CurrentCulture, SharedStrings.GeneratorModelsImportAsFormat, Path.GetFileName(path)),
+                    first.ToString(),
+                    second.ToString());
+                if (kind == ConfirmChoice.Cancel)
                 {
-                    string stem = System.IO.Path.GetFileNameWithoutExtension(path);
-                    foreach (var type in Enum.GetValues<GeneratorType>().OrderByDescending(t => t.ToString().Length))
-                    {
-                        string prefix = type.ToString();
-                        if (stem.StartsWith(prefix, StringComparison.Ordinal) && stem.Length > prefix.Length)
-                        {
-                            stem = stem[prefix.Length..];
-                            break;
-                        }
-                    }
-
-                    string name = GeneratorModelNaming.SanitizeName(stem);
-                    if (string.IsNullOrEmpty(name))
-                    {
-                        skipped++;
-                        continue;
-                    }
-
-                    id = new GeneratorModelId(GeneratorType.Difficulty, name);
+                    skipped++;
+                    continue;
                 }
+
+                var id = new GeneratorModelId(kind == ConfirmChoice.First ? first : second, name);
 
                 string destPath;
                 try
@@ -317,7 +325,7 @@ public sealed partial class GeneratorModelsViewModel : ViewModelBase
         }
     }
 
-    /// <summary>Gives the selected model <see cref="NewName"/>, asking before overwriting what's stored.</summary>
+    /// <summary>Gives the selected model <see cref="NewName"/> in <see cref="NewType"/>, asking before overwriting what's stored.</summary>
     [RelayCommand(CanExecute = nameof(CanActOnSelection))]
     private async Task RenameAsync()
     {
@@ -338,23 +346,25 @@ public sealed partial class GeneratorModelsViewModel : ViewModelBase
             return;
         }
 
-        if (string.Equals(name, selected.Name, StringComparison.Ordinal))
+        var moved = selected.Id with { Type = NewType, Name = name };
+        if (moved == selected.Id)
             return;
 
-        var renamed = selected.Id with { Name = name };
-        if (Exists(renamed) && !await _confirmations.ConfirmAsync(
+        if (Exists(moved) && !await _confirmations.ConfirmAsync(
                 SharedStrings.GeneratorModelsOverwriteTitle,
-                string.Format(CultureInfo.CurrentCulture, SharedStrings.GeneratorModelsOverwriteFormat, renamed.Type, renamed.Name),
+                string.Format(CultureInfo.CurrentCulture, SharedStrings.GeneratorModelsOverwriteFormat, moved.Type, moved.Name),
                 SharedStrings.GeneratorModelsOverwriteConfirm))
             return;
 
         IsBusy = true;
         try
         {
-            _store.Rename(selected.Id, name, overwrite: true);
+            _store.Move(selected.Id, NewType, name, overwrite: true);
             Refresh();
-            SelectedModel = Models.FirstOrDefault(m => m.Id == renamed);
-            Status = string.Format(CultureInfo.CurrentCulture, SharedStrings.GeneratorModelsRenamedFormat, name);
+            SelectedModel = Models.FirstOrDefault(m => m.Id == moved);
+            Status = moved.Type == selected.Id.Type
+                ? string.Format(CultureInfo.CurrentCulture, SharedStrings.GeneratorModelsRenamedFormat, name)
+                : string.Format(CultureInfo.CurrentCulture, SharedStrings.GeneratorModelsMovedFormat, moved.Type, name);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -486,7 +496,7 @@ public sealed partial class GeneratorModelsViewModel : ViewModelBase
         }
     }
 
-    // How many of the old folder's models are already in the new one.
+    // How many of the old folder's models are already in the new one, by storage-relative path.
     private static int Collisions(string from, string to)
     {
         try
@@ -494,19 +504,31 @@ public sealed partial class GeneratorModelsViewModel : ViewModelBase
             if (!System.IO.Directory.Exists(from) || !System.IO.Directory.Exists(to))
                 return 0;
 
-            var names = System.IO.Directory.EnumerateFiles(to)
-                .Where(p => GeneratorModelNaming.TryParseFileName(p, out _))
-                .Select(System.IO.Path.GetFileName)
+            var names = StoredRelativePaths(to)
                 .ToHashSet(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
             StringComparer comparer = OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
-            return System.IO.Directory.EnumerateFiles(from)
-                .Where(p => GeneratorModelNaming.TryParseFileName(p, out _))
-                .Select(System.IO.Path.GetFileName)
-                .Count(name => name is not null && names.Contains(name, comparer));
+            return StoredRelativePaths(from)
+                .Count(name => names.Contains(name, comparer));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             return 0;
+        }
+    }
+
+    private static IEnumerable<string> StoredRelativePaths(string folder)
+    {
+        foreach (var type in Enum.GetValues<GeneratorType>())
+        {
+            string dir = System.IO.Path.Combine(folder, type.ToString());
+            if (!System.IO.Directory.Exists(dir))
+                continue;
+
+            foreach (string path in System.IO.Directory.EnumerateFiles(dir))
+            {
+                if (GeneratorModelNaming.TryParseStoredPath(path, out var id) && id is not null)
+                    yield return GeneratorModelNaming.RelativePathFor(id);
+            }
         }
     }
 

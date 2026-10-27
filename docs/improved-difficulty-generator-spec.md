@@ -688,7 +688,7 @@ The design questions are settled as follows.
 | Learned voicing and sustains | A later milestone, M7 (§10). |
 | Training stack | TorchSharp with GPU acceleration where present (spec §6.5), CPU otherwise. Batched, bucketed full-sequence CRF NLL with Adam; reproducible from a seed. |
 | App inference | Hand-written managed C# BiGRU+CRF in PyTorch GRU convention (parity 1e-4, checked by the trainer's `selftest`; measured 1.7e-6). ONNX Runtime is not used in the apps (§7: no new native dependencies, AOT). |
-| Pack storage | One pack is one `NeuralDifficulty` model in the shared generator-model store (`IGeneratorModelStore`), file `NeuralDifficulty{name}.neuralpack`. |
+| Pack storage | One pack is one `NeuralDifficulty` model in the shared generator-model store (`IGeneratorModelStore`), file `NeuralDifficulty/{name}.neuralpack`. |
 
 Chosen when the work started: the pack file's extension is `.neuralpack`, and the parity
 tolerance of §3.3 is 1e-4. Still to be chosen: the pack repository's name and address

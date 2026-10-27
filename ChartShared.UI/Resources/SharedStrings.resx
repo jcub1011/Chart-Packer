@@ -1170,13 +1170,13 @@
     <value>Generator models</value>
   </data>
   <data name="GeneratorModelsDescription" xml:space="preserve">
-    <value>Where generator models are stored. Manage opens the storage, to change the folder and import, export, rename and delete models.</value>
+    <value>Where generator models are stored. Manage opens the storage, to change the folder and import, export, rename, retype and delete models.</value>
   </data>
   <data name="GeneratorModelsSettingsDescriptionFormat" xml:space="preserve">
-    <value>Stored in {0}. Manage opens the storage dialog, to change the folder and import, export, rename and delete models.</value>
+    <value>Stored in {0}. Manage opens the storage dialog, to change the folder and import, export, rename, retype and delete models.</value>
   </data>
   <data name="GeneratorModelsKeywords" xml:space="preserve">
-    <value>models weights storage folder import export delete rename migrate</value>
+    <value>models weights storage folder import export delete rename retype type migrate</value>
   </data>
   <data name="GeneratorModelsManageButton" xml:space="preserve">
     <value>Manage models…</value>
@@ -1214,6 +1214,15 @@
   <data name="GeneratorModelsNameLabel" xml:space="preserve">
     <value>Name</value>
   </data>
+  <data name="GeneratorModelsTypeLabel" xml:space="preserve">
+    <value>Type</value>
+  </data>
+  <data name="GeneratorModelsImportAsTitle" xml:space="preserve">
+    <value>Import model as?</value>
+  </data>
+  <data name="GeneratorModelsImportAsFormat" xml:space="preserve">
+    <value>Import "{0}" as which type?</value>
+  </data>
   <data name="GeneratorModelsEmpty" xml:space="preserve">
     <value>No models stored.</value>
   </data>
@@ -1243,6 +1252,9 @@
   </data>
   <data name="GeneratorModelsRenamedFormat" xml:space="preserve">
     <value>Renamed to {0}.</value>
+  </data>
+  <data name="GeneratorModelsMovedFormat" xml:space="preserve">
+    <value>Moved to {0} "{1}".</value>
   </data>
   <data name="GeneratorModelsMigratedFormat" xml:space="preserve">
     <value>Now storing in {0}. Copied {1}; skipped {2}.</value>

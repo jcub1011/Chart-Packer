@@ -4,7 +4,7 @@ namespace ChartShared.Core.Generation;
 
 /// <summary>
 /// The generator models both apps share (issue #154): large model/weight files in one
-/// configurable folder, each named <c>{GeneratorType}{ModelName}.{MODEL_EXT}</c>.
+/// configurable folder, each stored as <c>{GeneratorType}\{ModelName}.{MODEL_EXT}</c>.
 /// </summary>
 /// <remarks>
 /// Generators read through this (never the folder directly), so storage can move without
@@ -67,6 +67,11 @@ public interface IGeneratorModelStore
     /// <exception cref="FileNotFoundException">The model isn't stored.</exception>
     /// <exception cref="IOException">A model is already stored under <paramref name="newName"/>, without <paramref name="overwrite"/>.</exception>
     GeneratorModelId Rename(GeneratorModelId id, string newName, bool overwrite);
+
+    /// <summary>Moves <paramref name="id"/> to <paramref name="newType"/> and <paramref name="newName"/>.</summary>
+    /// <exception cref="FileNotFoundException">The model isn't stored.</exception>
+    /// <exception cref="IOException">A model is already stored there, without <paramref name="overwrite"/>.</exception>
+    GeneratorModelId Move(GeneratorModelId id, GeneratorType newType, string newName, bool overwrite);
 
     /// <summary>
     /// Copies the current folder's models to <paramref name="destinationFolder"/> (the source

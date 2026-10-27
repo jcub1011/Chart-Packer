@@ -59,7 +59,7 @@ public sealed class GeneratorModelStoreTests
         Assert.AreEqual(1, listed.Count);
         Assert.AreEqual(id, listed[0].Id);
         Assert.AreEqual(bytes.Length, listed[0].Size);
-        Assert.AreEqual(Path.Combine(_folder, "DifficultyFirst.json"), listed[0].Path);
+        Assert.AreEqual(Path.Combine(_folder, "Difficulty", "First.json"), listed[0].Path);
 
         await using var read = store.OpenRead(id);
         await using var copy = new MemoryStream();
@@ -97,8 +97,18 @@ public sealed class GeneratorModelStoreTests
     public async Task TempFilesAreNotModels()
     {
         var store = Store();
+        Directory.CreateDirectory(Path.Combine(_folder, "Difficulty"));
+        await File.WriteAllTextAsync(Path.Combine(_folder, "Difficulty", "A.json.abc.tmp"), "half");
+
+        Assert.AreEqual(0, store.List().Count);
+    }
+
+    [TestMethod]
+    public async Task FlatFilesAreNotModels()
+    {
+        var store = Store();
         Directory.CreateDirectory(_folder);
-        await File.WriteAllTextAsync(Path.Combine(_folder, "DifficultyA.json.abc.tmp"), "half");
+        await File.WriteAllBytesAsync(Path.Combine(_folder, "DifficultyFirst.json"), Bytes(16));
 
         Assert.AreEqual(0, store.List().Count);
     }
@@ -113,7 +123,7 @@ public sealed class GeneratorModelStoreTests
 
         await store.ImportAsync(source, id, overwrite: false);
 
-        string dest = Path.Combine(_root.FullName, "exported", "out.json");
+        string dest = Path.Combine(_root.FullName, "exports", "out.json");
         await store.ExportAsync(id, dest, overwrite: false);
         Assert.IsTrue(File.Exists(dest));
 
@@ -142,8 +152,8 @@ public sealed class GeneratorModelStoreTests
         var renamed = store.Rename(id, "New", overwrite: false);
 
         Assert.AreEqual(new GeneratorModelId(GeneratorType.Difficulty, "New"), renamed);
-        Assert.IsFalse(File.Exists(Path.Combine(_folder, "DifficultyOld.json")));
-        Assert.IsTrue(File.Exists(Path.Combine(_folder, "DifficultyNew.json")));
+        Assert.IsFalse(File.Exists(Path.Combine(_folder, "Difficulty", "Old.json")));
+        Assert.IsTrue(File.Exists(Path.Combine(_folder, "Difficulty", "New.json")));
     }
 
     [TestMethod]
@@ -163,6 +173,38 @@ public sealed class GeneratorModelStoreTests
     }
 
     [TestMethod]
+    public async Task MoveChangesTheKindAndMovesTheFile()
+    {
+        var store = Store();
+        var id = new GeneratorModelId(GeneratorType.Difficulty, "Pack");
+        await using (var source = new MemoryStream(Bytes(64), writable: false))
+            await store.SaveAsync(id, source, overwrite: false);
+
+        var moved = store.Move(id, GeneratorType.NeuralDifficulty, "Pack", overwrite: false);
+
+        Assert.AreEqual(new GeneratorModelId(GeneratorType.NeuralDifficulty, "Pack"), moved);
+        Assert.IsFalse(File.Exists(Path.Combine(_folder, "Difficulty", "Pack.json")));
+        Assert.IsTrue(File.Exists(Path.Combine(_folder, "NeuralDifficulty", "Pack.neuralpack")));
+        Assert.AreEqual(1, store.List().Count);
+    }
+
+    [TestMethod]
+    public async Task MoveOntoAnotherModelNeedsOverwrite()
+    {
+        var store = Store();
+        var first = new GeneratorModelId(GeneratorType.Difficulty, "First");
+        var second = new GeneratorModelId(GeneratorType.NeuralDifficulty, "First");
+        await using (var a = new MemoryStream(Bytes(8), writable: false))
+            await store.SaveAsync(first, a, overwrite: false);
+        await using (var b = new MemoryStream(Bytes(8), writable: false))
+            await store.SaveAsync(second, b, overwrite: false);
+
+        Assert.ThrowsExactly<IOException>(() => store.Move(first, GeneratorType.NeuralDifficulty, "First", overwrite: false));
+        store.Move(first, GeneratorType.NeuralDifficulty, "First", overwrite: true);
+        Assert.AreEqual(1, store.List().Count);
+    }
+
+    [TestMethod]
     public async Task MigrateCopiesAndKeepsTheSource()
     {
         var store = Store();
@@ -176,8 +218,8 @@ public sealed class GeneratorModelStoreTests
         Assert.AreEqual(1, result.Copied);
         Assert.AreEqual(0, result.Skipped);
         Assert.AreEqual(0, result.Errors.Count);
-        Assert.IsTrue(File.Exists(Path.Combine(_folder, "DifficultyFirst.json")));
-        Assert.IsTrue(File.Exists(Path.Combine(dest, "DifficultyFirst.json")));
+        Assert.IsTrue(File.Exists(Path.Combine(_folder, "Difficulty", "First.json")));
+        Assert.IsTrue(File.Exists(Path.Combine(dest, "Difficulty", "First.json")));
     }
 
     [TestMethod]
@@ -186,15 +228,15 @@ public sealed class GeneratorModelStoreTests
         var store = Store();
         await using (var source = new MemoryStream(Bytes(32), writable: false))
             await store.SaveAsync(new GeneratorModelId(GeneratorType.Difficulty, "First"), source, overwrite: false);
-        string dest = Path.Combine(_root.FullName, "moved");
+        string dest = Path.Combine(_root.FullName, "moved", "Difficulty");
         Directory.CreateDirectory(dest);
-        await File.WriteAllBytesAsync(Path.Combine(dest, "DifficultyFirst.json"), Bytes(32));
+        await File.WriteAllBytesAsync(Path.Combine(dest, "First.json"), Bytes(32));
 
-        var skipped = await store.MigrateCopyAsync(dest, overwrite: false);
+        var skipped = await store.MigrateCopyAsync(Path.Combine(_root.FullName, "moved"), overwrite: false);
         Assert.AreEqual(0, skipped.Copied);
         Assert.AreEqual(1, skipped.Skipped);
 
-        var copied = await store.MigrateCopyAsync(dest, overwrite: true);
+        var copied = await store.MigrateCopyAsync(Path.Combine(_root.FullName, "moved"), overwrite: true);
         Assert.AreEqual(1, copied.Copied);
         Assert.AreEqual(0, copied.Skipped);
     }
