@@ -133,17 +133,13 @@ namespace ChartBuilder.Views
         }
 
         /// <summary>
-        /// Space anywhere in the window plays or pauses, and Shift+Space plays the selection, once a press however long
-        /// it's held. Tunnelled, so a focused button or list plays rather than taking it. Not while a text box has focus:
-        /// it types a space there. Not a key binding, which would run alongside the focused control's own Space.
+        /// Space anywhere in the window plays or pauses, once a press however long it's held. Tunnelled, so a focused
+        /// button or list plays rather than taking it. Not while a text box has focus: it types a space there. Not a key
+        /// binding, which would run alongside the focused control's own Space.
         /// </summary>
         private void OnSpaceKeyDown(object? sender, KeyEventArgs e)
         {
-            if (e.Key != Key.Space)
-                return;
-
-            bool playSelection = e.KeyModifiers == KeyModifiers.Shift;
-            if (!playSelection && e.KeyModifiers != KeyModifiers.None)
+            if (e.Key != Key.Space || e.KeyModifiers != KeyModifiers.None)
                 return;
 
             if (e.Source is TextBox || FocusManager?.GetFocusedElement() is TextBox)
@@ -154,13 +150,7 @@ namespace ChartBuilder.Views
                 return;
 
             _isSpaceHeld = true;
-            if (_viewModel is not { } vm)
-                return;
-
-            if (playSelection)
-                vm.Editor.PlaySelection();
-            else
-                vm.Editor.PlayPause();
+            _viewModel?.Editor.PlayPause();
         }
 
         /// <summary>

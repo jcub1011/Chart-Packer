@@ -233,7 +233,7 @@ namespace ChartBuilder.ViewModels
             }
         }
 
-        /// <summary>Plays from <paramref name="start"/> to <paramref name="end"/>, in seconds of audio, then pauses (Shift+Space).</summary>
+        /// <summary>Plays from <paramref name="start"/> to <paramref name="end"/>, in seconds of audio, then pauses.</summary>
         public void PlayRegion(double start, double end)
         {
             if (_player is not { } player || end <= start)

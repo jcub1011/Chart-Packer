@@ -315,7 +315,7 @@ which already has speed, pitch correction (`Dsp/TimeStretcher`) and a heard `Pos
   of speed, playing or pausing. It maps output frames to the mix by a second `PositionMap` of the
   stretcher's nominal `SourcePosition`, which moves evenly at the speed. `Position` and the sounds laid
   over the mix stay on the grains played.
-- **Regions.** Play selection and the loop are a region that `StemPlayer` plays. A loop carries on
+- **Regions.** The loop is a region that `StemPlayer` plays. A loop carries on
   from the region's start without dropping the queue. Played as mixed, it turns on the region's end
   frame; stretched, within a chunk (20 ms) of it. A seek drops a region played once, but not a loop.
 
@@ -1637,8 +1637,7 @@ Acceptance criteria:
 1. Playback uses `StemPlayer`. It plays every stem sample-aligned, and has mute and solo per stem,
    volume, speed from 25% to 200% with **pitch correction** (on by default, as in the inspector),
    and sample-exact seeking.
-2. **Play from cursor** (Space), **play selection**, and a **loop region** for repeating a hard
-   passage at a lower speed.
+2. **Play from cursor** (Space), and a **loop region** for repeating a hard passage at a lower speed.
 3. **Metronome**: a click on each beat, with an accented click on each measure, from the tempo
    map. It is mixed in after the time-stretcher ([§4.4.1](#441-playback-changes)), so it stays
    sharp and in time with the stems at any speed.
@@ -2979,7 +2978,6 @@ These are the defaults. Rebinding is future work.
 | `0` | Open note, or drum kick (as `1`–`5`, while the song plays) |
 | `Shift`+`0` | 2× kick (Expert drums; as `1`–`5`, while the song plays) |
 | `Space` | Play or pause from the cursor |
-| `Shift`+`Space` | Play the selection |
 | `↑` / `↓` (Highway), `→` / `←` (Timeline) | Move the cursor one grid step later or earlier |
 | `Alt`+arrows | Move the selection one grid step in time, or one lane across |
 | `Alt`+`Shift`+arrows across | Shift the selected notes a lane, each stopping at the edge |

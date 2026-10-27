@@ -912,10 +912,6 @@ Open it anyway?</value>
     <value>{0} ms</value>
     <comment>The calibrated audio/visual latency, in the transport bar, e.g. "42 ms".</comment>
   </data>
-  <data name="NothingToPlayStatus" xml:space="preserve">
-    <value>Select notes or a span of the song to play it.</value>
-    <comment>Said when Shift+Space is pressed with nothing selected.</comment>
-  </data>
   <data name="NothingToLoopStatus" xml:space="preserve">
     <value>Select notes or a span of the song to loop it.</value>
     <comment>Said when L is pressed with nothing selected.</comment>

@@ -499,18 +499,6 @@ namespace ChartBuilder.ViewModels
                 Playback.PlayPauseCommand.Execute(null);
         }
 
-        /// <summary>Plays the selection's span, then pauses (Shift+Space).</summary>
-        public void PlaySelection()
-        {
-            if (Session.Selection.Span is not { } span)
-            {
-                Session.Status = Strings.NothingToPlayStatus;
-                return;
-            }
-
-            Playback.PlayRegion(Session.AudioAt(span.From), Session.AudioAt(span.To));
-        }
-
         /// <summary>Sets the loop region to the selection's span (L).</summary>
         public void SetLoopFromSelection()
         {
