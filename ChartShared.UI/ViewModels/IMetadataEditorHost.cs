@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using ChartShared.Core.Library;
 using ChartShared.Core.Metadata;
@@ -34,6 +35,9 @@ namespace ChartShared.UI.ViewModels
 
         /// <summary>Works out <c>song_length</c> from the songs' files; null where that isn't offered.</summary>
         IRelayCommand? AutoSetSongLengthCommand { get; }
+
+        /// <summary>Where the playhead is, for setting a time to it; null when there is none, as for several songs.</summary>
+        TimeSpan? PlayheadPosition { get; }
 
         /// <summary>Whether <paramref name="key"/> can be changed, beside <see cref="CanEdit"/>: not when something else decides it.</summary>
         bool CanEditKey(string key);

@@ -1163,4 +1163,19 @@
   <data name="ReductionPreviewToolTip" xml:space="preserve">
     <value>Show the draft against its source, with the song, marking where it changed</value>
   </data>
+  <data name="TimecodeWatermark" xml:space="preserve">
+    <value>HH:MM:SS:mmm or milliseconds</value>
+    <comment>Watermark of a time's edit box, e.g. preview_start_time. Accepts a timecode or a bare millisecond count.</comment>
+  </data>
+  <data name="UsePlayheadButton" xml:space="preserve">
+    <value>Use playhead</value>
+    <comment>Button setting a time to the current playhead position.</comment>
+  </data>
+  <data name="UsePlayheadToolTip" xml:space="preserve">
+    <value>Set to the current playhead position</value>
+  </data>
+  <data name="InvalidTimecode" xml:space="preserve">
+    <value>Enter milliseconds or a timecode like 00:03:45:123.</value>
+    <comment>Error for a time's edit box when its text is neither.</comment>
+  </data>
 </root>

@@ -61,4 +61,94 @@ public sealed class MetadataTimesTests
         Assert.IsFalse(MetadataTimes.TryFormat(key, value, out string? formatted));
         Assert.IsNull(formatted);
     }
+
+    [TestMethod]
+    [DataRow("225123", false, 225_123L)]
+    [DataRow("+1000", false, 1_000L)]
+    [DataRow("0", false, 0L)]
+    [DataRow("-150", true, -150L)]
+    [DataRow("+1000", true, 1_000L)]
+    [DataRow("00:03:45:123", false, 225_123L)]
+    [DataRow("00:00:00:000", false, 0L)]
+    [DataRow("3:45:123", false, 225_123L)]
+    [DataRow("3:45", false, 225_000L)]
+    [DataRow("3:45.123", false, 225_123L)]
+    [DataRow("45.5", false, 45_500L)]
+    [DataRow("45.05", false, 45_050L)]
+    [DataRow("45.005", false, 45_005L)]
+    [DataRow("1:02:03", false, 3_723_000L)]
+    [DataRow("1:02:03.5", false, 3_723_500L)]
+    [DataRow("-00:00:01:500", true, -1_500L)]
+    [DataRow("  00:00:55:000  ", false, 55_000L)]
+    public void ParsesTimecodes(string text, bool allowNegative, long expected)
+    {
+        Assert.IsTrue(MetadataTimes.TryParseTimecode(text, allowNegative, out long ms));
+        Assert.AreEqual(expected, ms);
+    }
+
+    [TestMethod]
+    [DataRow("-1", false)]
+    [DataRow("-00:00:01:000", false)]
+    [DataRow("", false)]
+    [DataRow("   ", true)]
+    [DataRow("abc", false)]
+    [DataRow("12:34:56:789:0", false)]
+    [DataRow("1::2", false)]
+    [DataRow("12:60", false)]
+    [DataRow("1:2:3:1000", false)]
+    [DataRow("1:2:3:4.5", false)]
+    [DataRow("45.1234", false)]
+    [DataRow("999999999999999:00:00:000", false)]
+    [DataRow("45:123", false)]
+    [DataRow("99999999999999999999", false)]
+    [DataRow("1:99999999999999999999", false)]
+    public void RejectsBadTimecodes(string text, bool allowNegative) =>
+        Assert.IsFalse(MetadataTimes.TryParseTimecode(text, allowNegative, out _));
+
+    [TestMethod]
+    [DataRow("preview_start_time", "00:00:55:000", "55000")]
+    [DataRow("preview_start_time", "55000", "55000")]
+    [DataRow("preview_start_time", "0:55", "55000")]
+    [DataRow("preview_start_time", "0:55.000", "55000")]
+    [DataRow("delay", "-00:00:00:150", "-150")]
+    [DataRow("delay", "-150", "-150")]
+    [DataRow("preview", "00:00:55:000 00:01:25:000", "55000 85000")]
+    [DataRow("preview", "0:55 1:25", "55000 85000")]
+    public void NormalizesTimeKeys(string key, string text, string expected)
+    {
+        Assert.IsTrue(MetadataTimes.TryNormalize(key, text, out string? normalized));
+        Assert.AreEqual(expected, normalized);
+    }
+
+    [TestMethod]
+    [DataRow("preview_start_time", "abc")]
+    [DataRow("preview_start_time", "-5")]
+    [DataRow("preview_start_time", "")]
+    [DataRow("preview", "55000")]
+    [DataRow("preview", "55000 -1")]
+    [DataRow("name", "x")]
+    public void RejectsBadTimeKeyText(string key, string text) =>
+        Assert.IsFalse(MetadataTimes.TryNormalize(key, text, out _));
+
+    [TestMethod]
+    [DataRow("preview_start_time", "55000", "00:00:55:000")]
+    [DataRow("preview", "55000 85000", "00:00:55:000 00:01:25:000")]
+    public void ShowsEditableTimecodes(string key, string value, string expected)
+    {
+        Assert.IsTrue(MetadataTimes.TryGetEditable(key, value, out string? editable));
+        Assert.AreEqual(expected, editable);
+    }
+
+    [TestMethod]
+    [DataRow("preview_start_time", true, true)]
+    [DataRow("preview_end_time", true, true)]
+    [DataRow("song_length", true, true)]
+    [DataRow("delay", true, true)]
+    [DataRow("preview", true, false)]
+    [DataRow("name", false, false)]
+    public void RecognisesTimeKeys(string key, bool isTime, bool isSingle)
+    {
+        Assert.AreEqual(isTime, MetadataTimes.IsTimeKey(key));
+        Assert.AreEqual(isSingle, MetadataTimes.IsSingleTimeKey(key));
+    }
 }

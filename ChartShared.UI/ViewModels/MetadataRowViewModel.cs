@@ -33,14 +33,23 @@ namespace ChartShared.UI.ViewModels
         /// <summary>The row is <c>song_length</c>, which can be worked out from the song's files.</summary>
         public bool IsSongLength => Key.Equals(MetadataEditRules.SongLengthKey, StringComparison.OrdinalIgnoreCase);
 
+        /// <summary>The row's key holds a time: milliseconds, or two for <c>preview</c>.</summary>
+        public bool IsTimeKey => MetadataTimes.IsTimeKey(Key);
+
+        /// <summary>The row's key holds one time that the playhead can set; the <c>preview</c> pair takes two.</summary>
+        public bool IsSingleTimeKey => MetadataTimes.IsSingleTimeKey(Key);
+
+        /// <summary>Whether the Use-playhead button is shown: a single time the songs can be edited.</summary>
+        public bool ShowUsePlayhead => IsSingleTimeKey && CanChange() && !IsRemoved;
+
         /// <summary>The value as stored, or <see langword="null"/> when the songs shown don't share one.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(IsDistinct), nameof(DisplayValue), nameof(ToolTip), nameof(EditPlaceholder), nameof(ShowRichValue), nameof(ShowDistinct))]
         public partial string? Value { get; set; }
 
         [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(Marker), nameof(IsRemoved), nameof(IsChanged), nameof(CanRemove), nameof(ShowUndo), nameof(ShowRemove), nameof(HasUndoOrRemove), nameof(UndoToolTip))]
-        [NotifyCanExecuteChangedFor(nameof(BeginEditCommand), nameof(RemoveCommand), nameof(RevertCommand), nameof(QuickFixCommand))]
+        [NotifyPropertyChangedFor(nameof(Marker), nameof(IsRemoved), nameof(IsChanged), nameof(CanRemove), nameof(ShowUndo), nameof(ShowRemove), nameof(HasUndoOrRemove), nameof(UndoToolTip), nameof(ShowUsePlayhead))]
+        [NotifyCanExecuteChangedFor(nameof(BeginEditCommand), nameof(RemoveCommand), nameof(RevertCommand), nameof(QuickFixCommand), nameof(UsePlayheadCommand))]
         public partial MetadataRowState State { get; set; }
 
         [ObservableProperty]
@@ -111,8 +120,8 @@ namespace ChartShared.UI.ViewModels
             }
         }
 
-        /// <summary>Shown in the empty edit box of a distinct row, so it's clear typing replaces every value.</summary>
-        public string? EditPlaceholder => IsDistinct ? SharedStrings.DistinctValues : null;
+        /// <summary>Shown in the edit box of a time key or a distinct row, so it's clear what can be typed.</summary>
+        public string? EditPlaceholder => IsDistinct ? SharedStrings.DistinctValues : IsTimeKey ? SharedStrings.TimecodeWatermark : null;
 
         /// <summary><c>*</c> for an edited row, <c>+</c> for an added one. Removed rows are struck through instead.</summary>
         public string Marker => State switch
@@ -187,10 +196,12 @@ namespace ChartShared.UI.ViewModels
             OnPropertyChanged(nameof(ShowRemove));
             OnPropertyChanged(nameof(HasUndoOrRemove));
             OnPropertyChanged(nameof(ShowAutoSetLength));
+            OnPropertyChanged(nameof(ShowUsePlayhead));
             BeginEditCommand.NotifyCanExecuteChanged();
             RemoveCommand.NotifyCanExecuteChanged();
             RevertCommand.NotifyCanExecuteChanged();
             QuickFixCommand.NotifyCanExecuteChanged();
+            UsePlayheadCommand.NotifyCanExecuteChanged();
         }
 
         // A key the songs decide otherwise, such as a chart's drum layout, reads as any other but can't be changed.
@@ -202,14 +213,15 @@ namespace ChartShared.UI.ViewModels
         private void BeginEdit()
         {
             _owner.CancelOtherEdits(this);
-            EditText = Value ?? "";
+            EditText = MetadataTimes.TryGetEditable(Key, Value ?? "", out string? timecode) ? timecode : (Value ?? "");
             Error = null;
             IsEditing = true;
         }
 
         /// <summary>
         /// Puts the edit box's text into the drafts. Text song.ini can't hold stays in the box with an error; text
-        /// that only fails validation, such as a word for a number, goes in, and the row is marked instead.
+        /// that only fails validation, such as a word for a number, goes in, and the row is marked instead. A time
+        /// key's timecode is stored as the milliseconds it reads as.
         /// </summary>
         [RelayCommand]
         private void Commit()
@@ -230,10 +242,22 @@ namespace ChartShared.UI.ViewModels
                 return;
             }
 
+            string normalized = text;
+            if (IsTimeKey)
+            {
+                if (!MetadataTimes.TryNormalize(Key, text, out string? canonical))
+                {
+                    Error = SharedStrings.InvalidTimecode;
+                    return;
+                }
+
+                normalized = canonical;
+            }
+
             IsEditing = false;
             Error = null;
-            if (text != Value)
-                _owner.SetValue(Key, text);
+            if (normalized != Value)
+                _owner.SetValue(Key, normalized);
         }
 
         [RelayCommand]
@@ -269,6 +293,25 @@ namespace ChartShared.UI.ViewModels
         {
             Cancel();
             _owner.ApplyQuickFixes(Key);
+        }
+
+        private bool CanUsePlayhead() => CanChange() && !IsRemoved && IsSingleTimeKey && _owner.PlayheadPosition is not null;
+
+        /// <summary>Sets the row to the playhead position at once, as the milliseconds it reads as.</summary>
+        [RelayCommand(CanExecute = nameof(CanUsePlayhead))]
+        private void UsePlayhead()
+        {
+            if (_owner.PlayheadPosition is not { } position || !CanChange() || IsRemoved || !IsSingleTimeKey)
+                return;
+
+            long ms = (long)Math.Round(position.TotalMilliseconds, MidpointRounding.AwayFromZero);
+            if (!MetadataTimes.TryNormalize(Key, MetadataTimes.FormatMilliseconds(ms), out string? normalized))
+                return;
+
+            IsEditing = false;
+            Error = null;
+            if (normalized != Value)
+                _owner.SetValue(Key, normalized);
         }
     }
 }
