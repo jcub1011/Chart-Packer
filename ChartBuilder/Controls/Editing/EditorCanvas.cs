@@ -2130,7 +2130,7 @@ namespace ChartBuilder.Controls.Editing
                 {
                     double thickness = Math.Max(4, size * 0.45);
                     rect = Box(along - (thickness / 2), along + (thickness / 2), across1 + 4, across2 - 4);
-                    _gems.DrawBar(context, shown, color, rect, outlined: isGhost);
+                    _gems.DrawBar(context, kind, shown, color, rect, outlined: isGhost);
                 }
                 else
                 {
@@ -2140,7 +2140,7 @@ namespace ChartBuilder.Controls.Editing
                     rect = GemRect(projection, column, along, size);
                     if (column == slots.Slots.Count - 1 && slots.Across is null && note.Lane == EditorTools.ApartLane(slots))
                     {
-                        _gems.DrawBar(context, shown, color, rect, outlined: isGhost);
+                        _gems.DrawBar(context, kind, shown, color, rect, outlined: isGhost);
                     }
                     else
                     {
@@ -2225,7 +2225,7 @@ namespace ChartBuilder.Controls.Editing
                     ? Box(along - (thickness / 2), along + (thickness / 2), projection.LaneFrom + 4, projection.LaneFrom + (projection.LaneSize * slots.Slots.Count) - 4)
                     : GemRect(projection, column, along, size);
                 using (context.PushOpacity(0.45))
-                    _gems.DrawBar(context, placed, color, bar, outlined: true);
+                    _gems.DrawBar(context, track.Kind, placed, color, bar, outlined: true);
                 return;
             }
 
