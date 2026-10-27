@@ -210,6 +210,8 @@
     <StreamGeometry x:Key="QuantizeRecordStroke">M2,2 v10.667 a1.333,1.333 0 0 0 1.333,1.333 h10.667 M10.667,3.333 H12 A0.667,0.667 0 0 1 12.667,4 V10.667 A0.667,0.667 0 0 1 12,11.333 H10.667 A0.667,0.667 0 0 1 10,10.667 V4 A0.667,0.667 0 0 1 10.667,3.333 Z M5.333,5.333 H6.667 A0.667,0.667 0 0 1 7.333,6 V10.667 A0.667,0.667 0 0 1 6.667,11.333 H5.333 A0.667,0.667 0 0 1 4.667,10.667 V6 A0.667,0.667 0 0 1 5.333,5.333 Z</StreamGeometry>
     <!-- "repeat": play the loop region over and over. -->
     <StreamGeometry x:Key="LoopStroke">M11.333,1.333 l2.667,2.667 l-2.667,2.667 M2,7.333 v-0.667 a2.667,2.667 0 0 1 2.667,-2.667 h9.333 M4.667,14.667 l-2.667,-2.667 l2.667,-2.667 M14,8.667 v0.667 a2.667,2.667 0 0 1 -2.667,2.667 H2</StreamGeometry>
+    <!-- "loop-region": the Loop tool, the loop region between its two ends. -->
+    <StreamGeometry x:Key="LoopRegionStroke">M2,2.667 V13.333 M14,2.667 V13.333 M5.333,10.667 H10.667 A2.667,2.667 0 0 0 10.667,5.333 H5.333 M7,3.667 L5.333,5.333 L7,7</StreamGeometry>
     <!-- "drum": hit sounds, each note sounding as it's reached. -->
     <StreamGeometry x:Key="HitSoundsStroke">M1.333,1.333 l5.333,5.333 M14.667,1.333 l-5.333,5.333 M1.333,6 A6.667,3.333 0 1 0 14.667,6 A6.667,3.333 0 1 0 1.333,6 Z M4.667,8.933 v5.267 M8,9.333 v5.333 M11.333,8.933 v5.267 M1.333,6 v5.333 a6.667,3.333 0 0 0 13.333,0 V6</StreamGeometry>
     <!-- "circle-arrow-up": a newer release is available on GitHub. -->

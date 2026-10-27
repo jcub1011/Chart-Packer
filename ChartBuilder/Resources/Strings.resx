@@ -186,6 +186,14 @@
     <value>Sync</value>
     <comment>An editing tool: a synchronized region, whose edits are copied to the passages matching it.</comment>
   </data>
+  <data name="ToolLoop" xml:space="preserve">
+    <value>Loop</value>
+    <comment>An editing tool: the loop region, a stretch of the song the Loop button repeats.</comment>
+  </data>
+  <data name="ToolLoopName" xml:space="preserve">
+    <value>Loop tool</value>
+    <comment>The Loop tool's button for a screen reader, said apart from the transport bar's Loop button, which repeats the region.</comment>
+  </data>
   <data name="MenuFile" xml:space="preserve">
     <value>_File</value>
     <comment>The editor title bar's File menu. The underscore marks its access key (Alt+F).</comment>
@@ -901,11 +909,11 @@ Open it anyway?</value>
     <comment>The transport bar's volume button's tooltip.</comment>
   </data>
   <data name="LoopToolTipFormat" xml:space="preserve">
-    <value>Loop the region from {0} to {1}. L sets it from the selection.</value>
+    <value>Repeat the region from {0} to {1}. Tap L briefly, or click here, to turn repeating on or off.</value>
     <comment>The loop button's tooltip, with the loop region's start and end times.</comment>
   </data>
   <data name="LoopNoneToolTip" xml:space="preserve">
-    <value>Loop a region. Select a span of the song, then press L to set the region.</value>
+    <value>Loop a region. Pick the Loop tool, or hold L, and drag over a stretch of a lane; drawing it doesn't start the song repeating.</value>
     <comment>The loop button's tooltip when there's no loop region yet.</comment>
   </data>
   <data name="LatencyFormat" xml:space="preserve">
@@ -914,7 +922,7 @@ Open it anyway?</value>
   </data>
   <data name="NothingToLoopStatus" xml:space="preserve">
     <value>Select notes or a span of the song to loop it.</value>
-    <comment>Said when L is pressed with nothing selected.</comment>
+    <comment>Said when preview practice starts with no loop region and nothing selected to make one from.</comment>
   </data>
   <data name="TapTempoNotPlayingStatus" xml:space="preserve">
     <value>Play the song, then tap B in time with it.</value>
@@ -1151,6 +1159,10 @@ Open it anyway?</value>
   <data name="ToolSyncToolTip" xml:space="preserve">
     <value>Drag over a stretch of a lane to keep it in sync: every passage exactly matching it highlights, and edits in the region are made in each. Drag its edges to resize it, or its middle to move it; click a matching passage to sync from there. Hold Ctrl+Shift for the same without picking the tool. Hover the region and click its X to clear it.</value>
     <comment>The Sync tool's tooltip.</comment>
+  </data>
+  <data name="ToolLoopToolTip" xml:space="preserve">
+    <value>Drag over a stretch of a lane to loop it. Drag its edges to resize it, or its middle to move it; drawing it doesn't start the song repeating. Hold L for the same without picking the tool, and tap L briefly, having touched nothing, to start or stop repeating it. Hover the region and click its X to clear it, or middle-click with the tool picked.</value>
+    <comment>The Loop tool's tooltip.</comment>
   </data>
   <data name="ToolPhraseToolTip" xml:space="preserve">
     <value>Drag along the lanes to add a phrase of the picked kind. With any tool, click a phrase in the side rail to select it, drag to move it, or drag either end to resize it. S puts star power over the selection.</value>
@@ -2138,6 +2150,18 @@ Saving also changes song.ini:
   <data name="SyncSourceToolTip" xml:space="preserve">
     <value>Click to synchronize from this passage</value>
     <comment>A passage synced with a synchronized region, which a click makes the region's source.</comment>
+  </data>
+  <data name="LoopClearToolTip" xml:space="preserve">
+    <value>Clear the loop region</value>
+    <comment>The small X at the loop region's top right, which takes the region away.</comment>
+  </data>
+  <data name="LoopMoveToolTip" xml:space="preserve">
+    <value>Drag to move the loop region</value>
+    <comment>The body of the loop region, which a drag moves along time.</comment>
+  </data>
+  <data name="LoopResizeToolTip" xml:space="preserve">
+    <value>Drag to resize the loop region</value>
+    <comment>An end of the loop region, which a drag resizes the region by.</comment>
   </data>
   <data name="FillRunFormat" xml:space="preserve">
     <value>{0} of {1} proposed fills kept</value>

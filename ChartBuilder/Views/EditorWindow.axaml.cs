@@ -39,6 +39,10 @@ namespace ChartBuilder.Views
         // Space played or paused and hasn't been let go yet, so its auto-repeat doesn't toggle again.
         private bool _isSpaceHeld;
 
+        // L is holding the Loop tool on and hasn't been let go yet, so its auto-repeat doesn't hold it again, and its
+        // release, which may turn repeating the loop region on or off, comes once.
+        private bool _isLoopToolHeld;
+
         private bool _isApplying;
 
         // The sizes last given to the side columns and the timeline row: NaN for an auto-hiding side, and before the
@@ -66,9 +70,11 @@ namespace ChartBuilder.Views
             Deactivated += (_, _) =>
             {
                 _isSpaceHeld = false;
+                _isLoopToolHeld = false;
                 _viewModel?.Editor.RecordReleaseAll();
                 _viewModel?.Editor.Playtest.ReleaseKeys();
                 _viewModel?.Editor.HoldModifiers(EditorModifiers.None);
+                _viewModel?.Editor.HoldLoopTool(false);
             };
             TopBand.SizeChanged += (_, _) => ApplyLayout();
             TitleBand.SizeChanged += (_, e) => LoadingOverlay.Margin = new Thickness(0, e.NewSize.Height, 0, 0);
@@ -97,6 +103,10 @@ namespace ChartBuilder.Views
             // what Ctrl and Alt swap while they're held.
             AddHandler(KeyDownEvent, OnModifierKeys, RoutingStrategies.Tunnel, handledEventsToo: true);
             AddHandler(KeyUpEvent, OnModifierKeys, RoutingStrategies.Tunnel, handledEventsToo: true);
+
+            // Holding L holds the Loop tool on, wherever focus is, as Ctrl+Shift holds the Sync tool.
+            AddHandler(KeyDownEvent, OnLoopToolKeys, RoutingStrategies.Tunnel, handledEventsToo: true);
+            AddHandler(KeyUpEvent, OnLoopToolKeys, RoutingStrategies.Tunnel, handledEventsToo: true);
         }
 
         protected override void OnDataContextChanged(EventArgs e)
@@ -115,6 +125,7 @@ namespace ChartBuilder.Views
             _rightApplied = double.NaN;
             _timelineApplied = double.NaN;
             _isSpaceHeld = false;
+            _isLoopToolHeld = false;
             ApplyLayout();
         }
 
@@ -172,6 +183,37 @@ namespace ChartBuilder.Views
         }
 
         private void OnModifierKeys(object? sender, KeyEventArgs e) => _viewModel?.Editor.HoldModifiers(EditorCanvas.ModifiersOf(e.KeyModifiers));
+
+        /// <summary>
+        /// Holding L holds the Loop tool on, wherever focus is, so the loop region can be drawn, moved or resized without
+        /// picking the tool, and the toolbar's button is lit meanwhile; let go, the picked tool is in charge again. A short
+        /// press that touched nothing is a tap, which turns repeating the region on or off; held longer, it's only the
+        /// tool. A text box types it instead, and with a modifier it's another key's. While a playtest goes on it's the
+        /// playtest's, as Space, Esc, P and N are, so a lane's key bound to L doesn't turn repeating off mid-pass. Not a
+        /// key binding, which fires once and never says when the key is let go.
+        /// </summary>
+        private void OnLoopToolKeys(object? sender, KeyEventArgs e)
+        {
+            if (e.PhysicalKey != PhysicalKey.L || IsTyping(e) || _viewModel is not { IsOpening: false } vm || vm.Editor.Playtest is { IsActive: true })
+                return;
+
+            if (e.RoutedEvent == KeyDownEvent)
+            {
+                if (e.KeyModifiers != KeyModifiers.None || _isLoopToolHeld)
+                    return;
+                _isLoopToolHeld = true;
+                e.Handled = true;
+                vm.Editor.HoldLoopTool(true);
+                return;
+            }
+
+            // Let go of even as a modifier is let go first, which the key-up after it would be too late for.
+            if (!_isLoopToolHeld)
+                return;
+            _isLoopToolHeld = false;
+            e.Handled = true;
+            vm.Editor.ReleaseLoopTool();
+        }
 
         private void OnOpeningInput(object? sender, RoutedEventArgs e)
         {

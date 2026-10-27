@@ -240,9 +240,6 @@ namespace ChartBuilder.Controls.Editing
                 case PhysicalKey.B when plain:
                     editor.Tap();
                     return true;
-                case PhysicalKey.L when plain:
-                    editor.SetLoopFromSelection();
-                    return true;
                 case PhysicalKey.A when ctrl && !shift && !alt:
                     tools.SelectAll();
                     return true;

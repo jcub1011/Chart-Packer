@@ -267,6 +267,15 @@
                                 </ToolTip.Tip>
                                 <ctl:LineIcon Data="{StaticResource LinkStroke}" />
                             </ToggleButton>
+                            <ToggleButton Classes="tool" IsChecked="{Binding Editor.IsLoopTool}" AutomationProperties.Name="{x:Static res:Strings.ToolLoopName}">
+                                <ToolTip.Tip>
+                                    <StackPanel MaxWidth="320" Spacing="4">
+                                        <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.ToolLoop}" />
+                                        <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.ToolLoopToolTip}" />
+                                    </StackPanel>
+                                </ToolTip.Tip>
+                                <ctl:LineIcon Data="{StaticResource LoopRegionStroke}" />
+                            </ToggleButton>
                         </StackPanel>
                     </Border>
 
@@ -871,6 +880,8 @@
                                FindingMarks="{Binding Findings.Marks}"
                                VisibleStart="{Binding Editor.VisibleStart}"
                                VisibleEnd="{Binding Editor.VisibleEnd}"
+                               Loop="{Binding Playback.Loop}"
+                               LoopBrush="{DynamicResource LoopRegionLineBrush}"
                                SpanBrush="{DynamicResource AccentTintBrush}"
                                WaveformBrush="{DynamicResource WaveformBrush}"
                                BeatBrush="{DynamicResource SubtleBorderBrush}"
