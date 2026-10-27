@@ -37,5 +37,11 @@ namespace ChartBuilder.Controls.Editing
 
         /// <summary>The colour of a row of the phrase rail: its phrases', or disco flip's.</summary>
         public static Color Of(RailKind row) => row.Phrase is { } kind ? Of(kind) : DiscoFlip;
+
+        // How far a rail row's background is darkened from its kind's colour.
+        private const double RowDarken = 0.6;
+
+        /// <summary>The dark background of a row of the phrase rail, in its kind's colour.</summary>
+        public static Color RailBackground(RailKind row) => HighwayPalette.Darken(Of(row), RowDarken);
     }
 }

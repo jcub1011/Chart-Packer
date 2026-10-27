@@ -375,12 +375,9 @@ public sealed class DiscoFlipEditingTests
         var session = Of(chart, focused: DrumsExpert);
         session.Tool = EditorTool.Phrase;
 
-        session.PhraseKind = RailKind.DiscoFlip;
-        Assert.IsTrue(session.Tools.DrawsIn(DrumsExpert));
-        Assert.IsFalse(session.Tools.DrawsIn(GuitarExpert), "Its start isn't shown there, as a press is refused.");
-
-        session.PhraseKind = (RailKind)PhraseKind.StarPower;
-        Assert.IsTrue(session.Tools.DrawsIn(GuitarExpert));
+        Assert.IsTrue(session.Tools.DrawsIn(DrumsExpert, RailKind.DiscoFlip));
+        Assert.IsFalse(session.Tools.DrawsIn(GuitarExpert, RailKind.DiscoFlip), "Its start isn't shown there, as a press is refused.");
+        Assert.IsTrue(session.Tools.DrawsIn(GuitarExpert, PhraseKind.StarPower));
     }
 
     [TestMethod]
@@ -405,6 +402,41 @@ public sealed class DiscoFlipEditingTests
         Assert.AreSequenceEqual([drawn, new DiscoFlipRange(1920, 2880, 0)], Ranges(session, ChartDifficulty.Expert));
         Assert.IsFalse(session.Selection.HasDiscoFlips);
         Assert.AreEqual(2, session.UndoStack.UndoCount);
+    }
+
+    [TestMethod]
+    [DynamicData(nameof(Views))]
+    public void TheSelectToolDrawsASectionInTheDiscoFlipRow(LaneView view)
+    {
+        var session = Of(Drums(), focused: DrumsExpert);
+        session.Tool = EditorTool.Select;
+
+        DragFromTo(session, RailAt(session, 0, RailKind.DiscoFlip, view, DrumsExpert), RailAt(session, 960, RailKind.DiscoFlip, view, DrumsExpert));
+
+        var drawn = new DiscoFlipRange(0, 960, 0);
+        Assert.AreSequenceEqual([drawn], Ranges(session, ChartDifficulty.Expert));
+        Assert.AreSequenceEqual([new DiscoFlipSection(ChartDifficulty.Expert, drawn)], session.Selection.DiscoFlips.ToList());
+    }
+
+    [TestMethod]
+    [DynamicData(nameof(Views))]
+    public void TakingBackASectionDrawnInTheRailLeavesItSelected(LaneView view)
+    {
+        var chart = Drums();
+        new AddDiscoFlip(ChartDifficulty.Expert, 0, 960).Apply(chart);
+        var session = Of(chart, focused: DrumsExpert);
+        var section = new DiscoFlipSection(ChartDifficulty.Expert, new DiscoFlipRange(0, 960, 0));
+        session.Selection.SelectDiscoFlips([section]);
+        session.Tool = EditorTool.Select;
+
+        session.Tools.Press(RailAt(session, 1920, RailKind.DiscoFlip, view, DrumsExpert));
+        session.Tools.Drag(RailAt(session, 2880, RailKind.DiscoFlip, view, DrumsExpert));
+        session.Tools.Cancel();
+
+        Assert.AreSequenceEqual([new DiscoFlipRange(0, 960, 0)], Ranges(session, ChartDifficulty.Expert));
+        Assert.AreSequenceEqual([section], session.Selection.DiscoFlips.ToList());
+        Assert.IsFalse(session.HasPreview);
+        Assert.AreEqual(0, session.UndoStack.UndoCount);
     }
 
     [TestMethod]
