@@ -10,9 +10,10 @@ using static ChartBuilder.Tests.Editing.EditorSessions;
 namespace ChartBuilder.Tests.Editing;
 
 /// <summary>
-/// What the bottom timeline shows of the whole song (charter-spec C3 item 2): the notes of the lane in focus, in its rows
-/// and colours, every one of its phrases, in the row of the phrase rail it's drawn in, and the ghosts of a run of Generate
-/// fills or Generate star power. At 480 ticks a beat and 120 BPM, a beat is half a second.
+/// What the bottom timeline shows of the whole song (charter-spec C3 item 2): its tempo and time signature changes, the
+/// notes of the lane in focus in its rows and colours, every one of its phrases in the row of the phrase rail it's drawn
+/// in, and the ghosts of a run of Generate fills or Generate star power. At 480 ticks a beat and 120 BPM, a beat is half
+/// a second.
 /// </summary>
 [TestClass]
 public sealed class OverviewDataTests
@@ -162,6 +163,23 @@ public sealed class OverviewDataTests
         Assert.AreSequenceEqual([0.0], Overview(Of(chart), GuitarExpert).Notes.Select(n => n.Start).ToList());
         Assert.AreSequenceEqual([0.5], Overview(Of(chart, focused: guitarHard), guitarHard).Notes.Select(n => n.Start).ToList());
         Assert.AreSequenceEqual([2.0], Overview(Of(chart, focused: DrumsExpert), DrumsExpert).Notes.Select(n => n.Start).ToList());
+    }
+
+    [TestMethod]
+    public void TempoAndTimeSignatureChangesAreShownAtTheirTimes()
+    {
+        var chart = Guitar();
+        chart.TempoMap.Tempos.Add(new TempoChange(960, 500_000));
+        chart.TempoMap.TimeSignatures.Add(new TimeSignatureMarker(960, 3, 4));
+        chart.TempoMap.Tempos.Add(new TempoChange(1920, 400_000));
+        var session = Of(chart);
+
+        var overview = Overview(session, GuitarExpert);
+
+        Assert.AreSequenceEqual(
+            new[] { session.AudioAt(0), session.AudioAt(960), session.AudioAt(1920) },
+            overview.TempoChanges.ToList(),
+            "A tempo marker and a time signature at one tick are one change.");
     }
 
     [TestMethod]

@@ -154,6 +154,32 @@ public sealed partial class EditorTools
         return ChangeEvent(part, textEvent, textEvent with { Tick = tick });
     }
 
+    /// <summary>
+    /// Shows <paramref name="textEvent"/> moved to <paramref name="tick"/> on the chart, without putting it on the undo
+    /// stack, so a tick scrubbed in the Sections tab is seen as it's dragged. The move is refused as
+    /// <see cref="MoveEvent"/> refuses it, with the status saying why.
+    /// </summary>
+    /// <returns>Whether the preview was shown.</returns>
+    public bool PreviewMoveEvent(ChartInstrument? part, TextEvent textEvent, long tick)
+    {
+        if (TickRefusal(tick) is { } why)
+        {
+            _session.Status = why;
+            return false;
+        }
+
+        var to = textEvent with { Tick = tick };
+        if (to == textEvent)
+            return false;
+        if (EventRefusal(part, to, leaving: textEvent) is { } refusal)
+        {
+            _session.Status = refusal;
+            return false;
+        }
+
+        return _session.Preview(new ChangeTextEvent(part, textEvent, to));
+    }
+
     /// <summary>Deletes <paramref name="textEvent"/> from <c>EVENTS</c> or <paramref name="part"/>'s track, as one step.</summary>
     /// <returns>Whether it was deleted.</returns>
     public bool DeleteEvent(ChartInstrument? part, TextEvent textEvent) => _session.Execute(new RemoveTextEvent(part, textEvent));

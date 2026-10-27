@@ -280,6 +280,19 @@ public sealed class VocalToolsTests
         Assert.AreSequenceEqual(new long[] { 960 }, [.. session.Selection.TempoTicks]);
     }
 
+    [TestMethod]
+    public void TheTempoToolDragsATimeSignatureFromAVocalLane()
+    {
+        var session = Of(WithVocals([]));
+        session.Chart.TempoMap.TimeSignatures.Add(new TimeSignatureMarker(960, 3, 4));
+        session.Tool = EditorTool.Tempo;
+
+        DragFromTo(session, VocalAt(962, 60), VocalAt(1440, 60));
+
+        Assert.IsTrue(session.Chart.TempoMap.TimeSignatures.At(960).IsEmpty);
+        Assert.HasCount(1, session.Chart.TempoMap.TimeSignatures.At(1440));
+    }
+
     // Lyrics, slides and spoken notes.
 
     [TestMethod]

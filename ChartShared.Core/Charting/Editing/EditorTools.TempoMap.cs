@@ -1,6 +1,7 @@
 namespace ChartShared.Core.Charting.Editing;
 
-// The tempo map's changes (charter-spec C4): what the Tempo map tab's add buttons and Ctrl+Shift+↑ and Ctrl+Shift+↓ do.
+// The tempo map's changes (charter-spec C4): what the Tempo tool takes hold of on the lanes, and what the Tempo map tab's
+// add buttons and Ctrl+Shift+↑ and Ctrl+Shift+↓ do.
 public sealed partial class EditorTools
 {
     /// <summary>
@@ -74,6 +75,67 @@ public sealed partial class EditorTools
         }
 
         return _session.Execute(edit.Command!) ? tick : null;
+    }
+
+    /// <summary>
+    /// The tick of the tempo or time signature change nearest <paramref name="point"/>, within its tolerance; null for none.
+    /// A tempo marker and a time signature at one tick are one change.
+    /// </summary>
+    public long? TempoChangeAt(ChartPoint point) => TempoChangeAt(point.Tick, point.Tolerance);
+
+    /// <summary>
+    /// The tick of the tempo or time signature change nearest <paramref name="tick"/>, within
+    /// <paramref name="tolerance"/> ticks of it; null for none. A tempo marker and a time signature at one tick are one
+    /// change.
+    /// </summary>
+    public long? TempoChangeAt(double tick, double tolerance) => ChangeNear(tick, tolerance);
+
+    /// <summary>Whether the change at <paramref name="tick"/> can be moved: the one the song starts with stays put.</summary>
+    public static bool TempoChangeMoves(long tick) => tick > 0;
+
+    /// <summary>
+    /// The grid step where a press of the Tempo tool at <paramref name="point"/> would add a tempo marker: the nearest,
+    /// when there's no change there and the press isn't in the phrase rail. Null where a press would drag a change
+    /// instead, or would find a marker already there.
+    /// </summary>
+    public long? TempoAddAt(ChartPoint point) => point.Rail is null ? TempoAddAt(point.Tick, point.Tolerance) : null;
+
+    /// <summary>
+    /// The grid step where a press at <paramref name="tick"/> would add a tempo marker, within
+    /// <paramref name="tolerance"/> ticks of it: the nearest, when no change is there and it isn't before the song's
+    /// start. Null where a press would drag a change instead, or would find a marker already there.
+    /// </summary>
+    public long? TempoAddAt(double tick, double tolerance)
+    {
+        if (ChangeNear(tick, tolerance) is not null)
+            return null;
+        long at = Snap.Nearest(tick, Map);
+        return at < 0 || !Chart.TempoMap.Tempos.At(at).IsEmpty ? null : at;
+    }
+
+    // The tick of the nearest change, tempo marker or time signature, within the tolerance.
+    private long? ChangeNear(double pressed, double tolerance)
+    {
+        long from = (long)Math.Floor(pressed - tolerance), to = (long)Math.Ceiling(pressed + tolerance);
+        long? best = null;
+        double bestDistance = double.MaxValue;
+
+        // The tempo markers first, so one at the same distance as a time signature wins.
+        foreach (var marker in Chart.TempoMap.Tempos.Between(Math.Max(0, from), to))
+        {
+            double distance = Math.Abs(marker.Tick - pressed);
+            if (distance < bestDistance)
+                (best, bestDistance) = (marker.Tick, distance);
+        }
+
+        foreach (var signature in Chart.TempoMap.TimeSignatures.Between(Math.Max(0, from), to))
+        {
+            double distance = Math.Abs(signature.Tick - pressed);
+            if (distance < bestDistance)
+                (best, bestDistance) = (signature.Tick, distance);
+        }
+
+        return best;
     }
 
     // The cursor's tick, to the nearest, rather than on the grid.

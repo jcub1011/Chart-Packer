@@ -1134,15 +1134,20 @@ public sealed partial class EditorTools
             _session.Execute(edit.Command!);
     }
 
-    // The Tempo tool's press at a tick, in any lane: on a marker within the tolerance, a drag of it; elsewhere, a marker
-    // added on the grid.
+    // The Tempo tool's press at a tick, in any lane: on a tempo or time signature change within the tolerance, a drag of
+    // it; elsewhere, a marker added on the grid.
     private Gesture? PressTempo(double pressed, double tolerance)
     {
         var map = Chart.TempoMap;
-        if (TempoMarkerNear(pressed, tolerance) is { } tick)
+        if (ChangeNear(pressed, tolerance) is { } tick)
         {
-            _session.Selection.SelectTempos([tick]);
-            return new TempoDragGesture(this, tick, anchored: !map.Anchors.At(tick).IsEmpty);
+            bool hasTempo = !map.Tempos.At(tick).IsEmpty;
+            bool hasSignature = !map.TimeSignatures.At(tick).IsEmpty;
+            if (hasTempo)
+                _session.Selection.SelectTempos([tick]);
+            else
+                _session.Selection.SelectTempos([]);
+            return new TempoDragGesture(this, tick, anchored: hasTempo && !map.Anchors.At(tick).IsEmpty, movesSignature: hasSignature);
         }
 
         long at = Snap.Nearest(pressed, Map);
@@ -1721,8 +1726,11 @@ public sealed partial class EditorTools
         }
     }
 
-    /// <summary>Drags a tempo marker: in ticks when it isn't anchored, in time when it is (charter-spec C4 item 2).</summary>
-    private sealed class TempoDragGesture(EditorTools tools, long tick, bool anchored) : Gesture(tools)
+    /// <summary>
+    /// Drags the tempo or time signature change at a tick: a time signature alone or beside a tempo marker, in ticks; a
+    /// tempo marker alone in ticks when it isn't anchored, and in time when it is (charter-spec C4 item 2).
+    /// </summary>
+    private sealed class TempoDragGesture(EditorTools tools, long tick, bool anchored, bool movesSignature) : Gesture(tools)
     {
         private double _last = double.NaN;
 
@@ -1757,7 +1765,9 @@ public sealed partial class EditorTools
                 long to = (long)target;
                 if (to == tick)
                     return;
-                edit = TempoMapEdits.MoveMarker(Session.Chart, tick, to, Session.Delay, Session.KeepTimes);
+                edit = movesSignature
+                    ? TempoMapEdits.MoveChange(Session.Chart, tick, to, Session.Delay, Session.KeepTimes)
+                    : TempoMapEdits.MoveMarker(Session.Chart, tick, to, Session.Delay, Session.KeepTimes);
             }
 
             if (edit.IsRefused)
@@ -1770,8 +1780,11 @@ public sealed partial class EditorTools
         {
             DragTo(pointer);
             var command = Session.CommitPreview();
-            if (command is ChangeTempoMap && !anchored)
-                Session.Selection.SelectTempos([Tools.Snap.Nearest(pointer, Tools.Map)]);
+            if (command is ChangeTempoMap && !anchored && (long)Tools.Snap.Nearest(pointer, Tools.Map) is var to
+                && !Session.Chart.TempoMap.Tempos.At(to).IsEmpty)
+            {
+                Session.Selection.SelectTempos([to]);
+            }
         }
     }
 

@@ -860,10 +860,11 @@ Acceptance criteria:
      row of its phrase rail ([C8](#c8-phrases-and-events) item 1), in the rail's order and colours:
      star power (as the games read it), solos and big rock endings on 5-fret and GHL; star power,
      solos, fills (with a big rock ending), rolls, trills and the difficulty's disco flips on drums.
-     The sections' names are below the bands. While Generate fills or Generate star power runs, its
-     ghosts are drawn over everything, whichever lane is in focus, so they can be found: a kept one
-     as a faint amber column the height of the strip, capped in solid amber, a dropped one as a
-     faint outline; each at least 2 px wide.
+     The sections' names are below the bands. The chart's tempo and time-signature changes are drawn
+     as amber lines down the strip, in the tempo markers' colour, whatever tool is active. While
+     Generate fills or Generate star power runs, its ghosts are drawn over everything, whichever
+     lane is in focus, so they can be found: a kept one as a faint amber column the height of the
+     strip, capped in solid amber, a dropped one as a faint outline; each at least 2 px wide.
 3. **Part and difficulty picker.** Every part with its four difficulties. The letters use the
    detail panel's difficulty colours from `Theme.axaml` (green, yellow, red, purple) where the
    difficulty has notes, and grey where it is empty. The detail panel shows only charted
@@ -921,8 +922,8 @@ Acceptance criteria:
    - **Place** puts a note a grid step long on the grid step and row pressed, and a drag stretches
      it, never past the next note's start; Shift places a slide. On a note, it moves it.
    - **Erase** removes each note passed over, **Sustain** drags the selected notes' end, **Phrase**
-     draws a phrase from the grid step pressed, and **Tempo** adds and drags tempo markers as in a
-     highway's lane.
+     draws a phrase from the grid step pressed, and **Tempo** adds and drags tempo and time-signature
+     changes as in a highway's lane.
    - **The phrase strip** works with any tool, as a highway's phrase rail does: a press on a bar
      selects its phrase (Shift adds it or takes it away), and a drag moves the selected phrases, or
      resizes one by the end grabbed. A part's phrases never overlap. A new phrase is written as
@@ -956,6 +957,8 @@ Acceptance criteria:
      and stored as whole microseconds per quarter note, as MIDI stores them. The BPM shown is
      worked out from that.
    - **Time signature markers** have a numerator from 1 to 64 and a power-of-two denominator.
+   - On the lanes, a time signature can be dragged on its own, or with the tempo marker at its tick;
+     the change the song starts with stays put.
 2. **Anchors.**
    - Anchoring a tempo marker locks it to its time in seconds, in audio time
      ([§4.4.1](#441-playback-changes)).
@@ -1004,12 +1007,20 @@ Acceptance criteria:
 9. **The Tempo map tab** in the left panel lists every tick where the tempo or the time signature
    changes, the song's start among them, in time order, each with its time and its measure and
    beat. The change in force at the cursor is marked.
-   - Each row has a BPM field and a time signature's beats and note value. A field with nothing
-     placed at its tick shows what's in force there, greyed. Typing in it places a marker there;
-     emptying it removes the marker. Each edit is one undoable step, with the anchor offer
-     (item 2) when it needs one.
+   - Each row has a BPM field and a time signature's beats and note value. The BPM is a scrub field:
+     dragged sideways, or stepped with the arrows and the wheel, in 0.1 BPM steps. The chart follows
+     it as it's dragged, and the change is applied as one undoable step once it's been left alone. A
+     field with nothing placed at its tick shows what's in force there, greyed. Typing in it places
+     a marker there; emptying it removes the marker. Each edit is one undoable step, with the anchor
+     offer (item 2) when it needs one.
    - A row can be gone to, anchored, moved by its tick (its tempo marker and time signature
-     together) and removed. Where both are at one tick, removing asks which.
+     together) and removed. The tick is a scrub field too, in whole ticks; the chart follows it as
+     it's dragged, and the move is applied as one undoable step once it's been left alone. Where both
+     are at one tick, removing asks which.
+   - On the lanes, the Tempo tool previews where a press would add a marker, with the Phrase tool's
+     hover line, and shows a resize arrow over a change a drag moves: a tempo marker and any time
+     signature at its tick, or a time signature on its own. The change the song starts with can't be
+     moved, so shows the usual cursor.
    - **Add tempo change** adds a marker at the cursor, on the grid. **Add time signature** puts one
      at the start of the measure the cursor is in.
    - A time signature stands on its own: it needs no tempo marker at its tick.
@@ -1362,8 +1373,9 @@ Acceptance criteria:
      a section by its name; a song event (item 5, and `[coda]`) by what it is, set apart from the
      sections; anything else as it's written. Under them, headed by the part, are the focused lane's
      part's own text events, when it has any (item 6). Each row has a go-to, which moves the cursor
-     there and leaves the focus where it is; its name or text, typed to rename it; its tick, typed to
-     move it; and a delete. Each is one undoable step. A section is renamed by its name and keeps its
+     there and leaves the focus where it is; its name or text, typed to rename it; its tick, scrubbed
+     or typed in whole ticks to move it, the chart following it as it's dragged and the move applied
+     as one undoable step once it's been left alone; and a delete. Each is one undoable step. A section is renamed by its name and keeps its
      `[section …]` or `[prc_…]` style, and an empty name is refused. The list follows edits, undo and
      redo, a drag's preview and the focus, and a row whose event hasn't changed keeps what's being
      typed in it.

@@ -1,4 +1,5 @@
 using ChartBuilder.Tests.Charting;
+using ChartBuilder.ViewModels;
 using ChartShared.Core.Charting;
 using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charts;
@@ -135,6 +136,17 @@ public sealed class TempoMapTabTests
 
         Assert.IsTrue(TempoMapEdits.PlaceBpm(chart, Measure, EditableTempoMap.MaxMicrosecondsPerQuarter + 1, TimeSpan.Zero, keepTimes: false).IsRefused);
         Assert.IsTrue(TempoMapEdits.PlaceBpm(chart, -1, Bpm140, TimeSpan.Zero, keepTimes: false).IsRefused);
+    }
+
+    [TestMethod]
+    public void TheSlowestBpmTheFieldOffersIsOneMidiCanHold()
+    {
+        // The box is bounded by this, so what it holds can always be applied: the longest beat MIDI has, rounded up to
+        // the three decimals the box shows, as rounding down would make a tempo too slow for it.
+        long tempo = EditableTempoMap.MicrosecondsPerQuarterOf((double)TempoMapViewModel.MinBpm);
+        Assert.IsTrue(tempo <= EditableTempoMap.MaxMicrosecondsPerQuarter);
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(
+            () => EditableTempoMap.MicrosecondsPerQuarterOf((double)(TempoMapViewModel.MinBpm - 0.001m)));
     }
 
     // The time signature fields.

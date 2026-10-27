@@ -62,12 +62,22 @@
                                Text="{Binding Where}" />
                     <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="4">
                         <TextBlock Classes="muted" FontSize="11" VerticalAlignment="Center" Text="{x:Static res:Strings.SectionsTickLabel}" />
-                        <TextBox Classes="event-field"
-                                 Width="76"
-                                 Text="{Binding TickText, UpdateSourceTrigger=LostFocus}"
-                                 IsReadOnly="{Binding IsPlaced}"
-                                 ToolTip.Tip="{Binding TickToolTip}"
-                                 AutomationProperties.Name="{x:Static res:Strings.SectionsTickLabel}" />
+                        <NumericUpDown Name="TickBox"
+                                       Width="76"
+                                       MinHeight="26"
+                                       FontSize="12"
+                                       VerticalAlignment="Center"
+                                       ShowButtonSpinner="False"
+                                       ctl:DragScrub.IsEnabled="True"
+                                       ctl:DragScrub.Step="1"
+                                       Increment="1"
+                                       Minimum="0"
+                                       FormatString="0"
+                                       ParsingNumberStyle="Integer"
+                                       IsReadOnly="{Binding IsPlaced}"
+                                       Value="{Binding TickValue}"
+                                       ToolTip.Tip="{Binding TickToolTip}"
+                                       AutomationProperties.Name="{x:Static res:Strings.SectionsTickLabel}" />
                     </StackPanel>
                 </Grid>
             </Border>

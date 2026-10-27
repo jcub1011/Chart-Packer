@@ -605,9 +605,9 @@ namespace ChartBuilder.Controls.Editing
 
         /// <summary>
         /// What follows the pointer and the focus: the place tool's ghost, what the erase tool would take away, where the
-        /// Phrase tool would start drawing, where the Sync tool would start drawing a region, the synchronized region's
-        /// notes, its X and what of it the pointer would take hold of, the cursor, a box being drawn, and the focus's
-        /// edge.
+        /// Phrase tool would start drawing, where the Tempo tool would add a marker, where the Sync tool would start
+        /// drawing a region, the synchronized region's notes, its X and what of it the pointer would take hold of, the
+        /// cursor, a box being drawn, and the focus's edge.
         /// </summary>
         private void RenderOverlay(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, EditablePart part, IReadOnlyList<RailKind> rows, LaneSlots slots, LaneProjection screen)
         {
@@ -620,6 +620,7 @@ namespace ChartBuilder.Controls.Editing
 
             DrawEraseHover(context, session, key, track, part, rows, screen, slots);
             DrawPhraseHover(context, session, key, part, rows, screen, slots);
+            DrawTempoHover(context, session, screen, slots);
             DrawSyncLine(context, session, screen, slots);
             DrawSyncHover(context, session, key, screen, slots);
 
@@ -713,19 +714,19 @@ namespace ChartBuilder.Controls.Editing
         }
 
         /// <summary>
-        /// Whether the place tool's ghost, the erase tool's red or the Phrase tool's line is shown under the pointer, which
-        /// follow the song as it moves under it; or a Select tool's rail hover, whose placement line does too; or, with a
-        /// synchronized region drawn, its X and hover, which do too.
+        /// Whether the place tool's ghost, the erase tool's red, the Phrase tool's line or the Tempo tool's marker preview
+        /// is shown under the pointer, which follow the song as it moves under it; or a Select tool's rail hover, whose
+        /// placement line does too; or, with a synchronized region drawn, its X and hover, which do too.
         /// </summary>
         private bool IsHoverShown => _hover is { } hover && !_isPressed
-            && (Session?.Tool is EditorTool.Place or EditorTool.Erase or EditorTool.Phrase
+            && (Session?.Tool is EditorTool.Place or EditorTool.Erase or EditorTool.Phrase or EditorTool.Tempo
                 || Session?.Sync.IsActive == true
                 || (Session?.Tool == EditorTool.Select && PointAt(hover) is { Rail: not null }));
 
         /// <summary>
         /// Follows the cursor: the song and the notes are moved, as far as their page reaches, and drawn again around the
         /// screen past it, rather than the whole lane drawn again every frame the song plays. The glow is drawn again while
-        /// the song plays, and the place tool's ghost, which snaps to the song under a still pointer.
+        /// the song plays, and the tools' hover marks, which snap to the song under a still pointer.
         /// </summary>
         private void OnViewportChanged(object? sender, EventArgs e)
         {
@@ -1020,9 +1021,14 @@ namespace ChartBuilder.Controls.Editing
             else if (!_isPressed)
             {
                 if (_lane is { Vocal: not null })
-                    ShowVocalCursor(position);
-                else if (!ShowSyncCursor(position))
+                {
+                    if (!ShowVocalTempoCursor(position))
+                        ShowVocalCursor(position);
+                }
+                else if (!ShowSyncCursor(position) && !ShowTempoCursor(position))
+                {
                     ShowRailCursor(position);
+                }
             }
 
             _overlay.Redraw();
@@ -1286,6 +1292,34 @@ namespace ChartBuilder.Controls.Editing
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// Shows a resize arrow over a tempo or time signature change the Tempo tool would drag: up and down a highway's
+        /// lane, left and right along a timeline's. The change the song starts with can't be moved, so shows the usual
+        /// cursor. Whether it showed anything.
+        /// </summary>
+        private bool ShowTempoCursor(Point position)
+        {
+            if (Session is not { } session || session.Tool != EditorTool.Tempo || (_keys & KeyModifiers.Shift) != 0
+                || session.Tools.IsSyncPress(ModifiersOf(_keys)))
+            {
+                return false;
+            }
+
+            if (PointAt(position) is not { Rail: null } point || session.Tools.TempoChangeAt(point) is not { } tick)
+                return false;
+            ShowTempoCursorFor(tick);
+            return true;
+        }
+
+        /// <summary>Shows the cursor a tempo or time signature change can be dragged by, or the usual one at the song's start.</summary>
+        private void ShowTempoCursorFor(long tick)
+        {
+            SetCursor(EditorTools.TempoChangeMoves(tick)
+                ? View == LaneView.Highway ? StandardCursorType.SizeNorthSouth : StandardCursorType.SizeWestEast
+                : null);
+            ShowTip(null);
         }
 
         /// <summary>
@@ -2123,6 +2157,7 @@ namespace ChartBuilder.Controls.Editing
                 if (!tempoMap.Tempos.At(signature.Tick).IsEmpty)
                     continue;
                 double along = projection.AlongOf(session.AudioAt(signature.Tick));
+                context.DrawLine(TempoPen, At(along, across1), At(along, across2));
                 var text = Label(SignatureText(signature), 10, TempoBrush);
                 text.Draw(context, View == LaneView.Highway ? new Point(labels.X + 2, along + 1) : new Point(along + 3, labels.Y + 1));
             }
@@ -2470,6 +2505,26 @@ namespace ChartBuilder.Controls.Editing
                 return;
             var (across1, across2) = PhraseRowOf(projection, rows.Count, row);
             context.FillRectangle(brush, Box(along - 1.5, along + 1.5, across1 - 1, across2 + 1));
+        }
+
+        /// <summary>
+        /// Where a press of the Tempo tool would add a tempo marker: a line across the lanes in the tempo markers' amber,
+        /// on the grid step the press would snap to, as the Phrase tool's hover line is drawn. None over a change the press
+        /// would drag instead, in the phrase rail, or with Shift held or the Sync tool's press.
+        /// </summary>
+        private void DrawTempoHover(DrawingContext context, EditorSession session, LaneProjection projection, LaneSlots slots)
+        {
+            if (_hover is not { } hover || _isPressed || session.Tool != EditorTool.Tempo || (_keys & KeyModifiers.Shift) != 0
+                || session.Tools.IsSyncPress(ModifiersOf(_keys)))
+            {
+                return;
+            }
+
+            if (PointAt(hover) is not { Rail: null } point || point.Lane is null || session.Tools.TempoAddAt(point) is not { } tick)
+                return;
+
+            double along = projection.AlongOf(session.AudioAt(tick));
+            context.FillRectangle(TempoBrush, Box(along - 1, along + 1, projection.LaneFrom, projection.LaneFrom + (projection.LaneSize * slots.Slots.Count)));
         }
 
         /// <summary>

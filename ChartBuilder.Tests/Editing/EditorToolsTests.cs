@@ -592,6 +592,65 @@ public sealed class EditorToolsTests
     }
 
     [TestMethod]
+    public void TheTempoToolsPreviewIsWhereAPressWouldAddAMarker()
+    {
+        var session = Of(Guitar());
+        session.Tool = EditorTool.Tempo;
+        session.Chart.TempoMap.TimeSignatures.Add(new TimeSignatureMarker(1440, 3, 4));
+
+        Assert.AreEqual(960, session.Tools.TempoAddAt(At(session, 965, null)), "On the grid, where the marker would go.");
+        Assert.IsNull(session.Tools.TempoAddAt(At(session, 5, null)), "Over the song's first change, which a press drags.");
+        Assert.IsNull(session.Tools.TempoAddAt(At(session, 1442, null)), "Over a time signature on its own, which a press drags.");
+        Assert.IsNull(session.Tools.TempoAddAt(RailAt(session, 1920, PhraseKind.StarPower)), "The phrase rail adds no tempo marker.");
+
+        session.Chart.TempoMap.Tempos.Add(new TempoChange(960, 500_000));
+        Assert.IsNull(session.Tools.TempoAddAt(At(session, 990, null)), "The grid step it would snap to has a marker already.");
+    }
+
+    [TestMethod]
+    public void AChangeIsTakenHoldOfAtItsOwnTickAndTheSongsStartStaysPut()
+    {
+        var session = Of(Guitar());
+        session.Chart.TempoMap.TimeSignatures.Add(new TimeSignatureMarker(960, 3, 4));
+
+        Assert.AreEqual(0, session.Tools.TempoChangeAt(At(session, 0, null)));
+        Assert.AreEqual(960, session.Tools.TempoChangeAt(At(session, 965, null)));
+        Assert.IsFalse(EditorTools.TempoChangeMoves(0));
+        Assert.IsTrue(EditorTools.TempoChangeMoves(960));
+    }
+
+    [TestMethod]
+    public void TheTempoToolDragsATimeSignatureOnItsOwn()
+    {
+        var session = Of(Guitar());
+        session.Chart.TempoMap.TimeSignatures.Add(new TimeSignatureMarker(960, 3, 4));
+        session.Tool = EditorTool.Tempo;
+
+        DragFromTo(session, At(session, 962, null), At(session, 1440, null));
+
+        Assert.IsTrue(session.Chart.TempoMap.TimeSignatures.At(960).IsEmpty);
+        Assert.HasCount(1, session.Chart.TempoMap.TimeSignatures.At(1440));
+        Assert.AreEqual(1, session.UndoStack.UndoCount);
+    }
+
+    [TestMethod]
+    public void TheTempoToolDragsATempoMarkerAndTimeSignatureTogether()
+    {
+        var session = Of(Guitar());
+        session.Chart.TempoMap.Tempos.Add(new TempoChange(960, 400_000));
+        session.Chart.TempoMap.TimeSignatures.Add(new TimeSignatureMarker(960, 3, 4));
+        session.Tool = EditorTool.Tempo;
+
+        DragFromTo(session, At(session, 962, null), At(session, 1440, null));
+
+        Assert.IsTrue(session.Chart.TempoMap.Tempos.At(960).IsEmpty);
+        Assert.IsTrue(session.Chart.TempoMap.TimeSignatures.At(960).IsEmpty);
+        Assert.HasCount(1, session.Chart.TempoMap.Tempos.At(1440));
+        Assert.HasCount(1, session.Chart.TempoMap.TimeSignatures.At(1440));
+        Assert.AreEqual(1, session.UndoStack.UndoCount);
+    }
+
+    [TestMethod]
     public void GameTracksAreWorkedOutAgainAfterAnEditTouchesThem()
     {
         var session = Of(Guitar());
