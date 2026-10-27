@@ -9,7 +9,7 @@ namespace ChartBuilder.Tests.Editing;
 
 /// <summary>
 /// The star power layout the generator's window reviews (charter-spec C8 item 1): replacing or adding alongside the
-/// star power already there, keeping and dropping regions, drawing and resizing them, and applying them as one step.
+/// star power already there, keeping and dropping regions, and applying them as one step.
 /// </summary>
 [TestClass]
 public sealed class StarPowerPlanTests
@@ -66,70 +66,6 @@ public sealed class StarPowerPlanTests
     }
 
     [TestMethod]
-    public void ADrawnRegionIsAddedKeptAndPutInTimeOrder()
-    {
-        var plan = Plan();
-        plan.DropAll();
-        var phrase = new Phrase(PhraseKind.StarPower, 40 * Measure, Measure);
-
-        int index = plan.Add(phrase);
-
-        Assert.IsTrue(plan.Regions[index].Kept);
-        Assert.IsTrue(plan.Regions[index].Added);
-        Assert.AreEqual(phrase, plan.Regions[index].Phrase);
-        Assert.AreEqual(-1, plan.Add(new Phrase(PhraseKind.StarPower, 40 * Measure, Measure)));
-        Assert.AreEqual(1, plan.Regions.Count(r => r.Phrase == phrase));
-    }
-
-    [TestMethod]
-    public void ARegionOverlappingAKeptOneCantBeDrawn()
-    {
-        var plan = Plan();
-        var kept = plan.Regions[0].Phrase;
-        var phrase = kept with { Tick = kept.Tick + 1 };
-
-        Assert.IsTrue(plan.Validate(phrase).HasFlag(StarPowerRegionProblem.Overlap));
-        Assert.AreEqual(-1, plan.Add(phrase));
-    }
-
-    [TestMethod]
-    public void ARegionOutsideTheSpanCantBeDrawn()
-    {
-        var plan = StarPowerPlan.Generate(Chart(starPower: false), ChartInstrument.Guitar, StarPowerOptions.Default, StarPowerMode.Replace, (30 * Measure, (56 * Measure) - 1));
-
-        Assert.IsTrue(plan.Validate(new Phrase(PhraseKind.StarPower, 10 * Measure, Measure)).HasFlag(StarPowerRegionProblem.OutsideScope));
-        Assert.AreEqual(-1, plan.Add(new Phrase(PhraseKind.StarPower, 10 * Measure, Measure)));
-    }
-
-    [TestMethod]
-    public void ADrawnRegionCanBeResizedAndRemoved()
-    {
-        var plan = Plan();
-        plan.DropAll();
-        int index = plan.Add(new Phrase(PhraseKind.StarPower, 40 * Measure, Measure));
-
-        int moved = plan.Resize(index, 41 * Measure, 2 * Measure);
-
-        Assert.AreEqual(41 * Measure, plan.Regions[moved].Phrase.Tick);
-        Assert.AreEqual(2 * Measure, plan.Regions[moved].Phrase.Length);
-        Assert.IsTrue(plan.Remove(moved));
-        Assert.AreEqual(-1, plan.Regions.ToList().FindIndex(r => r.Phrase.Tick == 41 * Measure));
-    }
-
-    [TestMethod]
-    public void ARegionCanBeResizedOnToAnotherOnlyWhenThatOneIsDropped()
-    {
-        var plan = Plan();
-        var first = plan.Regions[0].Phrase;
-        var second = plan.Regions[1].Phrase;
-
-        Assert.AreEqual(-1, plan.Resize(0, first.Tick, second.Tick + second.Length - first.Tick));
-
-        plan.SetKept(1, false);
-        Assert.AreNotEqual(-1, plan.Resize(0, first.Tick, second.Tick + second.Length - first.Tick));
-    }
-
-    [TestMethod]
     public void ReplaceAppliesTheRemovalsAndTheKeptRegionsAsOneStep()
     {
         var chart = Chart(starPower: true);
@@ -174,7 +110,6 @@ public sealed class StarPowerPlanTests
             _ => [],
         };
         Assert.IsFalse(removes.Any(r => r.Phrase == straddler));
-        Assert.IsTrue(plan.Validate(straddler with { Tick = straddler.Tick + 1 }).HasFlag(StarPowerRegionProblem.Overlap));
     }
 
     [TestMethod]

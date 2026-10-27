@@ -30,12 +30,6 @@ namespace ChartShared.UI.Controls.Highway
     /// <summary>A star power phrase drawn behind a highway's notes, in song seconds.</summary>
     public readonly record struct StarPowerBand(double Start, double End);
 
-    /// <summary>A star power phrase being drawn or resized on a highway, in song seconds.</summary>
-    public readonly record struct PhraseDrawEventArgs(double Start, double End);
-
-    /// <summary>A star power phrase being resized by its start or end edge.</summary>
-    public readonly record struct PhraseResizeEventArgs(int Index, double Start, double End);
-
     /// <summary>One highway: an instrument difficulty's notes with their song times worked out.</summary>
     public sealed class HighwayLane
     {
@@ -171,9 +165,6 @@ namespace ChartShared.UI.Controls.Highway
         public static readonly StyledProperty<double> FineScrubFactorProperty =
             AvaloniaProperty.Register<NoteHighwayView, double>(nameof(FineScrubFactor), LaneScrub.DefaultFineFactor);
 
-        public static readonly StyledProperty<bool> IsPhraseEditingProperty =
-            AvaloniaProperty.Register<NoteHighwayView, bool>(nameof(IsPhraseEditing));
-
         public static readonly StyledProperty<int?> SelectedPhraseProperty =
             AvaloniaProperty.Register<NoteHighwayView, int?>(nameof(SelectedPhrase));
 
@@ -207,12 +198,10 @@ namespace ChartShared.UI.Controls.Highway
         private static readonly IPen StrikeEdgePen = new ImmutablePen(Color.FromArgb(0x8C, 0xFF, 0xFF, 0xFF).ToUInt32(), 1);
         private static readonly IBrush LabelBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xD0, 0xFF, 0xFF, 0xFF));
 
-        // Star power bands behind the notes, the selected one outlined, and the band being drawn.
+        // Star power bands behind the notes, the selected one outlined.
         private static readonly IBrush StarPowerBandBrush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(HighwayPalette.StarPower, 0x22));
         private static readonly IPen StarPowerBandPen = new ImmutablePen(HighwayPalette.WithAlpha(HighwayPalette.StarPower, 0xA0).ToUInt32(), 1);
         private static readonly IPen StarPowerSelectedPen = new ImmutablePen(Colors.White.ToUInt32(), 2);
-        private static readonly IBrush PhraseGhostBrush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(HighwayPalette.StarPower, 0x38));
-        private static readonly IPen PhraseGhostPen = new ImmutablePen(HighwayPalette.StarPower.ToUInt32(), 1, new ImmutableDashStyle([4, 2], 0));
 
         // How opaque a faded note is (HighwayNoteMark.Faded), on the highway and in its whole chart.
         private const double FadedOpacity = 0.28;
@@ -221,11 +210,6 @@ namespace ChartShared.UI.Controls.Highway
         // The track's waveform behind the notes: faint, so the gems stand out in front of it.
         private static readonly IBrush WaveformPeakBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x24, 0xC8, 0xD2, 0xFF));
         private static readonly IBrush WaveformLoudBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x48, 0xC8, 0xD2, 0xFF));
-
-        // Whether the pointer draws and resizes star power bands, and the cursor it shows there.
-        private static readonly Cursor PhraseCursor = new(StandardCursorType.Cross);
-        private static readonly Cursor PhraseResizeCursor = new(StandardCursorType.SizeNorthSouth);
-        private static readonly Cursor PhraseSelectCursor = new(StandardCursorType.Hand);
 
         private readonly GemPainter _gems = new();
         private readonly Dictionary<string, FormattedText> _labels = [];
@@ -241,14 +225,6 @@ namespace ChartShared.UI.Controls.Highway
         private int _hoveredLane = -1;
         private double _hoverY = double.NaN;
         private bool _isScrubbing;
-
-        // The band being drawn, in song seconds, while the phrase editing is on; and the band whose edge is being dragged,
-        // with whether it's its start or its end.
-        private bool _isDrawingPhrase;
-        private double _drawStart;
-        private double _drawEnd;
-        private int _resizeBand = -1;
-        private bool _resizeStart;
 
         // Whether Ctrl is held over a highway, or while scrubbing, making a drag fine, or Shift, showing its whole chart.
         private readonly LaneScrubMode _mode;
@@ -331,40 +307,12 @@ namespace ChartShared.UI.Controls.Highway
             set => SetValue(FineScrubFactorProperty, value);
         }
 
-        /// <summary>
-        /// Whether the pointer draws and resizes the star power bands rather than scrubbing. A press on a band's start or
-        /// end drags that edge; a press elsewhere draws a new band, raised as <see cref="PhraseDrawn"/> when it's long enough.
-        /// </summary>
-        public bool IsPhraseEditing
-        {
-            get => GetValue(IsPhraseEditingProperty);
-            set => SetValue(IsPhraseEditingProperty, value);
-        }
-
         /// <summary>The band drawn selected, or null for none.</summary>
         public int? SelectedPhrase
         {
             get => GetValue(SelectedPhraseProperty);
             set => SetValue(SelectedPhraseProperty, value);
         }
-
-        /// <summary>Raised when a press starts drawing a new band.</summary>
-        public event EventHandler? PhraseDrawStarted;
-
-        /// <summary>Raised as a new band is dragged out, or as it's cancelled.</summary>
-        public event EventHandler<PhraseDrawEventArgs>? PhraseDrawPreviewChanged;
-
-        /// <summary>Raised when a new band is drawn and let go of.</summary>
-        public event EventHandler<PhraseDrawEventArgs>? PhraseDrawn;
-
-        /// <summary>Raised as a band's start or end edge is dragged.</summary>
-        public event EventHandler<PhraseResizeEventArgs>? PhraseResized;
-
-        /// <summary>Raised when a band's edge is let go of.</summary>
-        public event EventHandler? PhraseResizeEnded;
-
-        /// <summary>Raised when a band is pressed, to select it.</summary>
-        public event EventHandler<int>? PhraseSelected;
 
         public NoteHighwayView()
         {
@@ -454,19 +402,7 @@ namespace ChartShared.UI.Controls.Highway
                 {
                     var waveform = waveforms is not null && i < waveforms.Count ? waveforms[i] : null;
                     using (context.PushOpacity(1 - overview))
-                    {
                         DrawHighway(context, scene, scene.Lanes[i], waveform, bounds, strike, gem, now, from, to, Y, i == 0 ? SelectedPhrase : null);
-                        if (i == 0 && _isDrawingPhrase)
-                        {
-                            double top = Y(Math.Max(_drawStart, _drawEnd)), bottom = Y(Math.Min(_drawStart, _drawEnd));
-                            var ghost = new Rect(bounds.X, Math.Min(top, bottom), bounds.Width, Math.Max(1, Math.Abs(bottom - top)));
-                            using (context.PushClip(bounds))
-                            {
-                                context.FillRectangle(PhraseGhostBrush, ghost);
-                                context.DrawRectangle(null, PhraseGhostPen, ghost.Deflate(0.5));
-                            }
-                        }
-                    }
                 }
 
                 if (overview > 0)
@@ -651,25 +587,6 @@ namespace ChartShared.UI.Controls.Highway
             base.OnPointerMoved(e);
             var point = e.GetPosition(this);
             _mode.Set(e.KeyModifiers);
-            if (_isDrawingPhrase)
-            {
-                _drawEnd = FallingTimeAt(point.Y);
-                PhraseDrawPreviewChanged?.Invoke(this, new PhraseDrawEventArgs(_drawStart, _drawEnd));
-                InvalidateVisual();
-                return;
-            }
-
-            if (_resizeBand >= 0 && Scene is { Lanes.Count: > 0 } scene && _resizeBand < scene.Lanes[0].StarPowerBands.Length)
-            {
-                var band = scene.Lanes[0].StarPowerBands[_resizeBand];
-                double time = FallingTimeAt(point.Y);
-                double start = _resizeStart ? Math.Min(time, band.End) : band.Start;
-                double end = _resizeStart ? band.End : Math.Max(time, band.Start);
-                PhraseResized?.Invoke(this, new PhraseResizeEventArgs(_resizeBand, start, end));
-                InvalidateVisual();
-                return;
-            }
-
             if (_isScrubbing)
             {
                 SetHover(_hoveredLane, point.Y);
@@ -678,56 +595,23 @@ namespace ChartShared.UI.Controls.Highway
             }
 
             SetHover(HighwayAt(point), point.Y);
-            if (IsPhraseEditing)
-                Cursor = BandEdgeAt(point) is not null
-                    ? PhraseResizeCursor
-                    : BandAt(point) >= 0 ? PhraseSelectCursor : PhraseCursor;
         }
 
-        /// <summary>The band whose stretch of the highway is under <paramref name="point"/>, or -1 for none.</summary>
-        private int BandAt(Point point)
+        /// <summary>
+        /// The wheel scrolls the highway through the song, a quarter of its look-ahead a notch, so the preview can be moved
+        /// without leaving it. The window hears <see cref="Scrubbed"/> and seeks.
+        /// </summary>
+        protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
         {
-            if (Scene is not { Lanes.Count: > 0 } scene || scene.Lanes[0].StarPowerBands.Length == 0)
-                return -1;
-            double time = FallingTimeAt(point.Y);
-            var bands = scene.Lanes[0].StarPowerBands;
-            for (int i = 0; i < bands.Length; i++)
-            {
-                if (time >= bands[i].Start && time <= bands[i].End)
-                    return i;
-            }
+            base.OnPointerWheelChanged(e);
+            if (Scene is not { } scene)
+                return;
 
-            return -1;
-        }
-
-        /// <summary>The song time at <paramref name="y"/> down a highway with the notes falling.</summary>
-        private double FallingTimeAt(double y)
-        {
             double now = (Clock?.Invoke() ?? TimeSpan.Zero).TotalSeconds;
-            double lookAhead = Math.Max(0.1, LookAhead);
-            double strike = Math.Max(1, Bounds.Height * StrikeFraction);
-            double time = now + ((strike - y) / strike * lookAhead);
-            double length = LengthSeconds > 0 ? LengthSeconds : Scene is { } scene ? scene.EndSeconds + 1 : double.MaxValue;
-            return Math.Clamp(time, 0, length);
-        }
-
-        /// <summary>The band whose start or end is within a few pixels of <paramref name="point"/>, or null for none.</summary>
-        private (int Index, bool Start)? BandEdgeAt(Point point)
-        {
-            if (Scene is not { Lanes.Count: > 0 } scene || scene.Lanes[0].StarPowerBands.Length == 0)
-                return null;
-            var bands = scene.Lanes[0].StarPowerBands;
-            double tolerance = Math.Max(0.02, 8 * GrabSecondsPerPixel);
-            double time = FallingTimeAt(point.Y);
-            for (int i = 0; i < bands.Length; i++)
-            {
-                if (Math.Abs(time - bands[i].Start) <= tolerance)
-                    return (i, true);
-                if (Math.Abs(time - bands[i].End) <= tolerance)
-                    return (i, false);
-            }
-
-            return null;
+            double step = Math.Clamp(Math.Max(0.1, LookAhead) * 0.25, 0.1, 2);
+            double target = Math.Clamp(now + (e.Delta.Y * step), 0, TimelineOf(scene));
+            Scrubbed?.Invoke(this, new ScrubEventArgs(target));
+            e.Handled = true;
         }
 
         /// <summary>
@@ -768,34 +652,6 @@ namespace ChartShared.UI.Controls.Highway
 
             SetHover(lane, point.Y);
             _mode.Set(e.KeyModifiers);
-
-            // Phrase editing is for the one highway the window shows: a press on an edge drags it, and elsewhere draws a band.
-            if (IsPhraseEditing && lane == 0)
-            {
-                if (BandEdgeAt(point) is { } edge)
-                {
-                    _resizeBand = edge.Index;
-                    _resizeStart = edge.Start;
-                    PhraseSelected?.Invoke(this, edge.Index);
-                }
-                else if (BandAt(point) is >= 0 and var band)
-                {
-                    PhraseSelected?.Invoke(this, band);
-                }
-                else
-                {
-                    _isDrawingPhrase = true;
-                    _drawStart = _drawEnd = FallingTimeAt(point.Y);
-                    PhraseDrawStarted?.Invoke(this, EventArgs.Empty);
-                    PhraseDrawPreviewChanged?.Invoke(this, new PhraseDrawEventArgs(_drawStart, _drawEnd));
-                }
-
-                e.Pointer.Capture(this);
-                e.Handled = true;
-                InvalidateVisual();
-                return;
-            }
-
             _isScrubbing = true;
             e.Pointer.Capture(this);
             ScrubStarted?.Invoke(this, EventArgs.Empty);
@@ -811,44 +667,10 @@ namespace ChartShared.UI.Controls.Highway
         protected override void OnPointerReleased(PointerReleasedEventArgs e)
         {
             base.OnPointerReleased(e);
-            var point = e.GetPosition(this);
-            if (_isDrawingPhrase)
-            {
-                _isDrawingPhrase = false;
-                _drawEnd = FallingTimeAt(point.Y);
-                e.Pointer.Capture(null);
-                PhraseDrawPreviewChanged?.Invoke(this, new PhraseDrawEventArgs(_drawStart, _drawStart));
-                if (Math.Abs(_drawEnd - _drawStart) > 0.001)
-                    PhraseDrawn?.Invoke(this, new PhraseDrawEventArgs(_drawStart, _drawEnd));
-                InvalidateVisual();
-                e.Handled = true;
-                return;
-            }
-
-            if (_resizeBand >= 0)
-            {
-                if (Scene is { Lanes.Count: > 0 } scene && _resizeBand < scene.Lanes[0].StarPowerBands.Length)
-                {
-                    var band = scene.Lanes[0].StarPowerBands[_resizeBand];
-                    double time = FallingTimeAt(point.Y);
-                    double start = _resizeStart ? Math.Min(time, band.End) : band.Start;
-                    double end = _resizeStart ? band.End : Math.Max(time, band.Start);
-                    PhraseResized?.Invoke(this, new PhraseResizeEventArgs(_resizeBand, start, end));
-                }
-
-                _resizeBand = -1;
-                e.Pointer.Capture(null);
-                PhraseResizeEnded?.Invoke(this, EventArgs.Empty);
-                e.Handled = true;
-                return;
-            }
-
             if (!_isScrubbing)
-            {
-                e.Pointer.Capture(null);
                 return;
-            }
 
+            var point = e.GetPosition(this);
             _mode.Set(e.KeyModifiers);
             Scrubbed?.Invoke(this, new ScrubEventArgs(ScrubTimeAt(point)));
             e.Pointer.Capture(null);
@@ -862,18 +684,7 @@ namespace ChartShared.UI.Controls.Highway
         protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
         {
             base.OnPointerCaptureLost(e);
-            if (_isDrawingPhrase)
-            {
-                _isDrawingPhrase = false;
-                PhraseDrawPreviewChanged?.Invoke(this, new PhraseDrawEventArgs(_drawStart, _drawStart));
-            }
-
-            bool resizing = _resizeBand >= 0;
-            _resizeBand = -1;
-            if (resizing)
-                PhraseResizeEnded?.Invoke(this, EventArgs.Empty);
             EndScrub();
-            InvalidateVisual();
         }
 
         private void EndScrub()
@@ -898,7 +709,7 @@ namespace ChartShared.UI.Controls.Highway
                 return;
 
             if (lane != _hoveredLane)
-                Cursor = lane >= 0 ? (IsPhraseEditing ? PhraseCursor : LaneScrub.UpDownCursor) : null;
+                Cursor = lane >= 0 ? LaneScrub.UpDownCursor : null;
             _hoveredLane = lane;
             _hoverY = y;
             if (lane >= 0)

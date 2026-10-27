@@ -956,10 +956,8 @@ namespace ChartBuilder.ViewModels
     /// <param name="Replaced">Whether it's star power the star power window is replacing, drawn muted.</param>
     public readonly record struct OverviewPhrase(double Start, double End, RailKind Row, bool Replaced = false);
 
-    /// <summary>A proposal of the run of Generate fills or Generate star power going on, in the audio, for the overview.</summary>
-    /// <param name="Selected">Whether it's the star power window's selected region.</param>
-    /// <param name="Added">Whether the author drew it, rather than the generator proposing it.</param>
-    public readonly record struct OverviewProposal(double Start, double End, bool Kept, bool Selected = false, bool Added = false);
+    /// <summary>A proposal of the run of Generate fills or the star power window, in the audio, for the overview.</summary>
+    public readonly record struct OverviewProposal(double Start, double End, bool Kept);
 
     /// <summary>
     /// A note of the lane in focus, for the overview: when it starts and its sustain ends in the audio (its start, with

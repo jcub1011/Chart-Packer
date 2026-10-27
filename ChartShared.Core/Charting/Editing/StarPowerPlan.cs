@@ -4,62 +4,13 @@ using ChartShared.Core.Charts;
 
 namespace ChartShared.Core.Charting.Editing;
 
-/// <summary>What's wrong with a region the author drew or resized, as <see cref="StarPowerPlan.Validate"/> finds it.</summary>
-[Flags]
-public enum StarPowerRegionProblem
-{
-    /// <summary>It's fine.</summary>
-    None = 0,
-
-    /// <summary>It isn't a star power phrase.</summary>
-    WrongKind = 1,
-
-    /// <summary>It starts before the chart, or has no length.</summary>
-    InvalidLength = 2,
-
-    /// <summary>It reaches outside the span star power is proposed over.</summary>
-    OutsideScope = 4,
-
-    /// <summary>It overlaps a region that's kept, or star power that stays.</summary>
-    Overlap = 8,
-
-    /// <summary>It overlaps a big rock ending.</summary>
-    CrossesBigRockEnding = 16,
-
-    /// <summary>It has no notes on a difficulty with notes, which CHR065 warns of.</summary>
-    EmptyOnDifficulty = 32,
-
-    /// <summary>It crosses a section, which the generator never does.</summary>
-    CrossesSection = 64,
-
-    /// <summary>It reaches past a solo's edge, which the generator never does.</summary>
-    CrossesSolo = 128,
-}
-
-/// <summary>The problems that stop a region being added: the rest are warnings.</summary>
-public static class StarPowerRegionProblems
-{
-    /// <summary>The problems that stop a region being added.</summary>
-    public const StarPowerRegionProblem Blocking =
-        StarPowerRegionProblem.WrongKind
-        | StarPowerRegionProblem.InvalidLength
-        | StarPowerRegionProblem.OutsideScope
-        | StarPowerRegionProblem.Overlap
-        | StarPowerRegionProblem.CrossesBigRockEnding;
-
-    /// <summary>Whether <paramref name="problems"/> stops a region being added.</summary>
-    public static bool IsBlocked(this StarPowerRegionProblem problems) => (problems & Blocking) != 0;
-}
-
-/// <summary>A star power phrase of a <see cref="StarPowerPlan"/>: one the generator proposed, or one the author drew.</summary>
+/// <summary>A star power phrase of a <see cref="StarPowerPlan"/>.</summary>
 /// <param name="Kept">Whether it's added when the plan is applied; every region starts kept.</param>
-/// <param name="Added">Whether the author drew it, rather than the generator proposing it.</param>
 public readonly record struct StarPowerRegion(
     Phrase Phrase,
     StarPowerRole Role,
     long? SpikeTick,
-    bool Kept = true,
-    bool Added = false)
+    bool Kept = true)
 {
     /// <summary>Whether it charges for a hard passage.</summary>
     public bool IsSpikeLeadIn => Role == StarPowerRole.SpikeLeadIn;
@@ -70,8 +21,8 @@ public readonly record struct StarPowerRegion(
 
 /// <summary>
 /// A star power layout worked out for one part by Generate star power (charter-spec C8 item 1), reviewed in its window:
-/// the phrases proposed, each kept or dropped, ones the author draws, and the star power already there, until the kept
-/// ones are applied to the chart as one undoable step. It changes nothing itself.
+/// the phrases proposed, each kept or dropped, and the star power already there, until the kept ones are applied to the
+/// chart as one undoable step. It changes nothing itself.
 /// </summary>
 /// <remarks>
 /// Over the whole part it replaces the star power there by default (<see cref="StarPowerMode.Replace"/>), so its phrases
@@ -84,7 +35,6 @@ public sealed class StarPowerPlan
     private readonly List<Phrase> _existing;
     private readonly List<Phrase> _surviving;
     private readonly EditableChart _chart;
-    private readonly EditablePart? _part;
     private readonly StarPowerParameters _parameters;
 
     private StarPowerPlan(
@@ -102,7 +52,6 @@ public sealed class StarPowerPlan
         NoStarPowerReason reason)
     {
         _chart = chart;
-        _part = whole;
         _parameters = parameters;
         _regions = regions;
         _existing = existing;
@@ -220,108 +169,6 @@ public sealed class StarPowerPlan
     {
         for (int i = 0; i < _regions.Count; i++)
             _regions[i] = _regions[i] with { Kept = false };
-    }
-
-    /// <summary>
-    /// Adds a region the author drew, kept, earliest first.
-    /// </summary>
-    /// <returns>The index it went at; -1 when it can't be added (<see cref="Validate"/> says why).</returns>
-    public int Add(Phrase phrase)
-    {
-        if (Validate(phrase).IsBlocked())
-            return -1;
-        int index = _regions.FindIndex(r => r.Phrase.Tick > phrase.Tick);
-        if (index < 0)
-            index = _regions.Count;
-        _regions.Insert(index, new StarPowerRegion(phrase, StarPowerRole.Filler, null, Kept: true, Added: true));
-        return index;
-    }
-
-    /// <summary>Removes the region at <paramref name="index"/>.</summary>
-    /// <returns>Whether there was one.</returns>
-    public bool Remove(int index)
-    {
-        if (index < 0 || index >= _regions.Count)
-            return false;
-        _regions.RemoveAt(index);
-        return true;
-    }
-
-    /// <summary>
-    /// Resizes the region at <paramref name="index"/> to start at <paramref name="tick"/> and last
-    /// <paramref name="length"/> ticks, in place: <see cref="Sort"/> puts it back in time order once the drag is done.
-    /// </summary>
-    /// <returns>Its index; -1 when it can't be resized (<see cref="Validate"/> says why).</returns>
-    public int Resize(int index, long tick, long length)
-    {
-        if (index < 0 || index >= _regions.Count)
-            return -1;
-        var phrase = _regions[index].Phrase with { Tick = tick, Length = length };
-        if (Validate(phrase, index).IsBlocked())
-            return -1;
-        _regions[index] = _regions[index] with { Phrase = phrase };
-        return index;
-    }
-
-    /// <summary>Puts the regions back in time order, after a resize has moved one past another.</summary>
-    public void Sort() => _regions.Sort(static (x, y) => x.Phrase.Tick.CompareTo(y.Phrase.Tick));
-
-    /// <summary>What's wrong with <paramref name="phrase"/> as a region here; <paramref name="ignoreIndex"/> doesn't count as overlapping.</summary>
-    public StarPowerRegionProblem Validate(Phrase phrase, int? ignoreIndex = null)
-    {
-        if (phrase.Kind != PhraseKind.StarPower)
-            return StarPowerRegionProblem.WrongKind;
-        var problems = StarPowerRegionProblem.None;
-        if (phrase.Tick < 0 || phrase.Length <= 0)
-            problems |= StarPowerRegionProblem.InvalidLength;
-        if (Span is { } span && (phrase.Tick < span.From || phrase.CoverEnd - 1 > span.To))
-            problems |= StarPowerRegionProblem.OutsideScope;
-
-        for (int i = 0; i < _regions.Count; i++)
-        {
-            if (i != ignoreIndex && _regions[i].Kept && phrase.Overlaps(_regions[i].Phrase))
-                problems |= StarPowerRegionProblem.Overlap;
-        }
-
-        if (_part is not null)
-        {
-            foreach (var other in _part.Phrases)
-            {
-                if (other.Kind != PhraseKind.StarPower || !phrase.Overlaps(other))
-                    continue;
-
-                // In Replace mode the star power wholly in the span goes when the plan is applied, so overlapping it is
-                // fine; one reaching across the span's edge stays, and can't be overlapped.
-                if (Mode == StarPowerMode.Replace && _existing.Contains(other))
-                    continue;
-                problems |= StarPowerRegionProblem.Overlap;
-            }
-
-            foreach (var other in _part.Phrases)
-            {
-                if (!phrase.Overlaps(other))
-                    continue;
-                if (other.Kind == PhraseKind.BigRockEnding)
-                    problems |= StarPowerRegionProblem.CrossesBigRockEnding;
-                else if (other.Kind == PhraseKind.Solo && (phrase.Tick < other.Tick || phrase.CoverEnd > other.CoverEnd))
-                    problems |= StarPowerRegionProblem.CrossesSolo;
-            }
-
-            foreach (var track in _part.Tracks)
-            {
-                if (track.Notes.Count > 0 && track.Notes.Between(phrase.Tick, phrase.CoverEnd - 1).IsEmpty)
-                    problems |= StarPowerRegionProblem.EmptyOnDifficulty;
-            }
-        }
-
-        // A section strictly after the start, before the end, as the generator keeps clear of them.
-        var sections = Reducer.SectionTicks(_chart);
-        int section = Array.BinarySearch(sections, phrase.Tick + 1);
-        section = section >= 0 ? section : ~section;
-        if (section < sections.Length && sections[section] < phrase.CoverEnd)
-            problems |= StarPowerRegionProblem.CrossesSection;
-
-        return problems;
     }
 
     /// <summary>

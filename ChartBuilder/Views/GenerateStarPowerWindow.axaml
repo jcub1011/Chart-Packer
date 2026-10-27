@@ -26,8 +26,8 @@
         WindowDecorationsTheme="{StaticResource TitleBarDecorations}"
         WindowStartupLocation="CenterOwner">
 
-    <!-- Generate star power (charter-spec C8 item 1): a highway preview of the result, a whole-song timeline of the
-         proposed regions, and the regions kept, dropped, drawn or resized, until the kept ones are applied at once. -->
+    <!-- Generate star power (charter-spec C8 item 1): a highway preview of the result on the right, and on the left the
+         regions to keep or drop, their properties, and the preview's controls. Apply puts the kept regions on the chart. -->
     <Window.Styles>
         <Style Selector="TextBlock.heading">
             <Setter Property="FontSize" Value="13" />
@@ -43,29 +43,30 @@
             <Setter Property="Background" Value="{DynamicResource ToolbarBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
         </Style>
-        <Style Selector="Border.region-chip">
+        <Style Selector="Border.region-row">
             <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="4" />
             <Setter Property="Padding" Value="6,4" />
+            <Setter Property="Margin" Value="0,2" />
         </Style>
-        <Style Selector="Border.region-chip.selected">
+        <Style Selector="Border.region-row.selected">
             <Setter Property="BorderBrush" Value="{DynamicResource AccentTextBrush}" />
             <Setter Property="BorderThickness" Value="2" />
         </Style>
-        <Style Selector="Border.region-chip.dropped">
+        <Style Selector="Border.region-row.dropped">
             <Setter Property="Opacity" Value="0.5" />
         </Style>
-        <Style Selector="Button.chip">
+        <Style Selector="Button.region-click">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Padding" Value="4,1" />
-            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
         </Style>
     </Window.Styles>
 
-    <Grid RowDefinitions="Auto,Auto,*,Auto,Auto,Auto">
+    <Grid RowDefinitions="Auto,Auto,*,Auto,Auto">
         <!-- The title bar, as the other windows' is: the icon and the title. -->
         <ui:TitleBar x:Name="WindowTitleBar"
                      Grid.Row="0"
@@ -143,72 +144,32 @@
             </StackPanel>
         </Border>
 
-        <!-- The preview highway and the selected region. -->
-        <Grid Grid.Row="2" ColumnDefinitions="*,340">
+        <!-- On the left: the preview's controls, the selected region's properties, and the regions. On the right: the
+             highway preview of the result. -->
+        <Grid Grid.Row="2" ColumnDefinitions="360,*">
             <Border Grid.Column="0"
+                    Background="{DynamicResource SurfaceBrush}"
                     BorderBrush="{DynamicResource SubtleBorderBrush}"
                     BorderThickness="0,0,1,0">
-                <DockPanel>
-                    <Border DockPanel.Dock="Top" Classes="band" BorderThickness="0,0,0,1" Padding="12,6">
-                        <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" ColumnSpacing="10">
-                            <TextBlock Grid.Column="0" FontWeight="SemiBold" VerticalAlignment="Center" Text="{Binding PartLabel}" />
-                            <TextBlock Grid.Column="1"
-                                       Classes="note"
-                                       VerticalAlignment="Center"
-                                       TextTrimming="CharacterEllipsis"
-                                       Text="{x:Static res:Strings.StarPowerDrawHint}" />
-                            <TextBlock Grid.Column="2"
+                <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Margin="12" Spacing="12">
+                        <TextBlock Classes="heading" Text="{x:Static res:Strings.StarPowerPreviewHeading}" />
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                            <TextBlock Grid.Column="0"
                                        Classes="note"
                                        VerticalAlignment="Center"
                                        Text="{x:Static res:Strings.StarPowerLookAheadLabel}" />
-                            <Slider Grid.Column="3"
-                                    Width="110"
+                            <Slider Grid.Column="1"
                                     Minimum="2"
                                     Maximum="8"
                                     SmallChange="0.5"
                                     LargeChange="1"
                                     Value="{Binding LookAhead}"
                                     ToolTip.Tip="{x:Static res:Strings.StarPowerLookAheadToolTip}" />
-                            <Button Grid.Column="4"
-                                    Classes="labelled"
-                                    Content="{x:Static res:Strings.StarPowerAddRegion}"
-                                    Command="{Binding AddAtPlayheadCommand}"
-                                    ToolTip.Tip="{x:Static res:Strings.StarPowerAddRegionToolTip}" />
                         </Grid>
-                    </Border>
-                    <Panel>
-                        <hw:NoteHighwayView x:Name="Highway"
-                                            AutomationProperties.Name="Star power preview"
-                                            Scene="{Binding Scene}"
-                                            Clock="{Binding Clock}"
-                                            LookAhead="{Binding LookAhead}"
-                                            LengthSeconds="{Binding LengthSeconds}"
-                                            IsPhraseEditing="{Binding IsPhraseEditing}"
-                                            SelectedPhrase="{Binding SelectedIndex}"
-                                            PhraseDrawStarted="OnPhraseDrawStarted"
-                                            PhraseDrawn="OnPhraseDrawn"
-                                            PhraseResized="OnPhraseResized"
-                                            PhraseResizeEnded="OnPhraseResizeEnded"
-                                            PhraseSelected="OnPhraseSelected" />
-                        <Border HorizontalAlignment="Center"
-                                VerticalAlignment="Center"
-                                MaxWidth="400"
-                                Margin="24"
-                                Classes="band"
-                                BorderThickness="1"
-                                CornerRadius="6"
-                                Padding="16"
-                                IsHitTestVisible="False"
-                                IsVisible="{Binding !HasProposals}">
-                            <TextBlock Text="{Binding EmptyText}" TextWrapping="Wrap" HorizontalAlignment="Center" />
-                        </Border>
-                    </Panel>
-                </DockPanel>
-            </Border>
+                        <TextBlock Classes="note" Text="{Binding PartLabel}" />
 
-            <Border Grid.Column="1" Background="{DynamicResource SurfaceBrush}">
-                <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-                    <StackPanel Margin="14" Spacing="12">
+                        <Separator />
                         <TextBlock Classes="heading" Text="{x:Static res:Strings.StarPowerSelectedRegionHeading}" />
                         <TextBlock Classes="note"
                                    Text="{x:Static res:Strings.StarPowerNoSelection}"
@@ -226,19 +187,65 @@
                                                    TextWrapping="Wrap"
                                                    Text="{Binding ChargedText}"
                                                    IsVisible="{Binding ChargedText, Converter={x:Static ObjectConverters.IsNotNull}}" />
-                                        <StackPanel Orientation="Horizontal" Spacing="8">
-                                            <ToggleButton Classes="labelled"
-                                                          Content="{x:Static res:Strings.StarPowerKept}"
-                                                          IsChecked="{Binding IsKept, Mode=OneWay}"
-                                                          Command="{Binding ToggleCommand}" />
-                                            <Button Classes="labelled"
-                                                    Content="{x:Static res:Strings.StarPowerRemoveRegion}"
-                                                    Command="{Binding RemoveCommand}" />
-                                        </StackPanel>
+                                        <ToggleButton Classes="labelled"
+                                                      Content="{x:Static res:Strings.StarPowerKept}"
+                                                      IsChecked="{Binding IsKept, Mode=OneWay}"
+                                                      Command="{Binding ToggleCommand}" />
                                     </StackPanel>
                                 </DataTemplate>
                             </ContentControl.ContentTemplate>
                         </ContentControl>
+
+                        <Separator />
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <TextBlock Grid.Column="0"
+                                       Classes="heading"
+                                       VerticalAlignment="Center"
+                                       Text="{x:Static res:Strings.StarPowerRegionsHeading}" />
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
+                                <Button Classes="labelled"
+                                        Content="{x:Static res:Strings.StarPowerPreviousRegion}"
+                                        Command="{Binding PreviousRegionCommand}"
+                                        ToolTip.Tip="{x:Static res:Strings.StarPowerPreviousRegionToolTip}" />
+                                <Button Classes="labelled"
+                                        Content="{x:Static res:Strings.StarPowerNextRegion}"
+                                        Command="{Binding NextRegionCommand}"
+                                        ToolTip.Tip="{x:Static res:Strings.StarPowerNextRegionToolTip}" />
+                            </StackPanel>
+                        </Grid>
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <Button Classes="labelled"
+                                    Content="{x:Static res:Strings.StarPowerKeepAll}"
+                                    Command="{Binding KeepAllCommand}" />
+                            <Button Classes="labelled"
+                                    Content="{x:Static res:Strings.StarPowerDropAll}"
+                                    Command="{Binding DropAllCommand}" />
+                        </StackPanel>
+                        <ItemsControl ItemsSource="{Binding Regions}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:StarPowerRegionViewModel">
+                                    <Button Classes="region-click"
+                                            Command="{Binding SelectCommand}"
+                                            ToolTip.Tip="{x:Static res:Strings.StarPowerRegionJumpToolTip}">
+                                        <Border Classes="region-row"
+                                                Classes.selected="{Binding IsSelected}"
+                                                Classes.dropped="{Binding !IsKept}">
+                                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6">
+                                                <CheckBox Grid.Column="0"
+                                                          VerticalAlignment="Center"
+                                                          IsChecked="{Binding IsKept, Mode=OneWay}"
+                                                          Command="{Binding ToggleCommand}"
+                                                          ToolTip.Tip="{x:Static res:Strings.StarPowerKeepToolTip}" />
+                                                <StackPanel Grid.Column="1" Spacing="1" VerticalAlignment="Center">
+                                                    <TextBlock FontSize="12" Text="{Binding TimeText}" />
+                                                    <TextBlock FontSize="10" Classes="note" Text="{Binding RoleText}" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
 
                         <Separator IsVisible="{Binding HasExisting}" />
                         <TextBlock Classes="heading"
@@ -260,68 +267,35 @@
                     </StackPanel>
                 </ScrollViewer>
             </Border>
+
+            <Border Grid.Column="1" Background="{DynamicResource AppBackgroundBrush}">
+                <Panel>
+                    <hw:NoteHighwayView x:Name="Highway"
+                                        AutomationProperties.Name="Star power preview"
+                                        Scene="{Binding Scene}"
+                                        Clock="{Binding Clock}"
+                                        LookAhead="{Binding LookAhead}"
+                                        LengthSeconds="{Binding LengthSeconds}"
+                                        SelectedPhrase="{Binding SelectedIndex}"
+                                        Scrubbed="OnHighwayScrubbed" />
+                    <Border HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            MaxWidth="400"
+                            Margin="24"
+                            Classes="band"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            Padding="16"
+                            IsHitTestVisible="False"
+                            IsVisible="{Binding !HasProposals}">
+                        <TextBlock Text="{Binding EmptyText}" TextWrapping="Wrap" HorizontalAlignment="Center" />
+                    </Border>
+                </Panel>
+            </Border>
         </Grid>
 
-        <!-- The regions, side by side, to select and keep or drop without hunting for a short bar in the song. -->
-        <Border Grid.Row="3" Classes="band" BorderThickness="0,1,0,1" Padding="12,8">
-            <DockPanel>
-                <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" ColumnSpacing="10" Margin="0,0,0,6">
-                    <TextBlock Grid.Column="0"
-                               Classes="heading"
-                               VerticalAlignment="Center"
-                               Text="{x:Static res:Strings.StarPowerRegionsHeading}" />
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
-                        <Button Classes="labelled"
-                                Content="{x:Static res:Strings.StarPowerPreviousRegion}"
-                                Command="{Binding PreviousRegionCommand}"
-                                ToolTip.Tip="{x:Static res:Strings.StarPowerPreviousRegionToolTip}" />
-                        <Button Classes="labelled"
-                                Content="{x:Static res:Strings.StarPowerNextRegion}"
-                                Command="{Binding NextRegionCommand}"
-                                ToolTip.Tip="{x:Static res:Strings.StarPowerNextRegionToolTip}" />
-                        <Button Classes="labelled"
-                                Content="{x:Static res:Strings.StarPowerKeepAll}"
-                                Command="{Binding KeepAllCommand}" />
-                        <Button Classes="labelled"
-                                Content="{x:Static res:Strings.StarPowerDropAll}"
-                                Command="{Binding DropAllCommand}" />
-                    </StackPanel>
-                </Grid>
-                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
-                    <ItemsControl ItemsSource="{Binding Regions}">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <StackPanel Orientation="Horizontal" Spacing="6" />
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="vm:StarPowerRegionViewModel">
-                                <Border Classes="region-chip"
-                                        Classes.selected="{Binding IsSelected}"
-                                        Classes.dropped="{Binding !IsKept}">
-                                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="4">
-                                        <CheckBox Grid.Column="0"
-                                                  VerticalAlignment="Center"
-                                                  IsChecked="{Binding IsKept, Mode=OneWay}"
-                                                  Command="{Binding ToggleCommand}"
-                                                  ToolTip.Tip="{x:Static res:Strings.StarPowerKeepToolTip}" />
-                                        <Button Grid.Column="1" Classes="chip" Command="{Binding SelectCommand}">
-                                            <StackPanel Spacing="1">
-                                                <TextBlock FontSize="12" Text="{Binding TimeText}" />
-                                                <TextBlock FontSize="10" Classes="note" Text="{Binding RoleText}" />
-                                            </StackPanel>
-                                        </Button>
-                                    </Grid>
-                                </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </ScrollViewer>
-            </DockPanel>
-        </Border>
-
         <!-- The whole song: the regions, the hard passages and the meter. -->
-        <Border Grid.Row="4" Padding="8,4,8,0">
+        <Border Grid.Row="3" Padding="8,4,8,0">
             <bctl:TimelineView x:Name="Timeline"
                                Height="118"
                                AutomationProperties.Name="Star power timeline"
@@ -343,7 +317,7 @@
         </Border>
 
         <!-- What applying does, and the way to do it. -->
-        <Border Grid.Row="5" Classes="band" BorderThickness="0,1,0,0" Padding="12,8">
+        <Border Grid.Row="4" Classes="band" BorderThickness="0,1,0,0" Padding="12,8">
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                 <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
                     <TextBlock FontWeight="SemiBold" Text="{Binding SummaryText}" />

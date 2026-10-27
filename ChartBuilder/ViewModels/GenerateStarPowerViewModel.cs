@@ -86,8 +86,6 @@ namespace ChartBuilder.ViewModels
 
         public double LengthSeconds => _playback.LengthSeconds;
 
-        public bool IsPhraseEditing => true;
-
         /// <summary>Whether the window applied the plan and closed.</summary>
         public bool Applied { get; private set; }
 
@@ -182,7 +180,6 @@ namespace ChartBuilder.ViewModels
             foreach (var item in Regions)
                 item.IsSelected = item == region;
             TimelineExtras = TimelineExtras is { } extras ? extras with { SelectedProposal = SelectedIndex } : null;
-            RemoveSelectedCommand.NotifyCanExecuteChanged();
         }
 
         [RelayCommand]
@@ -194,20 +191,6 @@ namespace ChartBuilder.ViewModels
             region.IsKept = _plan.Regions[region.Index].Kept;
             _dirty = true;
             RefreshAll();
-        }
-
-        [RelayCommand]
-        public void RemoveRegion(StarPowerRegionViewModel region)
-        {
-            if (region.Index < 0 || region.Index >= Regions.Count)
-                return;
-            _plan.Remove(region.Index);
-            _dirty = true;
-            if (SelectedRegion == region)
-                SelectedRegion = null;
-            RefreshAll();
-            if (SelectedRegion is null)
-                SelectFirst();
         }
 
         [RelayCommand]
@@ -246,82 +229,6 @@ namespace ChartBuilder.ViewModels
             if (index >= Regions.Count)
                 index = 0;
             SelectRegion(Regions[index]);
-        }
-
-        [RelayCommand]
-        public void AddAtPlayhead()
-        {
-            long tick = _session.Snap.Nearest(_session.TickAt(_playback.PositionSeconds), _session.TempoMap);
-            long length = Math.Max(1, _session.Chart.Resolution * 4L);
-            AddPhrase(new Phrase(PhraseKind.StarPower, tick, length));
-        }
-
-        [RelayCommand(CanExecute = nameof(HasSelectedRegion))]
-        public void RemoveSelected()
-        {
-            if (SelectedRegion is { } selected)
-                RemoveRegion(selected);
-        }
-
-        private bool HasSelectedRegion() => SelectedRegion is not null;
-
-        /// <summary>Pauses the audio while a region is drawn or resized, so the highway doesn't move under the pointer.</summary>
-        public void StartDrawing()
-        {
-            if (_playback.IsPlaying && _playback.PlayPauseCommand.CanExecute(null))
-                _playback.PlayPauseCommand.Execute(null);
-        }
-
-        /// <summary>Adds a region drawn from <paramref name="startSeconds"/> to <paramref name="endSeconds"/>.</summary>
-        public void Draw(double startSeconds, double endSeconds)
-        {
-            long a = _session.Snap.Nearest(_session.TickAt(startSeconds), _session.TempoMap);
-            long b = _session.Snap.Nearest(_session.TickAt(endSeconds), _session.TempoMap);
-            if (a == b)
-                return;
-            AddPhrase(new Phrase(PhraseKind.StarPower, Math.Min(a, b), Math.Abs(b - a)));
-        }
-
-        /// <summary>Resizes the region at <paramref name="index"/> as its edge is dragged.</summary>
-        public void Resize(int index, double startSeconds, double endSeconds)
-        {
-            long a = _session.Snap.Nearest(_session.TickAt(startSeconds), _session.TempoMap);
-            long b = _session.Snap.Nearest(_session.TickAt(endSeconds), _session.TempoMap);
-            if (a == b)
-                return;
-            var phrase = new Phrase(PhraseKind.StarPower, Math.Min(a, b), Math.Abs(b - a));
-            var problems = _plan.Validate(phrase, index);
-            if (problems.IsBlocked())
-            {
-                StatusText = Describe(problems);
-                return;
-            }
-
-            if (_plan.Resize(index, phrase.Tick, phrase.Length) < 0)
-            {
-                StatusText = Describe(problems);
-                return;
-            }
-
-            StatusText = problems == StarPowerRegionProblem.None ? null : Describe(problems);
-            _dirty = true;
-            RefreshAll();
-            if (index < Regions.Count)
-                SelectRegionForEdit(Regions[index]);
-        }
-
-        /// <summary>Puts the regions back in time order after a resize, keeping the one selected.</summary>
-        public void EndResize()
-        {
-            var selected = SelectedRegion?.Region.Phrase;
-            _plan.Sort();
-            RefreshAll();
-            if (selected is { } phrase)
-            {
-                var region = Regions.FirstOrDefault(r => r.Region.Phrase == phrase);
-                if (region is not null)
-                    SelectRegionForEdit(region);
-            }
         }
 
         /// <summary>
@@ -396,30 +303,6 @@ namespace ChartBuilder.ViewModels
         private StarPowerPlan GeneratePlan() =>
             StarPowerPlan.Generate(_session.Chart, Part, Options, Mode, _span, _session.ReadOptions);
 
-        private void AddPhrase(Phrase phrase)
-        {
-            var problems = _plan.Validate(phrase);
-            if (problems.IsBlocked())
-            {
-                StatusText = Describe(problems);
-                return;
-            }
-
-            int index = _plan.Add(phrase);
-            if (index < 0)
-            {
-                StatusText = Describe(problems);
-                return;
-            }
-
-            StatusText = problems == StarPowerRegionProblem.None ? null : Describe(problems);
-            _dirty = true;
-            RefreshAll();
-            var added = Regions.FirstOrDefault(r => r.Region.Phrase == phrase);
-            if (added is not null)
-                SelectRegion(added);
-        }
-
         private void RefreshAll()
         {
             _coverage = _plan.Coverage(SampleCount());
@@ -428,7 +311,6 @@ namespace ChartBuilder.ViewModels
             RefreshOverview();
             RefreshSummary();
             OnPropertyChanged(nameof(CanApply));
-            RemoveSelectedCommand.NotifyCanExecuteChanged();
         }
 
         private int SampleCount() => Math.Clamp((int)Math.Round(Math.Max(0, _playback.LengthSeconds) * 4), 64, 2048);
@@ -487,7 +369,7 @@ namespace ChartBuilder.ViewModels
         private void RefreshOverview()
         {
             var proposals = Regions
-                .Select(r => new OverviewProposal(r.StartSeconds, r.EndSeconds, r.IsKept, r.IsSelected, r.IsAdded))
+                .Select(r => new OverviewProposal(r.StartSeconds, r.EndSeconds, r.IsKept))
                 .ToList();
             Overview = OverviewData.Of(
                 _session,
@@ -534,17 +416,5 @@ namespace ChartBuilder.ViewModels
             if (HasProposals)
                 EmptyText = null;
         }
-
-        private static string Describe(StarPowerRegionProblem problems) => problems switch
-        {
-            var p when p.HasFlag(StarPowerRegionProblem.Overlap) => Strings.StarPowerRegionOverlap,
-            var p when p.HasFlag(StarPowerRegionProblem.OutsideScope) => Strings.StarPowerRegionOutsideScope,
-            var p when p.HasFlag(StarPowerRegionProblem.InvalidLength) => Strings.StarPowerRegionNoLength,
-            var p when p.HasFlag(StarPowerRegionProblem.CrossesBigRockEnding) => Strings.StarPowerRegionBigRockEnding,
-            var p when p.HasFlag(StarPowerRegionProblem.CrossesSolo) => Strings.StarPowerRegionSoloWarning,
-            var p when p.HasFlag(StarPowerRegionProblem.CrossesSection) => Strings.StarPowerRegionSectionWarning,
-            var p when p.HasFlag(StarPowerRegionProblem.EmptyOnDifficulty) => Strings.StarPowerRegionEmptyWarning,
-            _ => Strings.StarPowerRegionNoLength,
-        };
     }
 }

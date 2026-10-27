@@ -36,7 +36,6 @@ namespace ChartBuilder.ViewModels
             Charged = charged;
             SelectCommand = new RelayCommand(() => _owner.SelectRegion(this));
             ToggleCommand = new RelayCommand(() => _owner.ToggleRegion(this));
-            RemoveCommand = new RelayCommand(() => _owner.RemoveRegion(this));
         }
 
         public int Index { get; }
@@ -54,8 +53,6 @@ namespace ChartBuilder.ViewModels
 
         /// <summary>Whether the kept star power gives enough meter to activate going into its hard passage.</summary>
         public bool Charged { get; }
-
-        public bool IsAdded => Region.Added;
 
         public bool IsLeadIn => Region.IsSpikeLeadIn;
 
@@ -86,8 +83,6 @@ namespace ChartBuilder.ViewModels
         public IRelayCommand SelectCommand { get; }
 
         public IRelayCommand ToggleCommand { get; }
-
-        public IRelayCommand RemoveCommand { get; }
     }
 
     /// <summary>Star power already in the chart, as the window lists it.</summary>

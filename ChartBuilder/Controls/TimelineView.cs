@@ -114,7 +114,6 @@ namespace ChartBuilder.Controls
         private const double ProposalMinWidth = 2;
         private static readonly IBrush KeptProposalBrush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(PhraseColors.Proposal, 0x40));
         private static readonly IBrush ProposalCapBrush = new ImmutableSolidColorBrush(PhraseColors.Proposal);
-        private static readonly IBrush AddedProposalCapBrush = new ImmutableSolidColorBrush(Color.FromRgb(0xFF, 0xB0, 0x40));
         private static readonly IPen DroppedProposalPen = new ImmutablePen(HighwayPalette.WithAlpha(PhraseColors.Proposal, 0x60).ToUInt32(), 1);
 
         // Star power the window is replacing, drawn muted.
@@ -578,7 +577,7 @@ namespace ChartBuilder.Controls
                     if (kept)
                     {
                         context.FillRectangle(KeptProposalBrush, column);
-                        context.FillRectangle(proposal.Added ? AddedProposalCapBrush : ProposalCapBrush, new Rect(x, top, w, ProposalCap));
+                        context.FillRectangle(ProposalCapBrush, new Rect(x, top, w, ProposalCap));
                     }
                     else
                     {

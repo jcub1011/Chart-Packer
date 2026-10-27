@@ -2165,42 +2165,11 @@ Saving also changes song.ini:
     <value>Keep at least one region to apply star power.</value>
   </data>
   <data name="StarPowerNoRegions" xml:space="preserve">
-    <value>No regions. Draw one on the highway, add one at the playhead, or regenerate.</value>
+    <value>No regions. Regenerate to propose some.</value>
   </data>
   <data name="StarPowerUnchargedFormat" xml:space="preserve">
     <value>{0} hard passage(s) not charged</value>
     <comment>{0} is how many hard passages the kept star power doesn't give enough meter for.</comment>
-  </data>
-  <data name="StarPowerRegionOverlap" xml:space="preserve">
-    <value>That region overlaps one that's kept.</value>
-  </data>
-  <data name="StarPowerRegionOutsideScope" xml:space="preserve">
-    <value>That region is outside the span star power is being proposed over.</value>
-  </data>
-  <data name="StarPowerRegionNoLength" xml:space="preserve">
-    <value>A region needs a length.</value>
-  </data>
-  <data name="StarPowerRegionBigRockEnding" xml:space="preserve">
-    <value>A region can't cross a big rock ending.</value>
-  </data>
-  <data name="StarPowerRegionSectionWarning" xml:space="preserve">
-    <value>Added, though it crosses a section.</value>
-  </data>
-  <data name="StarPowerRegionSoloWarning" xml:space="preserve">
-    <value>Added, though it reaches past a solo's edge.</value>
-  </data>
-  <data name="StarPowerRegionEmptyWarning" xml:space="preserve">
-    <value>Added, though it has no notes on a difficulty with notes (CHR065).</value>
-  </data>
-  <data name="StarPowerAddRegion" xml:space="preserve">
-    <value>Add at playhead</value>
-    <comment>Adds a star power region at the playhead, which can then be resized.</comment>
-  </data>
-  <data name="StarPowerAddRegionToolTip" xml:space="preserve">
-    <value>Add a region at the playhead; drag the highway to draw one, or drag its ends to resize it</value>
-  </data>
-  <data name="StarPowerRemoveRegion" xml:space="preserve">
-    <value>Remove</value>
   </data>
   <data name="StarPowerKeepAll" xml:space="preserve">
     <value>Keep all</value>
@@ -2211,6 +2180,10 @@ Saving also changes song.ini:
   </data>
   <data name="StarPowerKeepToolTip" xml:space="preserve">
     <value>Keep this region</value>
+  </data>
+  <data name="StarPowerRegionJumpToolTip" xml:space="preserve">
+    <value>Jump to this region</value>
+    <comment>Clicking a region in the star power window's list moves the playhead to it.</comment>
   </data>
   <data name="StarPowerDropAll" xml:space="preserve">
     <value>Drop all</value>
@@ -2246,8 +2219,9 @@ Saving also changes song.ini:
   <data name="StarPowerNotCharged" xml:space="preserve">
     <value>Not enough meter for its hard passage</value>
   </data>
-  <data name="StarPowerDrawHint" xml:space="preserve">
-    <value>Drag on the highway to draw a region; drag a region's end to resize it.</value>
+  <data name="StarPowerPreviewHeading" xml:space="preserve">
+    <value>Preview</value>
+    <comment>The star power window's preview controls.</comment>
   </data>
   <data name="StarPowerLookAheadLabel" xml:space="preserve">
     <value>Preview (seconds)</value>
