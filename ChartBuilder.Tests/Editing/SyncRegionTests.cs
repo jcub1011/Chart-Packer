@@ -8,7 +8,8 @@ namespace ChartBuilder.Tests.Editing;
 
 /// <summary>
 /// The Sync tool: a region drawn on a lane, whose edits are made again in every passage of the lane that matched it
-/// exactly when it was drawn, as one undoable step.
+/// exactly as it was last drawn, moved or resized, as one undoable step. A region is kept with nothing matching it,
+/// hashed in yellow, and is never shorter than a 32nd note.
 /// </summary>
 [TestClass]
 public sealed class SyncRegionTests
@@ -87,26 +88,29 @@ public sealed class SyncRegionTests
     }
 
     [TestMethod]
-    public void ARegionOfOneChordIsRefusedWithAWarning()
+    public void ARegionOfOneChordIsKept()
     {
         var session = WithRiffs(2);
         Lay(session, 0, new(0, 1, 0), new(0, 1, 1), new(0, 1, 2));
         Lay(session, 4 * Measure, new(0, 1, 0), new(0, 1, 1), new(0, 1, 2));
 
-        Assert.IsFalse(session.Sync.Define(GuitarExpert, 0, Measure), "Three notes in one chord are still one chord.");
+        Assert.IsTrue(session.Sync.Define(GuitarExpert, 0, Measure), "Three notes in one chord are still one chord, and a region of one chord is kept.");
 
-        Assert.IsFalse(session.Sync.IsActive);
-        Assert.IsNotNull(session.Status);
+        Assert.IsTrue(session.Sync.IsActive);
+        Assert.AreSequenceEqual([4 * Measure], session.Sync.Matches.ToList());
+        Assert.IsFalse(session.Sync.IsUnmatched);
     }
 
     [TestMethod]
-    public void ARegionNothingElseMatchesIsRefusedWithAWarning()
+    public void ARegionNothingElseMatchesIsKeptHashedAsUnmatched()
     {
         var session = WithRiffs(0);
 
-        Assert.IsFalse(session.Sync.Define(GuitarExpert, 0, Measure));
+        Assert.IsTrue(session.Sync.Define(GuitarExpert, 0, Measure), "A region with nothing to synchronize with is kept all the same.");
 
-        Assert.IsFalse(session.Sync.IsActive);
+        Assert.IsTrue(session.Sync.IsActive);
+        Assert.IsTrue(session.Sync.IsUnmatched);
+        Assert.IsEmpty(session.Sync.Matches);
         Assert.IsNotNull(session.Status);
     }
 
@@ -327,16 +331,223 @@ public sealed class SyncRegionTests
     }
 
     [TestMethod]
-    public void ARegionRefusedLeavesTheSyncToolPicked()
+    public void AClickWithTheSyncToolDrawsNothingAndLeavesTheSyncToolPicked()
     {
         var session = WithRiffs(0, 2);
         session.Tool = EditorTool.Sync;
 
-        DragFromTo(session, At(session, 0, 0), At(session, 240, 0));
+        Click(session, At(session, 480, 1));
 
         Assert.IsFalse(session.Sync.IsActive);
         Assert.AreEqual(EditorTool.Sync, session.Tool);
-        Assert.IsNotNull(session.Status);
+    }
+
+    [TestMethod]
+    public void ADrawnRegionShorterThanA32ndNoteIsDrawnOne32ndLong()
+    {
+        var session = WithRiffs(0, 2);
+        session.Snap = SnapGrid.Of(64);
+        session.Tool = EditorTool.Sync;
+
+        DragFromTo(session, At(session, 0, 0), At(session, 30, 0));
+
+        Assert.AreEqual((0L, 60L), session.Sync.Span, "A 32nd note is 60 ticks at 480 per beat.");
+    }
+
+    [TestMethod]
+    public void ADrawnRegionSnapsDownToA32ndNoteWhenThePointerIsNearItsShortest()
+    {
+        var session = WithRiffs(0, 2);
+        session.Tool = EditorTool.Sync;
+
+        DragFromTo(session, At(session, 0, 0), At(session, 80, 0));
+
+        Assert.AreEqual((0L, 60L), session.Sync.Span, "Nearer a 32nd note than the 16th the grid offers, the end snaps down to it.");
+    }
+
+    [TestMethod]
+    public void TheShortestRegionSnapsDownToA32ndNoteHoweverThePointerMoves()
+    {
+        var session = WithRiffs(0, 2);
+        SyncFirstMeasure(session);
+        session.Tool = EditorTool.Sync;
+
+        DragFromTo(session, At(session, Measure, 0), At(session, 80, 0));
+        Assert.AreEqual((0L, 60L), session.Sync.Span, "Near the minimum, the end snaps down to exactly a 32nd note.");
+
+        DragFromTo(session, At(session, 60, 0), At(session, 30, 0));
+        Assert.AreEqual((0L, 60L), session.Sync.Span, "Dragged past the minimum, it stays exactly a 32nd note.");
+    }
+
+    [TestMethod]
+    public void TheStartCantCrossTheEndOrLeaveLessThanA32ndNote()
+    {
+        var session = WithRiffs(0, 2);
+        session.Snap = SnapGrid.Of(64);
+        SyncFirstMeasure(session);
+        session.Tool = EditorTool.Sync;
+
+        DragFromTo(session, At(session, 0, 0), At(session, 1950, 0));
+
+        Assert.AreEqual((1860L, Measure), session.Sync.Span);
+    }
+
+    [TestMethod]
+    public void TheEndCantCrossTheStartOrLeaveLessThanA32ndNote()
+    {
+        var session = WithRiffs(0, 2);
+        session.Snap = SnapGrid.Of(64);
+        SyncFirstMeasure(session);
+        session.Tool = EditorTool.Sync;
+
+        DragFromTo(session, At(session, Measure, 0), At(session, 30, 0));
+
+        Assert.AreEqual((0L, 60L), session.Sync.Span);
+    }
+
+    [TestMethod]
+    public void DraggingTheBodyMovesTheRegionAndFindsTheMatchesThereAgain()
+    {
+        var session = WithRiffs(0, 1, 2);
+        SyncFirstMeasure(session);
+        session.Tool = EditorTool.Sync;
+
+        DragFromTo(session, At(session, 960, 2), At(session, 960 + Measure, 2));
+
+        Assert.AreEqual((Measure, 2 * Measure), session.Sync.Span);
+        Assert.AreSequenceEqual([0L, 2 * Measure], session.Sync.Matches.ToList());
+    }
+
+    [TestMethod]
+    public void ClickingAMatchedPassageMakesItTheNewSource()
+    {
+        var session = WithRiffs(0, 2, 4);
+        SyncFirstMeasure(session);
+        session.Tool = EditorTool.Sync;
+
+        Click(session, At(session, (2 * Measure) + 480, 1));
+
+        Assert.AreEqual((2 * Measure, 3 * Measure), session.Sync.Span);
+        Assert.AreSequenceEqual([0L, 4 * Measure], session.Sync.Matches.ToList());
+        Assert.IsFalse(session.Sync.IsUnmatched);
+    }
+
+    [TestMethod]
+    public void HoldingCtrlAndShiftDrawsWithoutPickingTheSyncTool()
+    {
+        var session = WithRiffs(0, 2);
+        session.Tool = EditorTool.Place;
+
+        DragFromTo(session, At(session, 10, 3), At(session, 1910, 3), EditorModifiers.Control | EditorModifiers.Shift);
+
+        Assert.IsTrue(session.Sync.IsActive);
+        Assert.AreEqual((0L, Measure), session.Sync.Span);
+        Assert.AreEqual(EditorTool.Place, session.Tool, "Ctrl + Shift holds the Sync tool only while they're held.");
+    }
+
+    [TestMethod]
+    public void HoldingCtrlAndShiftAlsoResizesMovesAndMakesANewSource()
+    {
+        var session = WithRiffs(0, 2, 4);
+        SyncFirstMeasure(session);
+        session.Tool = EditorTool.Place;
+        var held = EditorModifiers.Control | EditorModifiers.Shift;
+
+        Click(session, At(session, (2 * Measure) + 480, 1), held);
+        Assert.AreEqual((2 * Measure, 3 * Measure), session.Sync.Span, "A click on a synced passage makes it the source.");
+
+        DragFromTo(session, At(session, 3 * Measure, 2), At(session, 30, 2), held);
+        Assert.AreEqual((2 * Measure, (2 * Measure) + 60), session.Sync.Span, "A drag of the region's end resizes it, never shorter than a 32nd note.");
+
+        DragFromTo(session, At(session, (2 * Measure) + 30, 2), At(session, (2 * Measure) + 30 - Measure, 2), held);
+        Assert.AreEqual((Measure, Measure + 60), session.Sync.Span, "A drag of the region's body moves it.");
+        Assert.AreEqual(EditorTool.Place, session.Tool);
+    }
+
+    [TestMethod]
+    public void TheSyncLineIsWhereANewRegionWouldStart()
+    {
+        var session = WithRiffs(0, 2);
+        session.Tool = EditorTool.Sync;
+
+        Assert.AreEqual(120L, session.Tools.SyncDrawStart(At(session, 130, 1)), "The grid step the press would snap to.");
+        Assert.AreEqual(0L, session.Tools.SyncDrawStart(At(session, 10, 1)), "None before the start.");
+        Assert.IsNull(session.Tools.SyncDrawStart(At(session, 130, 1), EditorModifiers.Shift), "Shift alone lends any tool the select tool's press.");
+        Assert.IsNull(session.Tools.SyncDrawStart(RailAt(session, 130, RailKind.DiscoFlip)), "Only in the lanes.");
+    }
+
+    [TestMethod]
+    public void TheSyncLineIsGoneWhereAPressTakesHoldOfTheRegion()
+    {
+        var session = WithRiffs(0, 2, 4);
+        SyncFirstMeasure(session);
+        session.Tool = EditorTool.Sync;
+
+        Assert.IsNull(session.Tools.SyncDrawStart(At(session, 0, 0)), "On the region's start, a drag resizes it.");
+        Assert.IsNull(session.Tools.SyncDrawStart(At(session, Measure, 0)), "On its end too.");
+        Assert.IsNull(session.Tools.SyncDrawStart(At(session, 960, 1)), "On its body, a drag moves it.");
+        Assert.IsNull(session.Tools.SyncDrawStart(At(session, (2 * Measure) + 480, 1)), "On a passage synced with it, a click makes it the source.");
+        Assert.AreEqual(3 * Measure, session.Tools.SyncDrawStart(At(session, (3 * Measure) + 10, 1)), "Elsewhere, a drag draws a new region.");
+    }
+
+    [TestMethod]
+    public void TheSyncLineFollowsCtrlShiftWithoutPickingTheTool()
+    {
+        var session = WithRiffs(0, 2);
+        session.Tool = EditorTool.Place;
+
+        Assert.IsNull(session.Tools.SyncDrawStart(At(session, 130, 1)), "Another tool's press draws nothing.");
+        Assert.AreEqual(120L, session.Tools.SyncDrawStart(At(session, 130, 1), EditorModifiers.Control | EditorModifiers.Shift), "Ctrl + Shift picks the Sync tool up.");
+    }
+
+    [TestMethod]
+    public void TheSyncToolDoesntDeleteNotes()
+    {
+        var session = WithRiffs(0, 2);
+        SyncFirstMeasure(session);
+        session.Selection.Select(GuitarExpert, [Expert(session).Notes[0]]);
+        session.Tool = EditorTool.Sync;
+
+        session.Tools.DeleteSelection();
+
+        Assert.AreSequenceEqual(Riff, NotesOfMeasureAt(session, 0));
+        Assert.AreSequenceEqual(Riff, NotesOfMeasureAt(session, 2 * Measure), "A delete in the region would go through every match.");
+
+        session.Tool = EditorTool.Place;
+        session.Tools.HoldKeys(EditorModifiers.Control | EditorModifiers.Shift);
+        session.Tools.DeleteSelection();
+        session.Tools.HoldKeys(EditorModifiers.None);
+
+        Assert.AreSequenceEqual(Riff, NotesOfMeasureAt(session, 0), "Held on with Ctrl + Shift, the Sync tool doesn't delete either.");
+        Assert.AreSequenceEqual(Riff, NotesOfMeasureAt(session, 2 * Measure));
+    }
+
+    [TestMethod]
+    public void NumberKeysDontRemoveNotesWithTheSyncToolActive()
+    {
+        var session = WithRiffs(0, 2);
+        SyncFirstMeasure(session);
+        session.Tool = EditorTool.Sync;
+        session.MoveCursorTo(480);
+
+        session.Tools.ToggleNoteAtCursor(1);
+
+        Assert.AreSequenceEqual(Riff, NotesOfMeasureAt(session, 0));
+        Assert.AreSequenceEqual(Riff, NotesOfMeasureAt(session, 2 * Measure));
+    }
+
+    [TestMethod]
+    public void TheMiddleButtonTakesTheRegionAwayRatherThanErasingNotes()
+    {
+        var session = WithRiffs(0, 2);
+        SyncFirstMeasure(session);
+        session.Tool = EditorTool.Sync;
+
+        session.Tools.PressErase(At(session, 480, 1));
+
+        Assert.IsFalse(session.Sync.IsActive);
+        Assert.AreSequenceEqual(Riff, NotesOfMeasureAt(session, 0));
+        Assert.AreSequenceEqual(Riff, NotesOfMeasureAt(session, 2 * Measure));
     }
 
     [TestMethod]

@@ -77,6 +77,14 @@ namespace ChartBuilder.Controls
         private static readonly IBrush SyncRegionBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x30, 0xFF, 0x7A, 0x1A));
         private static readonly IPen SyncRegionPen = new ImmutablePen(Color.FromArgb(0xE0, 0xFF, 0x7A, 0x1A).ToUInt32(), 1);
 
+        // A synchronized region nothing matched, hashed in yellow instead.
+        private static readonly IBrush SyncUnmatchedBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x22, 0xE6, 0xC8, 0x00));
+        private static readonly IPen SyncUnmatchedPen = new ImmutablePen(Color.FromArgb(0xE0, 0xE6, 0xC8, 0x00).ToUInt32(), 1);
+        private static readonly IPen SyncHashPen = new ImmutablePen(Color.FromArgb(0x90, 0xE6, 0xC8, 0x00).ToUInt32(), 1);
+
+        // How far apart a region nothing matched's hash lines are drawn, in pixels.
+        private const double SyncHashGap = 5;
+
         // The ghosts of a run of Generate fills or Generate star power, over everything else, so they're easy to find: a kept
         // one's a faint amber column the height of the overview, capped solid; a dropped one's only a faint outline.
         private const double ProposalCap = 4;
@@ -437,13 +445,15 @@ namespace ChartBuilder.Controls
 
             double width = bounds.Width;
             double top = BodyTop;
-            foreach (var (start, end, isRegion) in overview.Synced)
+            foreach (var (start, end, isRegion, unmatched) in overview.Synced)
             {
                 var band = new Rect(XOf(start, width), top, Math.Max(1, XOf(end, width) - XOf(start, width)), bounds.Bottom - top);
-                if (isRegion)
-                    context.DrawRectangle(SyncRegionBrush, SyncRegionPen, band.Deflate(0.5));
-                else
+                if (!isRegion)
                     context.FillRectangle(SyncedBrush, band);
+                else if (unmatched)
+                    DrawSyncHash(context, band);
+                else
+                    context.DrawRectangle(SyncRegionBrush, SyncRegionPen, band.Deflate(0.5));
             }
 
             DrawNotes(context, overview, width, top + (overview.Rows.Count * (BandHeight + BandGap)), bounds.Bottom);
@@ -500,6 +510,17 @@ namespace ChartBuilder.Controls
                         context.DrawRectangle(null, DroppedProposalPen, column.Deflate(0.5));
                     }
                 }
+            }
+        }
+
+        /// <summary>A synchronized region nothing matched, hashed in yellow.</summary>
+        private static void DrawSyncHash(DrawingContext context, Rect band)
+        {
+            context.DrawRectangle(SyncUnmatchedBrush, SyncUnmatchedPen, band.Deflate(0.5));
+            using (context.PushClip(band))
+            {
+                for (double x = band.Left - band.Height; x < band.Right; x += SyncHashGap)
+                    context.DrawLine(SyncHashPen, new Point(x, band.Bottom), new Point(x + band.Height, band.Top));
             }
         }
 

@@ -19,6 +19,7 @@ public sealed partial class EditorTools
     private const string NoDiscoFlipLength = "A disco flip section has to end after it starts.";
     private const string DiscoFlipOffPro = "Only Pro drums have disco flip.";
     private const string DiscoFlipWithoutEnd = "This disco flip section never ends, as the file has it, so it can't be moved or have its start changed. Give it an end first.";
+    private const string SyncToolKeeps = "The Sync tool doesn't delete anything; pick another tool to delete.";
 
     // The markings a chord's type is one of, natural having none (SetChordType).
     private static readonly ChordFlags[] ChordTypeFlags = [ChordFlags.ForceHopo, ChordFlags.ForceStrum, ChordFlags.Tap];
@@ -29,6 +30,9 @@ public sealed partial class EditorTools
     // The modifier keys held as the gesture last moved, which some gestures read as they go.
     private EditorModifiers _modifiers;
 
+    // The modifier keys held, as last taken in with no button down (HoldKeys), which say whether the Sync tool is held on.
+    private EditorModifiers _held;
+
     // Whether a press with Shift held has started the selection afresh, so those after it, while Shift stays down, add to it.
     private bool _shiftSelecting;
 
@@ -36,6 +40,19 @@ public sealed partial class EditorTools
 
     /// <summary>Whether a gesture is going on.</summary>
     public bool IsActive => _gesture is not null;
+
+    /// <summary>Whether the Sync tool is active: picked, or held on with Ctrl + Shift.</summary>
+    public bool SyncActive => _session.Tool == EditorTool.Sync
+        || (_held.HasFlag(EditorModifiers.Control) && _held.HasFlag(EditorModifiers.Shift));
+
+    /// <summary>
+    /// Whether a press with <paramref name="modifiers"/> held is the Sync tool's: the tool picked, or Ctrl + Shift held,
+    /// which picks it up for as long as they're held. With Shift alone held, whatever the tool, the press is the select
+    /// tool's.
+    /// </summary>
+    public bool IsSyncPress(EditorModifiers modifiers) =>
+        (modifiers.HasFlag(EditorModifiers.Control) && modifiers.HasFlag(EditorModifiers.Shift))
+        || (_session.Tool == EditorTool.Sync && !modifiers.HasFlag(EditorModifiers.Shift));
 
     private EditableChart Chart => _session.Chart;
 
@@ -88,9 +105,10 @@ public sealed partial class EditorTools
     /// Starts a gesture at <paramref name="point"/> with the current tool; in the phrase rail, with any tool but the erase
     /// tool, a gesture on the phrase there (charter-spec C8). Pressed on a selected note with Ctrl, a drag lengthens or
     /// shortens each selected note's sustain by the same grid steps; with Alt, it lays a run of each, as many steps as
-    /// dragged. With Shift, any tool selects as the select tool does, the first press while Shift is held selecting afresh.
-    /// The place tool puts a note down as <see cref="EditorSession.Placing"/> has it, Alt swapping a fret for an open note
-    /// or the kick, and Ctrl a run for a sustain.
+    /// dragged. With Shift, any tool selects as the select tool does, the first press while Shift is held selecting afresh;
+    /// Ctrl + Shift held instead picks up the Sync tool's press for as long as they're held. The place tool puts a note
+    /// down as <see cref="EditorSession.Placing"/> has it, Alt swapping a fret for an open note or the kick, and Ctrl a run
+    /// for a sustain.
     /// </summary>
     public void Press(ChartPoint point, EditorModifiers modifiers = EditorModifiers.None)
     {
@@ -107,6 +125,14 @@ public sealed partial class EditorTools
             // The erase tool erases there too, as it shows; a proposed phrase's ghost is still kept or dropped.
             bool erases = _session.Tool == EditorTool.Erase && !shift && _session.Proposals?.HitTest(point) is null;
             _gesture = erases ? new EraseGesture(this, point) : PressRail(point, shift);
+            return;
+        }
+
+        // The Sync tool's press, or Ctrl + Shift held, which picks the Sync tool up for as long as they're held. It wins
+        // over Shift's and Ctrl's presses of their own.
+        if (IsSyncPress(modifiers))
+        {
+            _gesture = point.Lane is null ? null : PressSync(point);
             return;
         }
 
@@ -140,15 +166,65 @@ public sealed partial class EditorTools
             EditorTool.Erase => new EraseGesture(this, point),
             EditorTool.Phrase => PhraseDrawStart(point) is { } from ? PressDraw(point.Track, from) : null,
             EditorTool.Tempo => PressTempo(point),
-            EditorTool.Sync => point.Lane is null ? null : new SyncGesture(this, point),
             _ => null,
         };
     }
 
     /// <summary>
+    /// A press with the Sync tool, or Ctrl + Shift held, in the lanes: on the synchronized region's end, a drag resizes
+    /// it; on its body, a drag moves it; on a passage synced with it, a click makes that passage the region's source;
+    /// anywhere else, a drag draws a new region in place of any drawn.
+    /// </summary>
+    private Gesture PressSync(ChartPoint point) => SyncHitOf(point) switch
+    {
+        { Grip: SyncGrip.Match } hit => new SyncGesture(this, point, hit.Start),
+        { Grip: SyncGrip.Start } => new SyncResizeGesture(this, point, start: true),
+        { Grip: SyncGrip.End } => new SyncResizeGesture(this, point, start: false),
+        { Grip: SyncGrip.Body } => new SyncMoveGesture(this, point),
+        _ => new SyncGesture(this, point),
+    };
+
+    /// <summary>
+    /// What a press at <paramref name="point"/> takes hold of on the synchronized region: an end to resize it, its body
+    /// to move it, or a passage synced with it to make the region's source (<see cref="SyncGrip.Match"/>, at the
+    /// passage's start). Null where there's nothing to take hold of: a press draws a new region.
+    /// </summary>
+    public SyncHit? SyncHitOf(ChartPoint point)
+    {
+        var sync = _session.Sync;
+        if (!sync.IsActive || point.Track != sync.Track || sync.Span is not var (from, to))
+            return null;
+        long length = to - from;
+        foreach (long start in sync.Matches)
+        {
+            if (point.Tick >= start && point.Tick < start + length)
+                return new SyncHit(SyncGrip.Match, start);
+        }
+
+        if (Math.Abs(point.Tick - from) <= point.Tolerance)
+            return new SyncHit(SyncGrip.Start, from);
+        if (Math.Abs(point.Tick - to) <= point.Tolerance)
+            return new SyncHit(SyncGrip.End, to);
+        return point.Tick > from && point.Tick < to ? new SyncHit(SyncGrip.Body, from) : null;
+    }
+
+    /// <summary>
+    /// Where a press at <paramref name="point"/>, with <paramref name="modifiers"/> held, starts drawing a new
+    /// synchronized region: the grid step nearest it. Null where a press does something else: one that takes hold of the
+    /// region or of a passage synced with it (<see cref="SyncHitOf"/>), one in the rail, or one that isn't the Sync
+    /// tool's press (<see cref="IsSyncPress"/>).
+    /// </summary>
+    public long? SyncDrawStart(ChartPoint point, EditorModifiers modifiers = EditorModifiers.None)
+    {
+        if (!IsSyncPress(modifiers) || point.Lane is null || Chart.PartOf(point.Track.Instrument) is null)
+            return null;
+        return SyncHitOf(point) is null ? Snap.Nearest(point.Tick, Map) : null;
+    }
+
+    /// <summary>
     /// Starts erasing at <paramref name="point"/>, as the middle button does: each note the pointer passes over goes, and
     /// in the phrase rail each phrase or disco flip section, as one step. With the Tempo tool, it removes the tempo marker
-    /// there instead.
+    /// there instead. With the Sync tool active, it takes the synchronized region away rather than erasing anything.
     /// </summary>
     public void PressErase(ChartPoint point)
     {
@@ -157,6 +233,12 @@ public sealed partial class EditorTools
         _session.Focused = point.Track;
         if (_session.TrackOf(point.Track) is null)
             return;
+        if (SyncActive)
+        {
+            _session.Sync.Clear();
+            return;
+        }
+
         if (_session.Tool == EditorTool.Tempo)
             RemoveTempoNear(point.Tick, point.Tolerance);
         else
@@ -187,10 +269,11 @@ public sealed partial class EditorTools
 
     /// <summary>
     /// Takes note of the modifier keys held while no button is down: once Shift is let go, the next press with Shift
-    /// selects afresh.
+    /// selects afresh, and whether the Sync tool is held on with Ctrl + Shift is kept up.
     /// </summary>
     public void HoldKeys(EditorModifiers modifiers)
     {
+        _held = modifiers;
         if (!modifiers.HasFlag(EditorModifiers.Shift))
             _shiftSelecting = false;
     }
@@ -238,7 +321,8 @@ public sealed partial class EditorTools
     /// <summary>
     /// Places a note in <paramref name="shown"/>'s column at the cursor of the focused lane, or removes the one there
     /// (charter-spec §9: 1–5, and 0 for an open note or the kick). Inside a disco flip section, it's the pad drawn in that
-    /// column (C6 item 7), so 2 places red. A note placed leaves nothing selected.
+    /// column (C6 item 7), so 2 places red. A note placed leaves nothing selected. One there isn't removed while the Sync
+    /// tool is active.
     /// </summary>
     public void ToggleNoteAtCursor(int shown)
     {
@@ -248,6 +332,12 @@ public sealed partial class EditorTools
         int lane = _session.StoredLane(key, tick, shown);
         if (track.TryGetNote(tick, lane, doubleKick: false, out var note))
         {
+            if (SyncActive)
+            {
+                _session.Status = SyncToolKeeps;
+                return;
+            }
+
             _session.Execute(new RemoveNotes(key.Instrument, key.Difficulty, [note]));
             return;
         }
@@ -309,10 +399,16 @@ public sealed partial class EditorTools
 
     /// <summary>
     /// Deletes the selected notes, phrases, disco flip sections and tempo markers (Delete), or a vocal part's notes and
-    /// phrases, as one step.
+    /// phrases, as one step. Nothing is deleted while the Sync tool is active.
     /// </summary>
     public void DeleteSelection()
     {
+        if (SyncActive)
+        {
+            _session.Status = SyncToolKeeps;
+            return;
+        }
+
         var selection = _session.Selection;
         var steps = new List<Func<(IChartCommand?, string?)>>();
         if (DeleteVocalsStep() is { } vocals)
