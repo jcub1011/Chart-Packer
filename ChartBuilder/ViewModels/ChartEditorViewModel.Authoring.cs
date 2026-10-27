@@ -39,6 +39,7 @@ namespace ChartBuilder.ViewModels
         // Generate fills' and Generate star power's options, as last picked.
         private FillOptions _fillOptions = FillOptions.Default;
         private StarPowerOptions _starPowerOptions = StarPowerOptions.Default;
+        private StarPowerMode _starPowerMode = StarPowerMode.Replace;
 
         /// <summary>The ways record mode can put a pass in: merged with what's there, or over it.</summary>
         public IReadOnlyList<RecordModeChoice> RecordModeChoices { get; } =
@@ -386,22 +387,23 @@ namespace ChartBuilder.ViewModels
         }
 
         /// <summary>
-        /// Opens Generate star power's options (charter-spec C8 item 1), from the Edit menu of a lane of
-        /// <paramref name="part"/>, and proposes star power for it with the options picked, over the span of a selection of
-        /// the part or the whole part. The options are kept while the editor is open, so the next run starts from the last
-        /// one's.
+        /// Opens Generate star power's window (charter-spec C8 item 1), from the Edit menu of a lane of
+        /// <paramref name="part"/>, to review the layout it proposes over the span of a selection of the part or the whole
+        /// part, then apply the kept regions or cancel. The options and mode are kept while the editor is open, so the next
+        /// run starts from the last one's.
         /// </summary>
         public async Task GenerateStarPowerAsync(ChartInstrument part)
         {
             if (_dialogs is null)
                 return;
             Session.Tools.Cancel();
+            Session.Fills.Cancel();
             var span = Session.Selection.SpanIn(part);
-            var options = new GenerateStarPowerViewModel(part, _starPowerOptions, overSelection: span is not null);
-            if (!await _dialogs.AskGenerateStarPowerAsync(options))
+            var viewModel = new GenerateStarPowerViewModel(this, part, _starPowerOptions, overSelection: span is not null, _starPowerMode);
+            if (!await _dialogs.ShowStarPowerGeneratorAsync(viewModel))
                 return;
-            _starPowerOptions = options.Options;
-            Session.StarPower.Start(part, _starPowerOptions, span);
+            _starPowerOptions = viewModel.Options;
+            _starPowerMode = viewModel.Mode;
         }
 
         /// <summary>Opens the highway preview in a window of its own (charter-spec C18).</summary>

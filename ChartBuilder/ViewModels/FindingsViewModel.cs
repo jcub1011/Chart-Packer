@@ -310,12 +310,12 @@ namespace ChartBuilder.ViewModels
 
             var session = _editor.Session;
 
-            // A run with the defaults over the whole part, worked out only when it's picked: the ghosts are the charter's to
-            // keep or drop before Add.
+            // Generate star power's window with the defaults over the whole part, where the charter keeps or drops the
+            // regions and applies them.
             if (finding.RuleId == ChrRules.Chr066)
             {
                 return finding.Location is { } noStarPower
-                    ? [new FindingFix(null, () => session.StarPower.Start(noStarPower.Part, StarPowerOptions.Default, null), null, null)]
+                    ? [new FindingFix(null, () => _ = _editor.GenerateStarPowerAsync(noStarPower.Part), null, null)]
                     : [];
             }
 

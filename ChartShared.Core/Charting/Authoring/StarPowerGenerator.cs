@@ -4,6 +4,16 @@ using ChartShared.Core.Charts;
 
 namespace ChartShared.Core.Charting.Authoring;
 
+/// <summary>What Generate star power does with the star power a part already has.</summary>
+public enum StarPowerMode
+{
+    /// <summary>It replaces the star power in the span: the phrases there are removed when the kept proposals are added.</summary>
+    Replace,
+
+    /// <summary>It adds its phrases alongside the star power there, keeping clear of it.</summary>
+    Add,
+}
+
 /// <summary>What the author picks for a run of Generate star power (charter-spec C8 item 1).</summary>
 /// <param name="SpacingSeconds">About how far apart phrases are, in seconds of the part's playing: its long rests don't count.</param>
 /// <param name="PlanForSpikes">
@@ -138,6 +148,9 @@ public enum NoStarPowerReason
 
     /// <summary>No spot fits: none has enough notes clear of sections, solos' edges and the phrases already there.</summary>
     NoSpotFits,
+
+    /// <summary>The part has star power already, and the run adds alongside it over the whole part.</summary>
+    HasStarPower,
 }
 
 /// <summary>What <see cref="StarPowerGenerator.Propose"/> proposed, the hard passages it found, and the difficulty it read.</summary>
@@ -146,7 +159,7 @@ public sealed record StarPowerGeneration(IReadOnlyList<StarPowerProposal> Propos
 
 /// <summary>
 /// Generate star power (charter-spec C8 item 1): proposes star power phrases for a 5-fret or keys part, over a span of it
-/// or all of it, which the author then keeps or drops (<see cref="Editing.StarPowerProposals"/>), or the library adds for
+/// or all of it, which the author then keeps or drops (<see cref="Editing.StarPowerPlan"/>), or the library adds for
 /// CHR066's fix (<see cref="Validation.SongDifficultyGeneration"/>). It changes nothing.
 /// </summary>
 /// <remarks>
@@ -201,12 +214,14 @@ public static class StarPowerGenerator
     }
 
     /// <summary>
-    /// Proposes star power phrases for <paramref name="part"/> of <paramref name="chart"/>. Star power already there stays:
-    /// proposals keep clear of it, and it counts towards the meter and the spacing.
+    /// Proposes star power phrases for <paramref name="part"/> of <paramref name="chart"/>. In <see cref="StarPowerMode.Add"/>,
+    /// star power already there stays: proposals keep clear of it, and it counts towards the meter and the spacing. In
+    /// <see cref="StarPowerMode.Replace"/>, it's ignored, as the kept proposals will replace it.
     /// </summary>
     /// <param name="readOptions">How the song's HOPOs and sustains are read (the defaults when null).</param>
     /// <param name="span">The ticks a phrase must lie within; the whole part when null.</param>
-    public static StarPowerGeneration Propose(EditableChart chart, ChartInstrument part, StarPowerOptions options, ChartReadOptions? readOptions = null, (long From, long To)? span = null, StarPowerParameters? parameters = null)
+    /// <param name="mode">What the proposals do with the star power already in the span.</param>
+    public static StarPowerGeneration Propose(EditableChart chart, ChartInstrument part, StarPowerOptions options, ChartReadOptions? readOptions = null, (long From, long To)? span = null, StarPowerParameters? parameters = null, StarPowerMode mode = StarPowerMode.Add)
     {
         ArgumentNullException.ThrowIfNull(chart);
         ArgumentNullException.ThrowIfNull(options);
@@ -218,7 +233,7 @@ public static class StarPowerGenerator
         if (chart.PartOf(part) is not { } whole || DifficultyGenerator.HighestCharted(whole) is not { } highest)
             return new StarPowerGeneration([], [], null, NoStarPowerReason.NoNotes);
 
-        var context = StarPowerContext.Of(chart, whole, highest, span, p);
+        var context = StarPowerContext.Of(chart, whole, highest, span, p, mode);
         var spikes = options.PlanForSpikes
             ? StarPowerSpikes.Find(context, DifficultyNotes.Of(GameTrack(chart, context.Source, readOptions ?? ChartReadOptions.Default), context.Map, DifficultyNotes.EndTickOf(chart)))
             : [];
@@ -264,16 +279,24 @@ internal sealed record StarPowerContext(
     TempoMap Map,
     StarPowerTimeline Timeline,
     StarPowerParameters Parameters,
+    StarPowerMode Mode,
     (long From, long To)? Span,
     long From,
     long To)
 {
     public int Resolution => Map.Resolution;
 
+    /// <summary>Whether the phrases proposed replace the star power already there, rather than keeping clear of it.</summary>
+    public bool ReplacingStarPower => Mode == StarPowerMode.Replace;
+
+    /// <summary>Whether <paramref name="phrase"/> is star power the plan replaces: it's wholly inside the span, or the whole part is.</summary>
+    public bool Replaces(Phrase phrase) =>
+        ReplacingStarPower && (Span is not { } span || (phrase.Tick >= span.From && phrase.CoverEnd - 1 <= span.To));
+
     /// <summary>The tick of the source's last chord.</summary>
     public long LastChordTick => Chords[^1].Tick;
 
-    public static StarPowerContext Of(EditableChart chart, EditablePart part, ChartDifficulty highest, (long From, long To)? span, StarPowerParameters p)
+    public static StarPowerContext Of(EditableChart chart, EditablePart part, ChartDifficulty highest, (long From, long To)? span, StarPowerParameters p, StarPowerMode mode = StarPowerMode.Add)
     {
         var source = part[highest];
         var others = part.Tracks.Where(t => t.Difficulty != highest && t.Notes.Count > 0).ToList();
@@ -284,6 +307,6 @@ internal sealed record StarPowerContext(
         var timeline = new StarPowerTimeline(map, chords, p);
         long from = Math.Max(chords[0].Tick, span?.From ?? long.MinValue);
         long to = Math.Min(chords[^1].Tick, span?.To ?? long.MaxValue);
-        return new StarPowerContext(part, source, others, chords, runs, sections, map, timeline, p, span, from, Math.Max(from, to));
+        return new StarPowerContext(part, source, others, chords, runs, sections, map, timeline, p, mode, span, from, Math.Max(from, to));
     }
 }

@@ -5,9 +5,8 @@ namespace ChartShared.Core.Charting.Editing;
 
 /// <summary>
 /// A run of phrases a generator proposed for one part, drawn as ghosts, each kept or dropped by the author, until the kept
-/// ones are added as one undoable step or the run is cancelled: Generate fills (<see cref="FillProposals"/>) and Generate
-/// star power (<see cref="StarPowerProposals"/>). Phrases are never added without the author's say. One run goes on at a
-/// time (<see cref="EditorSession.Proposals"/>): starting one ends the other.
+/// ones are added as one undoable step or the run is cancelled: Generate fills (<see cref="FillProposals"/>). Phrases are
+/// never added without the author's say.
 /// </summary>
 /// <remarks>
 /// The proposals were worked out from the chart as it was, so any change to the chart but the run's own, or to the
@@ -171,7 +170,6 @@ public abstract class PhraseProposals
     {
         Session.Tools.Cancel();
         Session.Fills.Cancel();
-        Session.StarPower.Cancel();
     }
 
     /// <summary>Starts the run with <paramref name="phrases"/>, earliest first, every one kept.</summary>

@@ -20,6 +20,22 @@ using ChartShared.UI.Controls.Highway;
 
 namespace ChartBuilder.Controls
 {
+    /// <summary>A point of the star power meter over the song, as the meter ribbon draws it.</summary>
+    public readonly record struct StarPowerMeterPoint(double Seconds, double Meter, bool Active);
+
+    /// <summary>A hard passage and whether the kept star power can be activated going into it.</summary>
+    public readonly record struct StarPowerSpikeMark(double Seconds, bool Charged);
+
+    /// <summary>
+    /// What the star power window's timeline adds to the editor's: the meter ribbon, the hard passages, and which proposed
+    /// region is selected.
+    /// </summary>
+    public sealed record StarPowerTimelineExtras(
+        IReadOnlyList<StarPowerMeterPoint> Meter,
+        IReadOnlyList<StarPowerSpikeMark> Spikes,
+        int? SelectedProposal,
+        double ActivationThreshold = 0.5);
+
     /// <summary>
     /// The editor's timeline: second marks, the whole mix's waveform, the chart's beat and measure lines, its tempo and
     /// time signature changes, and a playhead that clicking or dragging moves (scrubbing), and the wheel moves a bar at a
@@ -98,13 +114,28 @@ namespace ChartBuilder.Controls
         private const double ProposalMinWidth = 2;
         private static readonly IBrush KeptProposalBrush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(PhraseColors.Proposal, 0x40));
         private static readonly IBrush ProposalCapBrush = new ImmutableSolidColorBrush(PhraseColors.Proposal);
+        private static readonly IBrush AddedProposalCapBrush = new ImmutableSolidColorBrush(Color.FromRgb(0xFF, 0xB0, 0x40));
         private static readonly IPen DroppedProposalPen = new ImmutablePen(HighwayPalette.WithAlpha(PhraseColors.Proposal, 0x60).ToUInt32(), 1);
+
+        // Star power the window is replacing, drawn muted.
+        private static readonly IBrush ReplacedBandBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x40, 0x9E, 0x9E, 0x9E));
 
         // The lint marks: a short tick up from the ruler's foot, coloured by severity, errors drawn last so they show.
         private const double MarkHeight = 6;
         private static readonly IBrush ErrorMarkBrush = new ImmutableSolidColorBrush(Color.FromRgb(0xF8, 0x71, 0x71));
         private static readonly IBrush WarningMarkBrush = new ImmutableSolidColorBrush(Color.FromRgb(0xFB, 0xBF, 0x24));
         private static readonly IBrush InfoMarkBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xC0, 0x93, 0xC5, 0xFD));
+
+        // The star power window's extras: the meter ribbon along the bottom, and the hard passages as triangles at the top.
+        private const double MeterHeight = 20;
+        private static readonly IBrush MeterBackgroundBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xB0, 0x08, 0x08, 0x10));
+        private static readonly IBrush MeterFillBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x80, 0x7F, 0xE9, 0xFF));
+        private static readonly IPen MeterPen = new ImmutablePen(Color.FromArgb(0xE0, 0x7F, 0xE9, 0xFF).ToUInt32(), 1);
+        private static readonly IPen MeterThresholdPen = new ImmutablePen(Color.FromArgb(0x80, 0xFF, 0xFF, 0xFF).ToUInt32(), 1, new ImmutableDashStyle([3, 3], 0));
+        private static readonly IBrush SpikeChargedBrush = new ImmutableSolidColorBrush(Color.FromRgb(0xFF, 0xB0, 0x40));
+        private static readonly IBrush SpikeUnchargedBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x20, 0xFF, 0xB0, 0x40));
+        private static readonly IPen SpikePen = new ImmutablePen(Color.FromRgb(0xFF, 0xB0, 0x40).ToUInt32(), 1);
+        private static readonly IPen SelectedProposalPen = new ImmutablePen(Colors.White.ToUInt32(), 2);
 
         private readonly PlayheadLayer _playhead;
         private Pen? _tickPen;
@@ -192,11 +223,14 @@ namespace ChartBuilder.Controls
         public static readonly StyledProperty<IBrush?> LoopBrushProperty =
             AvaloniaProperty.Register<TimelineView, IBrush?>(nameof(LoopBrush));
 
+        public static readonly StyledProperty<StarPowerTimelineExtras?> StarPowerExtrasProperty =
+            AvaloniaProperty.Register<TimelineView, StarPowerTimelineExtras?>(nameof(StarPowerExtras));
+
         // What the picture of the ruler, waveform, overview, beat lines and loop lines shows: when one changes, it's drawn again.
         private static readonly AvaloniaProperty[] ContentProperties =
         [
             LengthProperty, WaveformProperty, BeatsProperty, WaveformBrushProperty, TickBrushProperty, BeatBrushProperty, MeasureBrushProperty,
-            OverviewProperty, FindingMarksProperty, LoopProperty, LoopBrushProperty,
+            OverviewProperty, FindingMarksProperty, LoopProperty, LoopBrushProperty, StarPowerExtrasProperty,
         ];
 
         static TimelineView()
@@ -333,6 +367,13 @@ namespace ChartBuilder.Controls
             set => SetValue(LoopBrushProperty, value);
         }
 
+        /// <summary>The meter ribbon, hard passages and selected proposal the star power window adds, or null for none.</summary>
+        public StarPowerTimelineExtras? StarPowerExtras
+        {
+            get => GetValue(StarPowerExtrasProperty);
+            set => SetValue(StarPowerExtrasProperty, value);
+        }
+
         protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
         {
             base.OnPropertyChanged(change);
@@ -423,6 +464,7 @@ namespace ChartBuilder.Controls
             {
                 DrawWaveform(context, bounds);
                 DrawOverview(context, bounds);
+                DrawStarPowerExtras(context, bounds);
                 DrawBeats(context, bounds);
                 DrawLoop(context, bounds);
                 DrawRuler(context, bounds);
@@ -495,7 +537,7 @@ namespace ChartBuilder.Controls
                 if (row < 0)
                     continue;
                 double y = top + (row * (BandHeight + BandGap));
-                context.FillRectangle(BandBrush(phrase.Row), new Rect(XOf(phrase.Start, width), y, Math.Max(1, XOf(phrase.End, width) - XOf(phrase.Start, width)), BandHeight));
+                context.FillRectangle(phrase.Replaced ? ReplacedBandBrush : BandBrush(phrase.Row), new Rect(XOf(phrase.Start, width), y, Math.Max(1, XOf(phrase.End, width) - XOf(phrase.Start, width)), BandHeight));
             }
 
             DrawTempoChanges(context, overview, width, bounds);
@@ -536,13 +578,81 @@ namespace ChartBuilder.Controls
                     if (kept)
                     {
                         context.FillRectangle(KeptProposalBrush, column);
-                        context.FillRectangle(ProposalCapBrush, new Rect(x, top, w, ProposalCap));
+                        context.FillRectangle(proposal.Added ? AddedProposalCapBrush : ProposalCapBrush, new Rect(x, top, w, ProposalCap));
                     }
                     else
                     {
                         context.DrawRectangle(null, DroppedProposalPen, column.Deflate(0.5));
                     }
                 }
+            }
+        }
+
+        /// <summary>
+        /// The star power window's extras: the meter ribbon along the bottom with its activation threshold, the hard
+        /// passages as triangles along the top of the overview, and the selected proposal outlined.
+        /// </summary>
+        private void DrawStarPowerExtras(DrawingContext context, Rect bounds)
+        {
+            if (StarPowerExtras is not { } extras)
+                return;
+
+            double width = bounds.Width;
+
+            // The meter ribbon, filled under its curve.
+            if (extras.Meter.Count > 1)
+            {
+                double top = bounds.Bottom - MeterHeight;
+
+                // The ribbon is drawn over the meter's samples, so they can be fewer than a pixel apart.
+                context.FillRectangle(MeterBackgroundBrush, new Rect(0, top, width, MeterHeight));
+                var area = new StreamGeometry();
+                using (var geometry = area.Open())
+                {
+                    geometry.BeginFigure(new Point(XOf(extras.Meter[0].Seconds, width), bounds.Bottom), true);
+                    foreach (var sample in extras.Meter)
+                        geometry.LineTo(new Point(XOf(sample.Seconds, width), top + (MeterHeight * (1 - sample.Meter))));
+                    geometry.LineTo(new Point(XOf(extras.Meter[^1].Seconds, width), bounds.Bottom));
+                    geometry.EndFigure(true);
+                }
+
+                context.DrawGeometry(MeterFillBrush, null, area);
+                for (int i = 1; i < extras.Meter.Count; i++)
+                {
+                    var previous = extras.Meter[i - 1];
+                    var sample = extras.Meter[i];
+                    context.DrawLine(MeterPen,
+                        new Point(XOf(previous.Seconds, width), top + (MeterHeight * (1 - previous.Meter))),
+                        new Point(XOf(sample.Seconds, width), top + (MeterHeight * (1 - sample.Meter))));
+                }
+
+                double threshold = top + (MeterHeight * (1 - extras.ActivationThreshold));
+                context.DrawLine(MeterThresholdPen, new Point(0, threshold), new Point(width, threshold));
+            }
+
+            // Hard passages: filled when charged, hollow when the kept star power falls short.
+            foreach (var spike in extras.Spikes)
+            {
+                double x = Math.Round(XOf(spike.Seconds, width));
+                var triangle = new StreamGeometry();
+                using (var geometry = triangle.Open())
+                {
+                    geometry.BeginFigure(new Point(x, BodyTop + 7), true);
+                    geometry.LineTo(new Point(x - 4, BodyTop));
+                    geometry.LineTo(new Point(x + 4, BodyTop));
+                    geometry.EndFigure(true);
+                }
+
+                context.DrawGeometry(spike.Charged ? SpikeChargedBrush : SpikeUnchargedBrush, SpikePen, triangle);
+            }
+
+            // The selected proposal, outlined so it's found in the whole song.
+            if (extras.SelectedProposal is { } selected && Overview is { } overview && selected >= 0 && selected < overview.Proposals.Count)
+            {
+                var proposal = overview.Proposals[selected];
+                double x = XOf(proposal.Start, width);
+                double w = Math.Max(ProposalMinWidth, XOf(proposal.End, width) - x);
+                context.DrawRectangle(null, SelectedProposalPen, new Rect(x, BodyTop, w, bounds.Bottom - BodyTop).Deflate(0.5));
             }
         }
 

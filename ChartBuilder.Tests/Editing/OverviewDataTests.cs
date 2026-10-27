@@ -68,7 +68,7 @@ public sealed class OverviewDataTests
     }
 
     [TestMethod]
-    public void ARunsProposalsShowKeptAndDroppedWhicheverLaneIsInFocus()
+    public void AWindowsProposalsShowKeptAndDroppedWhicheverLaneIsInFocus()
     {
         var chart = EditableChart.CreateNew(new NewChartSettings("Song", 480, 120, 4, 4, new HashSet<ChartInstrument> { ChartInstrument.Guitar, ChartInstrument.Drums }, DrumsVariant.Pro));
         var expert = chart.PartOf(ChartInstrument.Guitar)![ChartDifficulty.Expert];
@@ -81,16 +81,18 @@ public sealed class OverviewDataTests
         var session = Of(chart, focused: DrumsExpert);
         Assert.IsEmpty(Overview(session, DrumsExpert).Proposals);
 
-        session.StarPower.Start(ChartInstrument.Guitar, StarPowerOptions.Default, null);
-        session.StarPower.Toggle(0);
-        var overview = Overview(session, DrumsExpert);
+        var proposals = new List<OverviewProposal>
+        {
+            new(session.AudioAt(0), session.AudioAt(Measure), Kept: false),
+            new(session.AudioAt(Measure), session.AudioAt(2 * Measure), Kept: true),
+        };
+        var overview = OverviewData.Of(session, DrumsExpert, 100, proposals)!;
 
-        Assert.HasCount(session.StarPower.Proposals.Count, overview.Proposals);
+        Assert.HasCount(2, overview.Proposals);
         Assert.IsFalse(overview.Proposals[0].Kept);
-        Assert.IsTrue(overview.Proposals.Skip(1).All(p => p.Kept));
-        var first = session.StarPower.Proposals[0].Phrase;
-        Assert.AreEqual(session.AudioAt(first.Tick), overview.Proposals[0].Start, 1e-9);
-        Assert.AreEqual(session.AudioAt(first.CoverEnd), overview.Proposals[0].End, 1e-9);
+        Assert.IsTrue(overview.Proposals[1].Kept);
+        Assert.AreEqual(session.AudioAt(0), overview.Proposals[0].Start, 1e-9);
+        Assert.AreEqual(session.AudioAt(Measure), overview.Proposals[0].End, 1e-9);
     }
 
     [TestMethod]
