@@ -161,10 +161,31 @@ public sealed partial class EditorTools
     }
 
     /// <summary>
-    /// Drags out a synchronized region on the pressed lane's track, both ends on the grid (the Sync tool). Once it's drawn,
-    /// the tool picked before Sync comes back; when it's refused, Sync stays, to draw another. A click draws nothing.
+    /// Where a synchronized region's end dragged to <paramref name="pointer"/> goes, the other end at
+    /// <paramref name="fixedEnd"/>, and the region reaching one after it (<paramref name="after"/>) or one before it: to
+    /// the grid, or to exactly a 32nd note's length (<see cref="SyncRegion.MinLength"/>) when the pointer is nearer that,
+    /// or has crossed it, so the shortest region is one 32nd note however the pointer moves. Never before the start.
     /// </summary>
-    private sealed class SyncGesture(EditorTools tools, ChartPoint pressed) : Gesture(tools)
+    private long SyncEdgeAt(double pointer, long fixedEnd, bool after)
+    {
+        long min = SyncRegion.MinLength(Chart.Resolution);
+        long limit = Math.Max(0, after ? fixedEnd + min : fixedEnd - min);
+        if (after ? pointer <= limit : pointer >= limit)
+            return limit;
+
+        // The minimum is a step of its own, which the end goes to when the pointer is nearer it than the grid's step.
+        long at = Snap.Nearest(pointer, Map);
+        at = after ? Math.Max(at, limit) : Math.Min(at, limit);
+        return Math.Abs(pointer - limit) < Math.Abs(pointer - at) ? limit : at;
+    }
+
+    /// <summary>
+    /// Drags out a synchronized region on the pressed lane's track, both ends on the grid (the Sync tool), or with Ctrl
+    /// + Shift held, which picks the tool up for as long as they're held. Once it's drawn, the tool picked before Sync
+    /// comes back; a click draws nothing. Pressed on a passage synced with the region, a click makes that passage the
+    /// region's source instead (a drag there draws a new region).
+    /// </summary>
+    private sealed class SyncGesture(EditorTools tools, ChartPoint pressed, long? clickedMatch = null) : Gesture(tools)
     {
         private bool _moved;
 
@@ -173,10 +194,15 @@ public sealed partial class EditorTools
             _moved |= Math.Abs(point.Tick - pressed.Tick) > pressed.Tolerance;
             if (!_moved)
                 return;
-            var snap = Tools.Snap;
-            long a = snap.Nearest(Math.Max(0, pressed.Tick), Tools.Map);
-            long b = snap.Nearest(Math.Max(0, point.Tick), Tools.Map);
-            Session.Sync.Draft = a == b ? null : (pressed.Track, Math.Min(a, b), Math.Max(a, b));
+            long a = Tools.Snap.Nearest(Math.Max(0, pressed.Tick), Tools.Map);
+            long b = Tools.SyncEdgeAt(point.Tick, a, after: point.Tick >= pressed.Tick);
+            if (a == b)
+            {
+                Session.Sync.Draft = null;
+                return;
+            }
+
+            Session.Sync.Draft = (pressed.Track, Math.Min(a, b), Math.Max(a, b));
         }
 
         public override void Release(ChartPoint point)
@@ -184,10 +210,97 @@ public sealed partial class EditorTools
             Drag(point);
             var draft = Session.Sync.Draft;
             Session.Sync.Draft = null;
-            if (draft is var (track, from, to) && Session.Sync.Define(track, from, to))
-                Session.Tool = Session.ToolBeforeSync;
+            if (draft is var (track, from, to))
+            {
+                if (Session.Sync.Define(track, from, to) && Session.Tool == EditorTool.Sync)
+                    Session.Tool = Session.ToolBeforeSync;
+            }
+            else if (clickedMatch is { } start)
+            {
+                Session.Sync.MakeSource(start);
+            }
         }
 
         public override void Cancel() => Session.Sync.Draft = null;
+    }
+
+    /// <summary>
+    /// Drags the synchronized region along time, by its body, both ends keeping their distance on the grid. The
+    /// passages matching it are found again where it lands. Nothing moves until the pointer has, so a click only
+    /// picks the region up.
+    /// </summary>
+    private sealed class SyncMoveGesture(EditorTools tools, ChartPoint pressed) : Gesture(tools)
+    {
+        private readonly (long From, long To) _span = tools._session.Sync.Span!.Value;
+
+        // The span last dragged to, so one the pointer hasn't left isn't made again.
+        private (long From, long To)? _dragged;
+        private bool _moved;
+
+        public override void Drag(ChartPoint point)
+        {
+            _moved |= Math.Abs(point.Tick - pressed.Tick) > pressed.Tolerance;
+            if (!_moved)
+                return;
+            long length = _span.To - _span.From;
+            long from = Math.Max(0, Tools.Snap.Nearest(_span.From + (point.Tick - pressed.Tick), Tools.Map));
+            if (_dragged == (from, from + length))
+                return;
+            _dragged = (from, from + length);
+            Session.Sync.DragTo(from, from + length);
+        }
+
+        public override void Release(ChartPoint point)
+        {
+            Drag(point);
+            if (_moved && Session.Sync.Span is var (from, to))
+                Session.Sync.Redefine(from, to);
+        }
+
+        public override void Cancel()
+        {
+            if (_moved)
+                Session.Sync.DragTo(_span.From, _span.To);
+        }
+    }
+
+    /// <summary>
+    /// Drags one end of the synchronized region to the grid, the other staying where it is. It never crosses the other
+    /// end, and is never shorter than a 32nd note, which the end snaps down to. The passages matching it are found again
+    /// as it's resized.
+    /// </summary>
+    private sealed class SyncResizeGesture(EditorTools tools, ChartPoint pressed, bool start) : Gesture(tools)
+    {
+        private readonly (long From, long To) _span = tools._session.Sync.Span!.Value;
+
+        // The span last dragged to, so one the pointer hasn't left isn't made again.
+        private (long From, long To)? _dragged;
+        private bool _moved;
+
+        public override void Drag(ChartPoint point)
+        {
+            _moved |= Math.Abs(point.Tick - pressed.Tick) > pressed.Tolerance;
+            if (!_moved)
+                return;
+            long at = Tools.SyncEdgeAt(point.Tick, start ? _span.To : _span.From, after: !start);
+            (long From, long To) span = start ? (at, _span.To) : (_span.From, at);
+            if (span == _span || span == _dragged)
+                return;
+            _dragged = span;
+            Session.Sync.DragTo(span.From, span.To);
+        }
+
+        public override void Release(ChartPoint point)
+        {
+            Drag(point);
+            if (_moved && Session.Sync.Span is var (from, to))
+                Session.Sync.Redefine(from, to);
+        }
+
+        public override void Cancel()
+        {
+            if (_moved)
+                Session.Sync.DragTo(_span.From, _span.To);
+        }
     }
 }

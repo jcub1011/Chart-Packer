@@ -241,26 +241,14 @@ namespace ChartBuilder.ViewModels
         }
 
         /// <summary>
-        /// Whether the Sync tool's button is down: the tool is picked, or a synchronized region is drawn. Pressed while a
-        /// region is drawn, it takes the region away rather than picking the tool.
+        /// Whether the Sync tool's button is down: the tool is picked, or Ctrl + Shift is held, which holds it on for as
+        /// long as they're held. A synchronized region drawn is kept whatever tool is picked, and only the X over it takes
+        /// it away.
         /// </summary>
         public bool IsSyncTool
         {
-            get => Session.Tool == EditorTool.Sync || Session.Sync.IsActive;
-            set
-            {
-                if (Session.Sync.IsActive)
-                {
-                    Session.Sync.Clear();
-                    if (Session.Tool == EditorTool.Sync)
-                        Session.Tool = EditorTool.Select;
-                    OnSessionState(this, EventArgs.Empty);
-                }
-                else
-                {
-                    SetTool(EditorTool.Sync, value);
-                }
-            }
+            get => Session.Tool == EditorTool.Sync || (IsCtrlHeld && IsShiftHeld);
+            set => SetTool(EditorTool.Sync, value);
         }
 
         /// <summary>
@@ -347,9 +335,11 @@ namespace ChartBuilder.ViewModels
         {
             if (modifiers == _heldModifiers)
                 return;
-            bool swapsOpen = IsAltHeld, swapsDrag = IsCtrlHeld;
+            bool swapsOpen = IsAltHeld, swapsDrag = IsCtrlHeld, syncHeld = IsCtrlHeld && IsShiftHeld;
             _heldModifiers = modifiers;
             ModifiersHeld?.Invoke(this, modifiers);
+            if ((IsCtrlHeld && IsShiftHeld) != syncHeld)
+                OnPropertyChanged(nameof(IsSyncTool));
             if (IsAltHeld != swapsOpen)
                 OnPropertyChanged(nameof(PlaceOpen));
             if (IsCtrlHeld != swapsDrag)
@@ -368,6 +358,8 @@ namespace ChartBuilder.ViewModels
         private bool IsAltHeld => _heldModifiers.HasFlag(EditorModifiers.Alt);
 
         private bool IsCtrlHeld => _heldModifiers.HasFlag(EditorModifiers.Control);
+
+        private bool IsShiftHeld => _heldModifiers.HasFlag(EditorModifiers.Shift);
 
         /// <summary>
         /// Whether a click of the place tool puts down an open note: <see cref="PlaceOptions.Open"/>, swapped while Alt is
@@ -954,6 +946,10 @@ namespace ChartBuilder.ViewModels
     /// every other kind as charted.
     /// </param>
     /// <param name="Proposals">The run's proposals, whichever lane is in focus, so they can always be found; none without a run.</param>
+    /// <param name="Synced">
+    /// The synchronized region and the passages synced with it: each band's start and end in audio seconds, whether it's
+    /// the region itself, and whether the region is one nothing matched, which is drawn hashed in yellow.
+    /// </param>
     public sealed record OverviewData(
         IReadOnlyList<OverviewSection> Sections,
         int NoteRows,
@@ -961,7 +957,7 @@ namespace ChartBuilder.ViewModels
         IReadOnlyList<RailKind> Rows,
         IReadOnlyList<OverviewPhrase> Phrases,
         IReadOnlyList<OverviewProposal> Proposals,
-        IReadOnlyList<(double Start, double End, bool IsRegion)> Synced)
+        IReadOnlyList<(double Start, double End, bool IsRegion, bool Unmatched)> Synced)
     {
         /// <summary>
         /// The overview of <paramref name="session"/>'s song, <paramref name="length"/> seconds long, for the lane
@@ -1031,12 +1027,12 @@ namespace ChartBuilder.ViewModels
                     proposals.Add(new OverviewProposal(session.AudioAt(run.Phrases[i].Tick), session.AudioAt(run.Phrases[i].CoverEnd), run.IsKept(i)));
             }
 
-            var synced = new List<(double, double, bool)>();
+            var synced = new List<(double, double, bool, bool)>();
             if (session.Sync is { Span: var (from, to) } sync)
             {
-                synced.Add((session.AudioAt(from), session.AudioAt(to), true));
+                synced.Add((session.AudioAt(from), session.AudioAt(to), true, sync.IsUnmatched));
                 foreach (long start in sync.Matches)
-                    synced.Add((session.AudioAt(start), session.AudioAt(start + to - from), false));
+                    synced.Add((session.AudioAt(start), session.AudioAt(start + to - from), false, false));
             }
 
             return new OverviewData(sections, noteRows, notes, rows, phrases, proposals, synced);

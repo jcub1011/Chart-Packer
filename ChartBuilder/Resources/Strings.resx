@@ -1153,7 +1153,7 @@ Open it anyway?</value>
     <comment>The Tempo tool's tooltip.</comment>
   </data>
   <data name="ToolSyncToolTip" xml:space="preserve">
-    <value>Drag over two or more chords of a lane to sync them: every exactly matching passage highlights, and edits in the region apply to each. Click again to clear.</value>
+    <value>Drag over a stretch of a lane to keep it in sync: every passage exactly matching it highlights, and edits in the region are made in each. Drag its edges to resize it, or its middle to move it; click a matching passage to sync from there. Hold Ctrl+Shift for the same without picking the tool. Hover the region and click its X to clear it.</value>
     <comment>The Sync tool's tooltip.</comment>
   </data>
   <data name="ToolPhraseToolTip" xml:space="preserve">
@@ -2126,6 +2126,22 @@ Saving also changes song.ini:
   <data name="ProposalGhostToolTipFormat" xml:space="preserve">
     <value>Proposed {0}: click to keep or drop it</value>
     <comment>A proposed phrase's ghost in the phrase rail. {0} is its kind in lower case, e.g. "star power" or "drum fill".</comment>
+  </data>
+  <data name="SyncClearToolTip" xml:space="preserve">
+    <value>Clear the synchronized region</value>
+    <comment>The small X at a synchronized region's top right, which takes the region away.</comment>
+  </data>
+  <data name="SyncMoveToolTip" xml:space="preserve">
+    <value>Drag to move the synchronized region</value>
+    <comment>The body of a synchronized region, which a drag moves along time.</comment>
+  </data>
+  <data name="SyncResizeToolTip" xml:space="preserve">
+    <value>Drag to resize the synchronized region</value>
+    <comment>An end of a synchronized region, which a drag resizes the region by.</comment>
+  </data>
+  <data name="SyncSourceToolTip" xml:space="preserve">
+    <value>Click to synchronize from this passage</value>
+    <comment>A passage synced with a synchronized region, which a click makes the region's source.</comment>
   </data>
   <data name="FillRunFormat" xml:space="preserve">
     <value>{0} of {1} proposed fills kept</value>
