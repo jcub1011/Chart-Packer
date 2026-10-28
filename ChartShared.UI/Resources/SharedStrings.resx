@@ -1179,4 +1179,48 @@
     <value>Enter milliseconds or a timecode like 00:03:45:123.</value>
     <comment>Error for a time's edit box when its text is neither.</comment>
   </data>
+  <data name="CrashDialogTitleFormat" xml:space="preserve">
+    <value>{0} Hit an Error</value>
+    <comment>Title of the crash dialog. {0} is the app's name.</comment>
+  </data>
+  <data name="CrashDialogHeading" xml:space="preserve">
+    <value>What you were doing didn't finish</value>
+  </data>
+  <data name="CrashDialogBody" xml:space="preserve">
+    <value>You can keep working, but save soon: the app may not behave as expected until it restarts. Quitting asks about unsaved changes first.</value>
+  </data>
+  <data name="CrashShowDetails" xml:space="preserve">
+    <value>Show details</value>
+    <comment>Toggle in the crash dialog that shows the error's stack trace.</comment>
+  </data>
+  <data name="CrashHideDetails" xml:space="preserve">
+    <value>Hide details</value>
+  </data>
+  <data name="CrashOneMoreError" xml:space="preserve">
+    <value>1 more error came in after this one.</value>
+  </data>
+  <data name="CrashMoreErrorsFormat" xml:space="preserve">
+    <value>{0} more errors came in after this one.</value>
+    <comment>{0} is a count above 1.</comment>
+  </data>
+  <data name="CrashCopyDetailsButton" xml:space="preserve">
+    <value>Copy details</value>
+    <comment>Copies the error, its stack trace, the app's version and the OS to the clipboard.</comment>
+  </data>
+  <data name="CrashCopiedButton" xml:space="preserve">
+    <value>Copied</value>
+    <comment>Shown on the Copy details button for a moment once the details are copied.</comment>
+  </data>
+  <data name="CrashReportButton" xml:space="preserve">
+    <value>Report on GitHub</value>
+    <comment>Copies the details, then opens a new issue on the project's GitHub page.</comment>
+  </data>
+  <data name="CrashQuitButton" xml:space="preserve">
+    <value>Quit</value>
+    <comment>Closes the app as its windows' close buttons would, asking about unsaved changes.</comment>
+  </data>
+  <data name="CrashKeepWorkingButton" xml:space="preserve">
+    <value>Keep working</value>
+    <comment>Closes the crash dialog and carries on.</comment>
+  </data>
 </root>

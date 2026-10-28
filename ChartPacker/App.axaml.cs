@@ -18,6 +18,7 @@ using ChartShared.Core.Charting.Saving;
 using ChartShared.Core.Scanning;
 using ChartShared.Core.Settings;
 using ChartShared.Ffmpeg;
+using ChartShared.UI;
 using ChartShared.UI.Services;
 using ChartShared.UI.ViewModels.Settings;
 using ChartShared.UI.Views;
@@ -35,6 +36,9 @@ namespace ChartPacker
         {
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
+                // An exception nothing else catches on the UI thread is shown, and the app carries on, from here on.
+                CrashHandler.Install(desktop, Strings.AppName);
+
                 // Composition root: services are wired by hand (spec §4.2).
                 var settings = SettingsService.Load(UserConfigPaths.SettingsFile);
                 // Every window opens as it last closed, the main window where it was too, so this comes before any is made.

@@ -1,8 +1,5 @@
-using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
-using Avalonia.Layout;
-using ChartShared.UI.Controls;
 using ChartShared.UI.Resources;
 using ChartShared.UI.Services;
 
@@ -20,7 +17,7 @@ namespace ChartShared.UI.Views
             InitializeComponent();
             WindowChrome.ShowIcon(this, WindowTitleBar);
             Opened += (_, _) => WindowChrome.UseDarkTitleBar(this);
-            SetAction(CancelButton, SharedStrings.CancelButton, "ClearStroke");
+            DialogAction.Set(CancelButton, SharedStrings.CancelButton, "ClearStroke");
         }
 
         /// <param name="confirmIcon">The line icon beside the first action, by its key; null for none.</param>
@@ -31,10 +28,10 @@ namespace ChartShared.UI.Views
             Title = title;
             TitleText.Text = title;
             MessageText.Text = message;
-            SetAction(ConfirmButton, confirmLabel, confirmIcon);
+            DialogAction.Set(ConfirmButton, confirmLabel, confirmIcon);
             if (secondLabel is not null)
             {
-                SetAction(SecondButton, secondLabel, secondIcon);
+                DialogAction.Set(SecondButton, secondLabel, secondIcon);
                 SecondButton.IsVisible = true;
             }
         }
@@ -48,22 +45,6 @@ namespace ChartShared.UI.Views
             dialog.ConfirmButton.IsDefault = true;
             dialog.ConfirmButton.IsCancel = true;
             return dialog;
-        }
-
-        // An action's label, with its icon before it when it has one.
-        private static void SetAction(Button button, string label, string? icon)
-        {
-            AutomationProperties.SetName(button, label);
-            if (LineIcon.For(icon) is not { } glyph)
-            {
-                button.Content = label;
-                return;
-            }
-
-            var content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
-            content.Children.Add(glyph);
-            content.Children.Add(new TextBlock { Text = label, VerticalAlignment = VerticalAlignment.Center });
-            button.Content = content;
         }
 
         private void OnConfirm(object? sender, RoutedEventArgs e) => Close(ConfirmChoice.First);
