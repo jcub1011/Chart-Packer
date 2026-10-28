@@ -22,8 +22,7 @@ namespace ChartBuilder.ViewModels
             double startSeconds,
             double endSeconds,
             double? spikeSeconds,
-            int notes,
-            bool charged)
+            int notes)
         {
             _owner = owner;
             Index = index;
@@ -33,7 +32,6 @@ namespace ChartBuilder.ViewModels
             SpikeSeconds = spikeSeconds;
             Notes = notes;
             IsKept = region.Kept;
-            Charged = charged;
             SelectCommand = new RelayCommand(() => _owner.SelectRegion(this));
             ToggleCommand = new RelayCommand(() => _owner.ToggleRegion(this));
         }
@@ -51,8 +49,13 @@ namespace ChartBuilder.ViewModels
 
         public int Notes { get; }
 
-        /// <summary>Whether the kept star power gives enough meter to activate going into its hard passage.</summary>
-        public bool Charged { get; }
+        /// <summary>
+        /// Whether the kept star power gives enough meter to activate going into its hard passage. It changes as other
+        /// regions are kept or dropped, so a row shows it without being rebuilt.
+        /// </summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(ChargedText))]
+        public partial bool Charged { get; set; }
 
         public bool IsLeadIn => Region.IsSpikeLeadIn;
 

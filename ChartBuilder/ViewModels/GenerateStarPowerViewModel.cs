@@ -75,8 +75,6 @@ namespace ChartBuilder.ViewModels
 
         public string Title => string.Format(CultureInfo.CurrentCulture, Strings.GenerateStarPowerTitleFormat, ChartLabels.InstrumentName(Part));
 
-        public string PartLabel => ChartLabels.InstrumentName(Part);
-
         /// <summary>Where star power is proposed: over the selection, or the whole part.</summary>
         public string ScopeText { get; }
 
@@ -145,13 +143,18 @@ namespace ChartBuilder.ViewModels
         public partial string? SummaryText { get; private set; }
 
         [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasWarningOnly))]
         public partial string? WarningText { get; private set; }
 
         [ObservableProperty]
-        public partial bool HasWarnings { get; private set; }
-
-        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasStatus), nameof(HasWarningOnly))]
         public partial string? StatusText { get; private set; }
+
+        /// <summary>Whether applying failed, so the footer shows the error in place of the warning.</summary>
+        public bool HasStatus => StatusText is not null;
+
+        /// <summary>Whether the footer's notice line shows the warning, rather than an error standing in for it.</summary>
+        public bool HasWarningOnly => WarningText is not null && StatusText is null;
 
         /// <summary>Why there's nothing proposed, with what to try; null when there are regions.</summary>
         [ObservableProperty]
@@ -190,23 +193,25 @@ namespace ChartBuilder.ViewModels
             _plan.Toggle(region.Index);
             region.IsKept = _plan.Regions[region.Index].Kept;
             _dirty = true;
-            RefreshAll();
+            RefreshAfterKeepChange();
         }
 
         [RelayCommand]
         public void KeepAll()
         {
             _plan.KeepAll();
+            SyncKept();
             _dirty = true;
-            RefreshAll();
+            RefreshAfterKeepChange();
         }
 
         [RelayCommand]
         public void DropAll()
         {
             _plan.DropAll();
+            SyncKept();
             _dirty = true;
-            RefreshAll();
+            RefreshAfterKeepChange();
         }
 
         [RelayCommand]
@@ -307,10 +312,47 @@ namespace ChartBuilder.ViewModels
         {
             _coverage = _plan.Coverage(SampleCount());
             RefreshRegions();
+            RefreshLive();
+        }
+
+        /// <summary>
+        /// Updates what the plan's kept regions decide, from <see cref="_coverage"/> as the caller has just worked it
+        /// out: the rows' charged state, the highway, the timeline and the summary. It only updates the rows, never
+        /// rebuilds them, so their order, the list's scroll position and a row's focus stay as they were;
+        /// <see cref="RefreshAll"/> rebuilds them first, when the regions themselves changed.
+        /// </summary>
+        private void RefreshLive()
+        {
+            var charged = ChargedSpikes();
+            foreach (var region in Regions)
+                region.Charged = region.Region.SpikeTick is { } tick && charged.Contains(tick);
             RefreshScene();
             RefreshOverview();
             RefreshSummary();
             OnPropertyChanged(nameof(CanApply));
+        }
+
+        /// <summary>
+        /// Updates what keeping or dropping a region changes, without rebuilding the rows: their order, the list's
+        /// scroll position and a row's focus all stay as they were, so only colours and the highway change.
+        /// </summary>
+        private void RefreshAfterKeepChange()
+        {
+            // Changing the plan makes an earlier attempt's failure stale.
+            StatusText = null;
+            _coverage = _plan.Coverage(SampleCount());
+            RefreshLive();
+        }
+
+        /// <summary>Whether each hard passage is charged for, by its tick.</summary>
+        private HashSet<long> ChargedSpikes() =>
+            _coverage.Spikes.Where(static s => s.Charged).Select(static s => s.Spike.StartTick).ToHashSet();
+
+        /// <summary>Takes the rows' kept state from the plan after Keep all or Drop all, without rebuilding them.</summary>
+        private void SyncKept()
+        {
+            foreach (var region in Regions)
+                region.IsKept = _plan.Regions[region.Index].Kept;
         }
 
         private int SampleCount() => Math.Clamp((int)Math.Round(Math.Max(0, _playback.LengthSeconds) * 4), 64, 2048);
@@ -318,7 +360,6 @@ namespace ChartBuilder.ViewModels
         private void RefreshRegions()
         {
             var selectedPhrase = SelectedRegion?.Region.Phrase;
-            var charged = _coverage.Spikes.Where(static s => s.Charged).Select(static s => s.Spike.StartTick).ToHashSet();
             var noteTrack = _session.GameTrack(_key);
 
             Regions.Clear();
@@ -328,7 +369,6 @@ namespace ChartBuilder.ViewModels
                 var phrase = region.Phrase;
                 int notes = noteTrack.Notes.Count(n => phrase.Covers(n.Tick));
                 double? spike = region.SpikeTick is { } tick ? _session.AudioAt(tick) : null;
-                bool isCharged = region.SpikeTick is { } spikeTick && charged.Contains(spikeTick);
                 Regions.Add(new StarPowerRegionViewModel(
                     this,
                     i,
@@ -336,8 +376,7 @@ namespace ChartBuilder.ViewModels
                     _session.AudioAt(phrase.Tick),
                     _session.AudioAt(phrase.CoverEnd),
                     spike,
-                    notes,
-                    isCharged));
+                    notes));
             }
 
             ExistingRegions.Clear();
@@ -389,21 +428,24 @@ namespace ChartBuilder.ViewModels
             HasProposals = Regions.Count > 0;
             int kept = Regions.Count(static r => r.IsKept);
             double seconds = Regions.Where(static r => r.IsKept).Sum(static r => r.EndSeconds - r.StartSeconds);
-            SummaryText = string.Format(
-                CultureInfo.CurrentCulture,
-                Strings.StarPowerPlanSummaryFormat,
-                kept,
-                Regions.Count,
-                SongTime.Format(TimeSpan.FromSeconds(seconds)));
+            SummaryText = HasProposals
+                ? string.Format(
+                    CultureInfo.CurrentCulture,
+                    Strings.StarPowerPlanSummaryFormat,
+                    kept,
+                    Regions.Count,
+                    SongTime.Format(TimeSpan.FromSeconds(seconds)))
+                : Strings.StarPowerNothingToApply;
 
             int uncharged = _coverage.UnchargedSpikes;
             string? warning = null;
             if (HasProposals && kept == 0)
                 warning = Strings.StarPowerNoRegionsKept;
             else if (HasProposals && uncharged > 0)
-                warning = string.Format(CultureInfo.CurrentCulture, Strings.StarPowerUnchargedFormat, uncharged);
+                warning = uncharged == 1
+                    ? Strings.StarPowerUnchargedOne
+                    : string.Format(CultureInfo.CurrentCulture, Strings.StarPowerUnchargedFormat, uncharged);
             WarningText = warning;
-            HasWarnings = warning is not null;
 
             EmptyText = _plan.Reason switch
             {

@@ -1,4 +1,6 @@
+using System;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using ChartBuilder.ViewModels;
@@ -14,6 +16,7 @@ namespace ChartBuilder.Views
     public partial class GenerateStarPowerWindow : Window
     {
         private bool _spaceHeld;
+        private Flyout? _regenerateFlyout;
 
         public GenerateStarPowerWindow()
         {
@@ -43,9 +46,57 @@ namespace ChartBuilder.Views
 
         private void OnHighwayScrubbed(object? sender, ScrubEventArgs e) => ViewModel?.Playback.SeekTo(e.Seconds);
 
+        /// <summary>
+        /// Regenerates at once when nothing would be lost; otherwise asks in a flyout by the button, so the window's
+        /// layout doesn't move to make room for a question.
+        /// </summary>
+        private void OnRegenerateClick(object? sender, RoutedEventArgs e)
+        {
+            if (ViewModel is not { } viewModel || sender is not Control anchor)
+                return;
+
+            // A second press while the question is up asks it again, rather than taking its own press as the answer.
+            if (!viewModel.IsConfirmingRegenerate)
+                viewModel.RegenerateCommand.Execute(null);
+            if (!viewModel.IsConfirmingRegenerate)
+                return;
+            if (FlyoutBase.GetAttachedFlyout(anchor) is Flyout flyout)
+            {
+                _regenerateFlyout = flyout;
+                FlyoutBase.ShowAttachedFlyout(anchor);
+            }
+        }
+
+        private void OnConfirmRegenerate(object? sender, RoutedEventArgs e)
+        {
+            ViewModel?.ConfirmRegenerate();
+            _regenerateFlyout?.Hide();
+        }
+
+        private void OnKeepRegions(object? sender, RoutedEventArgs e)
+        {
+            ViewModel?.CancelRegenerate();
+            _regenerateFlyout?.Hide();
+        }
+
+        /// <summary>Dismissing the question by clicking away keeps the regions as they are.</summary>
+        private void OnRegenerateFlyoutClosed(object? sender, EventArgs e) => ViewModel?.CancelRegenerate();
+
         private void OnPreviewKeyDown(object? sender, KeyEventArgs e)
         {
-            if (e.Handled || e.Key != Key.Space || e.KeyModifiers != KeyModifiers.None || ViewModel is not { } viewModel)
+            if (e.Handled)
+                return;
+
+            // Escape closes the question first, rather than cancelling the window's plan while it's still open.
+            if (e.Key == Key.Escape && e.KeyModifiers == KeyModifiers.None && ViewModel is { IsConfirmingRegenerate: true } confirming)
+            {
+                confirming.CancelRegenerate();
+                _regenerateFlyout?.Hide();
+                e.Handled = true;
+                return;
+            }
+
+            if (e.Key != Key.Space || e.KeyModifiers != KeyModifiers.None || ViewModel is not { } viewModel)
                 return;
 
             if (!_spaceHeld && viewModel.Playback.PlayPauseCommand.CanExecute(null))
