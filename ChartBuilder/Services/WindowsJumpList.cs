@@ -39,8 +39,9 @@ namespace ChartBuilder.Services
         private static readonly Guid ShellLinkIid = new("000214F9-0000-0000-C000-000000000046");
         private static readonly Guid PropertyStoreIid = new("886D8EEB-8CF2-4446-8D02-CDBA1DBDCF99");
 
-        // System.Title, which is what the list shows for a link.
-        private static readonly PropertyKey TitleKey = new(new Guid("F29F85E0-4FF9-1068-AB91-08002B27B86D"), 2);
+        // System.Title (FMTID_SummaryInformation, PIDSI_TITLE), which is what the list shows for a link. A link without one is
+        // refused by AppendCategory with E_INVALIDARG, as a key that isn't this one leaves it.
+        internal static readonly PropertyKey TitleKey = new(new Guid("F29F85E0-4FF9-1068-AB91-08002B27B3D9"), 2);
 
         private static readonly StrategyBasedComWrappers Wrappers = new();
 

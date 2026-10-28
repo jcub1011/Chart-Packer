@@ -60,6 +60,20 @@ public sealed class JumpListComInterfaceTests
         Assert.AreEqual((ushort)0, variant.Type);
     }
 
+    // AppendCategory refuses a link with no title, and a title set under a key that isn't System.Title leaves it with none: it
+    // did, once, from a mistyped GUID. So the key is asked of Windows itself.
+    [TestMethod]
+    public void TitleKeyIsWhatWindowsCallsSystemTitle()
+    {
+        Assert.AreEqual(0, PSGetPropertyKeyFromName("System.Title", out var key));
+
+        Assert.AreEqual(key.FormatId, WindowsJumpList.TitleKey.FormatId);
+        Assert.AreEqual(key.PropertyId, WindowsJumpList.TitleKey.PropertyId);
+    }
+
+    [DllImport("propsys.dll", CharSet = CharSet.Unicode)]
+    private static extern int PSGetPropertyKeyFromName(string name, out PropertyKey key);
+
     // Declaration order is the metadata's (tokens go up as the compiler meets each method). The generator re-declares a base
     // interface's methods on the interface that extends it, after its own, so those are left out: they aren't its own slots.
     private static void AssertOrder(Type type, params string[] expected)
