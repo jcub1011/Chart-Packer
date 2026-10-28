@@ -16,7 +16,7 @@ on:
       draft:
         description: Don't create a release; upload the installer and zip as a workflow artifact instead.
         type: boolean
-        default: false
+        default: true
 
 # One release at a time, so two runs can't race on the same tag.
 concurrency:

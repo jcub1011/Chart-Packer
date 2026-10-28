@@ -26,6 +26,7 @@ namespace ChartBuilder.Services
     /// <param name="Input">The instrument devices and their bindings, for playtest and record mode (charter-spec C19).</param>
     /// <param name="OpenInputDevices">Opens the Input devices window, where the bindings are set.</param>
     /// <param name="Reveal">Shows the song's folder or <c>.sng</c> in the file manager, from the title bar.</param>
+    /// <param name="JumpList">The recent songs in the taskbar button's right-click menu, listed again as the Recent list changes.</param>
     public sealed record EditorServices(
         BuilderSettingsService Settings,
         ISettingsWindowService SettingsWindow,
@@ -46,5 +47,6 @@ namespace ChartBuilder.Services
         IEditorWindowService Editors,
         InputService Input,
         Action OpenInputDevices,
-        IFileRevealService Reveal);
+        IFileRevealService Reveal,
+        IJumpListService JumpList);
 }

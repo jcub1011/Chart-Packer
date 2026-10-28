@@ -35,6 +35,7 @@ namespace ChartBuilder.Services
     /// <param name="chartPackerSettingsFile">Chart Packer's settings, which a save reads for the library and packing, never writes.</param>
     /// <param name="recovery">Where the Editor autosaves the chart open, and where what's left to recover is found on startup.</param>
     /// <param name="input">The instrument devices and their bindings (charter-spec C19).</param>
+    /// <param name="jumpList">The recent songs in the taskbar button's right-click menu.</param>
     public sealed class BuilderWindows(
         IClassicDesktopStyleApplicationLifetime desktop,
         BuilderSettingsService settings,
@@ -42,7 +43,8 @@ namespace ChartBuilder.Services
         AudioLatencyService latency,
         string chartPackerSettingsFile,
         RecoveryStore recovery,
-        InputService input) : IEditorWindowService
+        InputService input,
+        IJumpListService jumpList) : IEditorWindowService
     {
         // The calibration tool, shared with Chart Packer, which pauses the Editor's playback as it opens, so its notes are
         // the only ones moving, and stops a Bind waiting in the Input devices window, so its taps don't bind a control. Its
@@ -105,6 +107,8 @@ namespace ChartBuilder.Services
         /// </summary>
         private async Task StartAsync(EditorWindowViewModel viewModel, BuilderArgs args)
         {
+            // Songs deleted since the last run drop off it, and so do those another Chart Builder added since.
+            jumpList.Refresh();
             switch (args)
             {
                 case { Problem: { } problem }:
@@ -170,7 +174,8 @@ namespace ChartBuilder.Services
             this,
             input,
             ShowInputDevices,
-            new FileRevealService(() => editor));
+            new FileRevealService(() => editor),
+            jumpList);
 
         /// <summary>
         /// Opens the Editor <paramref name="create"/> makes in the Editor window in place of what's open, letting go of that

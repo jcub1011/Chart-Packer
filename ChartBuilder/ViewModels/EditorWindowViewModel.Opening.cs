@@ -381,6 +381,7 @@ namespace ChartBuilder.ViewModels
                 new RecentSong { Path = song.Entry.FullPath, Title = song.Title, OpenedAt = DateTimeOffset.Now });
             _settings.Save();
             RefreshRecent();
+            _services.JumpList.Refresh();
         }
 
         /// <summary>Takes a song that's no longer there off the Recent list.</summary>
@@ -392,6 +393,7 @@ namespace ChartBuilder.ViewModels
             _settings.Settings.RecentSongs = RecentSongs.Remove(_settings.Settings.RecentSongs, path);
             _settings.Save();
             RefreshRecent();
+            _services.JumpList.Refresh();
         }
 
         /// <summary>Lists the Recent songs again, as saved.</summary>
