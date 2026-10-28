@@ -422,8 +422,7 @@
                           IsVisible="{Binding !IsLeftPanelAutoHide}" />
 
             <!-- The chart: its lanes, each a part's highway or a vocal part, docked as the user arranges them. Over them,
-                 while Generate fills or Generate star power runs (charter-spec C6 item 5, C8 item 1), a bar to keep, drop,
-                 add or cancel its proposals. -->
+                 while Generate fills runs (charter-spec C6 item 5), a bar to keep, drop, add or cancel its proposals. -->
             <DockPanel Grid.Column="2">
                 <Border DockPanel.Dock="Top"
                         IsVisible="{Binding Editor.IsProposalRunActive}"

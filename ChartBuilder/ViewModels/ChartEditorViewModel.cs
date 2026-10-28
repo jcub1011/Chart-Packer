@@ -468,22 +468,22 @@ namespace ChartBuilder.ViewModels
             set => Session.Placing = Session.Placing with { DoubleKick = value };
         }
 
-        /// <summary>Whether a run of Generate fills or Generate star power is going on, with its proposals shown as ghosts to keep or drop.</summary>
+        /// <summary>Whether a run of Generate fills is going on, with its proposals shown as ghosts to keep or drop.</summary>
         public bool IsProposalRunActive => Session.Proposals is not null;
 
         /// <summary>How many of the run's proposals are kept, of how many.</summary>
         public string ProposalRunText => Session.Proposals is { } run
-            ? string.Format(CultureInfo.CurrentCulture, run is StarPowerProposals ? Strings.StarPowerRunFormat : Strings.FillRunFormat, run.KeptCount, run.Phrases.Count)
+            ? string.Format(CultureInfo.CurrentCulture, Strings.FillRunFormat, run.KeptCount, run.Phrases.Count)
             : string.Empty;
 
         /// <summary>How the run's proposals are kept or dropped.</summary>
-        public string ProposalRunHint => Session.Proposals is StarPowerProposals ? Strings.StarPowerRunHint : Strings.FillRunHint;
+        public string ProposalRunHint => Strings.FillRunHint;
 
         /// <summary>What adding the run's kept proposals is called.</summary>
-        public string ProposalRunAdd => Session.Proposals is StarPowerProposals ? Strings.StarPowerRunAdd : Strings.FillRunAdd;
+        public string ProposalRunAdd => Strings.FillRunAdd;
 
         /// <summary>What adding the run's kept proposals does.</summary>
-        public string ProposalRunAddToolTip => Session.Proposals is StarPowerProposals ? Strings.StarPowerRunAddToolTip : Strings.FillRunAddToolTip;
+        public string ProposalRunAddToolTip => Strings.FillRunAddToolTip;
 
         /// <summary>What the bottom timeline shows of the whole song for the lane in focus (charter-spec C3 item 2).</summary>
         [ObservableProperty]
@@ -953,9 +953,10 @@ namespace ChartBuilder.ViewModels
     public sealed record OverviewSection(double Seconds, string Name);
 
     /// <summary>A phrase of the lane in focus, in the audio, and the phrase rail's row it's drawn in, for the overview.</summary>
-    public readonly record struct OverviewPhrase(double Start, double End, RailKind Row);
+    /// <param name="Replaced">Whether it's star power the star power window is replacing, drawn muted.</param>
+    public readonly record struct OverviewPhrase(double Start, double End, RailKind Row, bool Replaced = false);
 
-    /// <summary>A proposal of the run of Generate fills or Generate star power going on, in the audio, for the overview.</summary>
+    /// <summary>A proposal of the run of Generate fills or the star power window, in the audio, for the overview.</summary>
     public readonly record struct OverviewProposal(double Start, double End, bool Kept);
 
     /// <summary>
@@ -997,9 +998,16 @@ namespace ChartBuilder.ViewModels
     {
         /// <summary>
         /// The overview of <paramref name="session"/>'s song, <paramref name="length"/> seconds long, for the lane
-        /// <paramref name="key"/>; null while the length isn't known.
+        /// <paramref name="key"/>; null while the length isn't known. <paramref name="proposals"/> are the ghosts to draw,
+        /// or null for the run going on; <paramref name="replaceStarPower"/> shows the chart's star power as being replaced.
         /// </summary>
-        internal static OverviewData? Of(EditorSession session, ChartTrackKey? key, double length)
+        internal static OverviewData? Of(
+            EditorSession session,
+            ChartTrackKey? key,
+            double length,
+            IReadOnlyList<OverviewProposal>? proposals = null,
+            bool replaceStarPower = false,
+            IReadOnlyList<Phrase>? replacedStarPower = null)
         {
             if (!(length > 0))
                 return null;
@@ -1035,7 +1043,10 @@ namespace ChartBuilder.ViewModels
                     double start = session.AudioAt(note.Tick);
                     double end = note.Length > 0 ? session.AudioAt(note.Tick + note.Length) : start;
                     int row = note.Lane == ChartNote.OpenLane ? -1 : HighwayPalette.Column(kind, laneCount, note.Lane);
-                    var color = HighwayPalette.NoteColor(kind, laneCount, note);
+                    var color = replaceStarPower
+                        && (replacedStarPower is null || replacedStarPower.Any(p => p.Covers(note.Tick)))
+                        ? HighwayPalette.NoteColor(kind, laneCount, note with { Flags = note.Flags & ~NoteFlags.StarPower })
+                        : HighwayPalette.NoteColor(kind, laneCount, note);
                     bool top = HighwayPalette.IsBlackFret(kind, note.Lane) && whites.Contains((note.Tick, note.Lane - 3));
                     notes.Add(new OverviewNote(start, end, row, color == HighwayPalette.BlackFret ? HighwayPalette.BlackFretOutline : color, top));
                 }
@@ -1043,7 +1054,11 @@ namespace ChartBuilder.ViewModels
                 rows = PhraseRail.RowsOf(part.Kind);
                 var starPower = new RailKind(PhraseKind.StarPower);
                 foreach (var phrase in game.StarPower)
-                    phrases.Add(new OverviewPhrase(session.AudioAt(phrase.Tick), session.AudioAt(phrase.Tick + phrase.Length), starPower));
+                {
+                    bool replaced = replacedStarPower is not null
+                        && replacedStarPower.Any(p => p.Tick == phrase.Tick && p.Length == phrase.Length);
+                    phrases.Add(new OverviewPhrase(session.AudioAt(phrase.Tick), session.AudioAt(phrase.Tick + phrase.Length), starPower, replaced));
+                }
                 foreach (var phrase in part.Phrases)
                 {
                     RailKind row = PhraseRail.RowOf(part.Kind, phrase.Kind);
@@ -1058,11 +1073,13 @@ namespace ChartBuilder.ViewModels
                 }
             }
 
-            var proposals = new List<OverviewProposal>();
-            if (session.Proposals is { } run)
+            var ghosts = proposals ?? [];
+            if (proposals is null && session.Proposals is { } run)
             {
+                var fromRun = new List<OverviewProposal>();
                 for (int i = 0; i < run.Phrases.Count; i++)
-                    proposals.Add(new OverviewProposal(session.AudioAt(run.Phrases[i].Tick), session.AudioAt(run.Phrases[i].CoverEnd), run.IsKept(i)));
+                    fromRun.Add(new OverviewProposal(session.AudioAt(run.Phrases[i].Tick), session.AudioAt(run.Phrases[i].CoverEnd), run.IsKept(i)));
+                ghosts = fromRun;
             }
 
             var synced = new List<(double, double, bool, bool)>();
@@ -1073,7 +1090,7 @@ namespace ChartBuilder.ViewModels
                     synced.Add((session.AudioAt(start), session.AudioAt(start + to - from), false, false));
             }
 
-            return new OverviewData(sections, tempoChanges, noteRows, notes, rows, phrases, proposals, synced);
+            return new OverviewData(sections, tempoChanges, noteRows, notes, rows, phrases, ghosts, synced);
         }
     }
 }

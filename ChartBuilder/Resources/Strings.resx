@@ -535,7 +535,7 @@ Open it anyway?</value>
     <value>Pause (Space)</value>
   </data>
   <data name="PlayPauseButton" xml:space="preserve">
-    <value>Play or pause</value>
+    <value>Play or Pause</value>
   </data>
   <data name="SpeedToolTip" xml:space="preserve">
     <value>How fast the song plays</value>
@@ -2061,11 +2061,11 @@ Saving also changes song.ini:
     <comment>Generate fills and Generate star power: where the phrases are proposed, the selection or the whole part.</comment>
   </data>
   <data name="GenerateScopeSelection" xml:space="preserve">
-    <value>The selection</value>
+    <value>Selection</value>
     <comment>Generate fills and Generate star power: the phrases are proposed over the selection's span.</comment>
   </data>
   <data name="GenerateScopeWholePart" xml:space="preserve">
-    <value>The whole part</value>
+    <value>Whole Part</value>
     <comment>Generate fills and Generate star power: the phrases are proposed over the whole part.</comment>
   </data>
   <data name="GenerateButton" xml:space="preserve">
@@ -2084,32 +2084,175 @@ Saving also changes song.ini:
     <comment>The Generate star power dialog's introduction.</comment>
   </data>
   <data name="GenerateStarPowerSpacingLabel" xml:space="preserve">
-    <value>Spacing (seconds)</value>
+    <value>Spacing (Seconds)</value>
     <comment>About how many seconds apart generated star power phrases are.</comment>
   </data>
   <data name="GenerateStarPowerSpacingToolTip" xml:space="preserve">
     <value>Roughly how far apart phrases are, in seconds of the part's playing; long rests do not count. A whole part gets at least four.</value>
   </data>
   <data name="GenerateStarPowerSpikesLabel" xml:space="preserve">
-    <value>Charge for hard passages</value>
+    <value>Charge for Hard Passages</value>
     <comment>A check box: place phrases so a player has enough star power to activate going into each hard passage.</comment>
   </data>
   <data name="GenerateStarPowerSpikesToolTip" xml:space="preserve">
     <value>Place phrases to give half a meter, enough to activate, before each hardest passage the difficulty graph finds. Off, they're only spread evenly.</value>
   </data>
-  <data name="StarPowerRunFormat" xml:space="preserve">
-    <value>{0} of {1} proposed star power phrases kept</value>
-    <comment>The bar over the lanes while Generate star power runs. {0} is how many are kept, {1} how many were proposed.</comment>
+  <data name="StarPowerModeLabel" xml:space="preserve">
+    <value>Existing Star Power</value>
+    <comment>What Generate star power does with the star power a part already has.</comment>
   </data>
-  <data name="StarPowerRunHint" xml:space="preserve">
-    <value>Click a ghost in the rail's star power row to keep or drop it. Esc cancels.</value>
+  <data name="StarPowerModeReplace" xml:space="preserve">
+    <value>Replace</value>
+    <comment>Replaces the star power in the span with the kept proposals.</comment>
   </data>
-  <data name="StarPowerRunAdd" xml:space="preserve">
-    <value>Add star power</value>
-    <comment>Adds the kept star power phrases, as one step to undo.</comment>
+  <data name="StarPowerModeReplaceToolTip" xml:space="preserve">
+    <value>Remove the star power in the span and put the kept proposals there instead.</value>
   </data>
-  <data name="StarPowerRunAddToolTip" xml:space="preserve">
-    <value>Add the kept star power phrases, as one step to undo</value>
+  <data name="StarPowerModeAdd" xml:space="preserve">
+    <value>Add Alongside</value>
+    <comment>Adds the kept proposals beside the star power already in the span.</comment>
+  </data>
+  <data name="StarPowerModeAddToolTip" xml:space="preserve">
+    <value>Keep the star power already in the span and add the kept proposals beside it, keeping clear of it.</value>
+  </data>
+  <data name="StarPowerRegenerate" xml:space="preserve">
+    <value>Regenerate</value>
+    <comment>Works the layout out again with the options as they are now.</comment>
+  </data>
+  <data name="StarPowerRegenerateToolTip" xml:space="preserve">
+    <value>Propose the layout again with these options</value>
+  </data>
+  <data name="StarPowerRegenerateConfirm" xml:space="preserve">
+    <value>Replace the regions as they are now?</value>
+    <comment>Shown when Regenerate would lose the kept, dropped, drawn or resized regions.</comment>
+  </data>
+  <data name="StarPowerRegenerateConfirmYes" xml:space="preserve">
+    <value>Regenerate</value>
+  </data>
+  <data name="StarPowerRegenerateConfirmNo" xml:space="preserve">
+    <value>Keep Them</value>
+  </data>
+  <data name="StarPowerRegionsHeading" xml:space="preserve">
+    <value>Regions</value>
+    <comment>The star power window's ribbon of proposed regions.</comment>
+  </data>
+  <data name="StarPowerPlanSummaryFormat" xml:space="preserve">
+    <value>{0} of {1} Kept — {2} of Star Power</value>
+    <comment>{0} is how many regions are kept, {1} how many there are, {2} how long they add up to, e.g. 2:14.</comment>
+  </data>
+  <data name="StarPowerRoleFiller" xml:space="preserve">
+    <value>Filler</value>
+    <comment>A proposed star power phrase that spreads the phrases over the part.</comment>
+  </data>
+  <data name="StarPowerRoleLeadInFormat" xml:space="preserve">
+    <value>Lead-In for {0}</value>
+    <comment>A proposed star power phrase that charges the meter for the hard passage at {0}, e.g. 1:52.</comment>
+  </data>
+  <data name="StarPowerRegionDetailFormat" xml:space="preserve">
+    <value>{0} notes · {1}</value>
+    <comment>A region's notes and length, e.g. "8 notes · 2.0 s".</comment>
+  </data>
+  <data name="StarPowerExistingHeading" xml:space="preserve">
+    <value>Existing Star Power</value>
+  </data>
+  <data name="StarPowerExistingReplaced" xml:space="preserve">
+    <value>Will Be Replaced</value>
+  </data>
+  <data name="StarPowerExistingKept" xml:space="preserve">
+    <value>Kept Alongside</value>
+  </data>
+  <data name="StarPowerNoRegionsKept" xml:space="preserve">
+    <value>Keep at least one region to apply star power.</value>
+  </data>
+  <data name="StarPowerNoRegions" xml:space="preserve">
+    <value>No regions. Regenerate to propose some.</value>
+  </data>
+  <data name="StarPowerUnchargedFormat" xml:space="preserve">
+    <value>{0} hard passages not charged</value>
+    <comment>{0} is how many hard passages the kept star power doesn't give enough meter for, when it's more than one.</comment>
+  </data>
+  <data name="StarPowerUnchargedOne" xml:space="preserve">
+    <value>1 hard passage not charged</value>
+    <comment>A hard passage the kept star power doesn't give enough meter for, when it's the only one.</comment>
+  </data>
+  <data name="StarPowerKeepAll" xml:space="preserve">
+    <value>Keep All</value>
+  </data>
+  <data name="StarPowerKeepToolTip" xml:space="preserve">
+    <value>Keep This Region</value>
+  </data>
+  <data name="StarPowerRegionJumpToolTip" xml:space="preserve">
+    <value>Jump to This Region</value>
+    <comment>Clicking a region in the star power window's list moves the playhead to it.</comment>
+  </data>
+  <data name="StarPowerDropAll" xml:space="preserve">
+    <value>Drop All</value>
+  </data>
+  <data name="StarPowerPreviousRegion" xml:space="preserve">
+    <value>◀</value>
+  </data>
+  <data name="StarPowerNextRegion" xml:space="preserve">
+    <value>▶</value>
+  </data>
+  <data name="StarPowerPreviousRegionToolTip" xml:space="preserve">
+    <value>Previous Region</value>
+    <comment>The star power window's previous-region button; it and the next one step through the list.</comment>
+  </data>
+  <data name="StarPowerNextRegionToolTip" xml:space="preserve">
+    <value>Next Region</value>
+  </data>
+  <data name="StarPowerApply" xml:space="preserve">
+    <value>Apply Star Power</value>
+    <comment>Applies the kept regions to the chart, as one step to undo.</comment>
+  </data>
+  <data name="StarPowerApplyToolTip" xml:space="preserve">
+    <value>Apply the kept star power regions, as one step to undo (Ctrl+Enter)</value>
+  </data>
+  <data name="StarPowerCharged" xml:space="preserve">
+    <value>Charged</value>
+    <comment>A lead-in's chip, in the star power window's region list: the kept plan gives enough meter for its hard passage.</comment>
+  </data>
+  <data name="StarPowerNotCharged" xml:space="preserve">
+    <value>Not Charged</value>
+    <comment>A lead-in's chip, in the star power window's region list: the kept plan gives less than half a meter for its hard passage.</comment>
+  </data>
+  <data name="StarPowerPreviewHeading" xml:space="preserve">
+    <value>Preview</value>
+    <comment>The star power window's preview controls.</comment>
+  </data>
+  <data name="StarPowerLookAheadLabel" xml:space="preserve">
+    <value>Look Ahead</value>
+    <comment>How far ahead the star power window's highway shows.</comment>
+  </data>
+  <data name="StarPowerLookAheadToolTip" xml:space="preserve">
+    <value>How far ahead of the strike line the highway shows; more makes longer regions easier to draw.</value>
+  </data>
+  <data name="StarPowerTimelineHeading" xml:space="preserve">
+    <value>Whole Song</value>
+    <comment>The star power window's whole-song timeline, under the region list and the highway preview.</comment>
+  </data>
+  <data name="StarPowerEmptyHeading" xml:space="preserve">
+    <value>Nothing to Propose</value>
+    <comment>The star power window's preview, when no regions could be proposed; the reason follows under it.</comment>
+  </data>
+  <data name="StarPowerNothingToApply" xml:space="preserve">
+    <value>No Regions to Apply</value>
+    <comment>The star power window's footer, in place of the kept/total summary when there are no regions.</comment>
+  </data>
+  <data name="StarPowerNoSpot" xml:space="preserve">
+    <value>No star power phrase fits: none has enough notes clear of sections, solos' edges and the star power there, early enough for it to be used.</value>
+  </data>
+  <data name="StarPowerNoNotes" xml:space="preserve">
+    <value>The part has no notes to propose star power over.</value>
+  </data>
+  <data name="StarPowerNotFiveFret" xml:space="preserve">
+    <value>Star power is generated only for 5-fret and keys parts.</value>
+  </data>
+  <data name="StarPowerHasStarPower" xml:space="preserve">
+    <value>The part has star power already. Replace it, or select a span to add beside it.</value>
+  </data>
+  <data name="StarPowerEmptyHint" xml:space="preserve">
+    <value>Change the spacing or mode, or select a span, then Regenerate.</value>
   </data>
   <data name="ProposalRunPrevious" xml:space="preserve">
     <value>◀ Previous</value>
@@ -2562,7 +2705,7 @@ Saving also changes song.ini:
   </data>
   <data name="LaneGenerateStarPower" xml:space="preserve">
     <value>Generate star power…</value>
-    <comment>A lane's Edit menu item, on 5-fret and keys lanes: opens Generate star power's options for the lane's part.</comment>
+    <comment>A lane's Edit menu item, on 5-fret and keys lanes: opens the star power generator's window for the lane's part.</comment>
   </data>
   <data name="LaneGenerateFills" xml:space="preserve">
     <value>Generate fills…</value>
