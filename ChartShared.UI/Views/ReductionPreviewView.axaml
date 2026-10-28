@@ -52,17 +52,11 @@
                             </DataTemplate>
                         </ComboBox.ItemTemplate>
                     </ComboBox>
-                    <!-- The look-ahead, in half-second steps, with the seconds it's at beside it; kept together as the bar wraps. -->
+                    <!-- The look-ahead, with the seconds it's at beside it; kept together as the bar wraps. -->
                     <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center"
                                 ToolTip.Tip="{x:Static res:SharedStrings.ReductionPreviewLaneLookAheadToolTip}">
-                        <Slider Width="160"
-                                Minimum="{x:Static vm:ReductionPreviewViewModel.MinLookAhead}"
-                                Maximum="{x:Static vm:ReductionPreviewViewModel.MaxLookAhead}"
-                                TickFrequency="{x:Static vm:ReductionPreviewViewModel.LookAheadStep}"
-                                IsSnapToTickEnabled="True"
-                                SmallChange="{x:Static vm:ReductionPreviewViewModel.LookAheadStep}"
-                                LargeChange="2"
-                                Value="{Binding LookAhead}"
+                        <ui:LookAheadSlider Width="160"
+                                LookAhead="{Binding LookAhead}"
                                 VerticalAlignment="Center"
                                 AutomationProperties.Name="{x:Static res:SharedStrings.ReductionPreviewLaneLookAheadLabel}" />
                         <TextBlock FontSize="12" FontFeatures="tnum" MinWidth="40" VerticalAlignment="Center" Text="{Binding LookAheadText}" />

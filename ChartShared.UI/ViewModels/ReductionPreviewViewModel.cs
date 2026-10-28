@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using Avalonia.Media;
+using ChartShared.Core.Charting;
 using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charts;
 using ChartShared.Core.Validation;
@@ -95,7 +96,7 @@ namespace ChartShared.UI.ViewModels
     {
         public bool IsShown { get; set; } = true;
 
-        public double LookAhead { get; set; } = 1.5;
+        public double LookAhead { get; set; } = ReductionPreviewViewModel.DefaultLookAhead;
 
         public ReductionChangeCategories Categories { get; set; } = ReductionChangeCategories.Default;
     }
@@ -150,12 +151,8 @@ namespace ChartShared.UI.ViewModels
     /// </remarks>
     public sealed partial class ReductionPreviewViewModel : ViewModelBase, IDisposable
     {
-        /// <summary>The shortest and longest look-ahead the preview gives, and the steps its slider takes.</summary>
-        public const double MinLookAhead = 0.5;
-
-        public const double MaxLookAhead = 10;
-
-        public const double LookAheadStep = 0.5;
+        /// <summary>The look-ahead a preview has before one has been chosen, in seconds.</summary>
+        public const double DefaultLookAhead = 1.5;
 
         // How far above the strike line a change gone to is, as a share of the look-ahead, so it can be seen coming.
         private const double LeadShare = 0.3;
@@ -202,7 +199,7 @@ namespace ChartShared.UI.ViewModels
             _settings = settings;
             _lease = lease;
             WheelUpIsLater = wheelUpIsLater;
-            LookAhead = SnapLookAhead(settings.LookAhead);
+            LookAhead = HighwayLookAhead.Clamp(settings.LookAhead, DefaultLookAhead);
             IsExpanded = settings.IsShown;
 
             var shown = settings.Categories;
@@ -223,16 +220,13 @@ namespace ChartShared.UI.ViewModels
         [ObservableProperty]
         public partial bool IsExpanded { get; set; }
 
-        /// <summary>
-        /// How many seconds ahead of the strike line the highways show, in steps of <see cref="LookAheadStep"/> from
-        /// <see cref="MinLookAhead"/> to <see cref="MaxLookAhead"/>; remembered for the next run.
-        /// </summary>
+        /// <summary>How many seconds ahead of the strike line the highways show (<see cref="HighwayLookAhead"/>); remembered for the next run.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(Lead), nameof(LookAheadText))]
         public partial double LookAhead { get; set; }
 
         /// <summary>The look-ahead in seconds, as the slider's readout shows it, e.g. "1.5 s".</summary>
-        public string LookAheadText => string.Format(CultureInfo.CurrentCulture, SharedStrings.ReductionPreviewLookAheadFormat, LookAhead);
+        public string LookAheadText => string.Format(CultureInfo.CurrentCulture, SharedStrings.LookAheadFormat, LookAhead);
 
         /// <summary>How far before a change going to it puts the playhead, in seconds, so it's seen coming down the highway.</summary>
         public double Lead => LookAhead * LeadShare;
@@ -278,11 +272,6 @@ namespace ChartShared.UI.ViewModels
         /// <summary>What changed at the stop last gone to, and where; empty for none.</summary>
         [ObservableProperty]
         public partial string CurrentText { get; private set; } = "";
-
-        /// <summary><paramref name="seconds"/> as the preview takes a look-ahead: on its steps, in its range.</summary>
-        public static double SnapLookAhead(double seconds) => double.IsFinite(seconds)
-            ? Math.Clamp(Math.Round(seconds / LookAheadStep) * LookAheadStep, MinLookAhead, MaxLookAhead)
-            : 1.5;
 
         /// <summary>Plays from where the song is, or from a bar before the run's range when it's outside it; or pauses.</summary>
         [RelayCommand]
@@ -447,17 +436,8 @@ namespace ChartShared.UI.ViewModels
                 SeekIntoRange();
         }
 
-        partial void OnLookAheadChanged(double value)
-        {
-            double snapped = SnapLookAhead(value);
-            if (snapped != value)
-            {
-                LookAhead = snapped;
-                return;
-            }
-
-            _settings.LookAhead = snapped;
-        }
+        // Already snapped by whatever sets it: the slider and the constructor.
+        partial void OnLookAheadChanged(double value) => _settings.LookAhead = value;
 
         private void OnFilterChanged(object? sender, PropertyChangedEventArgs e)
         {

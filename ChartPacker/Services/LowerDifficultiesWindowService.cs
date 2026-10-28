@@ -46,6 +46,9 @@ namespace ChartPacker.Services
         SongLocks? locks = null,
         AudioLatencyFile? latency = null) : ILowerDifficultiesWindowService
     {
+        // One for as long as Chart Packer runs, so whether the preview is shown and its filters carry over from one opening to the next.
+        private readonly PackerReductionPreviewSettings _previewSettings = new(settings);
+
         public bool IsAvailable => generated is not null;
 
         public async Task ShowAsync(IReadOnlyList<SongEntry> entries)
@@ -58,7 +61,7 @@ namespace ChartPacker.Services
             var player = new PlayerViewModel(settings, openOutput, latency);
             try
             {
-                using var viewModel = new LowerDifficultiesViewModel(entries, drafts, stash, reductionRules, new DraftSaver(songFiles), player, parallelism, locks);
+                using var viewModel = new LowerDifficultiesViewModel(entries, drafts, stash, reductionRules, new DraftSaver(songFiles), player, parallelism, _previewSettings, locks);
                 var dialog = new LowerDifficultiesWindow { DataContext = viewModel };
 
                 // The main panel lets go of its songs' files, as the window may save them, and its player stops.
@@ -68,6 +71,8 @@ namespace ChartPacker.Services
                     _ = viewModel.LoadAsync();
                     WindowChrome.UseOwnerIcon(dialog, window);
                     await dialog.ShowDialog(window);
+                    // Persist what the preview was left at now, rather than waiting for the main window to close.
+                    settings.Save();
                     await viewModel.ShutdownAsync();
                 }
                 finally

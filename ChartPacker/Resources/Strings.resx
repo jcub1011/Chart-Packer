@@ -1109,14 +1109,14 @@
   <data name="VideoRevertOffsetToolTip" xml:space="preserve">
     <value>Reset the video offset</value>
   </data>
-  <data name="HighwayNoteSpeedLabel" xml:space="preserve">
-    <value>Note speed</value>
+  <data name="HighwayLookAheadLabel" xml:space="preserve">
+    <value>Seek ahead</value>
   </data>
-  <data name="HighwayNoteSpeedDescription" xml:space="preserve">
-    <value>How fast notes fall down the note highway.</value>
+  <data name="HighwayLookAheadDescription" xml:space="preserve">
+    <value>How many seconds ahead of the strike line the note highway shows. Looking further ahead makes the notes fall more slowly.</value>
   </data>
-  <data name="HighwayNoteSpeedKeywords" xml:space="preserve">
-    <value>highway scroll speed hyperspeed notes chart falling</value>
+  <data name="HighwayLookAheadKeywords" xml:space="preserve">
+    <value>highway look ahead lookahead scroll speed hyperspeed note speed notes chart falling</value>
     <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
   </data>
   <data name="ShowHighwayLabel" xml:space="preserve">

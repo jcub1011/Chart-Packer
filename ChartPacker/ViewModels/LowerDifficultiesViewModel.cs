@@ -127,6 +127,7 @@ namespace ChartPacker.ViewModels
         /// <param name="rules">The default rules, which it starts from and can save.</param>
         /// <param name="player">Plays the song picked, for the preview; the window's own, which the caller disposes.</param>
         /// <param name="parallelism">How many songs are read, and generated, at once.</param>
+        /// <param name="previewSettings">What the preview remembers: whether it's shown, its look-ahead and its filters.</param>
         public LowerDifficultiesViewModel(
             IReadOnlyList<SongEntry> entries,
             MetadataDraftStore drafts,
@@ -135,6 +136,7 @@ namespace ChartPacker.ViewModels
             DraftSaver saver,
             PlayerViewModel player,
             int parallelism,
+            IReductionPreviewSettings previewSettings,
             SongLocks? locks = null)
         {
             ArgumentNullException.ThrowIfNull(entries);
@@ -168,7 +170,7 @@ namespace ChartPacker.ViewModels
             _scope = ScopeOf();
 
             Rules = new ReductionRulesViewModel(rules.Load(), ChartInstrumentKind.FiveFret, ChartDifficulty.Hard);
-            Generation = new GenerationPreviewViewModel(player, () => Rules.Defaults, Strings.LowerDifficultiesNothing, Strings.LowerDifficultiesPickSong);
+            Generation = new GenerationPreviewViewModel(player, () => Rules.Defaults, Strings.LowerDifficultiesNothing, Strings.LowerDifficultiesPickSong, previewSettings);
             Rules.Changed += (_, _) =>
             {
                 RulesSaveStatus = "";

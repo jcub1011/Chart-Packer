@@ -264,6 +264,29 @@ public sealed class SettingEditTests
     }
 
     [TestMethod]
+    public void ALookAheadIsHeldToTheSharedRangeAndGrain()
+    {
+        double live = 1.4;
+        var definition = new LookAheadSetting
+        {
+            Id = "lookAhead",
+            Category = Category,
+            Label = "Look-ahead",
+            DefaultValue = 1.4,
+            Get = () => live,
+            Set = v => live = v,
+        };
+
+        Assert.AreEqual(0.5, definition.Coerce(0.1), 1e-9, "Never below half a second.");
+        Assert.AreEqual(60, definition.Coerce(500), 1e-9, "Never above a minute.");
+        Assert.AreEqual(1.3, definition.Coerce(1.26), 1e-9, "Kept to its grain.");
+        Assert.AreEqual(1.4, definition.Coerce(double.NaN), 1e-9, "Not a number is the default.");
+
+        definition.Write(33.4);
+        Assert.AreEqual(33, live, 1e-9);
+    }
+
+    [TestMethod]
     public void ChoiceRaisesSelectedIndex()
     {
         var edit = (SettingEdit<char>)Choice().BeginEdit();

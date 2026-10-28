@@ -24,9 +24,9 @@ namespace ChartPacker.Services
         public const bool DefaultPitchCorrection = true;
         public const OverwritePolicy DefaultOverwritePolicy = OverwritePolicy.Skip;
         public const DedupKindPreference DefaultDedupKeepPreference = DedupKindPreference.PreferSng;
-        public const double DefaultHighwayNoteSpeed = 1;
-        public const double MinHighwayNoteSpeed = 0.5;
-        public const double MaxHighwayNoteSpeed = 3;
+        // Qualified: this class's own HighwayLookAhead property would otherwise be what the name means.
+        public const double DefaultHighwayLookAhead = ChartShared.Core.Charting.HighwayLookAhead.Default;
+        public const double DefaultGenerateDifficultiesLookAhead = ChartShared.UI.ViewModels.ReductionPreviewViewModel.DefaultLookAhead;
         public const HighwayPlacement DefaultHighwayPlacement = HighwayPlacement.Background;
         public const WaveformFidelity DefaultWaveformFidelity = WaveformFidelity.High;
         public const ScrubStep DefaultScrubStep = ScrubStep.Quarter;
@@ -123,8 +123,18 @@ namespace ChartPacker.Services
         [JsonConverter(typeof(JsonStringEnumConverter<HighwayPlacement>))]
         public HighwayPlacement HighwayPlacement { get; set; } = DefaultHighwayPlacement;
 
-        /// <summary>How fast the highway's notes fall, as a multiple of the normal speed.</summary>
-        public double HighwayNoteSpeed { get; set; } = DefaultHighwayNoteSpeed;
+        /// <summary>How many seconds ahead of the strike line the highway shows, from <see cref="HighwayLookAhead"/>'s range.</summary>
+        public double HighwayLookAhead { get; set; } = DefaultHighwayLookAhead;
+
+        /// <summary>
+        /// How fast the highway's notes fell, as a multiple of the normal speed, before the highway was set by its
+        /// look-ahead. Only read, to carry a file an older Chart Packer saved over to <see cref="HighwayLookAhead"/>
+        /// (<see cref="SettingsService"/>); null once it has.
+        /// </summary>
+        public double? HighwayNoteSpeed { get; set; }
+
+        /// <summary>How many seconds ahead the Generate lower difficulties window's preview shows, as its slider last left it.</summary>
+        public double GenerateDifficultiesLookAhead { get; set; } = DefaultGenerateDifficultiesLookAhead;
 
         /// <summary>How far Ctrl and the wheel move the audio over the seek bar or a lane: a note of this length on the chart's grid.</summary>
         [JsonConverter(typeof(JsonStringEnumConverter<ScrubStep>))]

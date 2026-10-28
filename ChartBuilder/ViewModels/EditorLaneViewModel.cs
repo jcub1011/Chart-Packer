@@ -9,6 +9,7 @@ using ChartShared.Core.Charting.Commands;
 using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charting.Layout;
 using ChartShared.Core.Charts;
+using ChartShared.UI.Resources;
 using ChartShared.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -88,37 +89,14 @@ namespace ChartBuilder.ViewModels
         /// The header's control sets it, as do Ctrl+wheel, + and − over the lane. It's kept with the lanes' layout.
         /// </summary>
         [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(LookAheadText), nameof(LookAheadScale))]
+        [NotifyPropertyChangedFor(nameof(LookAheadText))]
         public partial double LookAhead { get; set; }
 
-        /// <summary>
-        /// The look-ahead on a base-2 logarithmic scale, from <see cref="MinLookAheadScale"/> to
-        /// <see cref="MaxLookAheadScale"/>. The header's slider binds <see cref="LookAhead"/> linearly instead.
-        /// </summary>
-        public double LookAheadScale
-        {
-            get => Math.Log2(LookAhead);
-            set => LookAhead = Math.Pow(2, value);
-        }
-
-        public static double MinLookAheadScale => Math.Log2(EditorViewport.MinLookAhead);
-
-        public static double MaxLookAheadScale => Math.Log2(EditorViewport.MaxLookAhead);
-
-        /// <summary>The shortest look-ahead the header's slider offers, in seconds.</summary>
-        public static double MinLookAhead => EditorViewport.MinLookAhead;
-
-        /// <summary>The longest look-ahead the header's slider offers, in seconds.</summary>
-        public static double MaxLookAhead => EditorViewport.MaxLookAhead;
-
         /// <summary>The look-ahead as the header shows it, e.g. "2.0 s".</summary>
-        public string LookAheadText => string.Format(CultureInfo.CurrentCulture, Strings.LaneLookAheadFormat, LookAhead);
+        public string LookAheadText => string.Format(CultureInfo.CurrentCulture, SharedStrings.LookAheadFormat, LookAhead);
 
-        /// <summary>Looks further ahead by <paramref name="factor"/>, or nearer when it's less than 1.</summary>
-        public void ZoomBy(double factor) => LookAhead = EditorViewport.ClampLookAhead(LookAhead * factor);
-
-        /// <summary>Looks further ahead by half a second per <paramref name="steps"/>, or nearer when negative.</summary>
-        public void StepLookAhead(double steps) => LookAhead = EditorViewport.ClampLookAhead(LookAhead + steps * EditorViewport.LookAheadStep);
+        /// <summary>Looks further ahead by a notch (<see cref="HighwayLookAhead.Stepped"/>) per <paramref name="steps"/>, or nearer when negative.</summary>
+        public void StepLookAhead(int steps) => LookAhead = HighwayLookAhead.Stepped(LookAhead, steps);
 
         /// <summary>Another difficulty of the part, drawn faintly behind the lane's own; null for none.</summary>
         [ObservableProperty]

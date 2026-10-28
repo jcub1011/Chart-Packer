@@ -1,4 +1,5 @@
 using System;
+using ChartShared.Core.Charting;
 using ChartShared.Core.Library;
 using ChartShared.Core.Settings;
 using ChartShared.UI.Views;
@@ -96,9 +97,15 @@ namespace ChartPacker.Services
                 ? Math.Clamp(settings.MasterVolume, 0, 1)
                 : AppSettings.DefaultMasterVolume;
 
-            settings.HighwayNoteSpeed = double.IsFinite(settings.HighwayNoteSpeed)
-                ? Math.Clamp(settings.HighwayNoteSpeed, AppSettings.MinHighwayNoteSpeed, AppSettings.MaxHighwayNoteSpeed)
-                : AppSettings.DefaultHighwayNoteSpeed;
+            // A file an older Chart Packer saved has the highway's note speed rather than its look-ahead.
+            if (settings.HighwayNoteSpeed is { } speed)
+            {
+                settings.HighwayLookAhead = HighwayLookAhead.FromNoteSpeed(speed, AppSettings.DefaultHighwayLookAhead);
+                settings.HighwayNoteSpeed = null;
+            }
+
+            settings.HighwayLookAhead = HighwayLookAhead.Clamp(settings.HighwayLookAhead, AppSettings.DefaultHighwayLookAhead);
+            settings.GenerateDifficultiesLookAhead = HighwayLookAhead.Clamp(settings.GenerateDifficultiesLookAhead, AppSettings.DefaultGenerateDifficultiesLookAhead);
 
             settings.FineScrubMilliseconds = double.IsFinite(settings.FineScrubMilliseconds)
                 ? Math.Clamp(settings.FineScrubMilliseconds, AppSettings.MinFineScrubMilliseconds, AppSettings.MaxFineScrubMilliseconds)
