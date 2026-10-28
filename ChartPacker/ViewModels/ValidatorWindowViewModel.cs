@@ -409,7 +409,7 @@ namespace ChartPacker.ViewModels
                             // The song stays open for its chart only when a worker is free to lint it now. One kept open
                             // while it waits would hold the file against a job or a save writing it meanwhile, so it's
                             // let go of, and opened again once it's its turn.
-                            if (!_checkGate.Wait(0))
+                            if (!_checkGate.Wait(0, CancellationToken.None))
                             {
                                 files?.Dispose();
                                 files = null;
