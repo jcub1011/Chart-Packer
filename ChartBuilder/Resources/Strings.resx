@@ -2125,13 +2125,13 @@ Saving also changes song.ini:
     <comment>The star power window's footer, in place of the kept/total summary when there are no regions.</comment>
   </data>
   <data name="StarPowerNoSpot" xml:space="preserve">
-    <value>No star power phrase fits: none has enough notes clear of sections, solos' edges and the star power there, early enough for it to be used.</value>
+    <value>No star power phrase fits: none has enough notes clear of sections, solos' edges, drum fills and the star power there, early enough for it to be used.</value>
   </data>
   <data name="StarPowerNoNotes" xml:space="preserve">
     <value>The part has no notes to propose star power over.</value>
   </data>
-  <data name="StarPowerNotFiveFret" xml:space="preserve">
-    <value>Star power is generated only for 5-fret and keys parts.</value>
+  <data name="StarPowerUnsupportedInstrument" xml:space="preserve">
+    <value>Star power is generated only for 5-fret parts (keys included), GHL and drums.</value>
   </data>
   <data name="StarPowerHasStarPower" xml:space="preserve">
     <value>The part has star power already. Replace it, or select a span to add beside it.</value>

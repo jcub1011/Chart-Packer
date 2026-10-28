@@ -224,22 +224,36 @@ public sealed class ChartRuleTests
     }
 
     [TestMethod]
-    public void APartWithoutStarPowerIsNotedOnlyWhereStarPowerCanBeGenerated()
+    public void APartWithoutStarPowerIsNotedOnlyWhereAPhraseFits()
     {
-        // Drums and GHL have none and aren't noted; neither is a 5-fret part with too few chords for a phrase, nor keys whose
-        // six chords all come too near its end for a phrase's star power to be used.
-        var (chart, input) = Clean([KeyValuePair.Create("diff_bass", "2"), KeyValuePair.Create("diff_keys", "2"), KeyValuePair.Create("diff_guitarghl", "2")], drums: true);
+        // Neither a 5-fret part with too few chords for a phrase, nor keys whose six chords all come too near its end for a
+        // phrase's star power to be used.
+        var (chart, input) = Clean([KeyValuePair.Create("diff_bass", "2"), KeyValuePair.Create("diff_keys", "2")]);
         new AddPart(ChartInstrument.Bass).Apply(chart);
         new AddNotes(ChartInstrument.Bass, Expert, [new EditableNote(0, 1, 0), new EditableNote(Beat, 1, 1), new EditableNote(2 * Beat, 1, 2)]).Apply(chart);
         new AddPart(ChartInstrument.Keys).Apply(chart);
         new AddNotes(ChartInstrument.Keys, Expert, [.. Enumerable.Range(0, 6).Select(i => new EditableNote((long)i * Beat, 1, i % 5))]).Apply(chart);
         Assert.IsFalse(StarPowerGenerator.HasSpot(chart, chart.PartOf(ChartInstrument.Keys)!));
-        new AddPart(ChartInstrument.GhlGuitar).Apply(chart);
-        new AddNotes(ChartInstrument.GhlGuitar, Expert, [.. Enumerable.Range(0, Notes).Select(i => new EditableNote((long)i * Beat, 1, 0))]).Apply(chart);
 
         var findings = new ChartLinter().LintAll(Snapshot(chart, input)).FindingsOf(ChrRules.Chr066);
 
         Assert.IsEmpty(findings, string.Join("; ", findings.Select(Describe)));
+    }
+
+    [TestMethod]
+    public void DrumsAndGhlWithoutStarPowerAreNoted()
+    {
+        var (chart, input) = Clean([], drums: true);
+        new RemovePhrase(Drums, CleanStarPower).Apply(chart);
+        new AddPart(ChartInstrument.GhlGuitar).Apply(chart);
+        foreach (var difficulty in Enum.GetValues<ChartDifficulty>())
+            new AddNotes(ChartInstrument.GhlGuitar, difficulty, [.. Enumerable.Range(0, 64).Select(i => new EditableNote((long)i * Beat, 1, 1))]).Apply(chart);
+
+        var findings = new ChartLinter().LintAll(Snapshot(chart, input)).FindingsOf(ChrRules.Chr066);
+
+        Assert.AreSequenceEqual([Drums, ChartInstrument.GhlGuitar], [.. findings.Select(f => f.Location!.Part).Order()]);
+        foreach (var finding in findings)
+            Assert.IsNotEmpty(StarPowerGenerator.Propose(chart, finding.Location!.Part, StarPowerOptions.Default, input.Options).Proposals);
     }
 
     [TestMethod]
@@ -389,6 +403,8 @@ public sealed class ChartRuleTests
         }
 
         new AddPhrase(Guitar, CleanStarPower).Apply(chart);
+        if (drums)
+            new AddPhrase(Drums, CleanStarPower).Apply(chart);
         new AddTextEvent(null, TextEvent.Of(0, "[section Intro]")).Apply(chart);
         new AddTextEvent(null, TextEvent.Of(SongEventPlacement.Place(chart, null, TimeSpan.Zero).End, SongEvents.EndText)).Apply(chart);
         return (chart, Snapshot(chart, IniWith(extraIni, drums), audio ?? AudioLength));

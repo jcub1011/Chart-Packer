@@ -154,8 +154,8 @@ internal static class StarPowerCandidates
         return Math.Min(release, next);
     }
 
-    // Whether a phrase can go there: within the span, crossing no section, solo edge or big rock ending, clear of the star
-    // power there but for what the plan replaces, and covering a note on every difficulty with notes.
+    // Whether a phrase can go there: within the span, crossing no section, solo edge, big rock ending or drum fill, clear
+    // of the star power there but for what the plan replaces, and covering a note on every difficulty with notes.
     private static bool Fits(StarPowerContext c, Phrase phrase)
     {
         if (c.Span is { } span && (phrase.Tick < span.From || phrase.CoverEnd - 1 > span.To))
@@ -180,7 +180,7 @@ internal static class StarPowerCandidates
                 continue;
             }
 
-            if (other.Kind == PhraseKind.BigRockEnding)
+            if (other.Kind == PhraseKind.BigRockEnding || other.Kind == PhraseKind.DrumFill)
                 return false;
             if (other.Kind == PhraseKind.Solo && (phrase.Tick < other.Tick || phrase.CoverEnd > other.CoverEnd))
                 return false;

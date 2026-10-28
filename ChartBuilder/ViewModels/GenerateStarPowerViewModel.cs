@@ -174,7 +174,7 @@ namespace ChartBuilder.ViewModels
 
             EmptyText = _plan.Reason switch
             {
-                NoStarPowerReason.NotFiveFret => Strings.StarPowerNotFiveFret,
+                NoStarPowerReason.UnsupportedInstrument => Strings.StarPowerUnsupportedInstrument,
                 NoStarPowerReason.NoNotes => Strings.StarPowerNoNotes,
                 NoStarPowerReason.HasStarPower => Strings.StarPowerHasStarPower,
                 NoStarPowerReason.NoSpotFits => $"{Strings.StarPowerNoSpot}\n{Strings.GenerateEmptyHint}",

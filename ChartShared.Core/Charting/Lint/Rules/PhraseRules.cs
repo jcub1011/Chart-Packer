@@ -207,9 +207,9 @@ public sealed class PhraseEmptyOnDifficultyRule : IChartLintRule
 }
 
 /// <summary>
-/// CHR066: a 5-fret or keys part with notes has no star power phrases, so a player never earns star power on it. One
-/// finding for each such part where a phrase fits (<see cref="StarPowerGenerator.HasSpot"/>), so generating it
-/// (<see cref="StarPowerGenerator"/>) always proposes some.
+/// CHR066: a part star power can be generated for with notes has no star power phrases, so a player never earns star
+/// power on it. One finding for each such part where a phrase fits (<see cref="StarPowerGenerator.HasSpot"/>), so
+/// generating it (<see cref="StarPowerGenerator"/>) always proposes some.
 /// </summary>
 public sealed class NoStarPowerRule : IChartLintRule
 {
