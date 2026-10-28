@@ -27,14 +27,19 @@ public sealed record UpdateSettings(
 /// <c>update-settings.json</c>: shared update preferences read and written by both apps.
 /// Holds whether the update check runs and whether pre-releases count as available updates,
 /// plus the last check time and its cached result so the title bar badge shows instantly on launch.
-/// <c>{ "checkForUpdates": true, "checkFrequency": "daily", "includePrereleases": false, "lastCheckedUtc": "...", "cachedTag": "v1.2.0", "cachedPrerelease": false, "cachedIncludePrereleases": false }</c>.
+/// <c>{ "SchemaVersion": 1, "checkForUpdates": true, "checkFrequency": "daily", "includePrereleases": false, "lastCheckedUtc": "...", "cachedTag": "v1.2.0", "cachedPrerelease": false, "cachedIncludePrereleases": false }</c>.
 /// </summary>
 /// <remarks>
 /// Several processes may share the file, so a save re-reads it and changes only the keys it owns,
 /// keeping any keys it doesn't know. The path is always passed in; tests pass a temp file.
+/// A write stamps <see cref="SchemaVersion"/> into a file that has an older one or none; a file from a newer build isn't
+/// written (a write gives false). Reading never writes, so an older file is stamped by the next write.
 /// </remarks>
 public sealed class UpdateSettingsFile
 {
+    /// <summary>The schema version this build writes to the file.</summary>
+    public const int SchemaVersion = 1;
+
     private readonly string _path;
 
     public UpdateSettingsFile(string path)
@@ -76,8 +81,11 @@ public sealed class UpdateSettingsFile
         return new UpdateSettings(checkForUpdates, frequency, includePrereleases, checkedUtc, tag, prerelease, cachedInclude);
     }
 
+    /// <summary>The schema version the file records; 0 when it has none. Reading it never writes.</summary>
+    public int StoredSchemaVersion => SettingsSchema.Read(JsonFiles.ReadObject(_path, warn: false));
+
     /// <summary>Stores whether the update check runs. Gives false when it couldn't be written.</summary>
-    public bool SetCheckForUpdates(bool check) => JsonFiles.Update(_path, file =>
+    public bool SetCheckForUpdates(bool check) => JsonFiles.Update(_path, SchemaVersion, file =>
     {
         file ??= [];
         file["checkForUpdates"] = check;
@@ -85,7 +93,7 @@ public sealed class UpdateSettingsFile
     });
 
     /// <summary>Stores how often the update check runs. Gives false when it couldn't be written.</summary>
-    public bool SetCheckFrequency(UpdateCheckFrequency frequency) => JsonFiles.Update(_path, file =>
+    public bool SetCheckFrequency(UpdateCheckFrequency frequency) => JsonFiles.Update(_path, SchemaVersion, file =>
     {
         file ??= [];
         if (!Enum.IsDefined(frequency))
@@ -95,7 +103,7 @@ public sealed class UpdateSettingsFile
     });
 
     /// <summary>Stores whether pre-releases count. Gives false when it couldn't be written.</summary>
-    public bool SetIncludePrereleases(bool include) => JsonFiles.Update(_path, file =>
+    public bool SetIncludePrereleases(bool include) => JsonFiles.Update(_path, SchemaVersion, file =>
     {
         file ??= [];
         file["includePrereleases"] = include;
@@ -106,7 +114,7 @@ public sealed class UpdateSettingsFile
     /// Stores a successful check's result: the tag it found (or null), whether that's a pre-release, and the
     /// <paramref name="includePrereleases"/> it was found with. Gives false when it couldn't be written.
     /// </summary>
-    public bool SetCached(DateTimeOffset checkedUtc, string? tag, bool prerelease, bool includePrereleases) => JsonFiles.Update(_path, file =>
+    public bool SetCached(DateTimeOffset checkedUtc, string? tag, bool prerelease, bool includePrereleases) => JsonFiles.Update(_path, SchemaVersion, file =>
     {
         file ??= [];
         file["lastCheckedUtc"] = checkedUtc.UtcDateTime.ToString("o");

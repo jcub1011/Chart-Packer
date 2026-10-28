@@ -35,6 +35,9 @@ namespace ChartBuilder.Services
 
         public BuilderSettings Settings { get; }
 
+        /// <summary>The schema version this build writes to <c>builder-settings.json</c>.</summary>
+        public const int SchemaVersion = 1;
+
         /// <summary>
         /// The default rules Reduce starts from (charter-spec C9 item 2, §10): <c>reduction-rules.json</c> beside the settings
         /// file, which Chart Packer reads and writes too.
@@ -45,7 +48,7 @@ namespace ChartBuilder.Services
         public static BuilderSettingsService Load(string filePath)
         {
             // Each window's placement is merged on its own, so Chart Builders closing different windows keep both.
-            var file = new JsonSettingsFile<BuilderSettings>(filePath, BuilderSettingsJsonContext.Default.BuilderSettings, [nameof(BuilderSettings.Windows)]);
+            var file = new JsonSettingsFile<BuilderSettings>(filePath, BuilderSettingsJsonContext.Default.BuilderSettings, [nameof(BuilderSettings.Windows)], SchemaVersion);
             var settings = file.Load();
             Sanitize(settings);
             string rules = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(filePath)) ?? "", Path.GetFileName(UserConfigPaths.ReductionRulesFile));
