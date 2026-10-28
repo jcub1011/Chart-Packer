@@ -11,6 +11,7 @@ using ChartBuilder.Devices;
 using ChartShared.Core.Launching;
 using ChartShared.Core.Settings;
 using ChartShared.UI.Services;
+using ChartShared.UI.Views;
 
 namespace ChartBuilder
 {
@@ -28,6 +29,8 @@ namespace ChartBuilder
                 // Composition root: services are wired by hand, as in Chart Packer. BuilderWindows opens the
                 // first Editor, then swaps it for a new one for each song or chart opened.
                 var settings = BuilderSettingsService.Load(UserConfigPaths.BuilderSettingsFile);
+                // Every window opens as it last closed, the Editor where it was too, so this comes before any is made.
+                WindowMemory.Use(settings.Settings, settings.Save);
 
                 // An Editor that didn't close cleanly leaves the copies it kept for undo; a day on, no session needs them.
                 MediaStash.SweepStale(TimeSpan.FromDays(1));

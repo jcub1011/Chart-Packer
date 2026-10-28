@@ -67,7 +67,7 @@ namespace ChartBuilder.Services
 
     /// <summary>Chart Builder's settings, persisted to <c>builder-settings.json</c> (charter-spec §10).</summary>
     /// <remarks>Chart Packer's are in its own file, so neither app overwrites the other's.</remarks>
-    public sealed class BuilderSettings : ISettingsWindowSize
+    public sealed class BuilderSettings : IRememberedWindows
     {
         public const double DefaultEditorLeftPanelWidth = 300;
         public const double DefaultEditorRightPanelWidth = 280;
@@ -192,26 +192,8 @@ namespace ChartBuilder.Services
         /// <summary>The editor's lanes, where each is docked and how big. Null for the default layout.</summary>
         public LaneDockState? EditorLanes { get; set; }
 
-        /// <summary>Whether the editor was maximized or fullscreen when it last closed, so the next one opens that way.</summary>
-        /// <remarks>Kept for files saved before fullscreen was told apart from maximized; use with <see cref="EditorFullscreen"/>.</remarks>
-        public bool EditorMaximized { get; set; }
-
-        /// <summary>Whether the editor was fullscreen when it last closed, so the next one opens fullscreen.</summary>
-        public bool EditorFullscreen { get; set; }
-
-        /// <summary>The editor's normal bounds when it last closed, in screen pixels (position) and device-independent pixels (size). Null for none yet.</summary>
-        public int? EditorX { get; set; }
-
-        public int? EditorY { get; set; }
-
-        public double? EditorWidth { get; set; }
-
-        public double? EditorHeight { get; set; }
-
-        /// <summary>The Settings window's normal size when it last closed, in device-independent pixels. Null for none yet.</summary>
-        public double? SettingsWindowWidth { get; set; }
-
-        public double? SettingsWindowHeight { get; set; }
+        /// <summary>How each window was shown when it last closed, by its type's name (<see cref="ChartShared.UI.Views.WindowMemory"/>). Null for none yet.</summary>
+        public Dictionary<string, SavedWindow>? Windows { get; set; }
 
         /// <summary>What Chart Builder opens with when it starts with nothing on its command line.</summary>
         public StartupAction StartupAction { get; set; } = StartupAction.BlankChart;

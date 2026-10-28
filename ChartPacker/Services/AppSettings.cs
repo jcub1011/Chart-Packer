@@ -11,7 +11,7 @@ using ChartShared.UI.Services;
 namespace ChartPacker.Services
 {
     /// <summary>User settings persisted to <c>settings.json</c>. See spec §8.</summary>
-    public sealed class AppSettings : ISettingsWindowSize
+    public sealed class AppSettings : IRememberedWindows
     {
         public const double DefaultLibraryPaneWidth = 320;
         public const double MinLibraryPaneWidth = 200;
@@ -46,25 +46,8 @@ namespace ChartPacker.Services
         /// <summary>Width of the library (left) panel, in device-independent pixels.</summary>
         public double LibraryPaneWidth { get; set; } = DefaultLibraryPaneWidth;
 
-        /// <summary>Whether the main window was maximized when it last closed, so it opens that way.</summary>
-        public bool MainWindowMaximized { get; set; }
-
-        /// <summary>The main window's normal bounds when it last closed, in screen pixels (position) and device-independent pixels (size). Null for none yet.</summary>
-        public int? MainWindowX { get; set; }
-
-        public int? MainWindowY { get; set; }
-
-        public double? MainWindowWidth { get; set; }
-
-        public double? MainWindowHeight { get; set; }
-
-        /// <summary>The Settings window's normal size when it last closed, in device-independent pixels. Null for none yet.</summary>
-        public double? SettingsWindowWidth { get; set; }
-
-        public double? SettingsWindowHeight { get; set; }
-
-        /// <summary>Whether the merge songs editor was maximized when it was last closed.</summary>
-        public bool MergeWindowMaximized { get; set; }
+        /// <summary>How each window was shown when it last closed, by its type's name (<see cref="ChartShared.UI.Views.WindowMemory"/>). Null for none yet.</summary>
+        public Dictionary<string, SavedWindow>? Windows { get; set; }
 
         /// <summary>Share of the merge songs editor's width given to the preview (right) panel, from 0 to 1.</summary>
         public double MergePreviewFraction { get; set; } = DefaultMergePreviewFraction;

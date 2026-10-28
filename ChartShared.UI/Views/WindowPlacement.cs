@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Platform;
@@ -9,6 +10,26 @@ namespace ChartShared.UI.Views
     /// <summary>Where a window goes on the screens, in screen pixels: placing one over where another was.</summary>
     public static class WindowPlacement
     {
+        // GWL_STYLE, and the DPI of a screen at 100%.
+        private const int WindowStyle = -16;
+        private const double BaseDpi = 96;
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct Rect32
+        {
+            public int Left;
+            public int Top;
+            public int Right;
+            public int Bottom;
+        }
+
+        [DllImport("user32.dll", EntryPoint = "GetWindowLongW")]
+        private static extern int GetWindowLong(IntPtr hwnd, int index);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool AdjustWindowRectExForDpi(ref Rect32 rect, uint style, [MarshalAs(UnmanagedType.Bool)] bool menu, uint exStyle, uint dpi);
+
         /// <summary>
         /// The middle of <paramref name="window"/>, frame included. Null while it's minimized, when its position isn't
         /// where it shows, or before it has a frame.
@@ -34,11 +55,14 @@ namespace ChartShared.UI.Views
             Fit(center.Y - (size.Height / 2), size.Height, workingArea.Y, workingArea.Bottom));
 
         /// <summary>
-        /// Where a window of <paramref name="size"/> goes to be at <paramref name="position"/>, moved as little as
-        /// keeps it inside <paramref name="workingArea"/>. One too big for the area is put at its top left.
+        /// Where a window goes to be at <paramref name="position"/>, its frame's top left, moved as little as keeps its
+        /// client area, of <paramref name="size"/>, inside <paramref name="workingArea"/>. The client area starts
+        /// <paramref name="frameLeft"/> right of the frame's left: the resize border Windows draws there is invisible, so a
+        /// window snapped to the area's left edge has its frame that far past it, and it's left there. One too big for
+        /// the area is put at its top left.
         /// </summary>
-        public static PixelPoint PlaceAt(PixelPoint position, PixelSize size, PixelRect workingArea) => new(
-            Fit(position.X, size.Width, workingArea.X, workingArea.Right),
+        public static PixelPoint PlaceAt(PixelPoint position, PixelSize size, PixelRect workingArea, int frameLeft = 0) => new(
+            Fit(position.X + frameLeft, size.Width, workingArea.X, workingArea.Right) - frameLeft,
             Fit(position.Y, size.Height, workingArea.Y, workingArea.Bottom));
 
         /// <summary>
@@ -60,23 +84,39 @@ namespace ChartShared.UI.Views
             if (ScreenOf(window, center) is not { } screen)
                 return false;
 
-            // The window isn't on a screen yet, so its size is scaled as the one it's going to.
-            var area = screen.WorkingArea;
-            var size = PixelSize.FromSize(new Size(window.Width, window.Height), screen.Scaling);
-            var minPixels = PixelSize.FromSize(new Size(window.MinWidth, window.MinHeight), screen.Scaling);
-            size = FitSize(size, minPixels, area);
-
-            window.Width = size.Width / screen.Scaling;
-            window.Height = size.Height / screen.Scaling;
+            var size = FitTo(window, screen);
             window.WindowStartupLocation = WindowStartupLocation.Manual;
-            window.Position = Centered(center, size, area);
+            window.Position = Centered(center, size, screen.WorkingArea);
             return true;
         }
 
         /// <summary>
+        /// Makes <paramref name="window"/>, not yet shown, fit the working area of <paramref name="screen"/>, but no smaller
+        /// than the window's own minimum where it allows.
+        /// </summary>
+        /// <returns>Its size on that screen, in screen pixels.</returns>
+        public static PixelSize FitTo(Window window, Screen screen)
+        {
+            // The window isn't on a screen yet, so its size is scaled as the one it's going to.
+            var size = PixelSize.FromSize(new Size(window.Width, window.Height), screen.Scaling);
+            var minPixels = PixelSize.FromSize(new Size(window.MinWidth, window.MinHeight), screen.Scaling);
+            var fitted = FitSize(size, minPixels, screen.WorkingArea);
+
+            // Left alone when it fits, so a size that's already right isn't rounded to the screen's pixels.
+            if (fitted != size)
+            {
+                window.Width = fitted.Width / screen.Scaling;
+                window.Height = fitted.Height / screen.Scaling;
+            }
+
+            return fitted;
+        }
+
+        /// <summary>
         /// Puts <paramref name="window"/>, not yet shown, at the normal <paramref name="bounds"/> it was saved with: on
-        /// the screen their top left is on (or their middle is, or the first), their size made to fit that screen's
-        /// working area but no smaller than the window's own minimum where it allows, moved as little as keeps it there.
+        /// the screen their client area's top left is on (or their middle is, or the first), their size made to fit that
+        /// screen's working area but no smaller than the window's own minimum where it allows, moved as little as keeps
+        /// it there.
         /// </summary>
         /// <returns>False, leaving the window where it would have gone, when there are no screens.</returns>
         public static bool Restore(Window window, WindowBounds bounds)
@@ -85,8 +125,10 @@ namespace ChartShared.UI.Views
             if (screens.Count == 0)
                 return false;
 
-            // The window isn't on a screen yet, so its middle is found with the size scaled as each screen would show it.
-            var target = window.Screens.ScreenFromPoint(bounds.Position)
+            // The window isn't on a screen yet, so its frame and middle are found as each screen would show them. It's
+            // the client area's top left that says which screen it's on: a window snapped to a screen's left edge has its
+            // frame's on the screen to its left.
+            var target = screens.FirstOrDefault(s => s.Bounds.Contains(new PixelPoint(bounds.Position.X + FrameLeft(window, s.Scaling), bounds.Position.Y)))
                 ?? screens.FirstOrDefault(s => s.Bounds.Contains(bounds.MiddleOn(s.Scaling)))
                 ?? screens[0];
             var area = target.WorkingArea;
@@ -98,8 +140,23 @@ namespace ChartShared.UI.Views
             window.Width = pixelSize.Width / target.Scaling;
             window.Height = pixelSize.Height / target.Scaling;
             window.WindowStartupLocation = WindowStartupLocation.Manual;
-            window.Position = PlaceAt(bounds.Position, pixelSize, area);
+            window.Position = PlaceAt(bounds.Position, pixelSize, area, FrameLeft(window, target.Scaling));
             return true;
+        }
+
+        /// <summary>
+        /// How far right of <paramref name="window"/>'s left edge, in screen pixels at <paramref name="scaling"/>, its
+        /// client area starts: the frame's resize border, which Windows draws invisible. 0 elsewhere.
+        /// </summary>
+        private static int FrameLeft(Window window, double scaling)
+        {
+            if (!OperatingSystem.IsWindows() || window.TryGetPlatformHandle() is not { } handle)
+                return 0;
+
+            // As Avalonia sizes the frame, a client area extended over the title bar included.
+            var frame = default(Rect32);
+            uint style = unchecked((uint)GetWindowLong(handle.Handle, WindowStyle));
+            return AdjustWindowRectExForDpi(ref frame, style, false, 0, (uint)Math.Round(BaseDpi * scaling)) ? -frame.Left : 0;
         }
 
         /// <summary>

@@ -55,6 +55,28 @@ public sealed class WindowPlacementTests
     }
 
     [TestMethod]
+    public void LeavesARestoredWindowSnappedToAnEdgeWhereItWas()
+    {
+        // Snapped to the left (past a taskbar there) or the right, the frame's invisible border hangs off the area.
+        var area = new PixelRect(70, 0, 1850, 1040);
+        var size = new PixelSize(1280, 800);
+        const int frameLeft = 8;
+
+        Assert.AreEqual(new PixelPoint(62, 0), WindowPlacement.PlaceAt(new PixelPoint(62, 0), size, area, frameLeft));
+        Assert.AreEqual(new PixelPoint(632, 0), WindowPlacement.PlaceAt(new PixelPoint(632, 0), size, area, frameLeft));
+    }
+
+    [TestMethod]
+    public void KeepsARestoredWindowsClientAreaInsideTheWorkingArea()
+    {
+        var size = new PixelSize(1280, 800);
+        const int frameLeft = 8;
+
+        Assert.AreEqual(new PixelPoint(-8, 0), WindowPlacement.PlaceAt(new PixelPoint(-500, -500), size, Screen, frameLeft));
+        Assert.AreEqual(new PixelPoint(632, 240), WindowPlacement.PlaceAt(new PixelPoint(1900, 1000), size, Screen, frameLeft));
+    }
+
+    [TestMethod]
     public void PutsARestoredPositionTooBigForTheWorkingAreaAtItsTopLeft()
     {
         var position = WindowPlacement.PlaceAt(new PixelPoint(100, 100), new PixelSize(2560, 1440), Screen);
