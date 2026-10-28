@@ -135,7 +135,7 @@ public sealed class StarPowerPlan
         var p = parameters ?? StarPowerParameters.Default;
         var whole = chart.PartOf(part);
         if (whole is null || !StarPowerGenerator.CanGenerate(whole.Kind))
-            return Empty(chart, part, whole, options, mode, span, p, NoStarPowerReason.NotFiveFret);
+            return Empty(chart, part, whole, options, mode, span, p, NoStarPowerReason.UnsupportedInstrument);
         if (DifficultyGenerator.HighestCharted(whole) is null)
             return Empty(chart, part, whole, options, mode, span, p, NoStarPowerReason.NoNotes);
         if (mode == GenerationMode.Add && span is null && StarPowerGenerator.HasStarPower(whole))

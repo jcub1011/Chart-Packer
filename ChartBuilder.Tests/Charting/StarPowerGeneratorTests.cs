@@ -347,10 +347,38 @@ public sealed class StarPowerGeneratorTests
     }
 
     [TestMethod]
-    public void NothingIsProposedForDrumsGhlAPartWithoutNotesOrOneTooSparse()
+    public void DrumsAndGhlAreGivenStarPowerAsFiveFretIs()
     {
-        Assert.AreEqual(NoStarPowerReason.NotFiveFret, StarPowerGenerator.Propose(Editing.EditorSessions.Drums(), ChartInstrument.Drums, StarPowerOptions.Default).Reason);
-        Assert.AreEqual(NoStarPowerReason.NotFiveFret, StarPowerGenerator.Propose(Editing.EditorSessions.Ghl(), ChartInstrument.GhlGuitar, StarPowerOptions.Default).Reason);
+        var drums = PartChart(ChartInstrument.Drums, Steady(0, 64));
+        var drumPower = StarPowerGenerator.Propose(drums, ChartInstrument.Drums, StarPowerOptions.Default);
+        Assert.AreEqual(NoStarPowerReason.None, drumPower.Reason);
+        Assert.HasCount(6, drumPower.Proposals);
+
+        var ghl = PartChart(ChartInstrument.GhlGuitar, Steady(0, 64));
+        var ghlPower = StarPowerGenerator.Propose(ghl, ChartInstrument.GhlGuitar, StarPowerOptions.Default);
+        Assert.AreEqual(NoStarPowerReason.None, ghlPower.Reason);
+        Assert.HasCount(6, ghlPower.Proposals);
+    }
+
+    [TestMethod]
+    public void DrumsKeepStarPowerClearOfExistingFills()
+    {
+        var chart = PartChart(ChartInstrument.Drums, Steady(0, 64));
+        var fill = new Phrase(PhraseKind.DrumFill, 20 * Measure, Measure);
+        new AddPhrase(ChartInstrument.Drums, fill).Apply(chart);
+
+        var generated = StarPowerGenerator.Propose(chart, ChartInstrument.Drums, StarPowerOptions.Default);
+
+        Assert.IsNotEmpty(generated.Proposals);
+        foreach (var proposal in generated.Proposals)
+            Assert.IsFalse(proposal.Phrase.Overlaps(fill), $"{proposal.Phrase} overlaps the fill.");
+    }
+
+    [TestMethod]
+    public void NothingIsProposedForAPartWithoutNotesOrOneTooSparse()
+    {
+        Assert.AreEqual(NoStarPowerReason.NoNotes, StarPowerGenerator.Propose(Editing.EditorSessions.Drums(), ChartInstrument.Drums, StarPowerOptions.Default).Reason);
+        Assert.AreEqual(NoStarPowerReason.NoNotes, StarPowerGenerator.Propose(Editing.EditorSessions.Ghl(), ChartInstrument.GhlGuitar, StarPowerOptions.Default).Reason);
         Assert.AreEqual(NoStarPowerReason.NoNotes, Propose(Chart([])).Reason);
         Assert.AreEqual(NoStarPowerReason.NoSpotFits, Propose(Chart([new EditableNote(0, 1, 0), new EditableNote(Beat, 1, 1), new EditableNote(2 * Beat, 1, 2)])).Reason);
     }
@@ -390,6 +418,16 @@ public sealed class StarPowerGeneratorTests
         var list = notes.ToList();
         if (list.Count > 0)
             new AddNotes(Guitar, Expert, list).Apply(chart);
+        return chart;
+    }
+
+    /// <summary>A drums or GHL chart with <paramref name="notes"/> on Expert.</summary>
+    internal static EditableChart PartChart(ChartInstrument part, IEnumerable<EditableNote> notes)
+    {
+        var chart = part == ChartInstrument.Drums ? Editing.EditorSessions.Drums() : Editing.EditorSessions.Ghl();
+        var list = notes.ToList();
+        if (list.Count > 0)
+            new AddNotes(part, Expert, list).Apply(chart);
         return chart;
     }
 

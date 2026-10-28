@@ -115,7 +115,7 @@ public static class ChrRules
     /// <summary>A star power phrase or solo with no notes in it on one charted difficulty, though another has some.</summary>
     public const string Chr065 = "CHR065";
 
-    /// <summary>A 5-fret or keys part with notes has no star power phrases.</summary>
+    /// <summary>A part star power can be generated for has notes but no star power phrases.</summary>
     public const string Chr066 = "CHR066";
 
     /// <summary>A part is in the chart but has no notes on any difficulty.</summary>

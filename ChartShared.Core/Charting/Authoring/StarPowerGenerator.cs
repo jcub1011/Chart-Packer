@@ -130,13 +130,13 @@ public enum NoStarPowerReason
     /// <summary>It proposed some.</summary>
     None,
 
-    /// <summary>The part isn't 5-fret or keys.</summary>
-    NotFiveFret,
+    /// <summary>The part is of a kind star power isn't generated for.</summary>
+    UnsupportedInstrument,
 
     /// <summary>The part has no notes.</summary>
     NoNotes,
 
-    /// <summary>No spot fits: none has enough notes clear of sections, solos' edges and the phrases already there.</summary>
+    /// <summary>No spot fits: none has enough notes clear of sections, solos' edges, drum fills and the phrases already there.</summary>
     NoSpotFits,
 
     /// <summary>The part has star power already, and the run adds alongside it over the whole part.</summary>
@@ -148,8 +148,8 @@ public enum NoStarPowerReason
 public sealed record StarPowerGeneration(IReadOnlyList<StarPowerProposal> Proposals, IReadOnlyList<StarPowerSpike> Spikes, ChartDifficulty? Source, NoStarPowerReason Reason);
 
 /// <summary>
-/// Generate star power (charter-spec C8 item 1): proposes star power phrases for a 5-fret or keys part, over a span of it
-/// or all of it, which the author then keeps or drops (<see cref="Editing.StarPowerPlan"/>), or the library adds for
+/// Generate star power (charter-spec C8 item 1): proposes star power phrases for a 5-fret, GHL or drums part, over a span
+/// of it or all of it, which the author then keeps or drops (<see cref="Editing.StarPowerPlan"/>), or the library adds for
 /// CHR066's fix (<see cref="Validation.SongDifficultyGeneration"/>). It changes nothing.
 /// </summary>
 /// <remarks>
@@ -160,8 +160,8 @@ public sealed record StarPowerGeneration(IReadOnlyList<StarPowerProposal> Propos
 /// whole part.</para>
 /// <para>A phrase starts on a measure line, or on a run's first chord where it's on a beat, and ends at a run's end or
 /// the last chord before a measure line; a run is chords between rests of a beat and sections (as the reducer splits
-/// them). It covers its last chord's sustains, up to the next chord. It doesn't cross a section, a solo's edge or a big
-/// rock ending, overlap star power already there, or complete too late for its star power to be used.</para>
+/// them). It covers its last chord's sustains, up to the next chord. It doesn't cross a section, a solo's edge, a big
+/// rock ending or a drum fill, overlap star power already there, or complete too late for its star power to be used.</para>
 /// <para>With <see cref="StarPowerOptions.PlanForSpikes"/>, the hard passages are found from the difficulty model,
 /// scored a few measures at a time on their own so endurance doesn't rank later ones higher, and the most prominent
 /// are charged for: the meter is simulated as the games fill and drain it, and each is given the phrases that bring a
@@ -171,8 +171,9 @@ public sealed record StarPowerGeneration(IReadOnlyList<StarPowerProposal> Propos
 /// </remarks>
 public static class StarPowerGenerator
 {
-    /// <summary>Whether a part of <paramref name="kind"/> can be given star power: 5-fret, keys among them.</summary>
-    public static bool CanGenerate(ChartInstrumentKind kind) => kind == ChartInstrumentKind.FiveFret;
+    /// <summary>Whether a part of <paramref name="kind"/> can be given star power: 5-fret (keys among them), GHL and drums.</summary>
+    public static bool CanGenerate(ChartInstrumentKind kind) =>
+        kind is ChartInstrumentKind.FiveFret or ChartInstrumentKind.SixFret or ChartInstrumentKind.Drums;
 
     /// <summary>Whether <paramref name="part"/> has a star power phrase.</summary>
     public static bool HasStarPower(EditablePart part)
@@ -190,8 +191,8 @@ public static class StarPowerGenerator
     /// <summary>
     /// Whether a star power phrase fits anywhere in <paramref name="part"/> of <paramref name="chart"/>, so
     /// <see cref="Propose"/> over the whole part proposes at least one: a spot with enough chords, clear of sections,
-    /// solos' edges and the star power there, early enough to be used. It doesn't score the part's difficulty, so it's
-    /// cheap enough for lint (CHR066).
+    /// solos' edges, drum fills and the star power there, early enough to be used. It doesn't score the part's difficulty,
+    /// so it's cheap enough for lint (CHR066).
     /// </summary>
     public static bool HasSpot(EditableChart chart, EditablePart part, StarPowerParameters? parameters = null)
     {
@@ -219,13 +220,14 @@ public static class StarPowerGenerator
         var p = parameters ?? StarPowerParameters.Default;
 
         if (!CanGenerate(ChartInstruments.KindOf(part)))
-            return new StarPowerGeneration([], [], null, NoStarPowerReason.NotFiveFret);
+            return new StarPowerGeneration([], [], null, NoStarPowerReason.UnsupportedInstrument);
         if (chart.PartOf(part) is not { } whole || DifficultyGenerator.HighestCharted(whole) is not { } highest)
             return new StarPowerGeneration([], [], null, NoStarPowerReason.NoNotes);
 
+        var optionsRead = readOptions ?? ChartReadOptions.Default;
         var context = StarPowerContext.Of(chart, whole, highest, span, p, mode);
         var spikes = options.PlanForSpikes
-            ? StarPowerSpikes.Find(context, DifficultyNotes.Of(GameTrack(chart, context.Source, readOptions ?? ChartReadOptions.Default), context.Map, DifficultyNotes.EndTickOf(chart)))
+            ? SpikesOf(chart, context, optionsRead)
             : [];
         var candidates = StarPowerCandidates.Find(context);
         var proposals = new StarPowerScheduler(context, candidates, options).Schedule(spikes);
@@ -245,9 +247,23 @@ public static class StarPowerGenerator
         };
     }
 
-    // The track as the games read it, which the difficulty model reads: HOPOs and taps as they're played.
-    private static NoteTrack GameTrack(EditableChart chart, EditableTrack track, ChartReadOptions options) =>
-        new(GameView.Frets(track.Notes, track.FlaggedChords, chart.Resolution, options, []), []);
+    // The hard passages of the source, rated as its own instrument.
+    private static List<StarPowerSpike> SpikesOf(EditableChart chart, StarPowerContext context, ChartReadOptions options)
+    {
+        var instrument = InstrumentOf(chart, context.Part, options);
+        var track = GameView.Project(chart, new ChartTrackKey(context.Part.Instrument, context.Source.Difficulty), options);
+        var notes = DifficultyNotes.Of(
+            track,
+            context.Map,
+            DifficultyNotes.EndTickOf(chart),
+            DifficultyParameters.For(instrument),
+            DifficultyNotes.FreeLanesOf(context.Part, context.Source.Difficulty));
+        return StarPowerSpikes.Find(context, notes, DifficultyParameters.For(instrument));
+    }
+
+    // The difficulty model the part is read with: its own, and Pro drums when the drums are charted that way.
+    private static DifficultyInstrument InstrumentOf(EditableChart chart, EditablePart part, ChartReadOptions options) =>
+        DifficultyInstruments.Of(part.Instrument, proView: part.Kind == ChartInstrumentKind.Drums && DifficultyGenerator.DrumsVariantOf(chart, options) == DrumsVariant.Pro);
 }
 
 /// <summary>What Generate star power reads of a chart, worked out once for each stage (<see cref="StarPowerGenerator"/>).</summary>

@@ -304,7 +304,7 @@ namespace ChartBuilder.ViewModels
             var others = Enum.GetValues<ChartDifficulty>().Where(d => d != track.Difficulty).Reverse();
 
             // The generators work on the whole part, so on whichever lane of it the menu is opened from, and only on the
-            // parts they can: star power on 5-fret and keys, fills on drums.
+            // parts they can: star power on 5-fret (keys too), GHL and drums, fills on drums.
             var generate = new List<LaneMenuItem>();
             if (StarPowerGenerator.CanGenerate(part.Kind))
                 generate.Add(LaneMenuItem.Action(Strings.LaneGenerateStarPower, part.HasNotes, () => _ = editor.GenerateStarPowerAsync(track.Instrument), "GenerateStroke"));

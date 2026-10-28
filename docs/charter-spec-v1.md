@@ -1300,8 +1300,8 @@ Acceptance criteria:
      the span selected, in the focused lane's part. When a star power phrase already starts and ends
      exactly there, `S` removes it instead. With nothing selected, the status says so.
    - **Generate star power** proposes star power phrases over the selection or the whole part of a
-     5-fret or keys lane, placed so a player has enough to activate going into the part's hardest
-     passages. The author picks, for each run, about how many **seconds apart** phrases are
+     5-fret (keys included), GHL or drums lane, placed so a player has enough to activate going into
+     the part's hardest passages. The author picks, for each run, about how many **seconds apart** phrases are
      (default 22, as the official charts are), and whether they're **charged for the hard passages**
      (default on) or only spread evenly. The window lists the proposals to keep or drop, shows them
      on the highway and the timeline, and adds the accepted ones as one undoable command. CHR066's
@@ -1320,8 +1320,8 @@ Acceptance criteria:
      them, where that's within a beat, or else to the next beat line, but never over the next chord.
      It has 4 to 40 chords, lasts no more than 10 s, and is best about a measure long (0.75 to 1.25),
      as most official phrases are; up to 4 where the part is too sparse for shorter. It doesn't
-     cross a section, a solo's start or end (it can be inside a solo) or a big rock ending, and
-     keeps 4 measures clear of every other star power phrase, those already there too, which it
+     cross a section, a solo's start or end (it can be inside a solo), a big rock ending or a drum
+     fill, and keeps 4 measures clear of every other star power phrase, those already there, which it
      never removes; the official charts never have two closer than 2, and seldom closer than 5. It
      completes at least 2 measures of playing before the part's last note, so its star power can be
      used. Better spots start on a measure line on a chord, end a run, end on a sustain of a beat
@@ -1353,16 +1353,16 @@ Acceptance criteria:
      spot. Then a stretch longer than 45 s is given one more in its middle, up to two past the
      count. Without any passage, or with
      charging off, the phrases are spread evenly. The same chart always gets the same phrases.
-   - *Settled:* **Generate star power…** is beside Generate fills, for a 5-fret or keys lane with
-     notes. It and Generate fills share one window; its options are in the window's toolbar, kept
+   - *Settled:* **Generate star power…** is beside Generate fills, for a 5-fret (keys included), GHL
+     or drums lane with notes. It and Generate fills share one window; its options are in the window's toolbar, kept
      while the editor is open: the spacing in seconds, whether to charge for the hard passages, and
      Existing Star Power (Replace, the default, or Add Alongside). Over the whole part in Add, it's
      refused while the part has star power, as the author's phrases are theirs to keep; over a
      selection it proposes beside them. The window lists the regions, each kept or dropped, previews
      them on the highway, and shows the meter and the hard passages on the whole-song timeline.
      Apply (Ctrl+Enter) adds the kept ones as one undoable command; Cancel adds nothing, and the
-     chart is unchanged until Apply. When nothing fits, the preview says why: not a 5-fret or keys
-     part, no notes, star power already there, or no spot.
+     chart is unchanged until Apply. When nothing fits, the preview says why: a part star power
+     isn't generated for, no notes, star power already there, or no spot.
 2. **Solos** (pitch 103), drawn as a shaded band with a note count.
    - *Settled in CM3:* the count is drawn at the solo's start. It counts the notes the solo covers on
      the difficulty shown, a chord once.
@@ -2642,7 +2642,7 @@ covers a note.
 | CHR063 | Warning | Notes inside a big rock ending, which the games skip | — |
 | CHR064 | — | *Retired in CM3.* A disco flip section that starts or ends between notes of a chord. A mix event applies to every note on its tick, so it can't. | — |
 | CHR065 | Warning | A star power phrase or solo with no notes in it on a charted difficulty, though another difficulty has some. A phrase empty on every difficulty is CHR060's or CHR061's. | — |
-| CHR066 | Info | A 5-fret or keys part has no star power phrases, so a player never earns star power on it. Only where a phrase fits, so generating it always proposes some; drums and GHL aren't checked. One finding per part. | Generate star power ([C8](#c8-phrases-and-events) item 1): a window to keep or drop in Chart Builder, added at once in the library |
+| CHR066 | Info | A 5-fret (keys included), GHL or drums part has no star power phrases, so a player never earns star power on it. Only where a phrase fits, so generating it always proposes some. One finding per part. | Generate star power ([C8](#c8-phrases-and-events) item 1): a window to keep or drop in Chart Builder, added at once in the library |
 
 *Settled in CM3:* CHR062 gives one finding for each group of phrases that saving would merge into one, and its fix
 merges the group into its first phrase.
