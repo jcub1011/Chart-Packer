@@ -55,6 +55,33 @@ internal static class JsonFiles
         return change(ReadObject(path, warn: false)) is { } json && WriteAtomically(path, json);
     }
 
+    /// <summary>
+    /// <see cref="Update(string, Func{JsonObject?, JsonObject?})"/> for a file that records a schema version: what
+    /// <paramref name="change"/> gives is stamped with <paramref name="schemaVersion"/> (see <see cref="SettingsSchema"/>)
+    /// before it's written. A file that records a newer version than <paramref name="schemaVersion"/> is left as it is, as
+    /// this build would write it in a shape the file's newer one doesn't have.
+    /// </summary>
+    /// <param name="schemaVersion">The version this build writes; 0 for a file that records none, which is never refused.</param>
+    /// <returns>Whether it was written: false too when the file is from a newer build.</returns>
+    public static bool Update(string path, int schemaVersion, Func<JsonObject?, JsonObject?> change)
+    {
+        ArgumentNullException.ThrowIfNull(change);
+        return Update(path, file =>
+        {
+            int found = SettingsSchema.Read(file);
+            if (schemaVersion > 0 && found > schemaVersion)
+            {
+                Trace.TraceWarning($"Not writing '{path}': it records schema version {found}, newer than this build's {schemaVersion}.");
+                return null;
+            }
+
+            var changed = change(file);
+            if (changed is not null)
+                SettingsSchema.Stamp(changed, schemaVersion);
+            return changed;
+        });
+    }
+
     // The lock on the file at path, held until it's disposed; null when another process held it throughout, or it
     // couldn't be made.
     private static FileStream? Lock(string path)

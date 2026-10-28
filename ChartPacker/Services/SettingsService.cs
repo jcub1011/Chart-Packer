@@ -22,6 +22,9 @@ namespace ChartPacker.Services
             Settings = settings;
         }
 
+        /// <summary>The schema version this build writes to <c>settings.json</c>.</summary>
+        public const int SchemaVersion = 1;
+
         /// <summary>The slowest <see cref="PlaybackSpeed"/>: 1%.</summary>
         public const double MinPlaybackSpeed = 0.01;
 
@@ -40,7 +43,7 @@ namespace ChartPacker.Services
         public static SettingsService Load(string filePath)
         {
             // Each window's placement is merged on its own, so processes closing different windows keep both.
-            var file = new JsonSettingsFile<AppSettings>(filePath, AppSettingsJsonContext.Default.AppSettings, [nameof(AppSettings.Windows)]);
+            var file = new JsonSettingsFile<AppSettings>(filePath, AppSettingsJsonContext.Default.AppSettings, [nameof(AppSettings.Windows)], SchemaVersion);
             var settings = file.Load();
             Sanitize(settings);
             return new SettingsService(file, settings);

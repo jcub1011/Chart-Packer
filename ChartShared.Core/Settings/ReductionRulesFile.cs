@@ -22,6 +22,9 @@ public sealed class ReductionRulesFile
 {
     private const string LegacyProperty = "ReductionRules";
 
+    /// <summary>The schema version this build writes to <c>reduction-rules.json</c>.</summary>
+    public const int SchemaVersion = 1;
+
     private readonly string _path;
     private readonly string? _legacyPath;
     private readonly JsonSettingsFile<ReductionDefaults> _file;
@@ -33,7 +36,7 @@ public sealed class ReductionRulesFile
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         _path = path;
         _legacyPath = legacyPath;
-        _file = new JsonSettingsFile<ReductionDefaults>(path, ReductionRulesJsonContext.Default.ReductionDefaults);
+        _file = new JsonSettingsFile<ReductionDefaults>(path, ReductionRulesJsonContext.Default.ReductionDefaults, schemaVersion: SchemaVersion);
     }
 
     /// <summary>

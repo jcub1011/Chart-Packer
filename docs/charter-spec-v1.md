@@ -3065,6 +3065,15 @@ rename, so two processes' saves can't interleave and lose one's changes. The loc
 which the OS lets go of if a process dies. A save that can't get the lock within about a second
 isn't written.
 
+Every settings file records an integer `SchemaVersion`, saying which shape its settings have. A file
+without one reads as 0, as every file written before versioning did. A save raises it to the version
+the build writes and never lowers it: a build that finds a file from a newer build leaves it as it is,
+and its saves are refused (and traced), rather than write settings in the older shape under the newer
+number. Nothing is written when the file is read, so an older file is stamped by the next save that
+happens anyway — even one that changes no setting, unless the file can't be read then. A build
+migrating a drastically changed schema reads the version the file was loaded with before changing its
+settings.
+
 | File | Owner | Holds |
 | ---- | ----- | ----- |
 | `settings.json` | Chart Packer (`AppSettings`) | Chart Packer's settings, as now. Chart Builder reads the output folder and overwrite policy from it for **Save and pack** ([C17](#c17-save-and-export)), and never writes it. |

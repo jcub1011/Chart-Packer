@@ -19,10 +19,13 @@ namespace ChartBuilder.Services
 
         public InputSettings Settings { get; }
 
+        /// <summary>The schema version this build writes to <c>input-bindings.json</c>.</summary>
+        public const int SchemaVersion = 1;
+
         /// <summary>Loads the bindings from <paramref name="filePath"/>, falling back to the keyboard's defaults when it's missing or unreadable.</summary>
         public static InputSettingsService Load(string filePath)
         {
-            var file = new JsonSettingsFile<InputSettings>(filePath, InputSettingsJsonContext.Default.InputSettings);
+            var file = new JsonSettingsFile<InputSettings>(filePath, InputSettingsJsonContext.Default.InputSettings, schemaVersion: SchemaVersion);
             var settings = file.Load();
             settings.Sanitize();
             return new InputSettingsService(file, settings);
