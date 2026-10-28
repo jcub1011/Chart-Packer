@@ -17,7 +17,8 @@ public sealed record OpenedTrack(SongTrack Track, IPcmSource? Source, string? Er
 /// </summary>
 /// <remarks>
 /// Every file is opened for reading only, sharing reads, so nothing can replace or delete it
-/// until this is disposed: dispose it before saving the song. All of a <c>.sng</c>'s tracks read
+/// until this is disposed: dispose it before saving the song. (A loose file that fails to read is let go of and opened
+/// again, see <see cref="ReopeningStream"/>, and is unheld for that moment.) All of a <c>.sng</c>'s tracks read
 /// through one handle. Each source is read by one thread at a time, but separate sources, including
 /// those of <see cref="OpenSource"/>, may be read on separate threads.
 /// </remarks>
@@ -153,6 +154,7 @@ public sealed class SongAudio : IDisposable
         return AudioDecoder.Open(stream, track.StoredName);
     }
 
-    private static FileStream OpenFile(string path) =>
-        new(path, FileMode.Open, FileAccess.Read, FileShare.Read, BufferSize);
+    // A song in a folder, or a draft's staged file, may be on a cloud or network drive that drops out for a moment mid-song.
+    private static ReopeningStream OpenFile(string path) =>
+        new(() => new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, BufferSize));
 }
