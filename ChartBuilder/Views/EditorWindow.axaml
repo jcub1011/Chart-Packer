@@ -183,8 +183,8 @@
 
             <!-- The toolbar's groups wrap onto more rows as the window narrows, rather than scrolling. -->
             <Border Classes="toolbar">
-                <WrapPanel ItemSpacing="8" LineSpacing="6">
-                    <WrapPanel.Styles>
+                <bctl:CenteredWrapPanel ItemSpacing="8" LineSpacing="6">
+                    <bctl:CenteredWrapPanel.Styles>
                         <Style Selector="ToggleButton.labelled">
                             <Setter Property="Height" Value="28" />
                             <Setter Property="Padding" Value="10,0" />
@@ -203,7 +203,7 @@
                             <Setter Property="Margin" Value="4,5" />
                             <Setter Property="Background" Value="{DynamicResource SubtleBorderBrush}" />
                         </Style>
-                    </WrapPanel.Styles>
+                    </bctl:CenteredWrapPanel.Styles>
 
                     <!-- The editing tools (charter-spec §4.5: EditorTools), one picked at a time, as icons whose tips name
                          them. Beside the Phrase tool is the kind of phrase it adds, of those the part in focus can have
@@ -381,7 +381,7 @@
                             </Button>
                         </StackPanel>
                     </Border>
-                </WrapPanel>
+                </bctl:CenteredWrapPanel>
             </Border>
         </StackPanel>
 
