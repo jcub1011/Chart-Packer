@@ -411,6 +411,22 @@ public sealed class EditorSession
         }
     }
 
+    /// <summary>
+    /// The vocal part's lane the keys act on, when the lane last clicked or chosen was one; null when it was a highway's
+    /// (<see cref="Focused"/>). The Edit menu's Select all and Paste follow it, as the lane's own keys do.
+    /// </summary>
+    public VocalTrack? FocusedVocal
+    {
+        get;
+        set
+        {
+            if (field == value)
+                return;
+            field = value;
+            RaiseState();
+        }
+    }
+
     /// <summary>What the editor has to say: why an edit was refused, or what a key did. Null for nothing.</summary>
     public string? Status
     {

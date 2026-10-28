@@ -89,7 +89,7 @@
         <!-- The title bar and the toolbar. The code-behind refits the panels as they change height, the toolbar wrapping as
              the window narrows. -->
         <StackPanel x:Name="TopBand" Grid.Row="0">
-            <!-- The window draws its own title bar (TitleBar): the icon, the File and Edit menus, and the window's title and
+            <!-- The window draws its own title bar (TitleBar): the icon, the File, Edit and View menus, and the window's title and
                  the program version. Dragging anywhere but the menus, the title and the version moves the window. Layered
                  over the progress of a song being opened, see-through so it shows. -->
             <Panel x:Name="TitleBand">
@@ -156,6 +156,46 @@
                                 </MenuItem>
                                 <MenuItem Header="{x:Static res:Strings.MenuRedo}" Command="{Binding RedoCommand}" InputGesture="Ctrl+Y">
                                     <MenuItem.Icon><ctl:LineIcon Data="{StaticResource UndoStroke}" RenderTransform="scaleX(-1)" /></MenuItem.Icon>
+                                </MenuItem>
+                                <Separator />
+                                <!-- These do what the canvas's keys do, on the focused lane and what's selected. Their gestures are
+                                     shown only, as the window doesn't bind them: the canvas handles them, and a window binding
+                                     would take Ctrl+X, C, V and A from the panels' text boxes. So they're the keys of the lane
+                                     in focus; with focus in a panel, they're that panel's, and the items act on the lane last
+                                     focused. -->
+                                <MenuItem Header="{x:Static res:Strings.MenuCut}" Command="{Binding CutCommand}" InputGesture="Ctrl+X">
+                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource CutStroke}" /></MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="{x:Static res:Strings.MenuCopy}" Command="{Binding CopyCommand}" InputGesture="Ctrl+C">
+                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource CopyStroke}" /></MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="{x:Static res:Strings.MenuPaste}" Command="{Binding PasteCommand}" InputGesture="Ctrl+V">
+                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource PasteStroke}" /></MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="{x:Static res:Strings.MenuPasteMerge}" Command="{Binding PasteMergeCommand}" InputGesture="Ctrl+Shift+V">
+                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource PasteMergeStroke}" /></MenuItem.Icon>
+                                </MenuItem>
+                                <Separator />
+                                <MenuItem Header="{x:Static res:Strings.MenuSelectAll}" Command="{Binding SelectAllCommand}" InputGesture="Ctrl+A">
+                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource SelectStroke}" /></MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="{x:Static res:Strings.MenuDelete}" Command="{Binding DeleteCommand}" InputGesture="Delete">
+                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource TrashStroke}" /></MenuItem.Icon>
+                                </MenuItem>
+                                <Separator />
+                                <MenuItem Header="{Binding QuantizeMenuHeader}" Command="{Binding QuantizeCommand}" InputGesture="Ctrl+Q">
+                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource QuantizeStroke}" /></MenuItem.Icon>
+                                </MenuItem>
+                            </MenuItem>
+                            <MenuItem Header="{x:Static res:Strings.MenuView}">
+                                <MenuItem Header="{x:Static res:Strings.MenuShowMessages}" Command="{Binding ShowMessagesCommand}">
+                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource InfoStroke}" /></MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="{x:Static res:Strings.MenuShowPreview}" Command="{Binding ShowPreviewCommand}">
+                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource PreviewStroke}" /></MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="{x:Static res:Strings.MenuShowDifficulty}" Command="{Binding ShowDifficultyCommand}">
+                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource SortAscendingStroke}" /></MenuItem.Icon>
                                 </MenuItem>
                             </MenuItem>
                         </Menu>

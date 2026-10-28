@@ -44,6 +44,7 @@ namespace ChartBuilder.Controls
         {
             Header = item.Header,
             Command = item.Command,
+            InputGesture = item.Gesture,
             IsEnabled = item.IsEnabled,
             ItemsSource = item.Items is { } inner ? MenuItems(inner) : null,
             Icon = LineIcon.For(item.IsChecked ? "CheckStroke" : item.Icon),
