@@ -150,9 +150,15 @@ namespace ChartBuilder.Controls.Editing
         private static readonly IBrush StrikeBandBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x90, 0x00, 0x00, 0x00));
         private static readonly IPen StrikeEdgePen = new ImmutablePen(Color.FromArgb(0x8C, 0xFF, 0xFF, 0xFF).ToUInt32(), 1);
         private static readonly Color SoloColor = PhraseColors.Solo;
-        private static readonly IBrush StarPowerTintBrush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(HighwayPalette.StarPower, 0x16));
-        private static readonly IBrush SoloTintBrush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(SoloColor, 0x1A));
         private static readonly IBrush SoloLabelBrush = new ImmutableSolidColorBrush(SoloColor);
+
+        // How opaque the range indicator over every phrase and disco flip is, and the lines marking where each begins
+        // and ends.
+        private const byte PhraseRangeAlpha = 0x16;
+
+        // A solo's tint is a shade stronger than the other kinds', as it was before they were tinted too.
+        private const byte SoloTintAlpha = 0x1A;
+        private const byte PhraseRangeEdgeAlpha = 0xA0;
         private static readonly Color DiscoFlipColor = PhraseColors.DiscoFlip;
         private static readonly Color SectionColor = Color.FromRgb(0x5E, 0xEA, 0xD4);
         private static readonly IPen SectionPen = new ImmutablePen(HighwayPalette.WithAlpha(SectionColor, 0x70).ToUInt32(), 1.5);
@@ -526,7 +532,7 @@ namespace ChartBuilder.Controls.Editing
             // The rail's rows are tinted under whatever is marked across them, such as a timeline's section lines.
             DrawPhraseRailBackground(context, rows, projection);
             FindPhrasesShown(part, fromTick, toTick);
-            DrawPhraseTints(context, session, projection);
+            DrawPhraseRanges(context, session, key, projection, fromTick, toTick);
             DrawSpans(context, session, projection);
             DrawSyncBands(context, session, key, projection);
             DrawBeats(context, session, session.TempoMap, projection, fromTick, toTick, size);
@@ -1930,21 +1936,67 @@ namespace ChartBuilder.Controls.Editing
             return close.Inflate(ClickSlop).Contains(position);
         }
 
-        /// <summary>A faint tint across the lanes, behind the notes, over each star power phrase and solo (charter-spec C8).</summary>
-        private void DrawPhraseTints(DrawingContext context, EditorSession session, LaneProjection projection)
+        /// <summary>
+        /// A range's tint, where it starts and ends along the time axis, and whether it has an end to mark: at least two
+        /// pixels long, so one with no length shows.
+        /// </summary>
+        private readonly record struct PhraseRange(double Start, double End, Color Color, byte Alpha, bool HasEnd = true);
+
+        /// <summary>
+        /// A faint tint across the lanes, behind the notes, over every phrase and the difficulty's disco flip ranges
+        /// (charter-spec C8), each in its kind's colour, with its start, and its end where it has one, marked by a
+        /// stronger line of that colour. Overlapping tints show through each other.
+        /// </summary>
+        private void DrawPhraseRanges(DrawingContext context, EditorSession session, ChartTrackKey key, LaneProjection projection, double fromTick, double toTick)
         {
-            double across1 = projection.LaneFrom, across2 = projection.LaneFrom + (projection.LaneSize * projection.Slots.Slots.Count);
+            var ranges = new List<PhraseRange>(_phrasesShown.Count);
             foreach (var phrase in _phrasesShown)
             {
-                var tint = phrase.Kind switch
-                {
-                    PhraseKind.StarPower => StarPowerTintBrush,
-                    PhraseKind.Solo => SoloTintBrush,
-                    _ => null,
-                };
-                if (tint is not null)
-                    context.FillRectangle(tint, BoxOf(projection, session, phrase, across1, across2));
+                double start = projection.AlongOf(session.AudioAt(phrase.Tick));
+                double end = projection.AlongOf(session.AudioAt(phrase.CoverEnd));
+                ranges.Add(RangeOf(start, end, PhraseColors.Of(phrase.Kind), PhraseTintAlpha(phrase.Kind), projection.View));
             }
+
+            double farEnd = projection.AlongOf(projection.End);
+            foreach (var range in session.DiscoFlipRangesOf(key))
+            {
+                if (range.Tick > toTick || range.EndTick < fromTick)
+                    continue;
+                double start = projection.AlongOf(session.AudioAt(range.Tick));
+                double end = range.EndTick is { } endTick ? projection.AlongOf(session.AudioAt(endTick)) : farEnd;
+                ranges.Add(RangeOf(start, end, PhraseColors.DiscoFlip, PhraseRangeAlpha, projection.View, hasEnd: range.EndTick is not null));
+            }
+
+            if (ranges.Count == 0)
+                return;
+
+            double across1 = projection.LaneFrom, across2 = projection.LaneFrom + (projection.LaneSize * projection.Slots.Slots.Count);
+            foreach (var range in ranges)
+            {
+                var tint = HighwayPalette.WithAlpha(range.Color, range.Alpha);
+                context.FillRectangle(_gems.Brush(tint), Box(Math.Min(range.Start, range.End), Math.Max(range.Start, range.End), across1, across2));
+            }
+
+            // The edges go over every tint, so none of them is hidden where ranges overlap. Like the tints, they're cut
+            // to the page, so a range reaching far past it doesn't make its picture bigger than the page.
+            foreach (var range in ranges)
+            {
+                var pen = _gems.Pen(HighwayPalette.WithAlpha(range.Color, PhraseRangeEdgeAlpha), 1);
+                context.DrawLine(pen, At(Limited(range.Start), across1), At(Limited(range.Start), across2));
+                if (range.HasEnd)
+                    context.DrawLine(pen, At(Limited(range.End), across1), At(Limited(range.End), across2));
+            }
+        }
+
+        /// <summary>How opaque a phrase of <paramref name="kind"/> is tinted.</summary>
+        private static byte PhraseTintAlpha(PhraseKind kind) => kind == PhraseKind.Solo ? SoloTintAlpha : PhraseRangeAlpha;
+
+        /// <summary>A range's start and end along the time axis, in the order it runs: at least two pixels long, so one with no length shows.</summary>
+        private static PhraseRange RangeOf(double start, double end, Color color, byte alpha, LaneView view, bool hasEnd = true)
+        {
+            if (Math.Abs(end - start) < 2)
+                end = start + (view == LaneView.Highway ? -2 : 2);
+            return new PhraseRange(start, end, color, alpha, hasEnd);
         }
 
         /// <summary>
@@ -2050,7 +2102,7 @@ namespace ChartBuilder.Controls.Editing
         private Rect BoxOf(LaneProjection projection, EditorSession session, Phrase phrase, double across1, double across2)
         {
             double start = projection.AlongOf(session.AudioAt(phrase.Tick));
-            double end = projection.AlongOf(session.AudioAt(phrase.Tick + phrase.Length));
+            double end = projection.AlongOf(session.AudioAt(phrase.CoverEnd));
             if (Math.Abs(end - start) < 2)
                 end = start + (projection.View == LaneView.Highway ? -2 : 2);
             return Box(start, end, across1, across2);
