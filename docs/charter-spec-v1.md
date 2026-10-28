@@ -2899,7 +2899,7 @@ layout, so their part picker, findings and transport bar have still to be placed
 │ [+ Add part] │ ══════╪══╪══╪══╪══╪══╪═ strike ═══════   │ FINDINGS  0 ⨯ · 2 ⚠ · 1 ℹ │
 │              │ ▁▂▅▇█▇▅▃▂▁▂▃▅▇▅▃▁▂▃▅▇█▇▅  overview  ▕▮▕   │ ⚠ CHR020 sustain cut  →  │
 ├──────────────┴────────────────────────────────────────────┴──────────────────────────┤
-│ ▶ 1:38.4 / 4:12.0   Speed [75%] ♪PC   ⟲Loop  ♩Metro  🔊Hits   Latency 42 ms           │
+│ ▶ 1:38.4 / 4:12.0   Speed [75%] ♪PC   ⟲Loop  ♩Metro  🔊Hits   ⏱ 42 ms                  │
 └──────────────────────────────────────────────────────────────────────────────────────┘
 ```
 

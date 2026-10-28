@@ -1387,10 +1387,6 @@ Open it anyway?</value>
     <value>Play a sound for each note of the shown lanes as it reaches the strike line.</value>
     <comment>The hit sounds checkbox's tooltip.</comment>
   </data>
-  <data name="LatencyLabel" xml:space="preserve">
-    <value>Latency</value>
-    <comment>The transport bar's latency button's label, before the value.</comment>
-  </data>
   <data name="LatencyToolTip" xml:space="preserve">
     <value>The calibrated audio/visual latency for this output. Click to calibrate.</value>
     <comment>The transport bar's latency button's tooltip.</comment>

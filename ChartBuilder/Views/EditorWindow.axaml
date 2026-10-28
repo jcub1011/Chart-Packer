@@ -68,6 +68,12 @@
             <Setter Property="TextDecorations" Value="Strikethrough" />
             <Setter Property="Opacity" Value="0.55" />
         </Style>
+        <!-- The transport bar's latency button, the one tool button as wide as its stopwatch and value, rather than a
+             bare 28. -->
+        <Style Selector="Button.tool.value">
+            <Setter Property="Width" Value="NaN" />
+            <Setter Property="Padding" Value="6,0" />
+        </Style>
     </Window.Styles>
 
     <Grid x:Name="RootGrid">
@@ -848,13 +854,14 @@
                             </Button.Flyout>
                             <ctl:LineIcon Data="{StaticResource VolumeStroke}" />
                         </Button>
-                        <Button Classes="labelled"
+                        <!-- The calibrated latency, clicked to calibrate: a stopwatch with the value beside it. -->
+                        <Button Classes="tool value"
                                 Command="{Binding Playback.OpenCalibrationCommand}"
                                 ToolTip.Tip="{x:Static res:Strings.LatencyToolTip}"
                                 AutomationProperties.Name="{x:Static res:Strings.LatencyToolTip}">
                             <StackPanel Orientation="Horizontal" Spacing="4">
-                                <TextBlock Classes="muted" VerticalAlignment="Center" Text="{x:Static res:Strings.LatencyLabel}" />
-                                <TextBlock VerticalAlignment="Center" Text="{Binding Playback.LatencyText}" />
+                                <ctl:LineIcon Width="14" Height="14" Data="{StaticResource OffsetStroke}" />
+                                <TextBlock FontSize="12" VerticalAlignment="Center" Text="{Binding Playback.LatencyText}" />
                             </StackPanel>
                         </Button>
                     </WrapPanel>
