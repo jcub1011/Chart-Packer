@@ -18,13 +18,13 @@ public sealed class EditorViewport
     public const double StrikeFraction = 0.25;
 
     /// <summary>The shortest look-ahead a lane can have, in seconds.</summary>
-    public const double MinLookAhead = 0.5;
+    public const double MinLookAhead = HighwayLookAhead.Min;
 
     /// <summary>The longest look-ahead a lane can have, in seconds.</summary>
-    public const double MaxLookAhead = 60;
+    public const double MaxLookAhead = HighwayLookAhead.Max;
 
-    /// <summary>The step look-aheads move in, in seconds: half a second.</summary>
-    public const double LookAheadStep = 0.5;
+    /// <summary>The step a key or wheel notch moves a look-ahead by, in seconds: half a second.</summary>
+    public const double LookAheadStep = HighwayLookAhead.Step;
 
     /// <summary>Raised when the cursor moves, by the user or with the playhead.</summary>
     public event EventHandler? Changed;
@@ -35,13 +35,8 @@ public sealed class EditorViewport
     /// <summary>The cursor, in audio seconds: the strike line, where keys place notes and playback starts, and the playhead while playing.</summary>
     public double Cursor { get; private set; }
 
-    /// <summary><paramref name="seconds"/> as a look-ahead a lane can have: within range, to the nearest half second.</summary>
-    public static double ClampLookAhead(double seconds) =>
-        double.IsFinite(seconds) ? QuantizeLookAhead(Math.Clamp(seconds, MinLookAhead, MaxLookAhead)) : MinLookAhead;
-
-    /// <summary><paramref name="seconds"/> rounded to the nearest half second.</summary>
-    public static double QuantizeLookAhead(double seconds) =>
-        Math.Round(seconds / LookAheadStep, MidpointRounding.AwayFromZero) * LookAheadStep;
+    /// <summary><paramref name="seconds"/> as a look-ahead a lane can have: within range and snapped (<see cref="HighwayLookAhead"/>).</summary>
+    public static double ClampLookAhead(double seconds) => HighwayLookAhead.Clamp(seconds);
 
     /// <summary>
     /// The span of audio time a lane with <paramref name="lookAhead"/> seconds beyond its strike line shows, with the

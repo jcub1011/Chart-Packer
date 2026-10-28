@@ -456,22 +456,16 @@
                                 <TextBlock Classes="caption"
                                            VerticalAlignment="Center"
                                            Text="{x:Static res:Strings.GenerateLookAheadLabel}" />
-                                <Slider Width="130"
+                                <ui:LookAheadSlider Width="130"
                                         VerticalAlignment="Center"
-                                        Minimum="2"
-                                        Maximum="8"
-                                        SmallChange="0.5"
-                                        LargeChange="1"
-                                        TickFrequency="0.5"
-                                        IsSnapToTickEnabled="True"
-                                        Value="{Binding LookAhead}"
+                                        LookAhead="{Binding LookAhead}"
                                         ToolTip.Tip="{x:Static res:Strings.GenerateLookAheadToolTip}"
                                         AutomationProperties.Name="{x:Static res:Strings.GenerateLookAheadLabel}" />
                                 <TextBlock FontSize="12"
                                            FontFeatures="tnum"
                                            VerticalAlignment="Center"
                                            MinWidth="38"
-                                           Text="{Binding LookAhead, StringFormat='{}{0:0.0} s'}" />
+                                           Text="{Binding LookAhead, StringFormat={x:Static sres:SharedStrings.LookAheadFormat}}" />
                             </StackPanel>
                         </Grid>
                     </Border>

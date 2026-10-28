@@ -35,9 +35,6 @@ namespace ChartPacker.ViewModels
         // How long after a change of the rules the preview is worked out again, so typing a number does it once.
         private static readonly TimeSpan PreviewDelay = TimeSpan.FromMilliseconds(200);
 
-        // What the preview remembers, for as long as Chart Packer runs: whether it's shown, its look-ahead and its filters.
-        private static readonly ReductionPreviewMemory PreviewSettings = new();
-
         private readonly Func<ReductionDefaults> _rules;
         private readonly PlayerViewModel _player;
         private readonly PlayerPreviewPlayback _playback;
@@ -65,16 +62,18 @@ namespace ChartPacker.ViewModels
         /// <param name="rules">The rules to generate by, as they are now.</param>
         /// <param name="nothing">What it says when the song has nothing to generate.</param>
         /// <param name="pickSong">What it says with no song shown.</param>
-        public GenerationPreviewViewModel(PlayerViewModel player, Func<ReductionDefaults> rules, string nothing, string pickSong)
+        /// <param name="previewSettings">What the preview remembers: whether it's shown, its look-ahead and its filters.</param>
+        public GenerationPreviewViewModel(PlayerViewModel player, Func<ReductionDefaults> rules, string nothing, string pickSong, IReductionPreviewSettings previewSettings)
         {
             ArgumentNullException.ThrowIfNull(player);
             ArgumentNullException.ThrowIfNull(rules);
+            ArgumentNullException.ThrowIfNull(previewSettings);
             _player = player;
             _rules = rules;
             _nothing = nothing;
             _pickSong = pickSong;
             _playback = new PlayerPreviewPlayback(player);
-            Preview = new ReductionPreviewViewModel(_playback, PreviewSettings, wheelUpIsLater: true);
+            Preview = new ReductionPreviewViewModel(_playback, previewSettings, wheelUpIsLater: true);
             _redraw = new DispatcherTimer { Interval = PreviewDelay };
             _redraw.Tick += (_, _) => _ = RedrawAsync();
         }

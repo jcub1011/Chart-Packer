@@ -1082,8 +1082,9 @@
   <data name="ReductionPreviewFilterCountFormat" xml:space="preserve">
     <value>{0} ({1})</value>
   </data>
-  <data name="ReductionPreviewLookAheadFormat" xml:space="preserve">
+  <data name="LookAheadFormat" xml:space="preserve">
     <value>{0:0.0} s</value>
+    <comment>A highway's look-ahead, as its slider's readout shows it: how many seconds it shows beyond the strike line, e.g. "1.5 s".</comment>
   </data>
   <data name="ReductionPreviewWorking" xml:space="preserve">
     <value>Comparing the draft with what it's reduced from…</value>

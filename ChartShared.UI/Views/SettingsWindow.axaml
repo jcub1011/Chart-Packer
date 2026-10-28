@@ -90,6 +90,15 @@
                 <TextBlock Text="{Binding ValueText}" MinWidth="40" TextAlignment="Right" VerticalAlignment="Center" />
             </StackPanel>
         </DataTemplate>
+        <DataTemplate DataType="svm:LookAheadSettingViewModel">
+            <StackPanel Orientation="Horizontal" Spacing="10">
+                <ctl:LookAheadSlider LookAhead="{Binding Value}"
+                        Width="180"
+                        VerticalAlignment="Center"
+                        AutomationProperties.Name="{Binding Label}" />
+                <TextBlock Text="{Binding ValueText}" MinWidth="40" TextAlignment="Right" VerticalAlignment="Center" />
+            </StackPanel>
+        </DataTemplate>
         <DataTemplate DataType="svm:ChoiceSettingViewModel">
             <ComboBox ItemsSource="{Binding Choices}"
                       SelectedIndex="{Binding SelectedIndex}"

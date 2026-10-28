@@ -167,7 +167,14 @@ namespace ChartBuilder.ViewModels
         public LaneView DefaultView => _settings.Settings.DefaultEditorView;
 
         /// <summary>The look-ahead of a lane that hasn't had its own set: the highway speed setting's.</summary>
-        public double DefaultLookAhead => BuilderSettings.LookAheadAtSpeedOne / _settings.Settings.EditorHighwaySpeed;
+        public double DefaultLookAhead => HighwayLookAhead.Clamp(BuilderSettings.LookAheadAtSpeedOne / _settings.Settings.EditorHighwaySpeed);
+
+        /// <summary>How many seconds ahead the Generate fills and star power window's highway shows, as it was last left; kept with the settings.</summary>
+        public double GeneratePhrasesLookAhead
+        {
+            get => _settings.Settings.GeneratePhrasesLookAhead;
+            set => _settings.Settings.GeneratePhrasesLookAhead = value;
+        }
 
         /// <summary>
         /// Marks on the bottom timeline the span the lane in focus shows, from its look-ahead, after the cursor, the focus

@@ -51,7 +51,7 @@ namespace ChartBuilder.ViewModels
         {
             _editor = editor;
             _settings = settings;
-            LookAhead = Math.Clamp(settings.Settings.PreviewLookAhead, MinLookAhead, MaxLookAhead);
+            LookAhead = HighwayLookAhead.Clamp(settings.Settings.PreviewLookAhead, BuilderSettings.DefaultPreviewLookAhead);
             RefreshChoices();
             SelectedTrack = TrackChoices[0];
             Session.ChartChanged += OnChartChanged;
@@ -67,12 +67,6 @@ namespace ChartBuilder.ViewModels
             if (IsShown)
                 ShowSuggestion();
         }
-
-        /// <summary>The shortest look-ahead the preview's slider gives.</summary>
-        public const double MinLookAhead = 0.5;
-
-        /// <summary>The longest look-ahead the preview's slider gives.</summary>
-        public const double MaxLookAhead = 4;
 
         private EditorSession Session => _editor.Session;
 
@@ -272,17 +266,8 @@ namespace ChartBuilder.ViewModels
 
         partial void OnSelectedTrackChanged(PreviewTrackChoice? value) => ScheduleRebuild();
 
-        partial void OnLookAheadChanged(double value)
-        {
-            double clamped = Math.Clamp(value, MinLookAhead, MaxLookAhead);
-            if (clamped != value)
-            {
-                LookAhead = clamped;
-                return;
-            }
-
-            _settings.Settings.PreviewLookAhead = clamped;
-        }
+        // Already snapped by whatever sets it: the slider and the constructor.
+        partial void OnLookAheadChanged(double value) => _settings.Settings.PreviewLookAhead = value;
 
         partial void OnIsPracticeChanged(bool value)
         {

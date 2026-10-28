@@ -4,6 +4,7 @@ using System.Linq;
 using ChartPacker.Resources;
 using ChartPacker.ViewModels;
 using ChartShared.Audio.Waveforms;
+using ChartShared.Core.Charting;
 using ChartShared.Core.Dedup;
 using ChartShared.Core.Jobs;
 using ChartShared.Core.Settings;
@@ -280,20 +281,16 @@ namespace ChartPacker.Services
                         Get = () => highway.Placement,
                         Set = placement => highway.Placement = placement,
                     },
-                    new RangeSetting
+                    new LookAheadSetting
                     {
-                        Id = "playback.highwayNoteSpeed",
+                        Id = "playback.highwayLookAhead",
                         Category = visualizers,
-                        Label = Strings.HighwayNoteSpeedLabel,
-                        Description = Strings.HighwayNoteSpeedDescription,
-                        Keywords = SettingKeywords.Split(Strings.HighwayNoteSpeedKeywords),
-                        DefaultValue = AppSettings.DefaultHighwayNoteSpeed,
-                        Minimum = AppSettings.MinHighwayNoteSpeed,
-                        Maximum = AppSettings.MaxHighwayNoteSpeed,
-                        SmallChange = 0.1,
-                        Format = speed => speed.ToString("0.0", CultureInfo.CurrentCulture) + "×",
-                        Get = () => highway.NoteSpeed,
-                        Set = speed => highway.NoteSpeed = speed,
+                        Label = Strings.HighwayLookAheadLabel,
+                        Description = Strings.HighwayLookAheadDescription,
+                        Keywords = SettingKeywords.Split(Strings.HighwayLookAheadKeywords),
+                        DefaultValue = AppSettings.DefaultHighwayLookAhead,
+                        Get = () => highway.LookAhead,
+                        Set = seconds => highway.LookAhead = seconds,
                     },
                     new ChoiceSetting<ScrubStep>
                     {

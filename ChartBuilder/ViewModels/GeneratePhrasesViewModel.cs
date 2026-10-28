@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Linq;
 using ChartBuilder.Controls;
 using ChartBuilder.Resources;
+using ChartBuilder.Services;
 using ChartShared.Core.Charting;
 using ChartShared.Core.Charting.Authoring;
 using ChartShared.Core.Charting.Editing;
@@ -27,6 +28,7 @@ namespace ChartBuilder.ViewModels
     /// </remarks>
     public abstract partial class GeneratePhrasesViewModel : ViewModelBase
     {
+        private readonly ChartEditorViewModel _editor;
         private readonly EditorSession _session;
         private readonly PlaybackViewModel _playback;
         private readonly (long From, long To)? _span;
@@ -37,8 +39,10 @@ namespace ChartBuilder.ViewModels
 
         protected GeneratePhrasesViewModel(ChartEditorViewModel editor, ChartInstrument part, bool overSelection, GenerationMode mode)
         {
+            _editor = editor;
             _session = editor.Session;
             _playback = editor.Playback;
+            LookAhead = HighwayLookAhead.Clamp(editor.GeneratePhrasesLookAhead, BuilderSettings.DefaultGeneratePhrasesLookAhead);
             Part = part;
             _span = overSelection ? _session.Selection.SpanIn(part) : null;
             ScopeText = overSelection ? Strings.GenerateScopeSelection : Strings.GenerateScopeWholePart;
@@ -74,9 +78,12 @@ namespace ChartBuilder.ViewModels
         /// <summary>Whether the window applied the plan and closed.</summary>
         public bool Applied { get; protected set; }
 
-        /// <summary>How far ahead the preview highway shows, in seconds.</summary>
+        /// <summary>How far ahead the preview highway shows, in seconds; remembered for the next time.</summary>
         [ObservableProperty]
-        public partial double LookAhead { get; set; } = 4;
+        public partial double LookAhead { get; set; }
+
+        // Already snapped by whatever sets it: the slider and the constructor.
+        partial void OnLookAheadChanged(double value) => _editor.GeneratePhrasesLookAhead = value;
 
         /// <summary>The proposals, earliest first.</summary>
         public ObservableCollection<ProposalRowViewModel> Regions { get; } = [];

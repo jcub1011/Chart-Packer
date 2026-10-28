@@ -108,6 +108,7 @@ namespace ChartShared.UI.ViewModels.Settings
             ToggleSetting => new ToggleSettingViewModel((SettingEdit<bool>)edit),
             IntegerSetting integer => new IntegerSettingViewModel((SettingEdit<int>)edit, integer),
             RangeSetting range => new RangeSettingViewModel((SettingEdit<double>)edit, range),
+            LookAheadSetting => new LookAheadSettingViewModel((SettingEdit<double>)edit),
             FolderSetting folder => new FolderSettingViewModel((SettingEdit<string?>)edit, folder, folderPicker),
             TextSetting text => new TextSettingViewModel((SettingEdit<string>)edit, text),
             ActionSetting => new ActionSettingViewModel(edit),
@@ -176,6 +177,24 @@ namespace ChartShared.UI.ViewModels.Settings
         }
 
         public string ValueText => definition.FormatValue(edit.Value);
+
+        protected override void OnValueChanged()
+        {
+            OnPropertyChanged(nameof(Value));
+            OnPropertyChanged(nameof(ValueText));
+        }
+    }
+
+    /// <summary>A highway's look-ahead in seconds, shown as the look-ahead slider and its readout.</summary>
+    public sealed class LookAheadSettingViewModel(SettingEdit<double> edit) : SettingViewModel(edit)
+    {
+        public double Value
+        {
+            get => edit.Value;
+            set => edit.Value = value;
+        }
+
+        public string ValueText => string.Format(CultureInfo.CurrentCulture, SharedStrings.LookAheadFormat, edit.Value);
 
         protected override void OnValueChanged()
         {

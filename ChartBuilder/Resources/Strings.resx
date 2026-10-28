@@ -1391,10 +1391,6 @@ Open it anyway?</value>
     <value>The calibrated audio/visual latency for this output. Click to calibrate.</value>
     <comment>The transport bar's latency button's tooltip.</comment>
   </data>
-  <data name="LaneLookAheadFormat" xml:space="preserve">
-    <value>{0:0.0} s</value>
-    <comment>A lane's look-ahead, in its header: how many seconds it shows beyond the strike line, e.g. "2.0 s".</comment>
-  </data>
   <data name="LaneLookAheadToolTip" xml:space="preserve">
     <value>Look-ahead: how many seconds the lane shows beyond the strike line. Ctrl+wheel, + and − change it too.</value>
     <comment>The lane header's look-ahead button's tooltip.</comment>
@@ -3802,10 +3798,6 @@ Saving also changes song.ini:
   <data name="PreviewHighwaySection" xml:space="preserve">
     <value>Highway</value>
     <comment>The Preview tab's section with the highway.</comment>
-  </data>
-  <data name="PreviewLookAheadFormat" xml:space="preserve">
-    <value>{0:0.0} s</value>
-    <comment>How far ahead the preview looks, e.g. "1.4 s".</comment>
   </data>
   <data name="DifficultyRatingSection" xml:space="preserve">
     <value>Rating</value>

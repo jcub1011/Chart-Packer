@@ -102,9 +102,10 @@ namespace ChartBuilder.Services
                 : BuilderSettings.DefaultMasterVolume;
             settings.MetronomeVolume = Math.Clamp(settings.MetronomeVolume, 0, 100);
             settings.HitSoundVolume = Math.Clamp(settings.HitSoundVolume, 0, 100);
-            settings.PreviewLookAhead = double.IsFinite(settings.PreviewLookAhead) ? Math.Clamp(settings.PreviewLookAhead, 0.5, 4) : 1.4;
+            settings.PreviewLookAhead = HighwayLookAhead.Clamp(settings.PreviewLookAhead, BuilderSettings.DefaultPreviewLookAhead);
+            settings.GeneratePhrasesLookAhead = HighwayLookAhead.Clamp(settings.GeneratePhrasesLookAhead, BuilderSettings.DefaultGeneratePhrasesLookAhead);
             settings.ReducePreviewCategories &= ReductionChangeCategories.All;
-            settings.ReducePreviewLookAhead = BuilderSettings.SnapReducePreviewLookAhead(settings.ReducePreviewLookAhead);
+            settings.ReducePreviewLookAhead = HighwayLookAhead.Clamp(settings.ReducePreviewLookAhead, ReductionPreviewViewModel.DefaultLookAhead);
             settings.PlaytestEarlyMs = Math.Clamp(settings.PlaytestEarlyMs, (int)HitWindow.MinMs, (int)HitWindow.MaxMs);
             settings.PlaytestLateMs = Math.Clamp(settings.PlaytestLateMs, (int)HitWindow.MinMs, (int)HitWindow.MaxMs);
             if (!Enum.IsDefined(settings.GuitarRecordStyle))

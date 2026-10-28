@@ -244,8 +244,17 @@ namespace ChartBuilder.Services
         /// </summary>
         public ReductionDefaults? ReductionRules { get; set; }
 
+        /// <summary>The look-ahead the highway preview starts with, in seconds.</summary>
+        public const double DefaultPreviewLookAhead = HighwayLookAhead.Default;
+
         /// <summary>How many seconds ahead the highway preview shows (charter-spec C18), as its slider last left it.</summary>
-        public double PreviewLookAhead { get; set; } = 1.4;
+        public double PreviewLookAhead { get; set; } = DefaultPreviewLookAhead;
+
+        /// <summary>The look-ahead the Generate fills and star power dialog starts with, in seconds.</summary>
+        public const double DefaultGeneratePhrasesLookAhead = 4;
+
+        /// <summary>How many seconds ahead the Generate fills and star power dialog's highway shows, as its slider last left it.</summary>
+        public double GeneratePhrasesLookAhead { get; set; } = DefaultGeneratePhrasesLookAhead;
 
         /// <summary>Whether the Reduce dialog shows its preview, as it was last left.</summary>
         public bool ReducePreviewShown { get; set; }
@@ -254,17 +263,7 @@ namespace ChartBuilder.Services
         /// How many seconds ahead the Reduce dialog's preview shows, as its slider last left it: its own, as it goes further
         /// than the highway preview's, to see a stretch of changes at once.
         /// </summary>
-        public double ReducePreviewLookAhead { get; set; } = 1.5;
-
-        /// <summary>The shortest and longest look-ahead the Reduce dialog's preview gives, and the steps its slider takes.</summary>
-        public const double MinReducePreviewLookAhead = ReductionPreviewViewModel.MinLookAhead;
-
-        public const double MaxReducePreviewLookAhead = ReductionPreviewViewModel.MaxLookAhead;
-
-        public const double ReducePreviewLookAheadStep = ReductionPreviewViewModel.LookAheadStep;
-
-        /// <summary><paramref name="seconds"/> as the Reduce dialog's preview takes a look-ahead: on its steps, in its range.</summary>
-        public static double SnapReducePreviewLookAhead(double seconds) => ReductionPreviewViewModel.SnapLookAhead(seconds);
+        public double ReducePreviewLookAhead { get; set; } = ReductionPreviewViewModel.DefaultLookAhead;
 
         /// <summary>
         /// Which kinds of change the Reduce dialog's preview marks and stops at, as its filters were last left: all but the

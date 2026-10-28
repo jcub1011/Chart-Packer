@@ -118,15 +118,13 @@
                           IsEnabled="{Binding Player.ShowWaveforms}"
                           ToolTip.Tip="{Binding Player.LaneWaveformsToolTip}"
                           ToolTip.ShowOnDisabled="True" />
-                <Grid ColumnDefinitions="110,*" ColumnSpacing="6">
-                    <TextBlock Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.HighwayNoteSpeedLabel}" />
-                    <Slider Grid.Column="1"
-                            Minimum="0.5"
-                            Maximum="3"
-                            SmallChange="0.1"
-                            LargeChange="0.5"
-                            Value="{Binding Highway.NoteSpeed}"
-                            AutomationProperties.Name="{x:Static res:Strings.HighwayNoteSpeedLabel}" />
+                <Grid ColumnDefinitions="110,*,Auto" ColumnSpacing="6">
+                    <TextBlock Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.HighwayLookAheadLabel}" />
+                    <ui:LookAheadSlider Grid.Column="1"
+                            LookAhead="{Binding Highway.LookAhead}"
+                            AutomationProperties.Name="{x:Static res:Strings.HighwayLookAheadLabel}" />
+                    <TextBlock Grid.Column="2" FontSize="12" FontFeatures="tnum" MinWidth="40" VerticalAlignment="Center"
+                               Text="{Binding Highway.LookAhead, StringFormat={x:Static sres:SharedStrings.LookAheadFormat}}" />
                 </Grid>
                 <TextBlock Classes="muted" TextWrapping="Wrap" MaxWidth="520" HorizontalAlignment="Left" FontSize="12" Text="{x:Static res:Strings.HighwayFootnote}" />
             </StackPanel>
