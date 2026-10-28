@@ -1290,7 +1290,10 @@ Acceptance criteria:
      arrow, and over an end a resize arrow. On drums, a last row holds the lane's difficulty's disco
      flip ranges ([C6](#c6-drums-4-lane-pro-and-5-lane) item 7), which are edited the same way.
    - *Settled in CM3:* star power and solos also tint the lanes faintly behind the notes. Fills, big
-     rock endings, rolls and trills are drawn only in the rail.
+     rock endings, rolls and trills were drawn only in the rail. *Settled:* every phrase kind and
+     disco flip range tints the lanes faintly behind the notes, each in its kind's colour, with its
+     start, and its end where it has one, marked in that colour; where ranges of different kinds
+     overlap, their tints show through each other.
    - *Settled in CM3:* `S` ([§9](#9-keyboard-shortcuts)) puts star power over the selected notes:
      from the first one's tick to where the last to end is let go, or a tick past it when it has no
      sustain, so it covers every note as the games read markers. With no notes selected, it covers
