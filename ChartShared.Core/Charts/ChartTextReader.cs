@@ -62,10 +62,13 @@ internal static class ChartTextReader
 
     /// <summary>
     /// How long a note of <paramref name="length"/> ticks is held, as <paramref name="options"/> read it: a
-    /// <c>.chart</c> has no sustain cutoff unless song.ini sets one, and then one held for less isn't a sustain.
+    /// <c>.chart</c> has no sustain cutoff unless song.ini sets one, and then one held for less isn't a sustain. A hold
+    /// under <see cref="SustainCutoff.MinimumSustain"/> is a plain note whatever the cutoff.
     /// </summary>
     internal static long SustainOf(long length, ChartReadOptions options) =>
-        length <= 0 || (options.SustainCutoff is { } cutoff && length < cutoff) ? 0 : length;
+        length <= 0 || length < SustainCutoff.MinimumSustain || (options.SustainCutoff is { } cutoff && length < cutoff)
+            ? 0
+            : length;
 
     /// <exception cref="ChartFormatException">The file isn't a <c>.chart</c> YARG can read.</exception>
     public static ChartDocument Read(byte[] bytes, ChartReadOptions? options = null) => Read(Sections(Decode(bytes)), options);

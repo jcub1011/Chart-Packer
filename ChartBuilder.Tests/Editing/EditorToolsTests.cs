@@ -396,22 +396,24 @@ public sealed class EditorToolsTests
 
     [TestMethod]
     [DynamicData(nameof(Views))]
-    public void ATailDraggedShorterThanTheSustainCutoffMakesAPlainNote(LaneView view)
+    public void ATailDraggedShorterThanTenTicksMakesAPlainNote(LaneView view)
     {
-        // At 480 ticks a beat the cutoff is a third of a beat, 160 ticks: 120 is under it, 240 isn't.
-        var session = Of(Guitar());
+        // At a resolution of 32 the grid step is 8 ticks: 8 is under the floor, 16 isn't.
+        var chart = EditableChart.CreateNew(new NewChartSettings(
+            "Song", 32, 120, 4, 4, new HashSet<ChartInstrument> { ChartInstrument.Guitar }, DrumsVariant.Pro));
+        var session = Of(chart);
         var track = Expert(session);
-        track.Notes.Add(new EditableNote(0, 480, 0));
-        track.Notes.Add(new EditableNote(0, 480, 1));
+        track.Notes.Add(new EditableNote(0, 32, 0));
+        track.Notes.Add(new EditableNote(0, 32, 1));
 
-        DragFromTo(session, At(session, 300, 0, view), At(session, 240, 0, view));
-        DragFromTo(session, At(session, 300, 1, view), At(session, 120, 1, view));
+        DragFromTo(session, At(session, 20, 0, view), At(session, 16, 0, view));
+        DragFromTo(session, At(session, 20, 1, view), At(session, 8, 1, view));
 
-        Assert.AreSequenceEqual([new EditableNote(0, 240, 0), new EditableNote(0, EditableNote.PlainLength, 1)], track.Notes.ToList());
+        Assert.AreSequenceEqual([new EditableNote(0, 16, 0), new EditableNote(0, EditableNote.PlainLength, 1)], track.Notes.ToList());
     }
 
     [TestMethod]
-    public void AShortSustainFollowsTheSongsCutoff()
+    public void AShortSustainIgnoresTheSongsCutoff()
     {
         var session = Of(Guitar(), songIni: [KeyValuePair.Create("sustain_cutoff_threshold", "60")]);
         var track = Expert(session);

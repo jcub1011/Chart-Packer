@@ -19,8 +19,8 @@ public enum GuitarRecordStyle
 /// </summary>
 /// <remarks>
 /// <para>
-/// Strumming, a fret is usually held until the next note, so it's a sustain only when held past the games' sustain
-/// cutoff (a third of a beat unless song.ini sets one); shorter, and when the same fret is strummed again, it's a plain note.
+/// Strumming, a fret is usually held until the next note, so it's a sustain only when held for at least
+/// <see cref="EditableNote.MinimumSustainLength"/> ticks; shorter, and when the same fret is strummed again, it's a plain note.
 /// </para>
 /// <para>An open note is always a plain note, as there's no fret to hold it with.</para>
 /// <para>Drums record by the pad's colour: a cymbal or a tom isn't recorded in v1.</para>
@@ -144,13 +144,12 @@ public sealed class RecordInput : IActionSink
         }
     }
 
-    // Lets go of a lane: a sustain to now if it was held past the sustain cutoff, else a plain note.
+    // Lets go of a lane: a sustain to now if it was held at least the minimum, else a plain note.
     private void Let(int lane, double song)
     {
         if (!_sounding.Remove(lane, out double from))
             return;
         double held = _session.TickAt(song) - _session.TickAt(from);
-        long cutoff = SustainCutoff.Of(_session.Chart.Resolution, _session.ReadOptions.SustainCutoff);
-        _pass.Release(lane, held > cutoff ? song : from);
+        _pass.Release(lane, held >= EditableNote.MinimumSustainLength ? song : from);
     }
 }

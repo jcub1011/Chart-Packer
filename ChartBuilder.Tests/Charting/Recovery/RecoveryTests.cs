@@ -59,7 +59,10 @@ public sealed class RecoveryTests
         var differences = ChartModelComparer.Differences(MidiChartWriter.Normalize(atAutosave), recovered.Chart);
         Assert.IsEmpty(differences, string.Join("; ", differences.Select(d => d.Description)));
         Assert.Contains("charter", recovered.Reverted, "Reverted changes stay reverted.");
-        Assert.AreSequenceEqual(new[] { "diff_bass" }, [.. recovered.PendingChanges().Select(c => c.Key)], "The part added before the autosave still needs its rating.");
+        Assert.AreSequenceEqual(
+            new[] { "diff_bass", "sustain_cutoff_threshold" },
+            [.. recovered.PendingChanges().Select(c => c.Key)],
+            "The part added before the autosave still needs its rating, and the chart derives its cutoff.");
         Assert.IsEmpty(before.DiffTo(FolderSnapshot.Take(folder)), "Autosave never writes into the song.");
     }
 

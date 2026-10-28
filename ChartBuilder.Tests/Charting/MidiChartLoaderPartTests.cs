@@ -24,7 +24,7 @@ public sealed class MidiChartLoaderPartTests
     // Five-fret and six-fret.
 
     [TestMethod]
-    public void FiveFretNotesKeepTheirLanesAndExactLengths()
+    public void FiveFretNotesKeepTheirLanesAndLengthsAtLeastTheSustainFloor()
     {
         var (part, issues) = LoadPart(ChartInstrument.Guitar, Song()
             .Track("PART GUITAR")
@@ -35,7 +35,7 @@ public sealed class MidiChartLoaderPartTests
             [new EditableNote(0, 1, 0), new EditableNote(0, 1, 1), new EditableNote(480, 240, 2), new EditableNote(960, 0, 3), new EditableNote(1440, 481, 4)],
             NotesOf(part, Expert));
         Assert.AreSequenceEqual([new EditableNote(0, 120, 0)], NotesOf(part, Easy));
-        Assert.AreSequenceEqual([new EditableNote(0, 7, 4)], NotesOf(part, Medium));
+        Assert.AreSequenceEqual([new EditableNote(0, EditableNote.PlainLength, 4)], NotesOf(part, Medium), "A hold under the floor is a plain note.");
         Assert.IsEmpty(issues);
         Assert.IsEmpty(part.RawEvents);
         Assert.IsEmpty(part.TextEvents);

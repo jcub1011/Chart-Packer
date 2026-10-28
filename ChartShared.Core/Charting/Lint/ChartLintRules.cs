@@ -19,7 +19,6 @@ public static class ChartLintRules
         new OffGridRule(),
         new DuplicateMarkersRule(),
         new SustainIntoNextNoteRule(),
-        new SustainUnderCutoffRule(),
         new OpenInChordRule(),
         new RedundantForceRule(),
         new ForcedRepeatRule(),
