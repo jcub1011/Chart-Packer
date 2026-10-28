@@ -43,8 +43,9 @@ namespace ChartBuilder
                 // The instrument devices (charter-spec C19). Their backends start only while something plays them, on the
                 // main thread, as SDL wants.
                 var input = new InputService(InputSettingsService.Load(UserConfigPaths.InputBindingsFile), InputBackends.Create());
+                IJumpListService jumpList = OperatingSystem.IsWindows() ? new WindowsJumpListService(settings) : new NullJumpListService();
                 var windows = new BuilderWindows(
-                    desktop, settings, audio.Open, latency, UserConfigPaths.SettingsFile, new RecoveryStore(UserConfigPaths.RecoveryFolder), input);
+                    desktop, settings, audio.Open, latency, UserConfigPaths.SettingsFile, new RecoveryStore(UserConfigPaths.RecoveryFolder), input, jumpList);
                 windows.StartWith(BuilderArgs.Parse(desktop.Args ?? []));
 
                 // Settings are saved as they change (the Settings window saves them, and the Editor saves its layout

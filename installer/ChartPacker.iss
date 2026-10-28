@@ -143,6 +143,10 @@ Root: HKA; Subkey: "Software\Classes\Directory\Background\shell\{#FolderVerb}"; 
 [Run]
 Filename: "{app}\{#AppExe}"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent
 
+[UninstallRun]
+; Chart Builder's Jump List ("Recent") outlives the app unless it's emptied, which the app does itself, with no window.
+Filename: "{app}\{#BuilderExe}"; Parameters: "--clear-jump-list"; Flags: runhidden skipifdoesntexist; RunOnceId: "ClearBuilderJumpList"; Components: builder
+
 [Code]
 // Explorer runs the thumbnail handler in a COM surrogate (dllhost) that never lets go of it: a Native AOT DLL
 // can't be unloaded. Ending the surrogates that have it loaded frees the file; Explorer starts another when it

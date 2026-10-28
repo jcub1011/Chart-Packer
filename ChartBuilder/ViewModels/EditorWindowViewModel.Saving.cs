@@ -560,6 +560,7 @@ namespace ChartBuilder.ViewModels
                 settings.RecentSongs = RecentSongs.Add(settings.RecentSongs, new RecentSong { Path = entry.FullPath, Title = Song.Title ?? "", OpenedAt = DateTimeOffset.Now });
                 _settings.Save();
                 RefreshRecent();
+                _services.JumpList.Refresh();
                 Messages.Info(string.Format(CultureInfo.CurrentCulture, Strings.FirstSavedStatusFormat, folder));
                 return true;
             }

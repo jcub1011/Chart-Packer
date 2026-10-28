@@ -420,6 +420,10 @@
     <value>yesterday</value>
     <comment>When a recent song was last opened.</comment>
   </data>
+  <data name="JumpListRecentCategory" xml:space="preserve">
+    <value>Recent</value>
+    <comment>The title of the recent songs in the taskbar button's right-click menu.</comment>
+  </data>
   <data name="RecentOpenToolTipFormat" xml:space="preserve">
     <value>Open {0}</value>
     <comment>{0} is the song's path.</comment>
