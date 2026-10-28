@@ -744,6 +744,7 @@ Settings are stored as JSON (source-generated serialization) in the per-user con
 | Batch parallelism | Half the logical cores, at least 1 |
 | Theme | Follow OS |
 | Library sort ([F8](#f8-library-search-sort-and-filter)) | Scan order, first to last |
+| Scan on launch | On. The songs folder from last time is scanned as the app starts. When off, the empty list shows a Scan button instead. |
 
 ## 9. Non-functional requirements
 

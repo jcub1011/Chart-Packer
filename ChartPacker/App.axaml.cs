@@ -155,6 +155,8 @@ namespace ChartPacker
                     downloads,
                     folderPicker);
 
+                library.StartLaunchScan();
+
                 // Subscribed after MainWindow's own Closing handler, which captures the splitter positions first.
                 // It also runs when that handler cancels the close to ask about unsaved changes. They're saved then too,
                 // so they aren't lost if the OS shuts down without waiting for the answer; a close the user cancels

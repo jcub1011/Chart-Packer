@@ -801,6 +801,24 @@
     <value>threads parallel parallelism concurrency workers speed performance</value>
     <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
   </data>
+  <data name="ScanOnLaunchLabel" xml:space="preserve">
+    <value>Scan on launch</value>
+  </data>
+  <data name="ScanOnLaunchDescription" xml:space="preserve">
+    <value>Scan the songs folder from last time as the app starts. When off, use Scan (F5) to search it.</value>
+  </data>
+  <data name="ScanOnLaunchKeywords" xml:space="preserve">
+    <value>startup start open automatic auto rescan refresh</value>
+    <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
+  </data>
+  <data name="ChooseSongsFolderButton" xml:space="preserve">
+    <value>Choose Songs Folder…</value>
+    <comment>Button in the empty library list, shown when no songs folder is set.</comment>
+  </data>
+  <data name="ScanButton" xml:space="preserve">
+    <value>Scan</value>
+    <comment>Button in the empty library list, shown when a songs folder is set but hasn't been scanned.</comment>
+  </data>
   <data name="OutputFolderLabel" xml:space="preserve">
     <value>Output folder</value>
   </data>
