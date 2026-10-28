@@ -20,6 +20,7 @@ namespace ChartPacker.Services
         // Reading a song is mostly parsing its chart, so a reader per processor keeps every core busy.
         public static readonly int DefaultScanParallelism = Environment.ProcessorCount;
         public const int MinScanParallelism = 1;
+        public const bool DefaultScanOnLaunch = true;
         public const double DefaultMasterVolume = 1;
         public const bool DefaultPitchCorrection = true;
         public const OverwritePolicy DefaultOverwritePolicy = OverwritePolicy.Skip;
@@ -61,7 +62,10 @@ namespace ChartPacker.Services
         /// <summary>How many folders the library scan searches, and how many songs it reads, at once.</summary>
         public int ScanParallelism { get; set; } = DefaultScanParallelism;
 
-        /// <summary>The last folder picked in the library panel. It is restored at launch but not scanned.</summary>
+        /// <summary>Whether the app scans <see cref="LastFolder"/> as it starts. When off, the folder is restored but not scanned.</summary>
+        public bool ScanOnLaunch { get; set; } = DefaultScanOnLaunch;
+
+        /// <summary>The last folder picked in the library panel. It is restored at launch, and scanned then when <see cref="ScanOnLaunch"/> is on.</summary>
         public string? LastFolder { get; set; }
 
         /// <summary>Where Pack and Unpack write. <see langword="null"/> means the scanned folder.</summary>

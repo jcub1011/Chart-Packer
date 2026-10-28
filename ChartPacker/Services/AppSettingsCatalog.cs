@@ -50,6 +50,17 @@ namespace ChartPacker.Services
             return new SettingsCatalog(
                 [libraryCategory, scanning, duplicates, output, packing, downloadsCategory, playback, audio, visualizers, scrubbing, general, appearance, logging],
                 [
+                    new ToggleSetting
+                    {
+                        Id = "library.scanOnLaunch",
+                        Category = scanning,
+                        Label = Strings.ScanOnLaunchLabel,
+                        Description = Strings.ScanOnLaunchDescription,
+                        Keywords = SettingKeywords.Split(Strings.ScanOnLaunchKeywords),
+                        DefaultValue = AppSettings.DefaultScanOnLaunch,
+                        Get = () => library.ScanOnLaunch,
+                        Set = scan => library.ScanOnLaunch = scan,
+                    },
                     new IntegerSetting
                     {
                         Id = "library.scanDepth",

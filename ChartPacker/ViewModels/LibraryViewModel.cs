@@ -43,9 +43,9 @@ namespace ChartPacker.ViewModels
 
     /// <summary>The left panel: a picked folder, the song sources found under it, and Pack/Unpack/Merge/Validate/Deduplicate.</summary>
     /// <remarks>
-    /// Scanning only happens on an explicit <see cref="RescanCommand"/>, or as the first step of
-    /// <see cref="DeduplicateCommand"/>. Picking a folder, changing
-    /// the depth or launching the app never scans; the list is flagged as out of date instead.
+    /// Scanning only happens on an explicit <see cref="RescanCommand"/>, as the first step of
+    /// <see cref="DeduplicateCommand"/>, or at launch when <see cref="ScanOnLaunch"/> is on (see <see cref="StartLaunchScan"/>).
+    /// Picking a folder or changing the depth never scans; the list is flagged as out of date instead.
     /// The same goes for a pack or unpack job, which changes what's on disk.
     /// <para>
     /// <see cref="Entries"/> is what the list shows: the scanned songs that pass <see cref="Filter"/>'s
@@ -402,6 +402,20 @@ namespace ChartPacker.ViewModels
         {
             get => _settings.Settings.ScanParallelism;
             set => _settings.Settings.ScanParallelism = Math.Max(value, AppSettings.MinScanParallelism);
+        }
+
+        /// <summary>Whether the app scans the remembered songs folder as it starts.</summary>
+        public bool ScanOnLaunch
+        {
+            get => _settings.Settings.ScanOnLaunch;
+            set => _settings.Settings.ScanOnLaunch = value;
+        }
+
+        /// <summary>Scans the remembered folder if <see cref="ScanOnLaunch"/> is on and there is one. Called once, as the app starts.</summary>
+        public void StartLaunchScan()
+        {
+            if (ScanOnLaunch && RescanCommand.CanExecute(null))
+                RescanCommand.Execute(null);
         }
 
         /// <summary>Which copy the Deduplicate window keeps by default when a song is both a folder and a .sng.</summary>
