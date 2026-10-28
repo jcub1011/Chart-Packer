@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Avalonia.Input;
 using ChartBuilder.ViewModels;
 using ChartShared.Core.Charting;
@@ -9,7 +10,7 @@ namespace ChartBuilder.Controls.Editing
     /// <summary>
     /// The editor's keys (charter-spec §9), for the focused canvas. Letters, digits and brackets are matched by physical
     /// key, so they're in one place on every keyboard layout. Tab is never taken, so focus can always leave the canvas.
-    /// Ctrl+Z, Ctrl+Y and Ctrl+S are the window's.
+    /// Ctrl+Z, Ctrl+Y and Ctrl+S are the window's, and so are Alt+1 to Alt+6, which pick the tools (<see cref="ToolKeys"/>).
     /// </summary>
     internal static class EditorKeys
     {
@@ -329,6 +330,40 @@ namespace ChartBuilder.Controls.Editing
             PhysicalKey.Digit6 or PhysicalKey.NumPad6 => 6,
             _ => null,
         };
+
+        /// <summary>
+        /// The tools Alt and the number row's 1 to 6 pick, in the toolbar's order, so the tool at index <c>n</c> is Alt and
+        /// <c>n + 1</c>. The one table <see cref="ToolOf"/> and <see cref="ShortcutOf"/> both read.
+        /// </summary>
+        public static IReadOnlyList<EditorTool> ToolKeys { get; } =
+            [EditorTool.Select, EditorTool.Place, EditorTool.Erase, EditorTool.Phrase, EditorTool.Tempo, EditorTool.Sync];
+
+        /// <summary>
+        /// The tool Alt and a number-row digit picks (<see cref="ToolKeys"/>). The window takes it wherever focus is; plain
+        /// digits are the lanes' and Ctrl's are the difficulties'. Not the number pad's, whose digits with Alt are Windows'
+        /// Alt codes.
+        /// </summary>
+        /// <returns>The tool, or <see langword="null"/> when the key isn't one.</returns>
+        public static EditorTool? ToolOf(PhysicalKey key, KeyModifiers modifiers)
+        {
+            if ((modifiers & (KeyModifiers.Control | KeyModifiers.Shift | KeyModifiers.Alt | KeyModifiers.Meta)) != KeyModifiers.Alt)
+                return null;
+
+            int index = key - PhysicalKey.Digit1;
+            return index >= 0 && index < ToolKeys.Count ? ToolKeys[index] : null;
+        }
+
+        /// <summary>The key that picks <paramref name="tool"/> as shown to people, such as <c>Alt+3</c>, or <see langword="null"/> when none does.</summary>
+        public static string? ShortcutOf(EditorTool tool)
+        {
+            for (int i = 0; i < ToolKeys.Count; i++)
+            {
+                if (ToolKeys[i] == tool)
+                    return $"Alt+{i + 1}";
+            }
+
+            return null;
+        }
 
         /// <summary>The difficulty Ctrl and a digit picks: 1 Easy to 4 Expert.</summary>
         private static ChartDifficulty? DifficultyOf(PhysicalKey key) => key switch

@@ -43,6 +43,10 @@ namespace ChartBuilder.Views
         // release, which may turn repeating the loop region on or off, comes once.
         private bool _isLoopToolHeld;
 
+        // Alt picked a tool, and its release is still to come: it's taken then, so it isn't a lone Alt press, which Windows
+        // answers by moving focus to the menu bar.
+        private bool _isAltUsedForTool;
+
         private bool _isApplying;
 
         // The sizes last given to the side columns and the timeline row: NaN for an auto-hiding side, and before the
@@ -72,6 +76,7 @@ namespace ChartBuilder.Views
             {
                 _isSpaceHeld = false;
                 _isLoopToolHeld = false;
+                _isAltUsedForTool = false;
                 _viewModel?.Editor.RecordReleaseAll();
                 _viewModel?.Editor.Playtest.ReleaseKeys();
                 _viewModel?.Editor.HoldModifiers(EditorModifiers.None);
@@ -108,6 +113,10 @@ namespace ChartBuilder.Views
             // Holding L holds the Loop tool on, wherever focus is, as Ctrl+Shift holds the Sync tool.
             AddHandler(KeyDownEvent, OnLoopToolKeys, RoutingStrategies.Tunnel, handledEventsToo: true);
             AddHandler(KeyUpEvent, OnLoopToolKeys, RoutingStrategies.Tunnel, handledEventsToo: true);
+
+            // Alt+1 to Alt+6 pick the Select to Sync tools, wherever focus is.
+            AddHandler(KeyDownEvent, OnToolKeys, RoutingStrategies.Tunnel);
+            AddHandler(KeyUpEvent, OnToolKeyUp, RoutingStrategies.Tunnel, handledEventsToo: true);
         }
 
         protected override void OnDataContextChanged(EventArgs e)
@@ -200,6 +209,36 @@ namespace ChartBuilder.Views
             _isLoopToolHeld = false;
             e.Handled = true;
             vm.Editor.ReleaseLoopTool();
+        }
+
+        /// <summary>
+        /// Alt and 1 to 6 pick the Select, Place, Erase, Phrase, Tempo and Sync tools, in the toolbar's order, wherever focus
+        /// is: on a lane, on a button, in a panel. A text box types it instead. Not a key binding, which would run alongside
+        /// a focused control's own handling. Picking a tool is what its button does (a gesture under way is cancelled), so
+        /// it's allowed wherever the buttons are, a playtest or record pass included.
+        /// </summary>
+        private void OnToolKeys(object? sender, KeyEventArgs e)
+        {
+            if (e.Handled || IsTyping(e) || _viewModel is not { IsOpening: false } vm || EditorKeys.ToolOf(e.PhysicalKey, e.KeyModifiers) is not { } tool)
+                return;
+
+            e.Handled = true;
+            _isAltUsedForTool = true;
+            vm.Editor.Session.Tool = tool;
+        }
+
+        /// <summary>
+        /// Letting go of the Alt that picked a tool is taken, so the focus stays where it was, rather than going to the menu
+        /// bar as it does after Alt pressed and released alone. Even when something else took the key-up, so the next lone
+        /// Alt isn't taken in its place.
+        /// </summary>
+        private void OnToolKeyUp(object? sender, KeyEventArgs e)
+        {
+            if (!_isAltUsedForTool || e.Key is not (Key.LeftAlt or Key.RightAlt))
+                return;
+
+            _isAltUsedForTool = false;
+            e.Handled = true;
         }
 
         private void OnOpeningInput(object? sender, RoutedEventArgs e)

@@ -186,6 +186,10 @@
     <value>Sync</value>
     <comment>An editing tool: a synchronized region, whose edits are copied to the passages matching it.</comment>
   </data>
+  <data name="ToolKeyed" xml:space="preserve">
+    <value>{0} ({1})</value>
+    <comment>A tool's name with the key that picks it, in the heading of the toolbar button's tip. {0} is the tool's name and {1} its key, such as Alt+1.</comment>
+  </data>
   <data name="ToolLoop" xml:space="preserve">
     <value>Loop</value>
     <comment>An editing tool: the loop region, a stretch of the song the Loop button repeats.</comment>
