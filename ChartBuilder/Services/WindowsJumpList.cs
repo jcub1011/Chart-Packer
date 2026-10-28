@@ -24,6 +24,7 @@ namespace ChartBuilder.Services
     [SupportedOSPlatform("windows")]
     internal static partial class WindowsJumpList
     {
+        private const ushort VtLpwstr = 31;
         private const uint CoinitApartmentThreaded = 0x2;
         private const uint CoinitDisableOle1Dde = 0x4;
         private const uint ClsctxAll = 0x17;
@@ -144,7 +145,7 @@ namespace ChartBuilder.Services
             Marshal.ThrowExceptionForHR(Marshal.QueryInterface(linkPointer, in PropertyStoreIid, out nint storePointer));
             scope.Own(storePointer);
             var properties = scope.Wrap<IPropertyStore>(storePointer);
-            Marshal.ThrowExceptionForHR(InitPropVariantFromString(entry.Title, out PropVariant title));
+            var title = StringVariant(entry.Title);
             try
             {
                 var key = TitleKey;
@@ -153,11 +154,18 @@ namespace ChartBuilder.Services
             }
             finally
             {
-                _ = PropVariantClear(ref title);
+                ClearVariant(ref title);
             }
 
             return linkPointer;
         }
+
+        /// <summary>A <c>VT_LPWSTR</c> <c>PROPVARIANT</c> holding <paramref name="value"/>, made as propvarutil.h's inline <c>InitPropVariantFromString</c> does: propsys.dll doesn't export it.</summary>
+        /// <remarks>Its string is in COM task memory, so <see cref="ClearVariant"/> frees it.</remarks>
+        internal static PropVariant StringVariant(string value) => new() { Type = VtLpwstr, Value1 = Marshal.StringToCoTaskMemUni(value) };
+
+        /// <summary>Frees what <paramref name="value"/> holds and empties it.</summary>
+        internal static void ClearVariant(ref PropVariant value) => _ = PropVariantClear(ref value);
 
         /// <summary>The COM objects of one update, let go of together.</summary>
         private sealed class ComScope : IDisposable
@@ -214,9 +222,6 @@ namespace ChartBuilder.Services
 
         [LibraryImport("ole32.dll")]
         private static partial int PropVariantClear(ref PropVariant value);
-
-        [LibraryImport("propsys.dll", StringMarshalling = StringMarshalling.Utf16)]
-        private static partial int InitPropVariantFromString(string value, out PropVariant result);
     }
 
     /// <summary>A shell property's identity.</summary>

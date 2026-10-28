@@ -1,4 +1,6 @@
 using System.Reflection;
+using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 using ChartBuilder.Services;
 
 namespace ChartBuilder.Tests.Windows;
@@ -9,6 +11,7 @@ namespace ChartBuilder.Tests.Windows;
 /// the shell's headers give; nothing here touches the real shell.
 /// </summary>
 [TestClass]
+[SupportedOSPlatform("windows")]
 public sealed class JumpListComInterfaceTests
 {
     [TestMethod]
@@ -37,6 +40,25 @@ public sealed class JumpListComInterfaceTests
     [TestMethod]
     public void PropertyStoreKeepsTheShellsOrder() => AssertOrder(
         typeof(IPropertyStore), "GetCount", "GetAt", "GetValue", "SetValue", "Commit");
+
+    // The title's property value is made by hand, since propsys.dll exports no InitPropVariantFromString (it's inline in the
+    // header): the first build called it, and every update failed with EntryPointNotFoundException. Allocates, never the shell.
+    [TestMethod]
+    public void StringVariantHoldsTheTitleAsAWideString()
+    {
+        var variant = WindowsJumpList.StringVariant("Artist – Name");
+        try
+        {
+            Assert.AreEqual((ushort)31, variant.Type);
+            Assert.AreEqual("Artist – Name", Marshal.PtrToStringUni(variant.Value1));
+        }
+        finally
+        {
+            WindowsJumpList.ClearVariant(ref variant);
+        }
+
+        Assert.AreEqual((ushort)0, variant.Type);
+    }
 
     // Declaration order is the metadata's (tokens go up as the compiler meets each method). The generator re-declares a base
     // interface's methods on the interface that extends it, after its own, so those are left out: they aren't its own slots.
