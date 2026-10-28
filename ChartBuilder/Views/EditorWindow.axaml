@@ -6,6 +6,7 @@
         xmlns:ctl="using:ChartShared.UI.Controls"
         xmlns:uiviews="using:ChartShared.UI.Views"
         xmlns:bctl="using:ChartBuilder.Controls"
+        xmlns:edit="using:ChartBuilder.Controls.Editing"
         xmlns:chrome="using:Avalonia.Controls.Chrome"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -251,37 +252,41 @@
                          lane's part. -->
                     <Border Classes="toolbar-group">
                         <StackPanel Orientation="Horizontal" Spacing="2">
-                            <ToggleButton Classes="tool" IsChecked="{Binding Editor.IsSelectTool}" AutomationProperties.Name="{x:Static res:Strings.ToolSelect}">
+                            <ToggleButton Classes="tool" IsChecked="{Binding Editor.IsSelectTool}" AutomationProperties.Name="{x:Static res:Strings.ToolSelect}"
+                                          AutomationProperties.AcceleratorKey="{x:Static edit:ToolHeadings.SelectKey}">
                                 <ToolTip.Tip>
                                     <StackPanel MaxWidth="320" Spacing="4">
-                                        <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.ToolSelect}" />
+                                        <TextBlock FontWeight="SemiBold" Text="{x:Static edit:ToolHeadings.Select}" />
                                         <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.ToolSelectToolTip}" />
                                     </StackPanel>
                                 </ToolTip.Tip>
                                 <ctl:LineIcon Data="{StaticResource PointerStroke}" />
                             </ToggleButton>
-                            <ToggleButton Classes="tool" IsChecked="{Binding Editor.IsPlaceTool}" AutomationProperties.Name="{x:Static res:Strings.ToolPlace}">
+                            <ToggleButton Classes="tool" IsChecked="{Binding Editor.IsPlaceTool}" AutomationProperties.Name="{x:Static res:Strings.ToolPlace}"
+                                          AutomationProperties.AcceleratorKey="{x:Static edit:ToolHeadings.PlaceKey}">
                                 <ToolTip.Tip>
                                     <StackPanel MaxWidth="320" Spacing="4">
-                                        <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.ToolPlace}" />
+                                        <TextBlock FontWeight="SemiBold" Text="{x:Static edit:ToolHeadings.Place}" />
                                         <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.ToolPlaceToolTip}" />
                                     </StackPanel>
                                 </ToolTip.Tip>
                                 <ctl:LineIcon Data="{StaticResource PencilStroke}" />
                             </ToggleButton>
-                            <ToggleButton Classes="tool" IsChecked="{Binding Editor.IsEraseTool}" AutomationProperties.Name="{x:Static res:Strings.ToolErase}">
+                            <ToggleButton Classes="tool" IsChecked="{Binding Editor.IsEraseTool}" AutomationProperties.Name="{x:Static res:Strings.ToolErase}"
+                                          AutomationProperties.AcceleratorKey="{x:Static edit:ToolHeadings.EraseKey}">
                                 <ToolTip.Tip>
                                     <StackPanel MaxWidth="320" Spacing="4">
-                                        <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.ToolErase}" />
+                                        <TextBlock FontWeight="SemiBold" Text="{x:Static edit:ToolHeadings.Erase}" />
                                         <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.ToolEraseToolTip}" />
                                     </StackPanel>
                                 </ToolTip.Tip>
                                 <ctl:LineIcon Data="{StaticResource EraserStroke}" />
                             </ToggleButton>
-                            <ToggleButton Classes="tool" IsChecked="{Binding Editor.IsPhraseTool}" AutomationProperties.Name="{x:Static res:Strings.ToolPhrase}">
+                            <ToggleButton Classes="tool" IsChecked="{Binding Editor.IsPhraseTool}" AutomationProperties.Name="{x:Static res:Strings.ToolPhrase}"
+                                          AutomationProperties.AcceleratorKey="{x:Static edit:ToolHeadings.PhraseKey}">
                                 <ToolTip.Tip>
                                     <StackPanel MaxWidth="320" Spacing="4">
-                                        <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.ToolPhrase}" />
+                                        <TextBlock FontWeight="SemiBold" Text="{x:Static edit:ToolHeadings.Phrase}" />
                                         <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.ToolPhraseToolTip}" />
                                     </StackPanel>
                                 </ToolTip.Tip>
@@ -295,19 +300,21 @@
                                       DisplayMemberBinding="{Binding Label, x:DataType=vm:PhraseKindChoice}"
                                       ToolTip.Tip="{x:Static res:Strings.ToolPhraseKindToolTip}"
                                       AutomationProperties.Name="{x:Static res:Strings.ToolPhraseKindName}" />
-                            <ToggleButton Classes="tool" IsChecked="{Binding Editor.IsTempoTool}" AutomationProperties.Name="{x:Static res:Strings.ToolTempo}">
+                            <ToggleButton Classes="tool" IsChecked="{Binding Editor.IsTempoTool}" AutomationProperties.Name="{x:Static res:Strings.ToolTempo}"
+                                          AutomationProperties.AcceleratorKey="{x:Static edit:ToolHeadings.TempoKey}">
                                 <ToolTip.Tip>
                                     <StackPanel MaxWidth="320" Spacing="4">
-                                        <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.ToolTempo}" />
+                                        <TextBlock FontWeight="SemiBold" Text="{x:Static edit:ToolHeadings.Tempo}" />
                                         <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.ToolTempoToolTip}" />
                                     </StackPanel>
                                 </ToolTip.Tip>
                                 <ctl:LineIcon Data="{StaticResource MetronomeStroke}" />
                             </ToggleButton>
-                            <ToggleButton Classes="tool" IsChecked="{Binding Editor.IsSyncTool}" AutomationProperties.Name="{x:Static res:Strings.ToolSync}">
+                            <ToggleButton Classes="tool" IsChecked="{Binding Editor.IsSyncTool}" AutomationProperties.Name="{x:Static res:Strings.ToolSync}"
+                                          AutomationProperties.AcceleratorKey="{x:Static edit:ToolHeadings.SyncKey}">
                                 <ToolTip.Tip>
                                     <StackPanel MaxWidth="320" Spacing="4">
-                                        <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.ToolSync}" />
+                                        <TextBlock FontWeight="SemiBold" Text="{x:Static edit:ToolHeadings.Sync}" />
                                         <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.ToolSyncToolTip}" />
                                     </StackPanel>
                                 </ToolTip.Tip>
