@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Input;
+using Avalonia.Input;
 using ChartBuilder.Resources;
 using ChartShared.Core.Charting;
 using ChartShared.Core.Charting.Layout;
@@ -17,7 +18,7 @@ namespace ChartBuilder.ViewModels
     /// </summary>
     public sealed class LaneMenuItem
     {
-        private LaneMenuItem(string header, IReadOnlyList<LaneMenuItem>? items, ICommand? command, bool isEnabled, bool isChecked, string? icon = null)
+        private LaneMenuItem(string header, IReadOnlyList<LaneMenuItem>? items, ICommand? command, bool isEnabled, bool isChecked, string? icon = null, KeyGesture? gesture = null)
         {
             Header = header;
             Items = items;
@@ -25,6 +26,7 @@ namespace ChartBuilder.ViewModels
             IsEnabled = isEnabled;
             IsChecked = isChecked;
             Icon = icon;
+            Gesture = gesture;
         }
 
         public string Header { get; }
@@ -45,6 +47,9 @@ namespace ChartBuilder.ViewModels
         /// on a choice, whose place it is to show the tick.
         /// </summary>
         public string? Icon { get; }
+
+        /// <summary>The key shown beside the item as its shortcut, which the canvas handles; null for none.</summary>
+        public KeyGesture? Gesture { get; }
 
         /// <summary>
         /// Every part a lane can show, grouped by instrument, then the vocals. A part <paramref name="canPick"/> refuses
@@ -71,10 +76,10 @@ namespace ChartBuilder.ViewModels
 
         /// <summary>
         /// An item that runs <paramref name="run"/>, greyed out unless <paramref name="isEnabled"/>, beside the line icon
-        /// keyed <paramref name="icon"/>.
+        /// keyed <paramref name="icon"/>, with <paramref name="gesture"/> shown as its shortcut.
         /// </summary>
-        public static LaneMenuItem Action(string header, bool isEnabled, Action run, string? icon = null) =>
-            new(header, null, new RelayCommand(run), isEnabled, isChecked: false, icon);
+        public static LaneMenuItem Action(string header, bool isEnabled, Action run, string? icon = null, KeyGesture? gesture = null) =>
+            new(header, null, new RelayCommand(run), isEnabled, isChecked: false, icon, gesture);
 
         /// <summary>
         /// A submenu of <paramref name="items"/>, greyed out when none of them can be picked, beside the line icon keyed

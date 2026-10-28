@@ -234,6 +234,50 @@
     <value>_Redo</value>
     <comment>Edit menu (Ctrl+Y).</comment>
   </data>
+  <data name="MenuCut" xml:space="preserve">
+    <value>Cu_t</value>
+    <comment>Edit menu (Ctrl+X): copies the selected notes to the clipboard and deletes them. The underscore marks its access key.</comment>
+  </data>
+  <data name="MenuCopy" xml:space="preserve">
+    <value>_Copy</value>
+    <comment>Edit menu (Ctrl+C): copies the selected notes to the clipboard.</comment>
+  </data>
+  <data name="MenuPaste" xml:space="preserve">
+    <value>_Paste</value>
+    <comment>Edit menu (Ctrl+V): pastes the clipboard at the cursor, taking out what's in its span.</comment>
+  </data>
+  <data name="MenuPasteMerge" xml:space="preserve">
+    <value>Paste and _merge</value>
+    <comment>Edit menu (Ctrl+Shift+V): pastes the clipboard at the cursor, keeping what's already in its span.</comment>
+  </data>
+  <data name="MenuSelectAll" xml:space="preserve">
+    <value>Select _all</value>
+    <comment>Edit menu (Ctrl+A): selects every note of the focused lane.</comment>
+  </data>
+  <data name="MenuDelete" xml:space="preserve">
+    <value>_Delete</value>
+    <comment>Edit menu (Delete): deletes what's selected.</comment>
+  </data>
+  <data name="MenuQuantizeFormat" xml:space="preserve">
+    <value>_Quantize to {0}</value>
+    <comment>Edit menu (Q): puts the selected notes, and their sustains' ends, on the quantize grid. {0} is the grid, e.g. 1/16.</comment>
+  </data>
+  <data name="MenuView" xml:space="preserve">
+    <value>_View</value>
+    <comment>The editor title bar's View menu. The underscore marks its access key (Alt+V).</comment>
+  </data>
+  <data name="MenuShowMessages" xml:space="preserve">
+    <value>_Messages</value>
+    <comment>View menu: shows every message said this session.</comment>
+  </data>
+  <data name="MenuShowPreview" xml:space="preserve">
+    <value>_Preview window</value>
+    <comment>View menu: opens the highway preview in a window of its own.</comment>
+  </data>
+  <data name="MenuShowDifficulty" xml:space="preserve">
+    <value>_Difficulty window</value>
+    <comment>View menu: opens the difficulty analysis in a window of its own.</comment>
+  </data>
   <data name="MenuSettings" xml:space="preserve">
     <value>_Settings…</value>
     <comment>Edit menu: the program settings (Ctrl+,). The chart's settings are a tab in the left panel.</comment>
@@ -2712,6 +2756,13 @@ Saving also changes song.ini:
   </data>
   <data name="LanePasteMerge" xml:space="preserve">
     <value>Paste and merge (Ctrl+Shift+V)</value>
+  </data>
+  <data name="LaneDelete" xml:space="preserve">
+    <value>Delete (Del)</value>
+  </data>
+  <data name="LaneQuantize" xml:space="preserve">
+    <value>Quantize to grid (Q)</value>
+    <comment>The lane's Edit menu: puts the selected notes, and their sustains' ends, on the quantize grid, which the toolbar sets. The grid isn't named as the menu isn't rebuilt when it changes.</comment>
   </data>
   <data name="LaneTransform" xml:space="preserve">
     <value>Transform</value>

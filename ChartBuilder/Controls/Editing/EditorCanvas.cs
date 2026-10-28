@@ -881,8 +881,17 @@ namespace ChartBuilder.Controls.Editing
         protected override void OnGotFocus(FocusChangedEventArgs e)
         {
             base.OnGotFocus(e);
-            if (Session is { } session && _lane?.Track is { } key)
-                session.Focused = key;
+            if (Session is { } session)
+            {
+                if (_lane?.Vocal is { } vocal)
+                    session.FocusedVocal = vocal;
+                else if (_lane?.Track is { } key)
+                {
+                    session.Focused = key;
+                    session.FocusedVocal = null;
+                }
+            }
+
             _overlay.Redraw();
         }
 

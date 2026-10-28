@@ -243,6 +243,11 @@ namespace ChartBuilder.Controls.Editing
                 case PhysicalKey.A when ctrl && !shift && !alt:
                     tools.SelectAll();
                     return true;
+                // The selected notes onto the quantize grid, as the Edit menu's Quantize does. With Ctrl, as it rewrites the
+                // notes' times, which a stray plain press must not.
+                case PhysicalKey.Q when ctrl && !shift && !alt:
+                    editor.QuantizeSelection();
+                    return true;
                 // The section the cursor is in, across the lanes shown (charter-spec C15 item 2).
                 case PhysicalKey.A when ctrl && shift && !alt:
                     tools.SelectSectionAtCursor();

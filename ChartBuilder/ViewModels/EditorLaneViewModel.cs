@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using Avalonia.Input;
 using ChartBuilder.Resources;
 using ChartShared.Core.Charting;
 using ChartShared.Core.Charting.Authoring;
@@ -300,8 +301,12 @@ namespace ChartBuilder.ViewModels
                 LaneMenuItem.Action(Strings.LaneSelectSection, true, () => editor.Session.Tools.SelectSectionAtCursor(), "SelectStroke"),
                 LaneMenuItem.Action(Strings.LaneCut, true, editor.Cut, "CutStroke"),
                 LaneMenuItem.Action(Strings.LaneCopy, true, editor.Copy, "CopyStroke"),
-                LaneMenuItem.Action(Strings.LanePaste, true, () => _ = editor.PasteAsync(PasteMode.Overwrite), "PasteStroke"),
-                LaneMenuItem.Action(Strings.LanePasteMerge, true, () => _ = editor.PasteAsync(PasteMode.Merge), "PasteMergeStroke"),
+                // This menu is made ahead of the selection and the clipboard, which it can't follow, so these stay on and say
+                // why when there's nothing to do; the right-click menu is made as it opens, and dims them.
+                LaneMenuItem.Action(Strings.LanePaste, true, () => PasteFromClipboard(editor, PasteMode.Overwrite, null), "PasteStroke"),
+                LaneMenuItem.Action(Strings.LanePasteMerge, true, () => PasteFromClipboard(editor, PasteMode.Merge, null), "PasteMergeStroke"),
+                LaneMenuItem.Action(Strings.LaneDelete, true, editor.Session.Tools.DeleteSelection, "TrashStroke"),
+                LaneMenuItem.Action(Strings.LaneQuantize, true, editor.QuantizeSelection, "QuantizeStroke", new KeyGesture(Key.Q, KeyModifiers.Control)),
                 LaneMenuItem.Submenu(Strings.LaneTransform,
                 [
                     LaneMenuItem.Action(Strings.TransformLeftyFlip, true, editor.Session.Tools.LeftyFlip, "FlipStroke"),
