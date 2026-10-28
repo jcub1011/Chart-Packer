@@ -27,16 +27,26 @@ namespace ChartShared.UI.Controls.Highway
         Flagged = 2,
     }
 
-    /// <summary>A star power phrase drawn behind a highway's notes, in song seconds.</summary>
-    public readonly record struct StarPowerBand(double Start, double End);
+    /// <summary>The kind of band drawn behind a highway's notes: star power, or a proposed phrase of a generator's window.</summary>
+    public enum HighwayBandKind
+    {
+        /// <summary>A star power phrase.</summary>
+        StarPower,
+
+        /// <summary>A proposed fill of Generate fills, in the proposal amber.</summary>
+        Proposal,
+    }
+
+    /// <summary>A phrase drawn behind a highway's notes, in song seconds.</summary>
+    public readonly record struct HighwayBand(double Start, double End, HighwayBandKind Kind = HighwayBandKind.StarPower);
 
     /// <summary>One highway: an instrument difficulty's notes with their song times worked out.</summary>
     public sealed class HighwayLane
     {
         /// <param name="delay">How much later than its ticks say the chart plays against the audio.</param>
         /// <param name="marks">How each of <paramref name="notes"/> is marked out, in their order, or null for none.</param>
-        /// <param name="starPowerBands">The star power phrases to draw behind the notes, in song time, earliest first.</param>
-        public HighwayLane(ChartInstrumentKind kind, int laneCount, string label, IReadOnlyList<ChartNote> notes, TempoMap tempo, TimeSpan delay, IReadOnlyList<HighwayNoteMark>? marks = null, IReadOnlyList<StarPowerBand>? starPowerBands = null)
+        /// <param name="bands">The phrases to draw behind the notes, in song time, earliest first.</param>
+        public HighwayLane(ChartInstrumentKind kind, int laneCount, string label, IReadOnlyList<ChartNote> notes, TempoMap tempo, TimeSpan delay, IReadOnlyList<HighwayNoteMark>? marks = null, IReadOnlyList<HighwayBand>? bands = null)
         {
             if (marks is not null && marks.Count != notes.Count)
                 throw new ArgumentException("There must be a mark for each note.", nameof(marks));
@@ -46,7 +56,7 @@ namespace ChartShared.UI.Controls.Highway
             Label = label;
             Notes = [.. notes];
             Marks = marks is null ? null : [.. marks];
-            StarPowerBands = starPowerBands is null ? [] : [.. starPowerBands];
+            Bands = bands is null ? [] : [.. bands];
             Starts = new double[Notes.Length];
             Ends = new double[Notes.Length];
             for (int i = 0; i < Notes.Length; i++)
@@ -84,8 +94,8 @@ namespace ChartShared.UI.Controls.Highway
         /// <summary>How each note is marked out, in the order of <see cref="Notes"/>; null when none is.</summary>
         public HighwayNoteMark[]? Marks { get; }
 
-        /// <summary>The star power phrases drawn behind the notes, in song seconds, earliest first.</summary>
-        public StarPowerBand[] StarPowerBands { get; }
+        /// <summary>The phrases drawn behind the notes, in song seconds, earliest first.</summary>
+        public HighwayBand[] Bands { get; }
 
         /// <summary>Each note's song time, in seconds.</summary>
         public double[] Starts { get; }
@@ -198,10 +208,12 @@ namespace ChartShared.UI.Controls.Highway
         private static readonly IPen StrikeEdgePen = new ImmutablePen(Color.FromArgb(0x8C, 0xFF, 0xFF, 0xFF).ToUInt32(), 1);
         private static readonly IBrush LabelBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xD0, 0xFF, 0xFF, 0xFF));
 
-        // Star power bands behind the notes, the selected one outlined.
+        // Bands behind the notes, the selected one outlined: star power in its cyan, a proposed fill in the proposal amber.
         private static readonly IBrush StarPowerBandBrush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(HighwayPalette.StarPower, 0x22));
         private static readonly IPen StarPowerBandPen = new ImmutablePen(HighwayPalette.WithAlpha(HighwayPalette.StarPower, 0xA0).ToUInt32(), 1);
-        private static readonly IPen StarPowerSelectedPen = new ImmutablePen(Colors.White.ToUInt32(), 2);
+        private static readonly IBrush ProposalBandBrush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(HighwayPalette.Proposal, 0x22));
+        private static readonly IPen ProposalBandPen = new ImmutablePen(HighwayPalette.WithAlpha(HighwayPalette.Proposal, 0xA0).ToUInt32(), 1);
+        private static readonly IPen BandSelectedPen = new ImmutablePen(Colors.White.ToUInt32(), 2);
 
         // How opaque a faded note is (HighwayNoteMark.Faded), on the highway and in its whole chart.
         private const double FadedOpacity = 0.28;
@@ -727,17 +739,18 @@ namespace ChartShared.UI.Controls.Highway
             {
                 context.FillRectangle(HighwayBrush, bounds);
 
-                // Star power phrases, behind the notes they charge.
-                for (int i = 0; i < lane.StarPowerBands.Length; i++)
+                // Star power phrases and proposed fills, behind the notes they charge.
+                for (int i = 0; i < lane.Bands.Length; i++)
                 {
-                    var band = lane.StarPowerBands[i];
+                    var band = lane.Bands[i];
                     double top = y(band.End), bottom = y(band.Start);
                     var rect = new Rect(bounds.X, Math.Min(top, bottom), bounds.Width, Math.Max(1, Math.Abs(bottom - top)));
-                    context.FillRectangle(StarPowerBandBrush, rect);
-                    context.DrawLine(StarPowerBandPen, new Point(bounds.X, rect.Top), new Point(bounds.Right, rect.Top));
-                    context.DrawLine(StarPowerBandPen, new Point(bounds.X, rect.Bottom), new Point(bounds.Right, rect.Bottom));
+                    var (brush, pen) = band.Kind == HighwayBandKind.Proposal ? (ProposalBandBrush, ProposalBandPen) : (StarPowerBandBrush, StarPowerBandPen);
+                    context.FillRectangle(brush, rect);
+                    context.DrawLine(pen, new Point(bounds.X, rect.Top), new Point(bounds.Right, rect.Top));
+                    context.DrawLine(pen, new Point(bounds.X, rect.Bottom), new Point(bounds.Right, rect.Bottom));
                     if (i == selectedBand)
-                        context.DrawRectangle(null, StarPowerSelectedPen, rect.Deflate(1));
+                        context.DrawRectangle(null, BandSelectedPen, rect.Deflate(1));
                 }
 
                 // The track as it's heard, inside the rails, so a note can be lined up with the sound it's played to. Scaled

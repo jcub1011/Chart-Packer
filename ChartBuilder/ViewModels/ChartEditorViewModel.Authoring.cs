@@ -38,8 +38,9 @@ namespace ChartBuilder.ViewModels
 
         // Generate fills' and Generate star power's options, as last picked.
         private FillOptions _fillOptions = FillOptions.Default;
+        private GenerationMode _fillMode = GenerationMode.Add;
         private StarPowerOptions _starPowerOptions = StarPowerOptions.Default;
-        private StarPowerMode _starPowerMode = StarPowerMode.Replace;
+        private GenerationMode _starPowerMode = GenerationMode.Replace;
 
         /// <summary>The ways record mode can put a pass in: merged with what's there, or over it.</summary>
         public IReadOnlyList<RecordModeChoice> RecordModeChoices { get; } =
@@ -369,9 +370,9 @@ namespace ChartBuilder.ViewModels
         }
 
         /// <summary>
-        /// Opens Generate fills' options (charter-spec C6 item 5), from the Edit menu of a lane of the drums
-        /// <paramref name="part"/>, and proposes fills with the options picked, over the span of a selection of the part or
-        /// the whole part. The options are kept while the editor is open, so the next run starts from the last one's.
+        /// Opens Generate fills' window (charter-spec C6 item 5), from the Edit menu of a lane of the drums, to review the
+        /// fills it proposes over the span of a selection of the part or the whole part, then apply the kept fills or
+        /// cancel. The options and mode are kept while the editor is open, so the next run starts from the last one's.
         /// </summary>
         public async Task GenerateFillsAsync(ChartInstrument part)
         {
@@ -379,11 +380,11 @@ namespace ChartBuilder.ViewModels
                 return;
             Session.Tools.Cancel();
             var span = Session.Selection.SpanIn(part);
-            var options = new GenerateFillsViewModel(_fillOptions, overSelection: span is not null);
-            if (!await _dialogs.AskGenerateFillsAsync(options))
-                return;
-            _fillOptions = options.Options;
-            Session.Fills.Start(_fillOptions, span);
+            var viewModel = new GenerateFillsViewModel(this, part, _fillOptions, overSelection: span is not null, _fillMode);
+            // The options and mode are kept as the window left them, whether the fills were applied or not.
+            await _dialogs.ShowPhraseGeneratorAsync(viewModel);
+            _fillOptions = viewModel.Options;
+            _fillMode = viewModel.Mode;
         }
 
         /// <summary>
@@ -397,10 +398,9 @@ namespace ChartBuilder.ViewModels
             if (_dialogs is null)
                 return;
             Session.Tools.Cancel();
-            Session.Fills.Cancel();
             var span = Session.Selection.SpanIn(part);
             var viewModel = new GenerateStarPowerViewModel(this, part, _starPowerOptions, overSelection: span is not null, _starPowerMode);
-            if (!await _dialogs.ShowStarPowerGeneratorAsync(viewModel))
+            if (!await _dialogs.ShowPhraseGeneratorAsync(viewModel))
                 return;
             _starPowerOptions = viewModel.Options;
             _starPowerMode = viewModel.Mode;

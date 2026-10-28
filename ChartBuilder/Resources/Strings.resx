@@ -2019,13 +2019,6 @@ Saving also changes song.ini:
   <data name="TempoMapKeysHint" xml:space="preserve">
     <value>Ctrl+Shift+↑ / Ctrl+Shift+↓ move the cursor to the next/previous tempo or time signature change. The Tempo tool adds and drags tempo markers on the lanes.</value>
   </data>
-  <data name="GenerateFillsHeading" xml:space="preserve">
-    <value>Generate Fills</value>
-  </data>
-  <data name="GenerateFillsIntro" xml:space="preserve">
-    <value>Propose drum fills over the selection, or the whole part, to keep or drop before they're added.</value>
-    <comment>The Generate fills dialog's introduction.</comment>
-  </data>
   <data name="GenerateFillsSpacingLabel" xml:space="preserve">
     <value>Spacing (measures)</value>
     <comment>How many measures apart generated fills start, at the least.</comment>
@@ -2052,10 +2045,6 @@ Saving also changes song.ini:
   <data name="GenerateFillsEndAnyNote" xml:space="preserve">
     <value>Any note</value>
   </data>
-  <data name="GenerateScopeLabel" xml:space="preserve">
-    <value>Over</value>
-    <comment>Generate fills and Generate star power: where the phrases are proposed, the selection or the whole part.</comment>
-  </data>
   <data name="GenerateScopeSelection" xml:space="preserve">
     <value>Selection</value>
     <comment>Generate fills and Generate star power: the phrases are proposed over the selection's span.</comment>
@@ -2064,20 +2053,9 @@ Saving also changes song.ini:
     <value>Whole Part</value>
     <comment>Generate fills and Generate star power: the phrases are proposed over the whole part.</comment>
   </data>
-  <data name="GenerateButton" xml:space="preserve">
-    <value>Generate</value>
-    <comment>Generate fills and Generate star power: proposes the phrases, shown as ghosts to keep or drop.</comment>
-  </data>
-  <data name="GenerateStarPowerHeading" xml:space="preserve">
-    <value>Generate Star Power</value>
-  </data>
   <data name="GenerateStarPowerTitleFormat" xml:space="preserve">
     <value>Generate Star Power: {0}</value>
     <comment>The Generate star power dialog's title. {0} is the part, e.g. Guitar.</comment>
-  </data>
-  <data name="GenerateStarPowerIntro" xml:space="preserve">
-    <value>Propose star power phrases over the selection, or the whole part, to keep or drop before they're added.</value>
-    <comment>The Generate star power dialog's introduction.</comment>
   </data>
   <data name="GenerateStarPowerSpacingLabel" xml:space="preserve">
     <value>Spacing (Seconds)</value>
@@ -2097,37 +2075,6 @@ Saving also changes song.ini:
     <value>Existing Star Power</value>
     <comment>What Generate star power does with the star power a part already has.</comment>
   </data>
-  <data name="StarPowerModeReplace" xml:space="preserve">
-    <value>Replace</value>
-    <comment>Replaces the star power in the span with the kept proposals.</comment>
-  </data>
-  <data name="StarPowerModeReplaceToolTip" xml:space="preserve">
-    <value>Remove the star power in the span and put the kept proposals there instead.</value>
-  </data>
-  <data name="StarPowerModeAdd" xml:space="preserve">
-    <value>Add Alongside</value>
-    <comment>Adds the kept proposals beside the star power already in the span.</comment>
-  </data>
-  <data name="StarPowerModeAddToolTip" xml:space="preserve">
-    <value>Keep the star power already in the span and add the kept proposals beside it, keeping clear of it.</value>
-  </data>
-  <data name="StarPowerRegenerate" xml:space="preserve">
-    <value>Regenerate</value>
-    <comment>Works the layout out again with the options as they are now.</comment>
-  </data>
-  <data name="StarPowerRegenerateToolTip" xml:space="preserve">
-    <value>Propose the layout again with these options</value>
-  </data>
-  <data name="StarPowerRegenerateConfirm" xml:space="preserve">
-    <value>Replace the regions as they are now?</value>
-    <comment>Shown when Regenerate would lose the kept, dropped, drawn or resized regions.</comment>
-  </data>
-  <data name="StarPowerRegenerateConfirmYes" xml:space="preserve">
-    <value>Regenerate</value>
-  </data>
-  <data name="StarPowerRegenerateConfirmNo" xml:space="preserve">
-    <value>Keep Them</value>
-  </data>
   <data name="StarPowerRegionsHeading" xml:space="preserve">
     <value>Regions</value>
     <comment>The star power window's ribbon of proposed regions.</comment>
@@ -2144,21 +2091,8 @@ Saving also changes song.ini:
     <value>Lead-In for {0}</value>
     <comment>A proposed star power phrase that charges the meter for the hard passage at {0}, e.g. 1:52.</comment>
   </data>
-  <data name="StarPowerRegionDetailFormat" xml:space="preserve">
-    <value>{0} notes · {1}</value>
-    <comment>A region's notes and length, e.g. "8 notes · 2.0 s".</comment>
-  </data>
   <data name="StarPowerExistingHeading" xml:space="preserve">
     <value>Existing Star Power</value>
-  </data>
-  <data name="StarPowerExistingReplaced" xml:space="preserve">
-    <value>Will Be Replaced</value>
-  </data>
-  <data name="StarPowerExistingKept" xml:space="preserve">
-    <value>Kept Alongside</value>
-  </data>
-  <data name="StarPowerNoRegionsKept" xml:space="preserve">
-    <value>Keep at least one region to apply star power.</value>
   </data>
   <data name="StarPowerNoRegions" xml:space="preserve">
     <value>No regions. Regenerate to propose some.</value>
@@ -2170,32 +2104,6 @@ Saving also changes song.ini:
   <data name="StarPowerUnchargedOne" xml:space="preserve">
     <value>1 hard passage not charged</value>
     <comment>A hard passage the kept star power doesn't give enough meter for, when it's the only one.</comment>
-  </data>
-  <data name="StarPowerKeepAll" xml:space="preserve">
-    <value>Keep All</value>
-  </data>
-  <data name="StarPowerKeepToolTip" xml:space="preserve">
-    <value>Keep This Region</value>
-  </data>
-  <data name="StarPowerRegionJumpToolTip" xml:space="preserve">
-    <value>Jump to This Region</value>
-    <comment>Clicking a region in the star power window's list moves the playhead to it.</comment>
-  </data>
-  <data name="StarPowerDropAll" xml:space="preserve">
-    <value>Drop All</value>
-  </data>
-  <data name="StarPowerPreviousRegion" xml:space="preserve">
-    <value>◀</value>
-  </data>
-  <data name="StarPowerNextRegion" xml:space="preserve">
-    <value>▶</value>
-  </data>
-  <data name="StarPowerPreviousRegionToolTip" xml:space="preserve">
-    <value>Previous Region</value>
-    <comment>The star power window's previous-region button; it and the next one step through the list.</comment>
-  </data>
-  <data name="StarPowerNextRegionToolTip" xml:space="preserve">
-    <value>Next Region</value>
   </data>
   <data name="StarPowerApply" xml:space="preserve">
     <value>Apply Star Power</value>
@@ -2212,25 +2120,6 @@ Saving also changes song.ini:
     <value>Not Charged</value>
     <comment>A lead-in's chip, in the star power window's region list: the kept plan gives less than half a meter for its hard passage.</comment>
   </data>
-  <data name="StarPowerPreviewHeading" xml:space="preserve">
-    <value>Preview</value>
-    <comment>The star power window's preview controls.</comment>
-  </data>
-  <data name="StarPowerLookAheadLabel" xml:space="preserve">
-    <value>Look Ahead</value>
-    <comment>How far ahead the star power window's highway shows.</comment>
-  </data>
-  <data name="StarPowerLookAheadToolTip" xml:space="preserve">
-    <value>How far ahead of the strike line the highway shows; more makes longer regions easier to draw.</value>
-  </data>
-  <data name="StarPowerTimelineHeading" xml:space="preserve">
-    <value>Whole Song</value>
-    <comment>The star power window's whole-song timeline, under the region list and the highway preview.</comment>
-  </data>
-  <data name="StarPowerEmptyHeading" xml:space="preserve">
-    <value>Nothing to Propose</value>
-    <comment>The star power window's preview, when no regions could be proposed; the reason follows under it.</comment>
-  </data>
   <data name="StarPowerNothingToApply" xml:space="preserve">
     <value>No Regions to Apply</value>
     <comment>The star power window's footer, in place of the kept/total summary when there are no regions.</comment>
@@ -2246,33 +2135,6 @@ Saving also changes song.ini:
   </data>
   <data name="StarPowerHasStarPower" xml:space="preserve">
     <value>The part has star power already. Replace it, or select a span to add beside it.</value>
-  </data>
-  <data name="StarPowerEmptyHint" xml:space="preserve">
-    <value>Change the spacing or mode, or select a span, then Regenerate.</value>
-  </data>
-  <data name="ProposalRunPrevious" xml:space="preserve">
-    <value>◀ Previous</value>
-    <comment>The bar over the lanes while Generate fills or Generate star power runs: goes to the proposal before the cursor.</comment>
-  </data>
-  <data name="ProposalRunPreviousToolTip" xml:space="preserve">
-    <value>Go to the proposal before the cursor</value>
-  </data>
-  <data name="ProposalRunNext" xml:space="preserve">
-    <value>Next ▶</value>
-    <comment>The bar over the lanes while Generate fills or Generate star power runs: goes to the proposal after the cursor.</comment>
-  </data>
-  <data name="ProposalRunNextToolTip" xml:space="preserve">
-    <value>Go to the proposal after the cursor</value>
-  </data>
-  <data name="ProposalRunNoneBefore" xml:space="preserve">
-    <value>No proposal before the cursor.</value>
-  </data>
-  <data name="ProposalRunNoneAfter" xml:space="preserve">
-    <value>No proposal after the cursor.</value>
-  </data>
-  <data name="ProposalGhostToolTipFormat" xml:space="preserve">
-    <value>Proposed {0}: click to keep or drop it</value>
-    <comment>A proposed phrase's ghost in the phrase rail. {0} is its kind in lower case, e.g. "star power" or "drum fill".</comment>
   </data>
   <data name="SyncClearToolTip" xml:space="preserve">
     <value>Clear the synchronized region</value>
@@ -2301,30 +2163,6 @@ Saving also changes song.ini:
   <data name="LoopResizeToolTip" xml:space="preserve">
     <value>Drag to resize the loop region</value>
     <comment>An end of the loop region, which a drag resizes the region by.</comment>
-  </data>
-  <data name="FillRunFormat" xml:space="preserve">
-    <value>{0} of {1} proposed fills kept</value>
-    <comment>The bar over the lanes while Generate fills runs. {0} is how many are kept, {1} how many were proposed.</comment>
-  </data>
-  <data name="FillRunHint" xml:space="preserve">
-    <value>Click a ghost in the rail's fills row to keep or drop it. Esc cancels.</value>
-  </data>
-  <data name="FillRunKeepAll" xml:space="preserve">
-    <value>Keep all</value>
-  </data>
-  <data name="FillRunDropAll" xml:space="preserve">
-    <value>Drop all</value>
-  </data>
-  <data name="FillRunAdd" xml:space="preserve">
-    <value>Add fills</value>
-    <comment>Adds the kept fills, as one step to undo.</comment>
-  </data>
-  <data name="FillRunAddToolTip" xml:space="preserve">
-    <value>Add the kept fills, as one step to undo</value>
-  </data>
-  <data name="FillRunCancel" xml:space="preserve">
-    <value>Cancel</value>
-    <comment>Ends Generate fills, adding nothing.</comment>
   </data>
   <data name="SettingsCategoryPlayback" xml:space="preserve">
     <value>Playback</value>
@@ -2705,7 +2543,7 @@ Saving also changes song.ini:
   </data>
   <data name="LaneGenerateFills" xml:space="preserve">
     <value>Generate fills…</value>
-    <comment>A lane's Edit menu item, on drums lanes: opens Generate fills' options.</comment>
+    <comment>A lane's Edit menu item, on drums lanes: opens the fills generator's window for the lane's part.</comment>
   </data>
   <data name="ReduceTitleFormat" xml:space="preserve">
     <value>Reduce {0}</value>
@@ -3981,4 +3819,136 @@ Saving also changes song.ini:
     <value>Move this event to the playhead, on the grid</value>
     <comment>A Sections row's Move to the playhead button.</comment>
   </data>
-</root>
+  <data name="GenerateModeReplace" xml:space="preserve">
+    <value>Replace</value>
+    <comment>What a generator does with the phrases a part already has: replaces them with the kept proposals.</comment>
+  </data>
+  <data name="GenerateModeAdd" xml:space="preserve">
+    <value>Add Alongside</value>
+    <comment>What a generator does with the phrases a part already has: keeps them and adds the kept proposals beside them.</comment>
+  </data>
+  <data name="GeneratePreviewAutomationName" xml:space="preserve">
+    <value>Highway preview</value>
+  </data>
+  <data name="GenerateTimelineAutomationName" xml:space="preserve">
+    <value>Song timeline</value>
+  </data>
+  <data name="GenerateRegionDetailFormat" xml:space="preserve">
+    <value>{0} notes – {1}</value>
+    <comment>A proposal's notes and length, e.g. "8 notes – 2.0 s".</comment>
+  </data>
+  <data name="GenerateExistingReplaced" xml:space="preserve">
+    <value>Will Be Replaced</value>
+  </data>
+  <data name="GenerateExistingKept" xml:space="preserve">
+    <value>Kept Alongside</value>
+  </data>
+  <data name="GenerateNoProposalsKept" xml:space="preserve">
+    <value>Keep at least one to apply.</value>
+  </data>
+  <data name="GenerateEmptyHint" xml:space="preserve">
+    <value>Change the options or mode, or select a span, then Regenerate.</value>
+  </data>
+  <data name="GeneratePreviewHeading" xml:space="preserve">
+    <value>Preview</value>
+    <comment>The generation window's preview controls.</comment>
+  </data>
+  <data name="GenerateLookAheadLabel" xml:space="preserve">
+    <value>Look Ahead</value>
+    <comment>How far ahead the generation window's highway shows.</comment>
+  </data>
+  <data name="GenerateLookAheadToolTip" xml:space="preserve">
+    <value>How far ahead of the strike line the highway shows; more makes longer proposals easier to draw.</value>
+  </data>
+  <data name="GenerateTimelineHeading" xml:space="preserve">
+    <value>Whole Song</value>
+    <comment>The generation window's whole-song timeline.</comment>
+  </data>
+  <data name="GenerateEmptyHeading" xml:space="preserve">
+    <value>Nothing to Propose</value>
+    <comment>The generation window's preview, when nothing could be proposed; the reason follows under it.</comment>
+  </data>
+  <data name="GenerateRegenerate" xml:space="preserve">
+    <value>Regenerate</value>
+    <comment>Works the plan out again with the options as they are now.</comment>
+  </data>
+  <data name="GenerateRegenerateToolTip" xml:space="preserve">
+    <value>Propose the plan again with these options</value>
+  </data>
+  <data name="GenerateRegenerateConfirm" xml:space="preserve">
+    <value>Replace the proposals as they are now?</value>
+    <comment>Shown when Regenerate would lose the kept or dropped proposals.</comment>
+  </data>
+  <data name="GenerateRegenerateConfirmYes" xml:space="preserve">
+    <value>Regenerate</value>
+  </data>
+  <data name="GenerateRegenerateConfirmNo" xml:space="preserve">
+    <value>Keep Them</value>
+  </data>
+  <data name="GenerateKeepAll" xml:space="preserve">
+    <value>Keep All</value>
+  </data>
+  <data name="GenerateDropAll" xml:space="preserve">
+    <value>Drop All</value>
+  </data>
+  <data name="GenerateKeepToolTip" xml:space="preserve">
+    <value>Keep This Proposal</value>
+  </data>
+  <data name="GenerateRegionJumpToolTip" xml:space="preserve">
+    <value>Jump to This Proposal</value>
+    <comment>Clicking a proposal in the generation window's list moves the playhead to it.</comment>
+  </data>
+  <data name="GeneratePreviousRegionToolTip" xml:space="preserve">
+    <value>Previous Proposal</value>
+  </data>
+  <data name="GenerateNextRegionToolTip" xml:space="preserve">
+    <value>Next Proposal</value>
+  </data>
+  <data name="GenerateFillsTitleFormat" xml:space="preserve">
+    <value>Generate Fills: {0}</value>
+    <comment>The Generate fills window's title. {0} is the part, e.g. Drums.</comment>
+  </data>
+  <data name="GenerateFillsApply" xml:space="preserve">
+    <value>Add Fills</value>
+    <comment>Applies the kept fills to the chart, as one step to undo.</comment>
+  </data>
+  <data name="GenerateFillsApplyToolTip" xml:space="preserve">
+    <value>Add the kept fills, as one step to undo (Ctrl+Enter)</value>
+  </data>
+  <data name="GenerateFillsModeLabel" xml:space="preserve">
+    <value>Existing Fills</value>
+    <comment>What Generate fills does with the fills a part already has.</comment>
+  </data>
+  <data name="GenerateFillsRegionsHeading" xml:space="preserve">
+    <value>Fills</value>
+  </data>
+  <data name="GenerateFillsExistingHeading" xml:space="preserve">
+    <value>Existing Fills</value>
+  </data>
+  <data name="GenerateFillsRoleFormat" xml:space="preserve">
+    <value>{0} at {1}</value>
+    <comment>A fill's row: {0} is what it ends on, a crash or any note, and {1} is when, e.g. "Crash at 1:52".</comment>
+  </data>
+  <data name="GenerateFillsPlanSummaryFormat" xml:space="preserve">
+    <value>{0} of {1} Kept - {2} of Fills</value>
+    <comment>{0} is how many fills are kept, {1} how many there are, {2} how long they add up to, e.g. 0:08.</comment>
+  </data>
+  <data name="GenerateFillsNothingToApply" xml:space="preserve">
+    <value>No Fills to Add</value>
+    <comment>The Generate fills window's footer, in place of the kept/total summary when there are no fills.</comment>
+  </data>
+  <data name="GenerateFillsNoRegions" xml:space="preserve">
+    <value>No fills. Regenerate to propose some.</value>
+  </data>
+  <data name="GenerateFillsNoDrumNotes" xml:space="preserve">
+    <value>The drums have no notes to propose fills over.</value>
+  </data>
+  <data name="GenerateFillsTooFewStarPower" xml:space="preserve">
+    <value>Fills are proposed only after the second star power phrase ends, and the drums have fewer than two.</value>
+  </data>
+  <data name="GenerateFillsNoCrashSpot" xml:space="preserve">
+    <value>No fill fits: none ends on a crash on a measure's first beat that every difficulty with notes has a note on, after the second star power phrase and clear of star power, other fills and [coda].</value>
+  </data>
+  <data name="GenerateFillsNoNoteSpot" xml:space="preserve">
+    <value>No fill fits: none ends on a note on a measure's first beat that every difficulty with notes has, after the second star power phrase and clear of star power, other fills and [coda].</value>
+  </data></root>

@@ -27,8 +27,8 @@ namespace ChartBuilder.Controls
     public readonly record struct StarPowerSpikeMark(double Seconds, bool Charged);
 
     /// <summary>
-    /// What the star power window's timeline adds to the editor's: the meter ribbon, the hard passages, and which proposed
-    /// region is selected.
+    /// What the generation window's timeline adds to the editor's: for star power, the meter ribbon and the hard passages;
+    /// and which proposed region is selected.
     /// </summary>
     public sealed record StarPowerTimelineExtras(
         IReadOnlyList<StarPowerMeterPoint> Meter,
@@ -108,8 +108,8 @@ namespace ChartBuilder.Controls
         // How far apart a region nothing matched's hash lines are drawn, in pixels.
         private const double SyncHashGap = 5;
 
-        // The ghosts of a run of Generate fills or Generate star power, over everything else, so they're easy to find: a kept
-        // one's a faint amber column the height of the overview, capped solid; a dropped one's only a faint outline.
+        // The ghosts of a generator's proposals, over everything else, so they're easy to find: a kept one's a faint amber
+        // column the height of the overview, capped solid; a dropped one's only a faint outline.
         private const double ProposalCap = 4;
         private const double ProposalMinWidth = 2;
         private static readonly IBrush KeptProposalBrush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(PhraseColors.Proposal, 0x40));
@@ -125,7 +125,8 @@ namespace ChartBuilder.Controls
         private static readonly IBrush WarningMarkBrush = new ImmutableSolidColorBrush(Color.FromRgb(0xFB, 0xBF, 0x24));
         private static readonly IBrush InfoMarkBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xC0, 0x93, 0xC5, 0xFD));
 
-        // The star power window's extras: the meter ribbon along the bottom, and the hard passages as triangles at the top.
+        // The generation window's extras, for star power: the meter ribbon along the bottom, and the hard passages as
+        // triangles at the top. A fills window has neither, and uses them only to outline the selected proposal.
         private const double MeterHeight = 20;
         private static readonly IBrush MeterBackgroundBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xB0, 0x08, 0x08, 0x10));
         private static readonly IBrush MeterFillBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x80, 0x7F, 0xE9, 0xFF));
@@ -508,7 +509,7 @@ namespace ChartBuilder.Controls
         /// <summary>
         /// The lane in focus over the whole song: its notes, a band of its phrases for each row of its phrase rail, the
         /// chart's tempo and time signature changes, and the song's sections; the synchronized region and the passages
-        /// synced with it; and over them all, the ghosts of a run of Generate fills or Generate star power.
+        /// synced with it; and over them all, the ghosts of a generation window's proposals.
         /// </summary>
         private void DrawOverview(DrawingContext context, Rect bounds)
         {
@@ -588,8 +589,8 @@ namespace ChartBuilder.Controls
         }
 
         /// <summary>
-        /// The star power window's extras: the meter ribbon along the bottom with its activation threshold, the hard
-        /// passages as triangles along the top of the overview, and the selected proposal outlined.
+        /// The generation window's extras: for star power, the meter ribbon along the bottom with its activation threshold
+        /// and the hard passages as triangles along the top of the overview; and the selected proposal outlined.
         /// </summary>
         private void DrawStarPowerExtras(DrawingContext context, Rect bounds)
         {

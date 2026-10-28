@@ -130,20 +130,6 @@ namespace ChartBuilder.Views
         }
 
         /// <summary>
-        /// Esc ends a run of Generate fills or Generate star power (charter-spec C6 item 5, C8 item 1) when nothing focused
-        /// took it first: a lane takes back its drag before it ends the run (EditorKeys), and a field or a list keeps its own
-        /// Esc. Not a key binding, which would run before the focused control saw the key.
-        /// </summary>
-        protected override void OnKeyDown(KeyEventArgs e)
-        {
-            base.OnKeyDown(e);
-            if (e.Handled || e.Key != Key.Escape || e.KeyModifiers != KeyModifiers.None || _viewModel?.Editor.Session.Proposals is not { } run)
-                return;
-            run.Cancel();
-            e.Handled = true;
-        }
-
-        /// <summary>
         /// Space anywhere in the window plays or pauses, once a press however long it's held. Tunnelled, so a focused
         /// button or list plays rather than taking it. Not while a text box has focus: it types a space there. Not a key
         /// binding, which would run alongside the focused control's own Space.

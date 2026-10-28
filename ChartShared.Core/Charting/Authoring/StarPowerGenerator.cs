@@ -4,16 +4,6 @@ using ChartShared.Core.Charts;
 
 namespace ChartShared.Core.Charting.Authoring;
 
-/// <summary>What Generate star power does with the star power a part already has.</summary>
-public enum StarPowerMode
-{
-    /// <summary>It replaces the star power in the span: the phrases there are removed when the kept proposals are added.</summary>
-    Replace,
-
-    /// <summary>It adds its phrases alongside the star power there, keeping clear of it.</summary>
-    Add,
-}
-
 /// <summary>What the author picks for a run of Generate star power (charter-spec C8 item 1).</summary>
 /// <param name="SpacingSeconds">About how far apart phrases are, in seconds of the part's playing: its long rests don't count.</param>
 /// <param name="PlanForSpikes">
@@ -214,14 +204,14 @@ public static class StarPowerGenerator
     }
 
     /// <summary>
-    /// Proposes star power phrases for <paramref name="part"/> of <paramref name="chart"/>. In <see cref="StarPowerMode.Add"/>,
+    /// Proposes star power phrases for <paramref name="part"/> of <paramref name="chart"/>. In <see cref="GenerationMode.Add"/>,
     /// star power already there stays: proposals keep clear of it, and it counts towards the meter and the spacing. In
-    /// <see cref="StarPowerMode.Replace"/>, it's ignored, as the kept proposals will replace it.
+    /// <see cref="GenerationMode.Replace"/>, it's ignored, as the kept proposals will replace it.
     /// </summary>
     /// <param name="readOptions">How the song's HOPOs and sustains are read (the defaults when null).</param>
     /// <param name="span">The ticks a phrase must lie within; the whole part when null.</param>
     /// <param name="mode">What the proposals do with the star power already in the span.</param>
-    public static StarPowerGeneration Propose(EditableChart chart, ChartInstrument part, StarPowerOptions options, ChartReadOptions? readOptions = null, (long From, long To)? span = null, StarPowerParameters? parameters = null, StarPowerMode mode = StarPowerMode.Add)
+    public static StarPowerGeneration Propose(EditableChart chart, ChartInstrument part, StarPowerOptions options, ChartReadOptions? readOptions = null, (long From, long To)? span = null, StarPowerParameters? parameters = null, GenerationMode mode = GenerationMode.Add)
     {
         ArgumentNullException.ThrowIfNull(chart);
         ArgumentNullException.ThrowIfNull(options);
@@ -279,7 +269,7 @@ internal sealed record StarPowerContext(
     TempoMap Map,
     StarPowerTimeline Timeline,
     StarPowerParameters Parameters,
-    StarPowerMode Mode,
+    GenerationMode Mode,
     (long From, long To)? Span,
     long From,
     long To)
@@ -287,7 +277,7 @@ internal sealed record StarPowerContext(
     public int Resolution => Map.Resolution;
 
     /// <summary>Whether the phrases proposed replace the star power already there, rather than keeping clear of it.</summary>
-    public bool ReplacingStarPower => Mode == StarPowerMode.Replace;
+    public bool ReplacingStarPower => Mode == GenerationMode.Replace;
 
     /// <summary>Whether <paramref name="phrase"/> is star power the plan replaces: it's wholly inside the span, or the whole part is.</summary>
     public bool Replaces(Phrase phrase) =>
@@ -296,7 +286,7 @@ internal sealed record StarPowerContext(
     /// <summary>The tick of the source's last chord.</summary>
     public long LastChordTick => Chords[^1].Tick;
 
-    public static StarPowerContext Of(EditableChart chart, EditablePart part, ChartDifficulty highest, (long From, long To)? span, StarPowerParameters p, StarPowerMode mode = StarPowerMode.Add)
+    public static StarPowerContext Of(EditableChart chart, EditablePart part, ChartDifficulty highest, (long From, long To)? span, StarPowerParameters p, GenerationMode mode = GenerationMode.Add)
     {
         var source = part[highest];
         var others = part.Tracks.Where(t => t.Difficulty != highest && t.Notes.Count > 0).ToList();

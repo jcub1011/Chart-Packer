@@ -12,16 +12,16 @@ using ChartShared.UI.ViewModels;
 namespace ChartBuilder.ViewModels
 {
     /// <summary>
-    /// The highway preview of a star power layout: the chart's notes, tinted where the kept star power covers them, and the
-    /// phrases drawn behind them, without changing the chart.
+    /// The highway preview of a generator's proposals: the chart's notes, tinted where kept star power covers them, and the
+    /// phrases drawn behind them as bands, without changing the chart.
     /// </summary>
-    internal static class StarPowerPreviewScene
+    internal static class ProposalPreviewScene
     {
         /// <summary>
-        /// The preview of <paramref name="key"/>'s highway with <paramref name="playing"/> over it: the star power phrases
-        /// the result would have, in ticks, earliest first.
+        /// The preview of <paramref name="key"/>'s highway with <paramref name="playing"/> over it: the phrases the result
+        /// would have, in ticks, earliest first. Star power tints the notes it covers; fills are only bands.
         /// </summary>
-        public static HighwayScene Of(EditorSession session, ChartTrackKey key, IReadOnlyList<Phrase> playing)
+        public static HighwayScene Of(EditorSession session, ChartTrackKey key, IReadOnlyList<Phrase> playing, bool starPower)
         {
             ArgumentNullException.ThrowIfNull(session);
             ArgumentNullException.ThrowIfNull(playing);
@@ -31,27 +31,33 @@ namespace ChartBuilder.ViewModels
             for (int i = 0; i < notes.Length; i++)
             {
                 var note = game.Notes[i];
-                bool inside = playing.Any(p => p.Covers(note.Tick));
-                notes[i] = note with { Flags = (note.Flags & ~NoteFlags.StarPower) | (inside ? NoteFlags.StarPower : NoteFlags.None) };
+                notes[i] = starPower
+                    ? note with
+                    {
+                        Flags = (note.Flags & ~NoteFlags.StarPower)
+                            | (playing.Any(p => p.Covers(note.Tick)) ? NoteFlags.StarPower : NoteFlags.None),
+                    }
+                    : note;
             }
 
+            var kind = starPower ? HighwayBandKind.StarPower : HighwayBandKind.Proposal;
             var bands = playing
-                .Select(p => new StarPowerBand(session.AudioAt(p.Tick), session.AudioAt(p.CoverEnd)))
+                .Select(p => new HighwayBand(session.AudioAt(p.Tick), session.AudioAt(p.CoverEnd), kind))
                 .ToList();
-            var kind = ChartInstruments.KindOf(key.Instrument);
+            var instrument = ChartInstruments.KindOf(key.Instrument);
             var label = string.Format(
                 CultureInfo.CurrentCulture,
                 Strings.LaneTitleFormat,
                 ChartLabels.InstrumentName(key.Instrument),
                 ChartLabels.DifficultyName(key.Difficulty));
             var lane = new HighwayLane(
-                kind,
-                HighwayLane.LaneCountOf(kind, session.IsFiveLaneDrums),
+                instrument,
+                HighwayLane.LaneCountOf(instrument, session.IsFiveLaneDrums),
                 label,
                 notes,
                 session.TempoMap,
                 session.Delay,
-                starPowerBands: bands);
+                bands: bands);
             return new HighwayScene([lane], session.TempoMap, session.Delay);
         }
     }

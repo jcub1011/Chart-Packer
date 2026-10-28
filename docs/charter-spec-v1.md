@@ -862,10 +862,7 @@ Acceptance criteria:
      solos, fills (with a big rock ending), rolls, trills and the difficulty's disco flips on drums.
      The sections' names are below the bands. The chart's tempo and time-signature changes are drawn
      as amber lines down the strip, in the tempo markers' colour, whatever tool is active, and the
-     loop region's start and end as blue lines ([C10](#c10-playback) item 2). While
-     Generate fills or Generate star power runs, its ghosts are drawn over everything, whichever
-     lane is in focus, so they can be found: a kept one as a faint amber column the height of the
-     strip, capped in solid amber, a dropped one as a faint outline; each at least 2 px wide.
+     loop region's start and end as blue lines ([C10](#c10-playback) item 2).
 3. **Part and difficulty picker.** Every part with its four difficulties. The letters use the
    detail panel's difficulty colours from `Theme.axaml` (green, yellow, red, purple) where the
    difficulty has notes, and grey where it is empty. The detail panel shows only charted
@@ -1123,18 +1120,19 @@ Acceptance criteria:
      will write `[ENABLE_CHART_DYNAMICS]` for them.
 5. **Drum fills (activation lanes).**
    - A phrase on every difficulty. Its last note is where star power is activated.
-   - **Generate fills** proposes fills over the selection or the whole part. The author picks,
-     for each run:
+   - **Generate fills** proposes fills over the selection or the whole part, in the same window as
+     Generate star power ([C8](#c8-phrases-and-events) item 1). The author picks, for each run:
      - the **spacing**: fills start no closer than *n* measures apart (default 4);
      - the **fill length** (default 1 measure);
      - **what a fill must end on**: a crash (default) or any note. A crash is a green cymbal in
-       Pro, orange in 5-lane, and green in 4-lane.
+       Pro, orange in 5-lane, and green in 4-lane;
+     - **what to do with the fills already there**: add alongside them (default), or replace those
+       wholly inside the span.
 
      Fills are proposed only after the second star-power phrase has ended (the earliest point a
      player can have enough to activate), and never inside a star-power phrase. Where no note
-     fits at a spot, the fill is left out. The proposals are shown as ghosts, and the author keeps
-     or drops each one. Fills are never added silently, and the accepted ones are added as one
-     undoable command.
+     fits at a spot, the fill is left out. The window lists the proposals to keep or drop, previews
+     them as amber bands on the highway, and adds the kept ones as one undoable command.
    - *Settled in CM3:* a fill covers the notes from its start up to, but not including, its end
      (only its start, if it has no length), as the games read markers. Its last such note on a
      difficulty is where star power is activated there.
@@ -1155,20 +1153,16 @@ Acceptance criteria:
      starts at least the spacing in measures from every other fill's start, those already there and
      those proposed. Over the selection, a fill starts at or after the selection's start and ends on
      a note at or before its end.
-   - *Settled in CM3:* **Generate fills…** is beside the Phrase tool's picker, for a drums lane with
-     notes, and its options are in its flyout, kept while the editor is open. The proposals are
-     drawn as ghosts in the rail's fills row, over the bars there, in amber, a colour no phrase is
-     drawn in, whatever their kind, so they stand out: a kept one is lit, a little taller than its
-     row, with a bold dashed edge, and a band across the lanes edged by dashed lines at its start
-     and end; a dropped one is a faint outline, struck through, with a fainter band. Hovering a ghost
-     names it, and a click on one keeps or drops it, before anything else under it. While they're
-     shown, a bar over the lanes counts those kept, with **◀ Previous** and **Next ▶** (the cursor
-     goes to the start of the ghost before or after it, and the status says when there's none that
-     way), **Keep all**, **Drop all**, **Add fills** and **Cancel**; `Esc` cancels too, once nothing
-     focused has taken it (a drag is taken back first, and a field keeps its own `Esc`). Any change to the
-     chart but the run's own, an undo included, or to the song's settings, ends the run and says so,
-     as the proposals were worked out from the chart before it. When nothing fits, the message says
-     why: no drum notes, fewer than two star power phrases, or no spot.
+   - *Settled:* **Generate fills…** is beside the Phrase tool's picker, for a drums lane with notes.
+     Its options are in the generator window's toolbar, kept while the editor is open: the spacing,
+     the fill length, what a fill ends on, and Existing Fills (Replace or Add Alongside, default Add
+     Alongside). The window lists the fills proposed, each kept or dropped by its row,
+     with ◀ Previous, Next ▶, Keep all, Drop all and Regenerate. The preview highway draws the kept
+     fills as amber bands, and the whole-song timeline shows them as amber ghosts. Apply (Ctrl+Enter)
+     adds the kept fills as one undoable command; Cancel adds nothing, and the chart is unchanged
+     until Apply. In Replace, the fills wholly inside the span are removed when the kept ones are
+     added; one reaching across its edge stays, and keeps its ground. When nothing fits, the preview
+     says why: no drum notes, fewer than two star power phrases, or no spot.
 6. **Rolls and trills.**
    - Single-lane roll and two-lane trill phrases.
    - New ones reach Expert only, as the games default to. Each can be extended down to Hard,
@@ -1306,11 +1300,10 @@ Acceptance criteria:
      5-fret or keys lane, placed so a player has enough to activate going into the part's hardest
      passages. The author picks, for each run, about how many **seconds apart** phrases are
      (default 22, as the official charts are), and whether they're **charged for the hard passages**
-     (default on) or only spread
-     evenly. As with Generate fills, the proposals are ghosts the author keeps or drops, and the
-     accepted ones are added as one undoable command. CHR066's fix in Chart Builder starts a run with
-     the defaults over the whole part, whose ghosts the author keeps or drops as any other run's; it has
-     no Fix All. The library's adds what that run proposes, all at once.
+     (default on) or only spread evenly. The window lists the proposals to keep or drop, shows them
+     on the highway and the timeline, and adds the accepted ones as one undoable command. CHR066's
+     fix in Chart Builder opens the window with the defaults over the whole part; it has no Fix All.
+     The library's adds what it proposes, all at once.
    - *Settled:* phrases are placed against the part's highest difficulty with notes, and each
      covers a note on every difficulty with notes, so none is empty on one (CHR065). The count is
      the part's playing, in seconds with its rests left out (a gap between notes of 4 measures or
@@ -1358,13 +1351,15 @@ Acceptance criteria:
      count. Without any passage, or with
      charging off, the phrases are spread evenly. The same chart always gets the same phrases.
    - *Settled:* **Generate star power…** is beside Generate fills, for a 5-fret or keys lane with
-     notes, and its options are in its flyout, kept while the editor is open. Over the whole part
-     it's refused while the part has star power, as the author's phrases are theirs to keep; over a
-     selection it proposes beside them. The proposals are drawn and kept or dropped as Generate
-     fills' are, in the rail's star power row, with the same bar over the lanes (**Add star power**
-     adds them), and the same ways to end the run. One run, of fills or of star power, goes on at a
-     time: starting one ends the other. When nothing fits, the message says why: not a 5-fret or
-     keys part, no notes, star power already there, or no spot.
+     notes. It and Generate fills share one window; its options are in the window's toolbar, kept
+     while the editor is open: the spacing in seconds, whether to charge for the hard passages, and
+     Existing Star Power (Replace, the default, or Add Alongside). Over the whole part in Add, it's
+     refused while the part has star power, as the author's phrases are theirs to keep; over a
+     selection it proposes beside them. The window lists the regions, each kept or dropped, previews
+     them on the highway, and shows the meter and the hard passages on the whole-song timeline.
+     Apply (Ctrl+Enter) adds the kept ones as one undoable command; Cancel adds nothing, and the
+     chart is unchanged until Apply. When nothing fits, the preview says why: not a 5-fret or keys
+     part, no notes, star power already there, or no spot.
 2. **Solos** (pitch 103), drawn as a shaded band with a note count.
    - *Settled in CM3:* the count is drawn at the solo's start. It counts the notes the solo covers on
      the difficulty shown, a chord once.
@@ -2644,7 +2639,7 @@ covers a note.
 | CHR063 | Warning | Notes inside a big rock ending, which the games skip | — |
 | CHR064 | — | *Retired in CM3.* A disco flip section that starts or ends between notes of a chord. A mix event applies to every note on its tick, so it can't. | — |
 | CHR065 | Warning | A star power phrase or solo with no notes in it on a charted difficulty, though another difficulty has some. A phrase empty on every difficulty is CHR060's or CHR061's. | — |
-| CHR066 | Info | A 5-fret or keys part has no star power phrases, so a player never earns star power on it. Only where a phrase fits, so generating it always proposes some; drums and GHL aren't checked. One finding per part. | Generate star power ([C8](#c8-phrases-and-events) item 1): a run to keep or drop in Chart Builder, added at once in the library |
+| CHR066 | Info | A 5-fret or keys part has no star power phrases, so a player never earns star power on it. Only where a phrase fits, so generating it always proposes some; drums and GHL aren't checked. One finding per part. | Generate star power ([C8](#c8-phrases-and-events) item 1): a window to keep or drop in Chart Builder, added at once in the library |
 
 *Settled in CM3:* CHR062 gives one finding for each group of phrases that saving would merge into one, and its fix
 merges the group into its first phrase.
@@ -3026,7 +3021,7 @@ These are the defaults. Rebinding is future work.
 | `Ctrl`+`X` / `C` / `V` | Cut, copy, paste over the span the passage covers |
 | `Ctrl`+`Shift`+`V` | Paste, merged with what's there |
 | `Delete` | Delete the selection |
-| `Esc` | Cancel a pass of record mode; else take back a drag; else end a run of Generate fills or Generate star power, adding nothing; else clear the selection |
+| `Esc` | Cancel a pass of record mode; else take back a drag; else clear the selection |
 | `F11` | In the preview's window, full screen on or off; Esc leaves it |
 | `Ctrl`+`S` | Save |
 
