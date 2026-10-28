@@ -1661,13 +1661,9 @@ public sealed partial class EditorTools
 
     /// <summary>
     /// The length that ends <paramref name="note"/> at <paramref name="end"/>: none, at or before its tick, or when it would
-    /// be shorter than the sustain cutoff, as the games would read it as a plain note anyway.
+    /// be shorter than <see cref="EditableNote.MinimumSustainLength"/>, as Chart Builder would make it a plain note.
     /// </summary>
-    private long LengthTo(EditableNote note, long end)
-    {
-        long length = end - note.Tick;
-        return length < SustainCutoff.Of(_session.Chart.Resolution, _session.ReadOptions.SustainCutoff) ? EditableNote.PlainLength : length;
-    }
+    private long LengthTo(EditableNote note, long end) => EditableNote.SustainOrPlain(end - note.Tick);
 
     /// <summary>Where <paramref name="note"/>'s sustain ends: its own tick when it has none.</summary>
     private static long SustainEnd(EditableNote note) => note.Length <= EditableNote.PlainLength ? note.Tick : note.Tick + note.Length;

@@ -92,6 +92,7 @@ public static class MidiChartWriter
     /// <list type="bullet">
     /// <item>A note held into the next note on its pitch (the same difficulty and lane, a kick and a 2x kick being two
     /// pitches) is cut short there, as a second note-on while a note is held is ignored.</item>
+    /// <item>A hold shorter than <see cref="EditableNote.MinimumSustainLength"/> is made a plain note.</item>
     /// <item>Of a kick and a 2x kick on one tick, the games keep the one let go first: the shorter, or of two as long the
     /// 2x kick. The other is left out.</item>
     /// <item>Overlapping phrases on the same pitches merge into one, from the first's start to the last end: star power,
@@ -138,8 +139,8 @@ public static class MidiChartWriter
         if (changes.Any)
         {
             Logger.Debug(
-                "Normalizing the chart {Name} cut {Notes} notes, left out {Kicks} kicks and {Markings} chord markings, merged {Phrases} phrases and {TomMarkers} tom markers, moved {Texts} text events and reordered the passthrough tracks: {Reordered}",
-                saved.Name, changes.Notes, changes.Kicks, changes.Markings, changes.Phrases, changes.TomMarkers, changes.Texts, changes.Passthrough);
+                "Normalizing the chart {Name} cut {Notes} notes, made {Sustains} short sustains plain, left out {Kicks} kicks and {Markings} chord markings, merged {Phrases} phrases and {TomMarkers} tom markers, moved {Texts} text events and reordered the passthrough tracks: {Reordered}",
+                saved.Name, changes.Notes, changes.Sustains, changes.Kicks, changes.Markings, changes.Phrases, changes.TomMarkers, changes.Texts, changes.Passthrough);
         }
 
         return saved;
@@ -508,6 +509,8 @@ public static class MidiChartWriter
         foreach (var track in part.Tracks)
         {
             CutNotes(track, changes);
+            if (!drums)
+                NormalizeSustains(track, changes);
             if (drums && track.Difficulty == ChartDifficulty.Expert)
                 DropDoubledKicks(track, changes);
 
@@ -618,6 +621,23 @@ public static class MidiChartWriter
             track.Notes.Add(note);
     }
 
+    /// <summary>Makes each hold under <see cref="EditableNote.MinimumSustainLength"/> a plain note.</summary>
+    private static void NormalizeSustains(EditableTrack track, Changes changes)
+    {
+        var shortNotes = track.Notes
+            .Where(static n => n.Length > EditableNote.PlainLength && n.Length < EditableNote.MinimumSustainLength)
+            .ToList();
+        if (shortNotes.Count == 0)
+            return;
+
+        changes.Sustains += shortNotes.Count;
+        foreach (var note in shortNotes)
+        {
+            track.Notes.Remove(note);
+            track.Notes.Add(note with { Length = EditableNote.PlainLength });
+        }
+    }
+
     /// <summary>Of a kick and a 2x kick on one tick, leaves out the one let go second, which the games drop.</summary>
     private static void DropDoubledKicks(EditableTrack track, Changes changes)
     {
@@ -723,6 +743,8 @@ public static class MidiChartWriter
     {
         public int Notes { get; set; }
 
+        public int Sustains { get; set; }
+
         public int Kicks { get; set; }
 
         public int Markings { get; set; }
@@ -735,6 +757,6 @@ public static class MidiChartWriter
 
         public bool Passthrough { get; set; }
 
-        public bool Any => Notes + Kicks + Markings + Phrases + TomMarkers + Texts > 0 || Passthrough;
+        public bool Any => Notes + Sustains + Kicks + Markings + Phrases + TomMarkers + Texts > 0 || Passthrough;
     }
 }

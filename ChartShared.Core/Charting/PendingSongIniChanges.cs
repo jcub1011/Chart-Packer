@@ -25,8 +25,8 @@ public enum PendingChangeReason
     /// <summary>The drum layout keys the chart's drum variant needs.</summary>
     DrumLayout,
 
-    /// <summary>A <c>.chart</c> import's <c>sustain_cutoff_threshold</c>, which keeps its sustains sustains once it's a <c>notes.mid</c>.</summary>
-    ImportSettings,
+    /// <summary>The <c>sustain_cutoff_threshold</c> the chart's shortest sustain needs.</summary>
+    SustainCutoff,
 
     /// <summary><c>multiplier_note</c> removed, as the chart's star power is saved on 116.</summary>
     MultiplierNote,
@@ -46,11 +46,11 @@ public enum PendingChangeReason
 public sealed record PendingSongIniChange(string Key, string? Value, PendingChangeReason Reason)
 {
     /// <summary>
-    /// Whether the user can leave it out of the save. The drum layout keys, an import's sustain cutoff and
+    /// Whether the user can leave it out of the save. The drum layout keys, the sustain cutoff and
     /// <c>multiplier_note</c> decide how the saved chart is read, so leaving one out would save a chart that plays
     /// differently from what the editor shows.
     /// </summary>
-    public bool CanRevert => Reason is not (PendingChangeReason.DrumLayout or PendingChangeReason.ImportSettings or PendingChangeReason.MultiplierNote);
+    public bool CanRevert => Reason is not (PendingChangeReason.DrumLayout or PendingChangeReason.SustainCutoff or PendingChangeReason.MultiplierNote);
 
     /// <summary>As a metadata edit, for a draft.</summary>
     public MetadataChange ToMetadataChange() => new(Key, Value);
@@ -118,7 +118,7 @@ public static class PendingSongIniChanges
     /// <summary>
     /// The changes <paramref name="chart"/> and <paramref name="inputs"/> call for, in the order they're listed: the
     /// user's edits, the values the song has nowhere else, <c>charter</c>, <c>delay</c>, <c>song_length</c>, the parts'
-    /// ratings in part order, the drum keys, an import's sustain cutoff, then <c>multiplier_note</c>.
+    /// ratings in part order, the drum keys, the chart's sustain cutoff, then <c>multiplier_note</c>.
     /// </summary>
     /// <remarks>
     /// An edit takes the place of every other change to its key, but for a key the chart decides
@@ -147,7 +147,8 @@ public static class PendingSongIniChanges
     /// <summary>
     /// Whether <paramref name="key"/> is decided by the chart, so that an edit to it would save a chart that plays
     /// differently from what the editor shows: <c>multiplier_note</c> (the chart's star power is saved on 116), the
-    /// drum layout keys while the chart has drums, and an import's <c>sustain_cutoff_threshold</c>.
+    /// drum layout keys while the chart has drums, and <c>sustain_cutoff_threshold</c> while the chart has a sustain
+    /// (its shortest one decides it).
     /// </summary>
     public static bool IsChartOwned(string key, EditableChart chart, PendingSongIniInputs inputs)
     {
@@ -157,7 +158,7 @@ public static class PendingSongIniChanges
         bool Is(params string[] keys) => keys.Any(k => k.Equals(key, StringComparison.OrdinalIgnoreCase));
         return Is("multiplier_note", "star_power_note")
             || (Is("pro_drum", "pro_drums", "five_lane_drums") && chart.PartOf(ChartInstrument.Drums) is not null && chart.DrumsVariant is not null)
-            || (Is("sustain_cutoff_threshold") && inputs.Import?.Options.SustainCutoff is not null);
+            || (Is("sustain_cutoff_threshold") && ShortestSustain(chart) is not null);
     }
 
     private static List<PendingSongIniChange> Computed(EditableChart chart, PendingSongIniInputs inputs)
@@ -226,8 +227,12 @@ public static class PendingSongIniChanges
         if (chart.PartOf(ChartInstrument.Drums) is not null && chart.DrumsVariant is { } variant)
             changes.AddRange(DrumsChanges(variant, song));
 
-        if (inputs.Import?.Options.SustainCutoff is { } cutoff && song.SustainCutoff != cutoff)
-            changes.Add(new PendingSongIniChange("sustain_cutoff_threshold", cutoff.ToString(CultureInfo.InvariantCulture), PendingChangeReason.ImportSettings));
+        if (SustainCutoff.ForChartBuilder(chart.Resolution, ShortestSustain(chart)) is { } cutoff
+            && SongIniValues.Integer(SongIniValues.Last(pairs, "sustain_cutoff_threshold")) != cutoff)
+        {
+            changes.Add(new PendingSongIniChange(
+                "sustain_cutoff_threshold", cutoff.ToString(CultureInfo.InvariantCulture), PendingChangeReason.SustainCutoff));
+        }
 
         if (song.MultiplierNote == 103)
         {
@@ -236,6 +241,36 @@ public static class PendingSongIniChanges
         }
 
         return changes;
+    }
+
+    /// <summary>
+    /// The shortest sustain among the fret parts, as the save writes them: a sustain cut short by the next note on its
+    /// lane is that short. Null when the chart has none.
+    /// </summary>
+    private static long? ShortestSustain(EditableChart chart)
+    {
+        long? shortest = null;
+        foreach (var part in chart.Parts)
+        {
+            if (part.Kind == ChartInstrumentKind.Drums)
+                continue;
+            foreach (var track in part.Tracks)
+            {
+                // Backwards, as MidiChartWriter.CutNotes cuts each note at the next one on its lane.
+                var next = new Dictionary<(int Lane, bool DoubleKick), long>();
+                for (int i = track.Notes.Count - 1; i >= 0; i--)
+                {
+                    var note = track.Notes[i];
+                    var key = (note.Lane, note.DoubleKick);
+                    long length = next.TryGetValue(key, out long after) ? Math.Min(note.Length, after - note.Tick) : note.Length;
+                    if (length >= SustainCutoff.MinimumSustain && !(shortest <= length))
+                        shortest = length;
+                    next[key] = note.Tick;
+                }
+            }
+        }
+
+        return shortest;
     }
 
     /// <summary>

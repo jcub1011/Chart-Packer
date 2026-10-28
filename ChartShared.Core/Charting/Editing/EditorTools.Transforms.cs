@@ -71,8 +71,8 @@ public sealed partial class EditorTools
             long length = change switch
             {
                 SustainChange.Clear => EditableNote.PlainLength,
-                SustainChange.GridStep => Math.Max(EditableNote.PlainLength, Snap.Step(note.Tick, 1, Map) - note.Tick),
-                _ => NextChordAfter(track, note.Tick) is { } next ? next - note.Tick : note.Length,
+                SustainChange.GridStep => EditableNote.SustainOrPlain(Snap.Step(note.Tick, 1, Map) - note.Tick),
+                _ => NextChordAfter(track, note.Tick) is { } next ? EditableNote.SustainOrPlain(next - note.Tick) : note.Length,
             };
             if (length != note.Length)
                 lengths.Add((note, length));

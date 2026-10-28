@@ -239,9 +239,10 @@ namespace ChartBuilder.ViewModels
         {
             if (_loading || Session.Selection.Track is not { } key || !long.TryParse(value, NumberStyles.Integer, CultureInfo.CurrentCulture, out long length))
                 return;
-            var notes = Session.Selection.Notes.Where(n => n.Length != Math.Max(EditableNote.PlainLength, length)).ToList();
+            long sustainLength = EditableNote.SustainOrPlain(length);
+            var notes = Session.Selection.Notes.Where(n => n.Length != sustainLength).ToList();
             if (notes.Count > 0 && length >= 0)
-                Session.Execute(new SetSustain(key.Instrument, key.Difficulty, notes, Math.Max(EditableNote.PlainLength, length)));
+                Session.Execute(new SetSustain(key.Instrument, key.Difficulty, notes, sustainLength));
             Refresh();
         }
 

@@ -427,8 +427,14 @@ public sealed class EditorSession
         }
     }
 
-    /// <summary>The song.ini settings the chart is read with once saved, which the game view is worked out with.</summary>
-    public ChartReadOptions ReadOptions => _readOptions ??= MidiChartWriter.SettingsAfterSave(Chart, ChartReadOptions.From(_songIni));
+    /// <summary>
+    /// The settings the editor's game view is read with: the song's once saved, with sustains at Chart Builder's 10-tick
+    /// floor rather than the song's cutoff.
+    /// </summary>
+    public ChartReadOptions ReadOptions => _readOptions ??= MidiChartWriter.SettingsAfterSave(Chart, ChartReadOptions.From(_songIni)) with
+    {
+        SustainCutoff = EditableNote.MinimumSustainLength,
+    };
 
     /// <summary>Whether the drums are drawn with five pads.</summary>
     public bool IsFiveLaneDrums => Chart.DrumsVariant is { } variant ? variant == DrumsVariant.FiveLane : GameView.IsFiveLaneDrums(Chart, ReadOptions);

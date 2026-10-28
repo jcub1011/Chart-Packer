@@ -87,7 +87,9 @@ public static class ChartToMidi
     {
         options ??= ChartReadOptions.Default;
 
-        var before = ChartTextReader.Read(sections, options);
+        // A .chart's own sustains decide the cutoff it needs, not the one song.ini has now.
+        var chartOptions = options with { SustainCutoff = null };
+        var before = ChartTextReader.Read(sections, chartOptions);
         if (before.Tempo.Resolution > short.MaxValue)
             throw new ChartFormatException("The chart's resolution is too fine for a MIDI file.");
 
@@ -127,7 +129,7 @@ public static class ChartToMidi
         {
             if (!byInstrument.TryGetValue(instrument, out var difficulties))
                 continue;
-            var part = Part(instrument, difficulties, layout, options);
+            var part = Part(instrument, difficulties, layout, chartOptions);
             tracks.Add((TrackNames[instrument], part.Messages));
             if (part.ShortestSustain is { } ticks && !(shortest <= ticks))
                 shortest = ticks;

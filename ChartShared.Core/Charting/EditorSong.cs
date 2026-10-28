@@ -210,9 +210,9 @@ public sealed class EditorSong
     }
 
     /// <summary>
-    /// Whether <paramref name="key"/> can be edited: not when the chart decides it, as for the drum layout keys, an
-    /// import's <c>sustain_cutoff_threshold</c> and <c>multiplier_note</c>, which would save a chart that plays
-    /// differently from what the editor shows.
+    /// Whether <paramref name="key"/> can be edited: not when the chart decides it, as for the drum layout keys,
+    /// <c>sustain_cutoff_threshold</c> while the chart has a sustain, and <c>multiplier_note</c>, which would save a chart
+    /// that plays differently from what the editor shows.
     /// </summary>
     public bool CanEdit(string key)
     {

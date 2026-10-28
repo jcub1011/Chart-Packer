@@ -53,7 +53,10 @@ public static class ChrRules
     /// <summary>A sustain runs into the next note on its lane, so the games cut it short.</summary>
     public const string Chr020 = "CHR020";
 
-    /// <summary>A sustain is shorter than the sustain cutoff, so the games read it as a plain note.</summary>
+    /// <summary>
+    /// A sustain is shorter than the sustain cutoff, so the games read it as a plain note. Retired: Chart Builder derives
+    /// the cutoff from the chart, so the rule no longer runs.
+    /// </summary>
     public const string Chr021 = "CHR021";
 
     /// <summary>An open note in a chord with frets.</summary>

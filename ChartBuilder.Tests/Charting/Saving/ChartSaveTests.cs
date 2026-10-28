@@ -142,12 +142,14 @@ public sealed class ChartSaveTests
         var song = EditorSong.Of(opened);
         var original = ToWrite(song);
 
-        await SaveAsync(song, Token);
+        var request = await SaveAsync(song, Token);
 
         byte[] saved = await File.ReadAllBytesAsync(Path.Combine(folder, "notes.mid"), Token);
         var savedOptions = ChartReadOptions.From(SongIni.Read(Path.Combine(folder, "song.ini"), Token).Pairs);
         var instruments = original.Parts.Select(p => p.Instrument).ToList();
-        var games = ChartReadBack.Compare(MidiChartReader.Read(fixture.Midi, fixture.Options), MidiChartReader.Read(saved, savedOptions), instruments);
+        // The save derives the cutoff from the chart, so read the original under it too.
+        var originalOptions = fixture.Options with { SustainCutoff = request.After.SustainCutoff };
+        var games = ChartReadBack.Compare(MidiChartReader.Read(fixture.Midi, originalOptions), MidiChartReader.Read(saved, savedOptions), instruments);
         Assert.IsEmpty(games, GameViewTests.Describe(games));
 
         var reload = MidiChartLoader.Load(saved, savedOptions);
@@ -399,10 +401,10 @@ public sealed class ChartSaveTests
 
         await SaveAsync(song, Token);
 
-        Assert.AreSequenceEqual(new[] { "charter", "diff_bass", "multiplier_note" }, [.. pending.Select(c => c.Key)]);
+        Assert.AreSequenceEqual(new[] { "charter", "diff_bass", "sustain_cutoff_threshold", "multiplier_note" }, [.. pending.Select(c => c.Key)]);
         string after = await File.ReadAllTextAsync(Path.Combine(folder, "song.ini"), Token);
         Assert.AreEqual(
-            "; a comment\r\n[song]\r\nname = Song\r\nunknown_key = kept\r\nartist = A\r\nartist = B\r\ncharter = Me\r\ndiff_bass = -1\r\n\r\n[other]\r\nx = 1\r\n",
+            "; a comment\r\n[song]\r\nname = Song\r\nunknown_key = kept\r\nartist = A\r\nartist = B\r\ncharter = Me\r\ndiff_bass = -1\r\nsustain_cutoff_threshold = 59\r\n\r\n[other]\r\nx = 1\r\n",
             after);
     }
 
@@ -417,7 +419,9 @@ public sealed class ChartSaveTests
         await SaveAsync(song, Token);
 
         var metadata = SngReader.Read(sng, Token).Metadata.Select(p => (p.Key, p.Value)).ToList();
-        Assert.AreSequenceEqual(new[] { ("name", "Song"), ("loading_phrase", "kept"), ("diff_bass", "-1") }, [.. metadata]);
+        Assert.AreSequenceEqual(
+            new[] { ("name", "Song"), ("loading_phrase", "kept"), ("diff_bass", "-1"), ("sustain_cutoff_threshold", "59") },
+            [.. metadata]);
     }
 
     [TestMethod]

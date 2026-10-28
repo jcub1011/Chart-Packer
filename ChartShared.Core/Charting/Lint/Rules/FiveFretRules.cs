@@ -74,9 +74,9 @@ public sealed class SustainIntoNextNoteRule : IChartLintRule
     public int Reach => 0;
 
     /// <summary>The next note on <paramref name="note"/>'s lane, if <paramref name="note"/>'s sustain runs into it.</summary>
-    public static EditableNote? RunsInto(EditableTrack track, EditableNote note, long cutoff)
+    public static EditableNote? RunsInto(EditableTrack track, EditableNote note)
     {
-        if (note.Length < cutoff)
+        if (note.Length < EditableNote.MinimumSustainLength)
             return null;
         var notes = track.Notes;
         long end = note.Tick + note.Length;
@@ -91,7 +91,6 @@ public sealed class SustainIntoNextNoteRule : IChartLintRule
 
     public IEnumerable<Finding> Check(ChartLintContext context)
     {
-        long cutoff = SustainCutoff.Of(context.Chart.Resolution, context.Options.SustainCutoff);
         var findings = new List<Finding>();
         var found = new HashSet<(long, long)>();
         foreach (var part in context.Parts.Where(FretChords.IsFrets))
@@ -101,7 +100,7 @@ public sealed class SustainIntoNextNoteRule : IChartLintRule
                 found.Clear();
                 void Check(EditableNote note)
                 {
-                    if (RunsInto(track, note, cutoff) is { } next && found.Add((note.Tick, next.Tick)))
+                    if (RunsInto(track, note) is { } next && found.Add((note.Tick, next.Tick)))
                         findings.Add(new Finding(RuleId, Severity, FindingMessages.ChrSustainIntoNext, Location: new ChartLocation(part.Instrument, track.Difficulty, note.Tick, next.Tick)));
                 }
 
@@ -127,8 +126,8 @@ public sealed class SustainIntoNextNoteRule : IChartLintRule
 }
 
 /// <summary>
-/// CHR021: a sustain is shorter than the sustain cutoff, so the games read it as a plain note. Only lengths of at least a
-/// sixteenth note count: shorter ones are plain notes as written, as many charts hold every note a sixteenth.
+/// CHR021, retired: a sustain is shorter than the song's sustain cutoff, so the games read it as a plain note. Chart
+/// Builder now derives the cutoff from the chart, so the rule is kept for its ID but no longer runs.
 /// </summary>
 public sealed class SustainUnderCutoffRule : IChartLintRule
 {

@@ -156,7 +156,8 @@ What the model keeps that `ChartDocument` doesn't:
   (today they are only passed through `ChartToMidi` as pitch constants);
 - accents and ghosts, which are note velocities when `[ENABLE_CHART_DYNAMICS]` is set;
 - sections and other text events;
-- each note's exact sustain length. The sustain cutoff is applied only when the note is displayed;
+- each note's exact sustain length, except that a hold under the 10-tick floor is a plain note. The
+  song's cutoff is not applied to the model;
 - tempo anchors ([C4](#c4-tempo-map-and-grid)), saved as text events on the tempo track
   ([§7.3](#73-text-events));
 - everything else on an edited track, as `RawEvent`s.
@@ -258,9 +259,10 @@ changed in this way. Keeping ticks (the default) never touches passthrough track
      every note, flag, phrase, event, anchor and `RawEvent`.
   2. **Game view.** `ChartReader` reads them as YARG does, and the result must equal the model's
      **game view**. The game view is the `ChartDocument` the model projects to, using
-     `NoteBuilder`'s rules and the song's `song.ini` settings. It is the same projection the
-     editor draws natural HOPOs and sustain cutoffs from, and the one preview uses
-     ([C18](#c18-preview)). The comparison extends `NoteCheck` (behind `ChartMergeWarning`) to
+     `NoteBuilder`'s rules and the song's `song.ini` settings. The editor and its preview read
+     sustains with the 10-tick floor; the save check reads the chart under the cutoff the save
+     writes, so the two agree for a normalized chart ([C18](#c18-preview)). The comparison extends
+     `NoteCheck` (behind `ChartMergeWarning`) to
      compare star-power phrases, exact sustain lengths, accents, ghosts and the tempo map as well.
      `MidiChartReader` is extended to read `[ENABLE_CHART_DYNAMICS]` and velocities, as YARG does.
 
@@ -602,8 +604,9 @@ where it has them (`AudioFileInfo.Read`), and its charter from the **Default cha
 
 *Settled after CM5:* the album, genre and year are filled from the tags too. An edit to the song
 takes the place of whatever else would change its key (the default charter, `song_length`, a rating
-or a delay), and the keys the chart decides (the drum layout keys, `multiplier_note` and an import's
-`sustain_cutoff_threshold`) can't be edited. The song's edits count as unsaved changes, so closing
+or a delay), and the keys the chart decides (the drum layout keys, `multiplier_note` and
+`sustain_cutoff_threshold` while the chart has a sustain) can't be edited. The song's edits
+count as unsaved changes, so closing
 asks first and autosave keeps them, and none can be made, undone or redone while a save runs.
 
 *Revised after CM5:* the Chart Inspector, which edited the song as Chart Packer's inspector does, is
@@ -799,8 +802,8 @@ Acceptance criteria:
      keys; `Year` becomes `year`, without the `", "` Moonscraper writes before it; `PreviewStart`, in
      seconds, becomes `preview_start_time` in milliseconds; and `Difficulty` becomes `diff_band`. The
      resolution, the audio streams and `MediaType` belong to the `.chart` alone.
-   - When the conversion needs a `sustain_cutoff_threshold` to keep the `.chart`'s sustains
-     sustains (`ChartConversion.SustainCutoff`), that's a pending change too, which can't be reverted.
+   - The `.chart`'s own sustains decide the `sustain_cutoff_threshold` the save writes, as for any
+     chart: a pending change that can't be reverted ([§4.6](#46-saving)).
    - On the first save, `notes.chart` is staged for removal after a confirmation, so the song
      doesn't carry two charts that the games might pick between differently.
 4. **Drafts.** Chart Packer's unsaved metadata drafts don't reach Chart Builder
@@ -1059,12 +1062,16 @@ Acceptance criteria:
      with the sustain tool; the selected notes' sustains change by a Ctrl-drag on one of them or a
      right-drag ([§9](#9-keyboard-shortcuts)).
    - Sustains snap to the grid.
-   - A sustain shorter than the song's sustain cutoff (`sustain_cutoff_threshold`, otherwise a
-     third of a beat in MIDI) is drawn as a plain note with a dashed tail, because that's how the
-     games will read it.
-   - A sustain dragged shorter than the cutoff (by its tail, a Ctrl-drag or a right-drag) becomes a
-     plain note as it's dragged, since the games would read it as one anyway. A loaded chart's short
-     sustains are kept as they are, and CHR021 offers to make them plain.
+   - A hold of at least 10 ticks is a sustain; a shorter one is a plain note, in the editor and in
+     what it saves. The song's `sustain_cutoff_threshold` does not limit what can be authored.
+   - A sustain dragged shorter than 10 ticks (by its tail, a Ctrl-drag or a right-drag) becomes a
+     plain note as it's dragged. A loaded chart's holds under 10 ticks are made plain too.
+   - On save, `sustain_cutoff_threshold` is derived from the sustains the save writes, after a
+     sustain that runs into the next note on its lane is cut short there:
+     `max(2, min(resolution / 3, shortest sustain - 1))`, or left alone when there are no sustains.
+     The tick under the shortest sustain keeps it playable in both YARG (`length < cutoff`) and
+     Clone Hero (`length <= cutoff`); the third-of-a-beat cap covers songs whose sustains are all
+     longer than that.
    - **Extended sustains** (one note held while others are played) and **disjoint chords**
      (notes of one chord with different lengths) are allowed.
 4. **Forcing:**
@@ -2256,7 +2263,7 @@ Acceptance criteria:
    (`QuickFix.ApplyTo(MetadataItem)`). Chart Builder adds a chart kind of fix, which proposes an
    `IChartCommand` for a finding, and registers chart fixes with the same registry. Each fix is
    one undoable command (see the table for which rules have one). It's given the read options lint
-   used, for fixes that depend on them, such as CHR021's sustain cutoff. A fix that changes
+   used, for fixes that depend on them. A fix that changes
    `song.ini` instead (CHR084's) restores the pending change the user reverted; it isn't an undo
    step, as reverting isn't.
    - **More than one right answer.** Where a finding can be fixed more than one right way, such as
@@ -2359,20 +2366,20 @@ Acceptance criteria:
      ([C1](#c1-new-chart-and-chart-settings));
    - Chart settings' edits ([C1](#c1-new-chart-and-chart-settings)): any key, a part's rating and
      `delay`. The Art tab's and Tracks' file changes are listed with them when Save asks first;
-   - `sustain_cutoff_threshold`, on an import whose sustains need it to stay sustains once they're
-     MIDI ([C2](#c2-open-and-import)).
+   - `sustain_cutoff_threshold`, derived from the shortest sustain the save writes
+     ([C5](#c5-5-fret-notes)).
 
    Changes the chart is read by can't be reverted, as leaving one out would save a chart that plays
-   differently from what the editor shows: the drum layout keys, an import's
-   `sustain_cutoff_threshold` and `multiplier_note`. The rest can, and a reverted change stays
+   differently from what the editor shows: the drum layout keys, `sustain_cutoff_threshold` while the
+   chart has a sustain, and `multiplier_note`. The rest can, and a reverted change stays
    listed, struck through, until it's restored. Reverting isn't an undo step, and stays across saves.
 
    *Settled in CM2:* the list isn't kept as edits are made. It's worked out from the chart as it
    stands against `song.ini` as it was opened, so undoing an edit takes its change away. A part's
    rating is listed only for a part added since the song was opened. Only the reverts are kept.
 
-   Otherwise, `sustain_cutoff_threshold` and the HOPO threshold are never changed by Chart Builder.
-   Its display follows them.
+   Otherwise, the HOPO threshold is never changed by Chart Builder, and its display follows it.
+   `sustain_cutoff_threshold` is written by the save from the chart's own sustains.
 
    **Save asks first** only when it changes `song.ini` or removes a file, listing what it changes.
    An import's first save always asks, with **Remove notes.chart** and **Keep notes.chart**.
@@ -2606,7 +2613,7 @@ never reused.
 | ID | Sev. | Rule | Fix |
 | --- | --- | --- | --- |
 | CHR020 | Warning | A sustain runs into the next note on its lane, so the games will cut it short | Trim sustain |
-| CHR021 | Info | A sustain is shorter than the sustain cutoff, so the games read it as a plain note. Only lengths of at least a sixteenth note count, as many charts hold every plain note a sixteenth. | Make it a plain note, or lengthen it to the cutoff |
+| CHR021 | Info | Retired. A sustain is shorter than the song's cutoff, so the games would read it as a plain note. Chart Builder now derives the cutoff from the chart, so the rule is kept for its ID but no longer runs. | — |
 | CHR022 | Error | An open note in a chord with frets | Remove the open note, or keep only it |
 | CHR023 | Info | A force HOPO or force strum that doesn't change the chord at any HOPO threshold a MIDI chart can be read with | Remove force |
 | CHR024 | Warning | A forced HOPO on a chord that repeats the previous note or chord exactly. The games play it as a HOPO, but the same frets can't be hammered on again. | Remove force |

@@ -1601,8 +1601,8 @@ Saving also changes song.ini:
   <data name="PendingReasonDrumLayout" xml:space="preserve">
     <value>How the drums are read: the drum variant the chart has.</value>
   </data>
-  <data name="PendingReasonImportSettings" xml:space="preserve">
-    <value>The sustain cutoff imported .chart sustains need to stay sustains as notes.mid.</value>
+  <data name="PendingReasonSustainCutoff" xml:space="preserve">
+    <value>The sustain cutoff the chart's shortest sustain needs to play as a sustain.</value>
   </data>
   <data name="PendingReasonMultiplierNote" xml:space="preserve">
     <value>The chart's star power is saved on note 116, so multiplier_note no longer applies.</value>

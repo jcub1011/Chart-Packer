@@ -201,12 +201,12 @@ public sealed class ChartToMidiTests
     }
 
     [TestMethod]
-    public void OneTickSustainIsHeldLongEnoughToStayASustain()
+    public void ASustainUnderTenTicksIsAPlainNote()
     {
         byte[] chart = Chart("""
             [ExpertSingle]
             {
-              0 = N 0 1
+              0 = N 0 9
               192 = N 1 0
             }
             """);
@@ -214,14 +214,13 @@ public sealed class ChartToMidiTests
         var conversion = ChartToMidi.Convert(chart);
         var notes = ChartReaderTests.Notes(ChartReader.Read(conversion.Midi, "notes.mid", new ChartReadOptions(SustainCutoff: conversion.SustainCutoff)), ChartInstrument.Guitar);
 
-        // Clear of the lowest cutoff, 2, that a one-tick note is under.
-        Assert.AreEqual(2L, conversion.SustainCutoff);
-        Assert.AreSequenceEqual([3, 0], [.. notes.Select(n => n.Length)]);
+        Assert.IsNull(conversion.SustainCutoff);
+        Assert.AreSequenceEqual([0, 0], [.. notes.Select(n => n.Length)]);
         Assert.IsEmpty(conversion.Warnings);
     }
 
     [TestMethod]
-    public void SongIniSustainCutoffMakesShortChartSustainsNotes()
+    public void ASongIniCutoffDoesNotHideAChartsOwnSustains()
     {
         byte[] chart = Chart("""
             [ExpertSingle]
@@ -230,10 +229,14 @@ public sealed class ChartToMidiTests
             }
             """);
 
+        // The chart's 50-tick sustain decides the cutoff it needs, not song.ini's 64.
         var conversion = ChartToMidi.Convert(chart, ChartReadOptions.From([new("sustain_cutoff_threshold", "64")]));
-        var notes = ChartReaderTests.Notes(ChartReader.Read(conversion.Midi, "notes.mid"), ChartInstrument.Guitar);
+        var notes = ChartReaderTests.Notes(
+            ChartReader.Read(conversion.Midi, "notes.mid", new ChartReadOptions(SustainCutoff: conversion.SustainCutoff)),
+            ChartInstrument.Guitar);
 
-        Assert.AreEqual(0, notes.Single().Length);
+        Assert.AreEqual(49L, conversion.SustainCutoff);
+        Assert.AreEqual(50, notes.Single().Length);
         Assert.IsEmpty(conversion.Warnings);
     }
 

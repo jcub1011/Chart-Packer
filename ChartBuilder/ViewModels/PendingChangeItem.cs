@@ -55,7 +55,7 @@ namespace ChartBuilder.ViewModels
             PendingChangeReason.SongLength => Strings.PendingReasonSongLength,
             PendingChangeReason.PartRating => Strings.PendingReasonPartRating,
             PendingChangeReason.DrumLayout => Strings.PendingReasonDrumLayout,
-            PendingChangeReason.ImportSettings => Strings.PendingReasonImportSettings,
+            PendingChangeReason.SustainCutoff => Strings.PendingReasonSustainCutoff,
             PendingChangeReason.MultiplierNote => Strings.PendingReasonMultiplierNote,
             PendingChangeReason.DelayFromDownbeat => Strings.PendingReasonDelayFromDownbeat,
             PendingChangeReason.SuggestedRating => Strings.PendingReasonSuggestedRating,
