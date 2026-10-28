@@ -54,6 +54,7 @@ namespace ChartBuilder.Views
         public EditorWindow()
         {
             InitializeComponent();
+            WindowMemory.Remember(this, position: true);
 
             // The panel sizes are view state, so they're applied and captured here rather than bound. The view model
             // holds the sizes the user chose; the grid shows as much of each as fits, and refits as the window, or the

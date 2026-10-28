@@ -24,6 +24,8 @@ namespace ChartPacker.Views
                 RestoreLibraryPaneWidth();
             };
             Closing += OnClosing;
+            // After the splitters' capture, so the one save as the window closes keeps them too.
+            WindowMemory.Remember(this, position: true);
 
             // Coming back from Chart Builder, the songs it may have saved are read again (charter-spec §4.8).
             Activated += (_, _) =>

@@ -1,7 +1,6 @@
 using System;
 using ChartShared.Core.Library;
 using ChartShared.Core.Settings;
-using ChartShared.UI.Services;
 using ChartShared.UI.Views;
 
 namespace ChartPacker.Services
@@ -39,7 +38,8 @@ namespace ChartPacker.Services
         /// <summary>Loads settings from <paramref name="filePath"/>, falling back to defaults when it's missing or unreadable.</summary>
         public static SettingsService Load(string filePath)
         {
-            var file = new JsonSettingsFile<AppSettings>(filePath, AppSettingsJsonContext.Default.AppSettings);
+            // Each window's placement is merged on its own, so processes closing different windows keep both.
+            var file = new JsonSettingsFile<AppSettings>(filePath, AppSettingsJsonContext.Default.AppSettings, [nameof(AppSettings.Windows)]);
             var settings = file.Load();
             Sanitize(settings);
             return new SettingsService(file, settings);
@@ -108,18 +108,7 @@ namespace ChartPacker.Services
                 ? Math.Clamp(settings.LaneFineScrubFactor, AppSettings.MinLaneFineScrubFactor, AppSettings.MaxLaneFineScrubFactor)
                 : AppSettings.DefaultLaneFineScrubFactor;
 
-            SanitizeMainWindowBounds(settings);
-            SettingsWindowSize.Sanitize(settings);
-        }
-
-        /// <summary>The main window's saved normal bounds, as <see cref="WindowBounds.FromSaved"/> reads them: dropped whole when half-saved.</summary>
-        private static void SanitizeMainWindowBounds(AppSettings settings)
-        {
-            var bounds = WindowBounds.FromSaved(settings.MainWindowX, settings.MainWindowY, settings.MainWindowWidth, settings.MainWindowHeight);
-            settings.MainWindowX = bounds?.Position.X;
-            settings.MainWindowY = bounds?.Position.Y;
-            settings.MainWindowWidth = bounds?.Size.Width;
-            settings.MainWindowHeight = bounds?.Size.Height;
+            WindowMemory.Sanitize(settings);
         }
     }
 }

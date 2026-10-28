@@ -24,6 +24,7 @@ namespace ChartPacker.Views
         {
             InitializeComponent();
             WindowChrome.ShowIcon(this, WindowTitleBar);
+            WindowMemory.Remember(this);
             Opened += (_, _) => WindowChrome.UseDarkTitleBar(this);
             Closed += (_, _) => Watch(null);
             ReductionPreviewKeys.Attach(this, () => _viewModel?.Preview);

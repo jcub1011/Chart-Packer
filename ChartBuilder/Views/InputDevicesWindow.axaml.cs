@@ -16,6 +16,7 @@ namespace ChartBuilder.Views
         {
             InitializeComponent();
             WindowChrome.ShowIcon(this, WindowTitleBar);
+            WindowMemory.Remember(this);
             Opened += (_, _) => WindowChrome.UseDarkTitleBar(this);
             Deactivated += (_, _) => ViewModel?.ReleaseKeys();
             Closed += (_, _) => ViewModel?.Dispose();

@@ -28,6 +28,7 @@ namespace ChartPacker.Views
         {
             InitializeComponent();
             WindowChrome.ShowIcon(this, WindowTitleBar);
+            WindowMemory.Remember(this);
             // The splitter position is view state, so it's applied and captured here rather than bound.
             Opened += (_, _) =>
             {

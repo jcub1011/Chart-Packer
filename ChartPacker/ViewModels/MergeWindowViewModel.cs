@@ -424,13 +424,6 @@ namespace ChartPacker.ViewModels
         /// <summary>The merged song as chosen so far, as the inspector shows a song.</summary>
         public SongDetailViewModel Preview { get; } = preview;
 
-        /// <summary>Whether the window was maximized when last closed. The view applies it on open and writes it back on close.</summary>
-        public bool MergeWindowMaximized
-        {
-            get => _settings.Settings.MergeWindowMaximized;
-            set => _settings.Settings.MergeWindowMaximized = value;
-        }
-
         /// <summary>Share of the window's width given to the preview panel. The view applies it on open and writes it back on close.</summary>
         public double MergePreviewFraction
         {

@@ -142,7 +142,70 @@ public sealed class JsonSettingsFileTests
         Assert.AreEqual(3, Open().Load().Count);
     }
 
-    private JsonSettingsFile<TestSettings> Open() => new(_path, TestSettingsJsonContext.Default.TestSettings);
+    [TestMethod]
+    public void TwoProcessesKeepEachOthersEntries()
+    {
+        var first = Open();
+        var second = Open();
+        var firstSettings = first.Load();
+        var secondSettings = second.Load();
+
+        firstSettings.Counts = new() { ["A"] = 1 };
+        first.Save(firstSettings);
+        secondSettings.Counts = new() { ["B"] = 2 };
+        second.Save(secondSettings);
+
+        Assert.AreEquivalent(new Dictionary<string, int> { ["A"] = 1, ["B"] = 2 }, Open().Load().Counts!);
+    }
+
+    [TestMethod]
+    public void AnEntryRemovedIsRemovedAndAnotherProcesssChangeIsKept()
+    {
+        var setup = Open();
+        var settings = setup.Load();
+        settings.Counts = new() { ["A"] = 1, ["B"] = 2 };
+        setup.Save(settings);
+
+        var first = Open();
+        var second = Open();
+        var firstSettings = first.Load();
+        var secondSettings = second.Load();
+
+        secondSettings.Counts!["B"] = 3;
+        second.Save(secondSettings);
+        firstSettings.Counts!.Remove("A");
+        first.Save(firstSettings);
+
+        Assert.AreEquivalent(new Dictionary<string, int> { ["B"] = 3 }, Open().Load().Counts!);
+    }
+
+    [TestMethod]
+    public void ASaveWithNothingChangedLeavesTheFileAlone()
+    {
+        var file = Open();
+        var settings = file.Load();
+        settings.Count = 2;
+        file.Save(settings);
+        var written = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        File.SetLastWriteTimeUtc(_path, written);
+
+        Assert.IsTrue(file.Save(settings));
+
+        Assert.AreEqual(written, File.GetLastWriteTimeUtc(_path));
+    }
+
+    [TestMethod]
+    public void ASaveWithNothingChangedStillMakesAMissingFile()
+    {
+        var file = Open();
+        var settings = file.Load();
+
+        Assert.IsTrue(file.Save(settings));
+
+        Assert.IsTrue(File.Exists(_path));
+    }
+
+    private JsonSettingsFile<TestSettings> Open() => new(_path, TestSettingsJsonContext.Default.TestSettings, [nameof(TestSettings.Counts)]);
 }
 
 public sealed class TestSettings
@@ -150,6 +213,8 @@ public sealed class TestSettings
     public string Name { get; set; } = "Default";
 
     public int Count { get; set; } = 1;
+
+    public Dictionary<string, int>? Counts { get; set; }
 }
 
 [JsonSerializable(typeof(TestSettings))]

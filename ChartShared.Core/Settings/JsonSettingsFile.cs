@@ -14,7 +14,9 @@ namespace ChartShared.Core.Settings;
 /// More than one process may use a file at once (two Chart Builders, say), so a save never writes back
 /// what this process merely loaded. It re-reads the file and replaces only the top-level properties this
 /// process changed since it last loaded or saved, so another process's changes to other settings are
-/// kept. Properties this version doesn't know are kept too.
+/// kept. Properties this version doesn't know are kept too. A property merged by entry (a JSON object
+/// keyed by name, as each window's placement is) has only the entries this process changed replaced, so
+/// two processes each changing a different one keep both. A save with nothing changed writes nothing.
 /// </para>
 /// <para>
 /// A save writes a temp file of its own beside the file and renames it into place, so a reader never sees
@@ -32,16 +34,22 @@ public sealed class JsonSettingsFile<T>
 {
     private readonly string _path;
     private readonly JsonTypeInfo<T> _typeInfo;
+    private readonly HashSet<string> _mergedByEntry;
 
     // The settings as last loaded or saved: what a save compares with to find what this process changed.
     private JsonObject _baseline = [];
 
-    public JsonSettingsFile(string path, JsonTypeInfo<T> typeInfo)
+    /// <param name="mergedByEntry">
+    /// The top-level properties, by JSON name, that a save merges entry by entry rather than replacing whole: each a
+    /// JSON object keyed by name. Null for none.
+    /// </param>
+    public JsonSettingsFile(string path, JsonTypeInfo<T> typeInfo, IReadOnlyCollection<string>? mergedByEntry = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         ArgumentNullException.ThrowIfNull(typeInfo);
         _path = path;
         _typeInfo = typeInfo;
+        _mergedByEntry = new HashSet<string>(mergedByEntry ?? [], StringComparer.Ordinal);
     }
 
     /// <summary>Reads the settings, or gives defaults when the file is missing or unreadable.</summary>
@@ -70,19 +78,26 @@ public sealed class JsonSettingsFile<T>
     /// Writes the settings this process changed since it last loaded or saved, onto what the file holds
     /// now. Failures are traced; settings are never worth stopping the app for.
     /// </summary>
-    /// <returns>Whether the file was written.</returns>
+    /// <returns>Whether the file holds this process's settings: true too when there was nothing to write.</returns>
     public bool Save(T settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
         var current = ToJson(settings);
 
+        var changed = current.Where(p => !_baseline.TryGetPropertyValue(p.Key, out var before) || !JsonNode.DeepEquals(before, p.Value)).ToList();
+        // A missing file is still written, so a save makes one.
+        if (changed.Count == 0 && File.Exists(_path))
+            return true;
+
         bool saved = JsonFiles.Update(_path, file =>
         {
             // When the file is missing or can't be read now, the settings as last loaded or saved stand in for it.
             var merged = file ?? (JsonObject)_baseline.DeepClone();
-            foreach (var (name, value) in current)
+            foreach (var (name, value) in changed)
             {
-                if (!_baseline.TryGetPropertyValue(name, out var before) || !JsonNode.DeepEquals(before, value))
+                if (_mergedByEntry.Contains(name) && merged[name] is JsonObject entries)
+                    MergeEntries(entries, _baseline[name] as JsonObject, value as JsonObject ?? []);
+                else
                     merged[name] = value?.DeepClone();
             }
 
@@ -115,6 +130,27 @@ public sealed class JsonSettingsFile<T>
         if (saved)
             _baseline = current;
         return saved;
+    }
+
+    /// <summary>
+    /// Puts into <paramref name="entries"/>, as the file has them, the entries <paramref name="current"/> added or changed
+    /// since <paramref name="before"/>, and takes out those it no longer has. Another process's entries are left be.
+    /// </summary>
+    private static void MergeEntries(JsonObject entries, JsonObject? before, JsonObject current)
+    {
+        foreach (var (key, value) in current)
+        {
+            if (before is null || !before.TryGetPropertyValue(key, out var was) || !JsonNode.DeepEquals(was, value))
+                entries[key] = value?.DeepClone();
+        }
+
+        if (before is null)
+            return;
+        foreach (var (key, _) in before)
+        {
+            if (!current.ContainsKey(key))
+                entries.Remove(key);
+        }
     }
 
     private JsonObject ToJson(T settings) => JsonSerializer.SerializeToNode(settings, _typeInfo) as JsonObject ?? [];

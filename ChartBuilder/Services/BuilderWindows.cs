@@ -83,7 +83,6 @@ namespace ChartBuilder.Services
             _editor = editor;
             _authoring = new AvaloniaAuthoringDialogService(() => editor);
             _services = ServicesFor(editor, _authoring);
-            RestorePlacement(editor);
             WatchWindow(editor);
 
             var viewModel = CreateNewChart([]);
@@ -322,8 +321,8 @@ namespace ChartBuilder.Services
         }
 
         /// <summary>
-        /// Follows the Editor window for as long as it's open: the calibration offer as the audio's device changes, the
-        /// Editor open's unsaved edits as it closes, and where the window was.
+        /// Follows the Editor window for as long as it's open: the calibration offer as the audio's device changes, and
+        /// the Editor open's unsaved edits and layout as it closes. Where the window was, WindowMemory keeps.
         /// </summary>
         private void WatchWindow(EditorWindow editor)
         {
@@ -367,49 +366,9 @@ namespace ChartBuilder.Services
                 });
             };
 
-            // A minimized editor doesn't say how it was shown or where it was.
-            editor.Closing += (_, e) =>
-            {
-                if (e.Cancel)
-                    return;
-
-                if (WindowPlacement.TryCapture(editor, out var state, out var bounds))
-                {
-                    if (bounds is { } normal)
-                    {
-                        settings.Settings.EditorX = normal.Position.X;
-                        settings.Settings.EditorY = normal.Position.Y;
-                        settings.Settings.EditorWidth = normal.Size.Width;
-                        settings.Settings.EditorHeight = normal.Size.Height;
-                    }
-
-                    settings.Settings.EditorMaximized = state != WindowState.Normal;
-                    settings.Settings.EditorFullscreen = state == WindowState.FullScreen;
-                }
-
-                settings.Save();
-            };
-        }
-
-        /// <summary>
-        /// Puts <paramref name="editor"/> where it was when it last closed, or leaves it centered when that's
-        /// unknown or no longer on a screen.
-        /// </summary>
-        private void RestorePlacement(EditorWindow editor)
-        {
-            var saved = settings.Settings;
-            if (WindowBounds.FromSaved(saved.EditorX, saved.EditorY, saved.EditorWidth, saved.EditorHeight) is { } bounds)
-                WindowPlacement.Restore(editor, bounds);
-            ApplySavedState(editor);
-        }
-
-        /// <summary>Shows <paramref name="editor"/> maximized or fullscreen when it last closed that way.</summary>
-        private void ApplySavedState(EditorWindow editor)
-        {
-            if (settings.Settings.EditorFullscreen)
-                editor.WindowState = WindowState.FullScreen;
-            else if (settings.Settings.EditorMaximized)
-                editor.WindowState = WindowState.Maximized;
+            // Anything else the settings hold that's changed, on every close, even one cancelled above, as the window's
+            // placement and layout are: the OS won't wait for an answer. With nothing changed, nothing's written.
+            editor.Closing += (_, _) => settings.Save();
         }
 
         private void Show(Window window)
@@ -422,8 +381,6 @@ namespace ChartBuilder.Services
             () => owner,
             settingsPicker => new SettingsWindowViewModel(
                 BuilderSettingsCatalog.Create(settings, latency, () => _ = ShowCalibrationAsync(), () => _ = ShowReductionDefaultsAsync(), ShowInputDevices, ResetBindings), settingsPicker, settings.Save),
-            settings.Settings,
-            settings.Save,
             Strings.AppName);
 
         /// <summary>Puts every profile's bindings back to the keyboard's defaults, keeping each device's settings.</summary>
