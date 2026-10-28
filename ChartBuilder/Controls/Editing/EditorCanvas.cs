@@ -154,19 +154,6 @@ namespace ChartBuilder.Controls.Editing
         private static readonly IBrush SoloTintBrush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(SoloColor, 0x1A));
         private static readonly IBrush SoloLabelBrush = new ImmutableSolidColorBrush(SoloColor);
         private static readonly Color DiscoFlipColor = PhraseColors.DiscoFlip;
-
-        // Generate fills' and Generate star power's proposals (charter-spec C6 item 5, C8 item 1), in amber whatever their
-        // kind, so they stand out from the phrases there: a kept one's ghost is a lit bar taller than its row, with a bold
-        // dashed edge over a dark one so it reads on any bar, and a band across the lanes edged by dashed lines; a dropped
-        // one's only a faint dashed outline, struck through, and a fainter band.
-        private const double GhostRise = 2.5;
-        private static readonly IPen KeptGhostPen = new ImmutablePen(PhraseColors.Proposal.ToUInt32(), 2, new ImmutableDashStyle([4, 2], 0));
-        private static readonly IPen GhostShadowPen = new ImmutablePen(Color.FromArgb(0xC0, 0x00, 0x00, 0x00).ToUInt32(), 3);
-        private static readonly IPen DroppedGhostPen = new ImmutablePen(HighwayPalette.WithAlpha(PhraseColors.Proposal, 0x70).ToUInt32(), 1, new ImmutableDashStyle([3, 2], 0));
-        private static readonly IBrush KeptGhostBrush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(PhraseColors.Proposal, 0x80));
-        private static readonly IBrush KeptBandBrush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(PhraseColors.Proposal, 0x26));
-        private static readonly IPen KeptBandEdgePen = new ImmutablePen(HighwayPalette.WithAlpha(PhraseColors.Proposal, 0xC0).ToUInt32(), 1, new ImmutableDashStyle([4, 3], 0));
-        private static readonly IBrush DroppedBandBrush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(PhraseColors.Proposal, 0x0A));
         private static readonly Color SectionColor = Color.FromRgb(0x5E, 0xEA, 0xD4);
         private static readonly IPen SectionPen = new ImmutablePen(HighwayPalette.WithAlpha(SectionColor, 0x70).ToUInt32(), 1.5);
         private static readonly IBrush SectionBrush = new ImmutableSolidColorBrush(SectionColor);
@@ -540,7 +527,6 @@ namespace ChartBuilder.Controls.Editing
             DrawPhraseRailBackground(context, rows, projection);
             FindPhrasesShown(part, fromTick, toTick);
             DrawPhraseTints(context, session, projection);
-            DrawProposalBands(context, session, key, projection, fromTick, toTick);
             DrawSpans(context, session, projection);
             DrawSyncBands(context, session, key, projection);
             DrawBeats(context, session, session.TempoMap, projection, fromTick, toTick, size);
@@ -552,7 +538,6 @@ namespace ChartBuilder.Controls.Editing
             // The phrase rail is beside the lanes, clear of the strike line's band, which is drawn over this.
             DrawPhraseRail(context, session, part, rows, projection);
             DrawDiscoFlips(context, session, key, rows, projection, fromTick, toTick);
-            DrawProposalGhosts(context, session, key, rows, projection, fromTick, toTick);
         }
 
         /// <summary>
@@ -1370,8 +1355,8 @@ namespace ChartBuilder.Controls.Editing
 
         /// <summary>
         /// Shows a tooltip naming the phrase rail's row or bar under the pointer; a resize arrow over a phrase or disco flip
-        /// bar's end and a move arrow over its body, or a hand over a proposed fill's ghost, which is clicked to keep or drop
-        /// it; and a cross over an empty row where a drag would draw a phrase of its kind.
+        /// bar's end and a move arrow over its body; and a cross over an empty row where a drag would draw a phrase of its
+        /// kind.
         /// </summary>
         private void ShowRailCursor(Point position)
         {
@@ -1380,32 +1365,24 @@ namespace ChartBuilder.Controls.Editing
             if (PointAt(position) is { Rail: not null } point && Session is { } session)
             {
                 tip = ChartEditorViewModel.PhraseKindName(point.Rail.Value);
-                if (session.Proposals is { } run && run.HitTest(point) is not null)
-                {
-                    wanted = StandardCursorType.Hand;
-                    tip = string.Format(CultureInfo.CurrentCulture, Strings.ProposalGhostToolTipFormat, ChartEditorViewModel.PhraseKindName(run.Kind).ToLower(CultureInfo.CurrentCulture));
-                }
-                else
-                {
-                    PhraseGrip? grip = null;
-                    if (session.Chart.PartOf(point.Track.Instrument) is { } part && PhraseRail.HitTest(part, point) is { } phrase)
-                        grip = phrase.Grip;
-                    else if (PhraseRail.HitTestDiscoFlip(point.Track.Difficulty, session.DiscoFlipRangesOf(point.Track), point) is { } flip)
-                        grip = flip.Grip;
+                PhraseGrip? grip = null;
+                if (session.Chart.PartOf(point.Track.Instrument) is { } part && PhraseRail.HitTest(part, point) is { } phrase)
+                    grip = phrase.Grip;
+                else if (PhraseRail.HitTestDiscoFlip(point.Track.Difficulty, session.DiscoFlipRangesOf(point.Track), point) is { } flip)
+                    grip = flip.Grip;
 
-                    // The erase tool erases a bar rather than grabbing it, as its red shows.
-                    if (grip is { } grabbed && (session.Tool != EditorTool.Erase || (_keys & KeyModifiers.Shift) != 0))
-                    {
-                        wanted = grabbed == PhraseGrip.Body ? StandardCursorType.SizeAll
-                            : View == LaneView.Highway ? StandardCursorType.SizeNorthSouth
-                            : StandardCursorType.SizeWestEast;
-                    }
-                    else if (grip is null && (_keys & KeyModifiers.Shift) == 0
-                        && session.Tools.PhraseDrawAt(point) is { } draw
-                        && session.Tools.DrawsIn(point.Track, draw.Kind))
-                    {
-                        wanted = StandardCursorType.Cross;
-                    }
+                // The erase tool erases a bar rather than grabbing it, as its red shows.
+                if (grip is { } grabbed && (session.Tool != EditorTool.Erase || (_keys & KeyModifiers.Shift) != 0))
+                {
+                    wanted = grabbed == PhraseGrip.Body ? StandardCursorType.SizeAll
+                        : View == LaneView.Highway ? StandardCursorType.SizeNorthSouth
+                        : StandardCursorType.SizeWestEast;
+                }
+                else if (grip is null && (_keys & KeyModifiers.Shift) == 0
+                    && session.Tools.PhraseDrawAt(point) is { } draw
+                    && session.Tools.DrawsIn(point.Track, draw.Kind))
+                {
+                    wanted = StandardCursorType.Cross;
                 }
             }
 
@@ -2036,67 +2013,6 @@ namespace ChartBuilder.Controls.Editing
         }
 
         /// <summary>
-        /// The ghosts of Generate fills' or Generate star power's proposals (charter-spec C6 item 5, C8 item 1) in their row
-        /// beside a lane of the part, drawn over the bars there, as a click on one keeps or drops it before it reaches a bar.
-        /// </summary>
-        private void DrawProposalGhosts(DrawingContext context, EditorSession session, ChartTrackKey key, IReadOnlyList<RailKind> rows, LaneProjection projection, double fromTick, double toTick)
-        {
-            if (session.Proposals is not { } run || key.Instrument != run.ProposedPart)
-                return;
-            int row = IndexOf(rows, run.Kind);
-            if (row < 0)
-                return;
-            var (across1, across2) = PhraseRowOf(projection, rows.Count, row);
-            for (int i = 0; i < run.Phrases.Count; i++)
-            {
-                var phrase = run.Phrases[i];
-                if (phrase.Tick > toTick || phrase.CoverEnd < fromTick)
-                    continue;
-                if (run.IsKept(i))
-                {
-                    // Taller than its row, so it rises over the bars beside it.
-                    var bar = BoxOf(projection, session, phrase, across1 - GhostRise, across2 + GhostRise).Inflate(0.5);
-                    context.DrawRectangle(null, GhostShadowPen, bar, 2, 2);
-                    context.DrawRectangle(KeptGhostBrush, KeptGhostPen, bar, 2, 2);
-                }
-                else
-                {
-                    var bar = BoxOf(projection, session, phrase, across1, across2).Inflate(0.5);
-                    context.DrawRectangle(null, DroppedGhostPen, bar, 2, 2);
-                    context.DrawLine(DroppedGhostPen, bar.TopLeft, bar.BottomRight);
-                }
-            }
-        }
-
-        /// <summary>
-        /// A band across the lanes, behind the notes, over each of the proposals of the run going on, on a lane of its part: a
-        /// kept one's edged at its start and end by dashed lines across the lanes.
-        /// </summary>
-        private void DrawProposalBands(DrawingContext context, EditorSession session, ChartTrackKey key, LaneProjection projection, double fromTick, double toTick)
-        {
-            if (session.Proposals is not { } run || key.Instrument != run.ProposedPart)
-                return;
-            double across1 = projection.LaneFrom, across2 = projection.LaneFrom + (projection.LaneSize * projection.Slots.Slots.Count);
-            for (int i = 0; i < run.Phrases.Count; i++)
-            {
-                var phrase = run.Phrases[i];
-                if (phrase.Tick > toTick || phrase.CoverEnd < fromTick)
-                    continue;
-                var band = BoxOf(projection, session, phrase, across1, across2);
-                if (!run.IsKept(i))
-                {
-                    context.FillRectangle(DroppedBandBrush, band);
-                    continue;
-                }
-
-                context.FillRectangle(KeptBandBrush, band);
-                bool alongIsDown = projection.View == LaneView.Highway;
-                context.DrawLine(KeptBandEdgePen, band.TopLeft, alongIsDown ? band.TopRight : band.BottomLeft);
-                context.DrawLine(KeptBandEdgePen, alongIsDown ? band.BottomLeft : band.TopRight, band.BottomRight);
-            }
-        }
-
-        /// <summary>
         /// A solo's note count on the difficulty shown, at its start (charter-spec C8 item 2): only for the solos that start
         /// on screen, as the others' counts aren't seen.
         /// </summary>
@@ -2488,14 +2404,12 @@ namespace ChartBuilder.Controls.Editing
 
         /// <summary>
         /// What a click of the erase tool would take away where the pointer is, in red over it: a note with its sustain, or
-        /// in the phrase rail a phrase's bar or a disco flip section's. None over a proposed phrase's ghost, which a click
-        /// keeps or drops, or with Shift held, which lends the erase tool the select tool's press.
+        /// in the phrase rail a phrase's bar or a disco flip section's. None with Shift held, which lends the erase tool the
+        /// select tool's press.
         /// </summary>
         private void DrawEraseHover(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, EditablePart part, IReadOnlyList<RailKind> rows, LaneProjection projection, LaneSlots slots)
         {
             if (_hover is not { } hover || _isPressed || session.Tool != EditorTool.Erase || (_keys & KeyModifiers.Shift) != 0 || PointAt(hover) is not { } point)
-                return;
-            if (point.Rail is not null && session.Proposals?.HitTest(point) is not null)
                 return;
 
             switch (session.Tools.EraseTargetAt(point))

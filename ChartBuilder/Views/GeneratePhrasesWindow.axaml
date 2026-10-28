@@ -9,14 +9,14 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="1100" d:DesignHeight="760"
-        x:Class="ChartBuilder.Views.GenerateStarPowerWindow"
-        x:DataType="vm:GenerateStarPowerViewModel"
+        x:Class="ChartBuilder.Views.GeneratePhrasesWindow"
+        x:DataType="vm:GeneratePhrasesViewModel"
         Icon="/Assets/ChartBuilder.ico"
         Title="{Binding Title}"
         Background="{DynamicResource AppBackgroundBrush}"
         Width="1100"
         Height="760"
-        MinWidth="960"
+        MinWidth="1024"
         MinHeight="600"
         ShowInTaskbar="False"
         CanMinimize="False"
@@ -26,9 +26,78 @@
         WindowDecorationsTheme="{StaticResource TitleBarDecorations}"
         WindowStartupLocation="CenterOwner">
 
-    <!-- Generate star power (charter-spec C8 item 1): a highway preview of the result on the right, and on the left the
-         regions to keep or drop. The window is built from fixed bands, so keeping or dropping a region, showing a
-         warning, or asking to regenerate never moves the list, the preview or the timeline. -->
+    <!-- Generate star power and Generate fills (charter-spec C6 item 5, C8 item 1): a highway preview of the result on the
+         right, and on the left the proposals to keep or drop. The window is built from fixed bands, so keeping or dropping
+         a proposal, showing a warning, or asking to regenerate never moves the list, the preview or the timeline. -->
+    <Window.DataTemplates>
+        <!-- The options only one generator draws; the mode picker and Regenerate are common to both. -->
+        <DataTemplate DataType="vm:GenerateStarPowerViewModel" x:DataType="vm:GenerateStarPowerViewModel">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Classes="caption"
+                           VerticalAlignment="Center"
+                           Text="{x:Static res:Strings.GenerateStarPowerSpacingLabel}" />
+                <NumericUpDown Width="96"
+                               VerticalAlignment="Center"
+                               Value="{Binding Spacing}"
+                               Minimum="10"
+                               Maximum="60"
+                               Increment="5"
+                               FormatString="0"
+                               ParsingNumberStyle="Integer"
+                               ToolTip.Tip="{x:Static res:Strings.GenerateStarPowerSpacingToolTip}"
+                               AutomationProperties.Name="{x:Static res:Strings.GenerateStarPowerSpacingLabel}" />
+                <Border Width="1" Height="18" Background="{DynamicResource SubtleBorderBrush}" />
+                <CheckBox VerticalAlignment="Center"
+                          Content="{x:Static res:Strings.GenerateStarPowerSpikesLabel}"
+                          IsChecked="{Binding PlanForSpikes}"
+                          ToolTip.Tip="{x:Static res:Strings.GenerateStarPowerSpikesToolTip}" />
+            </StackPanel>
+        </DataTemplate>
+
+        <DataTemplate DataType="vm:GenerateFillsViewModel" x:DataType="vm:GenerateFillsViewModel">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Classes="caption"
+                           VerticalAlignment="Center"
+                           Text="{x:Static res:Strings.GenerateFillsSpacingLabel}" />
+                <NumericUpDown Width="88"
+                               VerticalAlignment="Center"
+                               Value="{Binding Spacing}"
+                               Minimum="{Binding MinSpacing}"
+                               Maximum="{Binding MaxSpacing}"
+                               Increment="1"
+                               FormatString="0"
+                               ParsingNumberStyle="Integer"
+                               ToolTip.Tip="{x:Static res:Strings.GenerateFillsSpacingToolTip}"
+                               AutomationProperties.Name="{x:Static res:Strings.GenerateFillsSpacingLabel}" />
+                <Border Width="1" Height="18" Background="{DynamicResource SubtleBorderBrush}" />
+                <TextBlock Classes="caption"
+                           VerticalAlignment="Center"
+                           Text="{x:Static res:Strings.GenerateFillsLengthLabel}" />
+                <NumericUpDown Width="88"
+                               VerticalAlignment="Center"
+                               Value="{Binding Length}"
+                               Minimum="{Binding MinLength}"
+                               Maximum="{Binding MaxLength}"
+                               Increment="1"
+                               FormatString="0"
+                               ParsingNumberStyle="Integer"
+                               ToolTip.Tip="{x:Static res:Strings.GenerateFillsLengthToolTip}"
+                               AutomationProperties.Name="{x:Static res:Strings.GenerateFillsLengthLabel}" />
+                <Border Width="1" Height="18" Background="{DynamicResource SubtleBorderBrush}" />
+                <TextBlock Classes="caption"
+                           VerticalAlignment="Center"
+                           Text="{x:Static res:Strings.GenerateFillsEndLabel}" />
+                <ComboBox Width="120"
+                          VerticalAlignment="Center"
+                          ItemsSource="{Binding EndChoices}"
+                          SelectedItem="{Binding SelectedEnd}"
+                          DisplayMemberBinding="{Binding Label, x:DataType=vm:FillEndChoice}"
+                          ToolTip.Tip="{x:Static res:Strings.GenerateFillsEndToolTip}"
+                          AutomationProperties.Name="{x:Static res:Strings.GenerateFillsEndLabel}" />
+            </StackPanel>
+        </DataTemplate>
+    </Window.DataTemplates>
+
     <Window.Styles>
         <Style Selector="TextBlock.heading">
             <Setter Property="FontSize" Value="13" />
@@ -41,8 +110,8 @@
             <Setter Property="TextWrapping" Value="Wrap" />
         </Style>
 
-        <!-- A region is a row rather than a card: its 3px bar says whether it's star power, and its colours say whether
-             it's selected. Both are always laid out, so neither switching changes the row's size. -->
+        <!-- A proposal is a row rather than a card: its 3px bar says which generator proposed it, and its colours say
+             whether it's selected. Both are always laid out, so neither switching changes the row's size. -->
         <Style Selector="Border.region-row">
             <Setter Property="Background" Value="{DynamicResource ToolbarBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
@@ -70,6 +139,9 @@
         </Style>
         <Style Selector="Border.keep-bar.lit">
             <Setter Property="Background" Value="{DynamicResource StarPowerBrush}" />
+        </Style>
+        <Style Selector="Border.keep-bar.lit.proposal">
+            <Setter Property="Background" Value="{DynamicResource ProposalBrush}" />
         </Style>
 
         <!-- The chip on a lead-in's row: cyan when the kept plan charges its hard passage, amber when it falls short. -->
@@ -123,74 +195,57 @@
                        Text="{Binding Title}" />
         </ui:TitleBar>
 
-        <!-- The options the layout is worked out with, in one fixed-height bar. Regenerate's question opens beside it,
-             so asking never adds a row. -->
+        <!-- The options the plan is worked out with, in one fixed-height bar: the generator's own, then the mode both
+             share. Regenerate's question opens beside it, so asking never adds a row. -->
         <Border Grid.Row="1" Classes="toolbar" Padding="12,8">
-            <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,*,Auto" ColumnSpacing="8">
-                <TextBlock Grid.Column="0"
+            <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" ColumnSpacing="8">
+                <ContentControl Grid.Column="0"
+                                VerticalAlignment="Center"
+                                HorizontalContentAlignment="Left"
+                                Content="{Binding}" />
+                <Border Grid.Column="1" Width="1" Height="18" Background="{DynamicResource SubtleBorderBrush}" />
+                <TextBlock Grid.Column="2"
                            Classes="caption"
                            VerticalAlignment="Center"
-                           Text="{x:Static res:Strings.GenerateStarPowerSpacingLabel}" />
-                <NumericUpDown Grid.Column="1"
-                               Width="96"
-                               VerticalAlignment="Center"
-                               Value="{Binding Spacing}"
-                               Minimum="10"
-                               Maximum="60"
-                               Increment="5"
-                               FormatString="0"
-                               ParsingNumberStyle="Integer"
-                               ToolTip.Tip="{x:Static res:Strings.GenerateStarPowerSpacingToolTip}"
-                               AutomationProperties.Name="{x:Static res:Strings.GenerateStarPowerSpacingLabel}" />
-                <Border Grid.Column="2" Width="1" Height="18" Background="{DynamicResource SubtleBorderBrush}" />
-                <CheckBox Grid.Column="3"
-                          VerticalAlignment="Center"
-                          Content="{x:Static res:Strings.GenerateStarPowerSpikesLabel}"
-                          IsChecked="{Binding PlanForSpikes}"
-                          ToolTip.Tip="{x:Static res:Strings.GenerateStarPowerSpikesToolTip}" />
-                <Border Grid.Column="4" Width="1" Height="18" Background="{DynamicResource SubtleBorderBrush}" />
-                <TextBlock Grid.Column="5"
-                           Classes="caption"
-                           VerticalAlignment="Center"
-                           Text="{x:Static res:Strings.StarPowerModeLabel}" />
-                <ComboBox Grid.Column="6"
+                           Text="{Binding ModeLabel}" />
+                <ComboBox Grid.Column="3"
                           Width="150"
                           VerticalAlignment="Center"
                           ItemsSource="{Binding ModeChoices}"
                           SelectedItem="{Binding SelectedMode}"
-                          DisplayMemberBinding="{Binding Label, x:DataType=vm:StarPowerModeChoice}"
-                          AutomationProperties.Name="{x:Static res:Strings.StarPowerModeLabel}" />
+                          DisplayMemberBinding="{Binding Label, x:DataType=vm:GenerationModeChoice}"
+                          AutomationProperties.Name="{Binding ModeLabel}" />
                 <Button x:Name="RegenerateButton"
-                        Grid.Column="8"
+                        Grid.Column="4"
                         Classes="labelled"
                         VerticalAlignment="Center"
                         Click="OnRegenerateClick"
-                        ToolTip.Tip="{x:Static res:Strings.StarPowerRegenerateToolTip}"
-                        AutomationProperties.Name="{x:Static res:Strings.StarPowerRegenerate}">
+                        ToolTip.Tip="{x:Static res:Strings.GenerateRegenerateToolTip}"
+                        AutomationProperties.Name="{x:Static res:Strings.GenerateRegenerate}">
                     <FlyoutBase.AttachedFlyout>
                         <Flyout Placement="BottomEdgeAlignedRight" Closed="OnRegenerateFlyoutClosed">
                             <StackPanel Width="270" Spacing="10">
-                                <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.StarPowerRegenerateConfirm}" />
+                                <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.GenerateRegenerateConfirm}" />
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
                                     <Button Classes="labelled accent"
-                                            Content="{x:Static res:Strings.StarPowerRegenerateConfirmYes}"
+                                            Content="{x:Static res:Strings.GenerateRegenerateConfirmYes}"
                                             Click="OnConfirmRegenerate" />
                                     <Button Classes="labelled"
-                                            Content="{x:Static res:Strings.StarPowerRegenerateConfirmNo}"
-                                            Click="OnKeepRegions" />
+                                            Content="{x:Static res:Strings.GenerateRegenerateConfirmNo}"
+                                            Click="OnKeepProposals" />
                                 </StackPanel>
                             </StackPanel>
                         </Flyout>
                     </FlyoutBase.AttachedFlyout>
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <ui:LineIcon Width="13" Height="13" Data="{StaticResource GenerateStroke}" />
-                        <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.StarPowerRegenerate}" />
+                        <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.GenerateRegenerate}" />
                     </StackPanel>
                 </Button>
             </Grid>
         </Border>
 
-        <!-- On the left: the regions, in a ledger that scrolls on its own. On the right: the highway preview of the
+        <!-- On the left: the proposals, in a ledger that scrolls on its own. On the right: the highway preview of the
              result. Both panes begin with a 40 high band, so their headings line up. -->
         <Grid Grid.Row="2" ColumnDefinitions="340,*">
             <Border Grid.Column="0"
@@ -206,7 +261,7 @@
                         <TextBlock Grid.Column="0"
                                    Classes="heading"
                                    VerticalAlignment="Center"
-                                   Text="{x:Static res:Strings.StarPowerRegionsHeading}" />
+                                   Text="{Binding RegionsHeading}" />
                         <Border Grid.Column="1" Classes="chip large" VerticalAlignment="Center">
                             <TextBlock Text="{Binding ScopeText}" />
                         </Border>
@@ -223,14 +278,14 @@
                                         IsEnabled="{Binding HasProposals}">
                                 <Button Classes="tool"
                                         Command="{Binding PreviousRegionCommand}"
-                                        ToolTip.Tip="{x:Static res:Strings.StarPowerPreviousRegionToolTip}"
-                                        AutomationProperties.Name="{x:Static res:Strings.StarPowerPreviousRegionToolTip}">
+                                        ToolTip.Tip="{x:Static res:Strings.GeneratePreviousRegionToolTip}"
+                                        AutomationProperties.Name="{x:Static res:Strings.GeneratePreviousRegionToolTip}">
                                     <ui:LineIcon Width="12" Height="12" Data="{StaticResource ArrowLeftStroke}" />
                                 </Button>
                                 <Button Classes="tool"
                                         Command="{Binding NextRegionCommand}"
-                                        ToolTip.Tip="{x:Static res:Strings.StarPowerNextRegionToolTip}"
-                                        AutomationProperties.Name="{x:Static res:Strings.StarPowerNextRegionToolTip}">
+                                        ToolTip.Tip="{x:Static res:Strings.GenerateNextRegionToolTip}"
+                                        AutomationProperties.Name="{x:Static res:Strings.GenerateNextRegionToolTip}">
                                     <ui:LineIcon Width="12" Height="12" Data="{StaticResource ArrowRightStroke}" />
                                 </Button>
                             </StackPanel>
@@ -239,10 +294,10 @@
                                         Spacing="6"
                                         IsEnabled="{Binding HasProposals}">
                                 <Button Classes="labelled"
-                                        Content="{x:Static res:Strings.StarPowerKeepAll}"
+                                        Content="{x:Static res:Strings.GenerateKeepAll}"
                                         Command="{Binding KeepAllCommand}" />
                                 <Button Classes="labelled"
-                                        Content="{x:Static res:Strings.StarPowerDropAll}"
+                                        Content="{x:Static res:Strings.GenerateDropAll}"
                                         Command="{Binding DropAllCommand}" />
                             </StackPanel>
                         </Grid>
@@ -258,10 +313,10 @@
                                 </ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="vm:StarPowerRegionViewModel">
+                                <DataTemplate x:DataType="vm:ProposalRowViewModel">
                                     <Button Classes="region-click"
                                             Command="{Binding SelectCommand}"
-                                            ToolTip.Tip="{x:Static res:Strings.StarPowerRegionJumpToolTip}"
+                                            ToolTip.Tip="{x:Static res:Strings.GenerateRegionJumpToolTip}"
                                             AutomationProperties.Name="{Binding TimeText}">
                                         <Border Classes="region-row"
                                                 Classes.selected="{Binding IsSelected}"
@@ -269,14 +324,15 @@
                                             <Grid ColumnDefinitions="3,Auto,*">
                                                 <Border Grid.Column="0"
                                                         Classes="keep-bar"
-                                                        Classes.lit="{Binding IsKept}" />
+                                                        Classes.lit="{Binding IsKept}"
+                                                        Classes.proposal="{Binding ProposalAccent}" />
                                                 <CheckBox Grid.Column="1"
                                                           VerticalAlignment="Center"
                                                           Margin="10,0,0,0"
                                                           IsChecked="{Binding IsKept, Mode=OneWay}"
                                                           Command="{Binding ToggleCommand}"
-                                                          ToolTip.Tip="{x:Static res:Strings.StarPowerKeepToolTip}"
-                                                          AutomationProperties.Name="{x:Static res:Strings.StarPowerKeepToolTip}" />
+                                                          ToolTip.Tip="{x:Static res:Strings.GenerateKeepToolTip}"
+                                                          AutomationProperties.Name="{x:Static res:Strings.GenerateKeepToolTip}" />
                                                 <StackPanel Grid.Column="2"
                                                             Classes="rowText"
                                                             Margin="8,6,10,6"
@@ -301,9 +357,9 @@
                                                                    Text="{Binding DetailText}" />
                                                         <Border Grid.Column="1"
                                                                 Classes="chip large status-chip"
-                                                                Classes.low="{Binding !Charged}"
-                                                                IsVisible="{Binding IsLeadIn}">
-                                                            <TextBlock Text="{Binding ChargedText}" />
+                                                                Classes.low="{Binding ChipLow}"
+                                                                IsVisible="{Binding HasChip}">
+                                                            <TextBlock Text="{Binding ChipText}" />
                                                         </Border>
                                                     </Grid>
                                                 </StackPanel>
@@ -315,8 +371,8 @@
                         </ItemsControl>
                     </ScrollViewer>
 
-                    <!-- Star power already in the chart: pinned below the list, with a cap of its own, so a long list
-                         never hides it and it never pushes the list around. -->
+                    <!-- The phrases already in the chart: pinned below the list, with a cap of its own, so a long list
+                         never hides them and it never pushes the list around. -->
                     <Border Grid.Row="3"
                             IsVisible="{Binding HasExisting}"
                             BorderBrush="{DynamicResource SubtleBorderBrush}"
@@ -325,14 +381,14 @@
                         <Grid RowDefinitions="Auto,Auto" RowSpacing="2">
                             <TextBlock Grid.Row="0"
                                        Classes="caption"
-                                       Text="{x:Static res:Strings.StarPowerExistingHeading}" />
+                                       Text="{Binding ExistingHeading}" />
                             <ScrollViewer Grid.Row="1"
                                           MaxHeight="96"
                                           HorizontalScrollBarVisibility="Disabled"
                                           VerticalScrollBarVisibility="Auto">
                                 <ItemsControl ItemsSource="{Binding ExistingRegions}">
                                     <ItemsControl.ItemTemplate>
-                                        <DataTemplate x:DataType="vm:StarPowerExistingItem">
+                                        <DataTemplate x:DataType="vm:ExistingProposalItem">
                                             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" Margin="0,3,0,0">
                                                 <StackPanel Grid.Column="0" Spacing="1">
                                                     <TextBlock FontSize="12"
@@ -368,7 +424,7 @@
                             <TextBlock Grid.Column="0"
                                        Classes="heading"
                                        VerticalAlignment="Center"
-                                       Text="{x:Static res:Strings.StarPowerPreviewHeading}" />
+                                       Text="{x:Static res:Strings.GeneratePreviewHeading}" />
                             <StackPanel Grid.Column="2"
                                         Orientation="Horizontal"
                                         Spacing="10"
@@ -399,7 +455,7 @@
                                 <Border Width="1" Height="18" Background="{DynamicResource SubtleBorderBrush}" />
                                 <TextBlock Classes="caption"
                                            VerticalAlignment="Center"
-                                           Text="{x:Static res:Strings.StarPowerLookAheadLabel}" />
+                                           Text="{x:Static res:Strings.GenerateLookAheadLabel}" />
                                 <Slider Width="130"
                                         VerticalAlignment="Center"
                                         Minimum="2"
@@ -409,8 +465,8 @@
                                         TickFrequency="0.5"
                                         IsSnapToTickEnabled="True"
                                         Value="{Binding LookAhead}"
-                                        ToolTip.Tip="{x:Static res:Strings.StarPowerLookAheadToolTip}"
-                                        AutomationProperties.Name="{x:Static res:Strings.StarPowerLookAheadLabel}" />
+                                        ToolTip.Tip="{x:Static res:Strings.GenerateLookAheadToolTip}"
+                                        AutomationProperties.Name="{x:Static res:Strings.GenerateLookAheadLabel}" />
                                 <TextBlock FontSize="12"
                                            FontFeatures="tnum"
                                            VerticalAlignment="Center"
@@ -422,12 +478,12 @@
 
                     <Panel Grid.Row="1">
                         <hw:NoteHighwayView x:Name="Highway"
-                                            AutomationProperties.Name="Star power preview"
+                                            AutomationProperties.Name="{Binding PreviewAutomationName}"
                                             Scene="{Binding Scene}"
                                             Clock="{Binding Clock}"
                                             LookAhead="{Binding LookAhead}"
                                             LengthSeconds="{Binding LengthSeconds}"
-                                            SelectedPhrase="{Binding SelectedIndex}"
+                                            SelectedPhrase="{Binding SelectedBand}"
                                             Scrubbed="OnHighwayScrubbed" />
                         <Border Classes="banner"
                                 HorizontalAlignment="Center"
@@ -442,7 +498,7 @@
                                 <TextBlock FontSize="14"
                                            FontWeight="SemiBold"
                                            HorizontalAlignment="Center"
-                                           Text="{x:Static res:Strings.StarPowerEmptyHeading}" />
+                                           Text="{x:Static res:Strings.GenerateEmptyHeading}" />
                                 <TextBlock Classes="note"
                                            TextAlignment="Center"
                                            Text="{Binding EmptyText}" />
@@ -453,16 +509,16 @@
             </Border>
         </Grid>
 
-        <!-- The whole song: the meter, the proposed regions and the hard passages. -->
+        <!-- The whole song: the proposals, and for star power the meter and the hard passages. -->
         <Border Grid.Row="3"
                 Background="{DynamicResource SurfaceBrush}"
                 BorderBrush="{DynamicResource SubtleBorderBrush}"
                 BorderThickness="0,1,0,0">
             <StackPanel Margin="12,6,12,8" Spacing="4">
-                <TextBlock Classes="caption" Text="{x:Static res:Strings.StarPowerTimelineHeading}" />
+                <TextBlock Classes="caption" Text="{x:Static res:Strings.GenerateTimelineHeading}" />
                 <bctl:TimelineView x:Name="Timeline"
                                    Height="108"
-                                   AutomationProperties.Name="Star power timeline"
+                                   AutomationProperties.Name="{Binding TimelineAutomationName}"
                                    Cursor="SizeWestEast"
                                    Position="{Binding Playback.PositionSeconds, Mode=TwoWay}"
                                    Length="{Binding LengthSeconds}"
@@ -519,10 +575,11 @@
                     <Button Classes="accent"
                             MinWidth="140"
                             HorizontalContentAlignment="Center"
-                            Content="{x:Static res:Strings.StarPowerApply}"
+                            Content="{Binding ApplyText}"
                             IsEnabled="{Binding CanApply}"
                             Click="OnApply"
-                            ToolTip.Tip="{x:Static res:Strings.StarPowerApplyToolTip}" />
+                            ToolTip.Tip="{Binding ApplyToolTip}"
+                            AutomationProperties.Name="{Binding ApplyText}" />
                 </StackPanel>
             </Grid>
         </Border>

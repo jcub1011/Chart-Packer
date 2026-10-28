@@ -12,8 +12,7 @@ namespace ChartBuilder.Tests.Editing;
 /// <summary>
 /// What the bottom timeline shows of the whole song (charter-spec C3 item 2): its tempo and time signature changes, the
 /// notes of the lane in focus in its rows and colours, every one of its phrases in the row of the phrase rail it's drawn
-/// in, and the ghosts of a run of Generate fills or Generate star power. At 480 ticks a beat and 120 BPM, a beat is half
-/// a second.
+/// in, and a generation window's proposals. At 480 ticks a beat and 120 BPM, a beat is half a second.
 /// </summary>
 [TestClass]
 public sealed class OverviewDataTests
@@ -93,6 +92,43 @@ public sealed class OverviewDataTests
         Assert.IsTrue(overview.Proposals[1].Kept);
         Assert.AreEqual(session.AudioAt(0), overview.Proposals[0].Start, 1e-9);
         Assert.AreEqual(session.AudioAt(Measure), overview.Proposals[0].End, 1e-9);
+    }
+
+    [TestMethod]
+    public void AReplacedFillsPhraseIsMarkedAsReplaced()
+    {
+        var chart = Drums();
+        var drums = chart.PartOf(ChartInstrument.Drums)!;
+        drums[ChartDifficulty.Expert].Notes.Add(new EditableNote(0, 1, 1));
+        var fill = new Phrase(PhraseKind.DrumFill, 0, Beat);
+        drums.Phrases.Add(fill);
+        var session = Of(chart, focused: DrumsExpert);
+
+        var overview = OverviewData.Of(session, DrumsExpert, 100, [], replacedPhrases: [fill])!;
+
+        RailKind fillRow = PhraseKind.DrumFill;
+        Assert.IsTrue(overview.Phrases.Single(p => p.Row == fillRow).Replaced);
+    }
+
+    [TestMethod]
+    public void APhraseOfAnotherKindIsNotMarkedAsReplacedAtAReplacedPhrasesTickAndLength()
+    {
+        // A solo over a replaced star power section of the same span isn't star power, so the plan doesn't replace it.
+        var chart = Guitar();
+        var guitar = chart.PartOf(ChartInstrument.Guitar)!;
+        guitar[ChartDifficulty.Expert].Notes.Add(new EditableNote(0, 1, 0));
+        var starPower = new Phrase(PhraseKind.StarPower, 0, Beat);
+        var solo = new Phrase(PhraseKind.Solo, 0, Beat);
+        guitar.Phrases.Add(starPower);
+        guitar.Phrases.Add(solo);
+        var session = Of(chart, focused: GuitarExpert);
+
+        var overview = OverviewData.Of(session, GuitarExpert, 100, [], replacedPhrases: [starPower])!;
+
+        RailKind starPowerRow = PhraseKind.StarPower;
+        RailKind soloRow = PhraseKind.Solo;
+        Assert.IsTrue(overview.Phrases.Single(p => p.Row == starPowerRow).Replaced);
+        Assert.IsFalse(overview.Phrases.Single(p => p.Row == soloRow).Replaced);
     }
 
     [TestMethod]

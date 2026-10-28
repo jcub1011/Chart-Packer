@@ -1,3 +1,4 @@
+using ChartShared.Core.Charting.Authoring;
 using ChartShared.Core.Charts;
 
 namespace ChartShared.Core.Charting;
@@ -13,13 +14,25 @@ public enum FillEnd
 }
 
 /// <summary>What the author picks for a run of Generate fills (charter-spec C6 item 5).</summary>
-/// <param name="SpacingMeasures">How many measures apart fills start, at the least, counting the fills already there.</param>
+/// <param name="SpacingMeasures">How many measures apart fills start, at the least, counting the fills already there that the run keeps.</param>
 /// <param name="LengthMeasures">How many measures a fill lasts, up to the note it ends on.</param>
 /// <param name="EndOn">What a fill must end on.</param>
 public sealed record FillOptions(int SpacingMeasures = 4, int LengthMeasures = 1, FillEnd EndOn = FillEnd.Crash)
 {
     /// <summary>The spec's defaults: 4 measures apart, 1 measure long, ending on a crash.</summary>
     public static FillOptions Default { get; } = new();
+
+    /// <summary>The fewest measures apart the author can ask for.</summary>
+    public const int MinSpacingMeasures = 1;
+
+    /// <summary>The most measures apart the author can ask for.</summary>
+    public const int MaxSpacingMeasures = 64;
+
+    /// <summary>The fewest measures a fill can last.</summary>
+    public const int MinLengthMeasures = 1;
+
+    /// <summary>The most measures a fill can last.</summary>
+    public const int MaxLengthMeasures = 16;
 }
 
 /// <summary>A fill <see cref="FillGenerator"/> proposes, and the tick of the note star power is activated on.</summary>
@@ -48,7 +61,7 @@ public sealed record FillGeneration(IReadOnlyList<FillProposal> Proposals, NoFil
 
 /// <summary>
 /// Generate fills (charter-spec C6 item 5): proposes drum fills over a span of the drums, or the whole part, which the
-/// author then keeps or drops (<see cref="Editing.FillProposals"/>). It changes nothing.
+/// author then keeps or drops (<see cref="Editing.FillPlan"/>). It changes nothing.
 /// </summary>
 /// <remarks>
 /// <para>A spot is a measure line: a fill starting there lasts <see cref="FillOptions.LengthMeasures"/> measures, by the
@@ -57,19 +70,25 @@ public sealed record FillGeneration(IReadOnlyList<FillProposal> Proposals, NoFil
 /// have a note there, or the spot is left out. The fill ends the tick after the note, as CHR043's fix ends one, so the note
 /// is the last it covers (§6) and CHR043 never fires on it.</para>
 /// <para>Spots are taken earliest first, from where the second star power phrase ends (overlapping ones counted as one,
-/// as saving merges them). A fill never overlaps star power (CHR042), another fill or a big rock ending, never reaches
-/// <c>[coda]</c>, and starts at least <see cref="FillOptions.SpacingMeasures"/> measures from every other fill's start,
-/// those already there and those proposed.</para>
+/// as saving merges them). A fill never overlaps star power (CHR042), a fill it doesn't replace or a big rock ending,
+/// never reaches <c>[coda]</c>, and starts at least <see cref="FillOptions.SpacingMeasures"/> measures from every other
+/// fill's start it doesn't replace, those already there and those proposed.</para>
 /// </remarks>
 public static class FillGenerator
 {
     // The drums pad a crash is on: green on 4-lane and Pro (a cymbal on Pro), orange on 5-lane.
     private const int CrashPad = 4;
 
-    /// <summary>Proposes fills for the drums of <paramref name="chart"/>.</summary>
+    /// <summary>
+    /// Proposes fills for the drums of <paramref name="chart"/>. In <see cref="GenerationMode.Add"/>, the fills already
+    /// there stay: proposals keep clear of them and count towards the spacing. In <see cref="GenerationMode.Replace"/>,
+    /// the fills wholly inside the span are ignored, as the kept proposals will replace them; fills reaching across its
+    /// edge still keep their ground.
+    /// </summary>
     /// <param name="variant">How the drums are charted, which says what a crash is.</param>
     /// <param name="span">The ticks a fill must lie within, from its start to its activation note; the whole part when null.</param>
-    public static FillGeneration Propose(EditableChart chart, DrumsVariant variant, FillOptions options, (long From, long To)? span = null)
+    /// <param name="mode">What the proposals do with the fills already in the span.</param>
+    public static FillGeneration Propose(EditableChart chart, DrumsVariant variant, FillOptions options, (long From, long To)? span = null, GenerationMode mode = GenerationMode.Add)
     {
         ArgumentNullException.ThrowIfNull(chart);
         ArgumentNullException.ThrowIfNull(options);
@@ -89,7 +108,9 @@ public static class FillGenerator
             to = Math.Min(to, coda - 1);
 
         var starPower = drums.Phrases.Where(static p => p.Kind == PhraseKind.StarPower).ToList();
-        var fills = drums.Phrases.Where(static p => p.Kind is PhraseKind.DrumFill or PhraseKind.BigRockEnding).ToList();
+        var fills = drums.Phrases
+            .Where(p => p.Kind is PhraseKind.DrumFill or PhraseKind.BigRockEnding && !Replaced(p, span, mode))
+            .ToList();
         long horizon = Math.Max(to, fills.Count > 0 ? fills.Max(static f => f.Tick) : 0);
         var lines = chart.TempoMap.ToTempoMap().BeatLines(0, horizon).Where(static b => b.IsMeasure).Select(static b => b.Tick).ToList();
 
@@ -180,6 +201,12 @@ public static class FillGenerator
         bool after = m + spacing < lines.Count && tick >= lines[m + spacing];
         return !before && !after;
     }
+
+    // Whether a phrase is one the Replace mode replaces: a fill wholly inside the span, or anywhere in the whole part.
+    private static bool Replaced(Phrase phrase, (long From, long To)? span, GenerationMode mode) =>
+        mode == GenerationMode.Replace
+        && phrase.Kind == PhraseKind.DrumFill
+        && (span is not { } s || (phrase.Tick >= s.From && phrase.CoverEnd - 1 <= s.To));
 
     private static int FirstAtOrAfter(List<long> lines, long tick)
     {

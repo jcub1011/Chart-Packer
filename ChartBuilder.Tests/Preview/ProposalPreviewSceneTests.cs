@@ -2,13 +2,14 @@ using ChartBuilder.ViewModels;
 using ChartShared.Core.Charting;
 using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charts;
+using ChartShared.UI.Controls.Highway;
 using static ChartBuilder.Tests.Editing.EditorSessions;
 
 namespace ChartBuilder.Tests.Preview;
 
-/// <summary>The star power window's highway preview: the kept phrases and the notes they tint, without changing the chart.</summary>
+/// <summary>The generation window's highway preview: the kept phrases as bands and, for star power, the notes they tint.</summary>
 [TestClass]
-public sealed class StarPowerPreviewSceneTests
+public sealed class ProposalPreviewSceneTests
 {
     private const long Beat = 480;
     private const long Measure = 1920;
@@ -23,13 +24,14 @@ public sealed class StarPowerPreviewSceneTests
         var session = Of(chart);
         var playing = new[] { new Phrase(PhraseKind.StarPower, 0, Measure), new Phrase(PhraseKind.StarPower, 8 * Beat, 2 * Beat) };
 
-        var scene = StarPowerPreviewScene.Of(session, GuitarExpert, playing);
+        var scene = ProposalPreviewScene.Of(session, GuitarExpert, playing, starPower: true);
         var lane = scene.Lanes.Single();
 
-        Assert.HasCount(2, lane.StarPowerBands);
-        Assert.AreEqual(session.AudioAt(0), lane.StarPowerBands[0].Start, 1e-9);
-        Assert.AreEqual(session.AudioAt(Measure), lane.StarPowerBands[0].End, 1e-9);
-        Assert.AreEqual(session.AudioAt(8 * Beat), lane.StarPowerBands[1].Start, 1e-9);
+        Assert.HasCount(2, lane.Bands);
+        Assert.AreEqual(HighwayBandKind.StarPower, lane.Bands[0].Kind);
+        Assert.AreEqual(session.AudioAt(0), lane.Bands[0].Start, 1e-9);
+        Assert.AreEqual(session.AudioAt(Measure), lane.Bands[0].End, 1e-9);
+        Assert.AreEqual(session.AudioAt(8 * Beat), lane.Bands[1].Start, 1e-9);
         Assert.IsTrue(Covered(lane, 0 * Beat));
         Assert.IsTrue(Covered(lane, 3 * Beat));
         Assert.IsFalse(Covered(lane, 4 * Beat));
@@ -48,13 +50,31 @@ public sealed class StarPowerPreviewSceneTests
         part.Phrases.Add(new Phrase(PhraseKind.StarPower, 16 * Beat, Measure));
         var session = Of(chart);
 
-        var scene = StarPowerPreviewScene.Of(session, GuitarExpert, [new Phrase(PhraseKind.StarPower, 0, Measure)]);
+        var scene = ProposalPreviewScene.Of(session, GuitarExpert, [new Phrase(PhraseKind.StarPower, 0, Measure)], starPower: true);
         var lane = scene.Lanes.Single();
 
         Assert.IsTrue(Covered(lane, 0));
         Assert.IsFalse(Covered(lane, 16 * Beat), "The chart's own phrase isn't tinted where the result doesn't keep it.");
     }
 
-    private static bool Covered(ChartShared.UI.Controls.Highway.HighwayLane lane, long tick) =>
+    [TestMethod]
+    public void AFillsBandsAreProposalBandsAndTheNotesKeepTheChartsColors()
+    {
+        var chart = Drums();
+        var drums = chart.PartOf(ChartInstrument.Drums)!;
+        var expert = drums[ChartDifficulty.Expert];
+        expert.Notes.Add(new EditableNote(0, 1, 4));
+        drums.Phrases.Add(new Phrase(PhraseKind.StarPower, 0, Measure));
+        var session = Of(chart, focused: DrumsExpert);
+
+        var scene = ProposalPreviewScene.Of(session, DrumsExpert, [new Phrase(PhraseKind.DrumFill, 0, Measure)], starPower: false);
+        var lane = scene.Lanes.Single();
+
+        Assert.HasCount(1, lane.Bands);
+        Assert.AreEqual(HighwayBandKind.Proposal, lane.Bands[0].Kind);
+        Assert.IsTrue((lane.Notes[0].Flags & NoteFlags.StarPower) != 0, "A fill preview leaves the chart's star power as it is.");
+    }
+
+    private static bool Covered(HighwayLane lane, long tick) =>
         (lane.Notes.Single(n => n.Tick == tick).Flags & NoteFlags.StarPower) != 0;
 }

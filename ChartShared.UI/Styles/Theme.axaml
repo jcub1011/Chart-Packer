@@ -30,6 +30,8 @@
         <!-- Star power's colour, as the highway and timeline draw it (HighwayPalette.StarPower). The star power
              window's kept-region bar uses it, so a kept phrase reads as star power rather than as UI selection. -->
         <SolidColorBrush x:Key="StarPowerBrush" Color="#7FE9FF" />
+        <!-- The amber a generated phrase is proposed in (HighwayPalette.Proposal). A fill's kept-region bar uses it. -->
+        <SolidColorBrush x:Key="ProposalBrush" Color="#FFB000" />
         <SolidColorBrush x:Key="WarningTextBrush" Color="#FBBF24" />
         <!-- A warning's tint and border, e.g. the star power window's low-meter chip. -->
         <SolidColorBrush x:Key="WarningTintBrush" Color="#1FFBBF24" />

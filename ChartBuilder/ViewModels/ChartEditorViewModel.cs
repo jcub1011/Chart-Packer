@@ -468,23 +468,6 @@ namespace ChartBuilder.ViewModels
             set => Session.Placing = Session.Placing with { DoubleKick = value };
         }
 
-        /// <summary>Whether a run of Generate fills is going on, with its proposals shown as ghosts to keep or drop.</summary>
-        public bool IsProposalRunActive => Session.Proposals is not null;
-
-        /// <summary>How many of the run's proposals are kept, of how many.</summary>
-        public string ProposalRunText => Session.Proposals is { } run
-            ? string.Format(CultureInfo.CurrentCulture, Strings.FillRunFormat, run.KeptCount, run.Phrases.Count)
-            : string.Empty;
-
-        /// <summary>How the run's proposals are kept or dropped.</summary>
-        public string ProposalRunHint => Strings.FillRunHint;
-
-        /// <summary>What adding the run's kept proposals is called.</summary>
-        public string ProposalRunAdd => Strings.FillRunAdd;
-
-        /// <summary>What adding the run's kept proposals does.</summary>
-        public string ProposalRunAddToolTip => Strings.FillRunAddToolTip;
-
         /// <summary>What the bottom timeline shows of the whole song for the lane in focus (charter-spec C3 item 2).</summary>
         [ObservableProperty]
         public partial OverviewData? Overview { get; private set; }
@@ -622,38 +605,6 @@ namespace ChartBuilder.ViewModels
         [RelayCommand]
         private void CoarserSnap() => Session.Snap = Session.Snap.Coarser();
 
-        [RelayCommand(CanExecute = nameof(IsProposalRunActive))]
-        private void KeepAllProposals() => Session.Proposals?.KeepAll();
-
-        [RelayCommand(CanExecute = nameof(IsProposalRunActive))]
-        private void DropAllProposals() => Session.Proposals?.DropAll();
-
-        /// <summary>Adds the run's kept proposals as one undoable step, ending the run.</summary>
-        [RelayCommand(CanExecute = nameof(CanAddProposals))]
-        private void AddProposals() => Session.Proposals?.Accept();
-
-        private bool CanAddProposals() => Session.Proposals is { KeptCount: > 0 };
-
-        /// <summary>Ends the run, adding nothing (Esc).</summary>
-        [RelayCommand(CanExecute = nameof(IsProposalRunActive))]
-        private void CancelProposals() => Session.Proposals?.Cancel();
-
-        /// <summary>Moves the cursor to the start of the run's proposal before it, which scrolls the lanes there.</summary>
-        [RelayCommand(CanExecute = nameof(IsProposalRunActive))]
-        private void PreviousProposal()
-        {
-            if (Session.Proposals is { } run && !run.GoToPrevious())
-                Session.Status = Strings.ProposalRunNoneBefore;
-        }
-
-        /// <summary>Moves the cursor to the start of the run's proposal after it, which scrolls the lanes there.</summary>
-        [RelayCommand(CanExecute = nameof(IsProposalRunActive))]
-        private void NextProposal()
-        {
-            if (Session.Proposals is { } run && !run.GoToNext())
-                Session.Status = Strings.ProposalRunNoneAfter;
-        }
-
         [RelayCommand]
         private void FinerSnap() => Session.Snap = Session.Snap.Finer();
 
@@ -726,7 +677,6 @@ namespace ChartBuilder.ViewModels
                 RefreshPlacing();
             }
 
-            RefreshProposalRun();
             RefreshPhraseChoices();
             RefreshVisibleSpan();
             AudioAssist.Refresh();
@@ -753,22 +703,6 @@ namespace ChartBuilder.ViewModels
             OnPropertyChanged(nameof(IsAccentPlace));
             OnPropertyChanged(nameof(IsGhostPlace));
             OnPropertyChanged(nameof(PlaceDoubleKick));
-        }
-
-        /// <summary>The bar over the lanes while a run of Generate fills or Generate star power goes on, after the run changes.</summary>
-        private void RefreshProposalRun()
-        {
-            OnPropertyChanged(nameof(IsProposalRunActive));
-            OnPropertyChanged(nameof(ProposalRunText));
-            OnPropertyChanged(nameof(ProposalRunHint));
-            OnPropertyChanged(nameof(ProposalRunAdd));
-            OnPropertyChanged(nameof(ProposalRunAddToolTip));
-            KeepAllProposalsCommand.NotifyCanExecuteChanged();
-            DropAllProposalsCommand.NotifyCanExecuteChanged();
-            AddProposalsCommand.NotifyCanExecuteChanged();
-            CancelProposalsCommand.NotifyCanExecuteChanged();
-            PreviousProposalCommand.NotifyCanExecuteChanged();
-            NextProposalCommand.NotifyCanExecuteChanged();
         }
 
         /// <summary>
@@ -956,7 +890,7 @@ namespace ChartBuilder.ViewModels
     /// <param name="Replaced">Whether it's star power the star power window is replacing, drawn muted.</param>
     public readonly record struct OverviewPhrase(double Start, double End, RailKind Row, bool Replaced = false);
 
-    /// <summary>A proposal of the run of Generate fills or the star power window, in the audio, for the overview.</summary>
+    /// <summary>A proposal of the generation window, in the audio, for the overview.</summary>
     public readonly record struct OverviewProposal(double Start, double End, bool Kept);
 
     /// <summary>
@@ -970,8 +904,8 @@ namespace ChartBuilder.ViewModels
     /// <summary>
     /// What the bottom timeline shows of the whole song (charter-spec C3 item 2): sections, the chart's tempo and time
     /// signature changes, the notes of the lane in focus, every one of its phrases, a row for each of the phrase rail's
-    /// rows, the ghosts of a run of Generate fills or Generate star power going on, and the synchronized region and the
-    /// passages synced with it, each as audio seconds.
+    /// rows, a generation window's proposals, and the synchronized region and the passages synced with it, each as audio
+    /// seconds.
     /// </summary>
     /// <param name="TempoChanges">The chart's tempo and time signature changes, in audio seconds, each earliest first.</param>
     /// <param name="NoteRows">How many rows the notes are drawn in: a fret, pad or column each; none with no lane.</param>
@@ -981,7 +915,7 @@ namespace ChartBuilder.ViewModels
     /// Its phrases: star power as the games read it, overlapping phrases as one; disco flips of the difficulty shown; and
     /// every other kind as charted.
     /// </param>
-    /// <param name="Proposals">The run's proposals, whichever lane is in focus, so they can always be found; none without a run.</param>
+    /// <param name="Proposals">The generation window's proposals, whichever lane is in focus, so they can always be found; none without one.</param>
     /// <param name="Synced">
     /// The synchronized region and the passages synced with it: each band's start and end in audio seconds, whether it's
     /// the region itself, and whether the region is one nothing matched, which is drawn hashed in yellow.
@@ -999,7 +933,8 @@ namespace ChartBuilder.ViewModels
         /// <summary>
         /// The overview of <paramref name="session"/>'s song, <paramref name="length"/> seconds long, for the lane
         /// <paramref name="key"/>; null while the length isn't known. <paramref name="proposals"/> are the ghosts to draw,
-        /// or null for the run going on; <paramref name="replaceStarPower"/> shows the chart's star power as being replaced.
+        /// or null for none; <paramref name="replaceStarPower"/> shows the chart's star power as being replaced, and
+        /// <paramref name="replacedPhrases"/> marks the phrases a generator's plan replaces, whatever their kind.
         /// </summary>
         internal static OverviewData? Of(
             EditorSession session,
@@ -1007,7 +942,7 @@ namespace ChartBuilder.ViewModels
             double length,
             IReadOnlyList<OverviewProposal>? proposals = null,
             bool replaceStarPower = false,
-            IReadOnlyList<Phrase>? replacedStarPower = null)
+            IReadOnlyList<Phrase>? replacedPhrases = null)
         {
             if (!(length > 0))
                 return null;
@@ -1044,7 +979,8 @@ namespace ChartBuilder.ViewModels
                     double end = note.Length > 0 ? session.AudioAt(note.Tick + note.Length) : start;
                     int row = note.Lane == ChartNote.OpenLane ? -1 : HighwayPalette.Column(kind, laneCount, note.Lane);
                     var color = replaceStarPower
-                        && (replacedStarPower is null || replacedStarPower.Any(p => p.Covers(note.Tick)))
+                        && (replacedPhrases is null
+                            || replacedPhrases.Any(p => p.Kind == PhraseKind.StarPower && p.Covers(note.Tick)))
                         ? HighwayPalette.NoteColor(kind, laneCount, note with { Flags = note.Flags & ~NoteFlags.StarPower })
                         : HighwayPalette.NoteColor(kind, laneCount, note);
                     bool top = HighwayPalette.IsBlackFret(kind, note.Lane) && whites.Contains((note.Tick, note.Lane - 3));
@@ -1055,15 +991,19 @@ namespace ChartBuilder.ViewModels
                 var starPower = new RailKind(PhraseKind.StarPower);
                 foreach (var phrase in game.StarPower)
                 {
-                    bool replaced = replacedStarPower is not null
-                        && replacedStarPower.Any(p => p.Tick == phrase.Tick && p.Length == phrase.Length);
+                    bool replaced = replacedPhrases is not null
+                        && replacedPhrases.Any(p => p.Kind == PhraseKind.StarPower && p.Tick == phrase.Tick && p.Length == phrase.Length);
                     phrases.Add(new OverviewPhrase(session.AudioAt(phrase.Tick), session.AudioAt(phrase.Tick + phrase.Length), starPower, replaced));
                 }
                 foreach (var phrase in part.Phrases)
                 {
                     RailKind row = PhraseRail.RowOf(part.Kind, phrase.Kind);
                     if (phrase.Kind != PhraseKind.StarPower && rows.Contains(row))
-                        phrases.Add(new OverviewPhrase(session.AudioAt(phrase.Tick), session.AudioAt(phrase.Tick + phrase.Length), row));
+                    {
+                        bool replaced = replacedPhrases is not null
+                            && replacedPhrases.Any(p => p.Kind == phrase.Kind && p.Tick == phrase.Tick && p.Length == phrase.Length);
+                        phrases.Add(new OverviewPhrase(session.AudioAt(phrase.Tick), session.AudioAt(phrase.Tick + phrase.Length), row, replaced));
+                    }
                 }
 
                 if (rows.Contains(RailKind.DiscoFlip))
@@ -1074,13 +1014,6 @@ namespace ChartBuilder.ViewModels
             }
 
             var ghosts = proposals ?? [];
-            if (proposals is null && session.Proposals is { } run)
-            {
-                var fromRun = new List<OverviewProposal>();
-                for (int i = 0; i < run.Phrases.Count; i++)
-                    fromRun.Add(new OverviewProposal(session.AudioAt(run.Phrases[i].Tick), session.AudioAt(run.Phrases[i].CoverEnd), run.IsKept(i)));
-                ghosts = fromRun;
-            }
 
             var synced = new List<(double, double, bool, bool)>();
             if (session.Sync is { Span: var (from, to) } sync)

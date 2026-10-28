@@ -25,8 +25,8 @@ public readonly record struct StarPowerRegion(
 /// chart as one undoable step. It changes nothing itself.
 /// </summary>
 /// <remarks>
-/// Over the whole part it replaces the star power there by default (<see cref="StarPowerMode.Replace"/>), so its phrases
-/// are worked out as if there were none; or it adds alongside them (<see cref="StarPowerMode.Add"/>), keeping clear of
+/// Over the whole part it replaces the star power there by default (<see cref="GenerationMode.Replace"/>), so its phrases
+/// are worked out as if there were none; or it adds alongside them (<see cref="GenerationMode.Add"/>), keeping clear of
 /// them. Over a span, only the phrases wholly inside it are replaced; one reaching across its edge stays.
 /// </remarks>
 public sealed class StarPowerPlan
@@ -42,7 +42,7 @@ public sealed class StarPowerPlan
         ChartInstrument part,
         EditablePart? whole,
         StarPowerOptions options,
-        StarPowerMode mode,
+        GenerationMode mode,
         (long From, long To)? span,
         StarPowerParameters parameters,
         ChartDifficulty? source,
@@ -60,7 +60,7 @@ public sealed class StarPowerPlan
         {
             foreach (var phrase in whole.Phrases)
             {
-                if (phrase.Kind == PhraseKind.StarPower && !(mode == StarPowerMode.Replace && existing.Contains(phrase)))
+                if (phrase.Kind == PhraseKind.StarPower && !(mode == GenerationMode.Replace && existing.Contains(phrase)))
                     _surviving.Add(phrase);
             }
         }
@@ -84,7 +84,7 @@ public sealed class StarPowerPlan
     public StarPowerOptions Options { get; }
 
     /// <summary>What it does with the star power already there.</summary>
-    public StarPowerMode Mode { get; }
+    public GenerationMode Mode { get; }
 
     /// <summary>The ticks it proposes over; null for the whole part.</summary>
     public (long From, long To)? Span { get; }
@@ -92,12 +92,12 @@ public sealed class StarPowerPlan
     /// <summary>The regions, earliest first.</summary>
     public IReadOnlyList<StarPowerRegion> Regions => _regions;
 
-    /// <summary>The star power the chart has wholly inside the span, which <see cref="StarPowerMode.Replace"/> replaces.</summary>
+    /// <summary>The star power the chart has wholly inside the span, which <see cref="GenerationMode.Replace"/> replaces.</summary>
     public IReadOnlyList<Phrase> Existing => _existing;
 
     /// <summary>
-    /// The star power that stays when the plan is applied: all of it in <see cref="StarPowerMode.Add"/>, and in
-    /// <see cref="StarPowerMode.Replace"/> what reaches across the span's edge.
+    /// The star power that stays when the plan is applied: all of it in <see cref="GenerationMode.Add"/>, and in
+    /// <see cref="GenerationMode.Replace"/> what reaches across the span's edge.
     /// </summary>
     public IReadOnlyList<Phrase> SurvivingStarPower => _surviving;
 
@@ -118,14 +118,14 @@ public sealed class StarPowerPlan
 
     /// <summary>
     /// Works out a layout for <paramref name="part"/> of <paramref name="chart"/>, every region kept. Over the whole part
-    /// in <see cref="StarPowerMode.Add"/>, a part that has star power already is refused, as the author's phrases are
+    /// in <see cref="GenerationMode.Add"/>, a part that has star power already is refused, as the author's phrases are
     /// theirs to keep: they can replace them, or select a span to add beside them.
     /// </summary>
     public static StarPowerPlan Generate(
         EditableChart chart,
         ChartInstrument part,
         StarPowerOptions options,
-        StarPowerMode mode,
+        GenerationMode mode,
         (long From, long To)? span,
         ChartReadOptions? readOptions = null,
         StarPowerParameters? parameters = null)
@@ -138,7 +138,7 @@ public sealed class StarPowerPlan
             return Empty(chart, part, whole, options, mode, span, p, NoStarPowerReason.NotFiveFret);
         if (DifficultyGenerator.HighestCharted(whole) is null)
             return Empty(chart, part, whole, options, mode, span, p, NoStarPowerReason.NoNotes);
-        if (mode == StarPowerMode.Add && span is null && StarPowerGenerator.HasStarPower(whole))
+        if (mode == GenerationMode.Add && span is null && StarPowerGenerator.HasStarPower(whole))
             return Empty(chart, part, whole, options, mode, span, p, NoStarPowerReason.HasStarPower);
 
         var generation = StarPowerGenerator.Propose(chart, part, options, readOptions, span, p, mode);
@@ -173,13 +173,13 @@ public sealed class StarPowerPlan
 
     /// <summary>
     /// The command that applies the plan: the star power wholly in the span removed in
-    /// <see cref="StarPowerMode.Replace"/>, then the kept regions added, as one undoable step. Null when there's
+    /// <see cref="GenerationMode.Replace"/>, then the kept regions added, as one undoable step. Null when there's
     /// nothing to do.
     /// </summary>
     public IChartCommand? BuildCommand()
     {
         var commands = new List<IChartCommand>();
-        if (Mode == StarPowerMode.Replace)
+        if (Mode == GenerationMode.Replace)
             commands.AddRange(_existing.Select(phrase => (IChartCommand)new RemovePhrase(Part, phrase)));
         commands.AddRange(_regions.Where(static r => r.Kept).Select(r => (IChartCommand)new AddPhrase(Part, r.Phrase)));
         return commands.Count switch
@@ -201,7 +201,7 @@ public sealed class StarPowerPlan
         ChartInstrument part,
         EditablePart? whole,
         StarPowerOptions options,
-        StarPowerMode mode,
+        GenerationMode mode,
         (long From, long To)? span,
         StarPowerParameters parameters,
         NoStarPowerReason reason) =>

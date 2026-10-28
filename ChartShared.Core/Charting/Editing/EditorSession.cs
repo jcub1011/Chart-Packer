@@ -99,7 +99,6 @@ public sealed class EditorSession
         Viewport = new EditorViewport();
         Selection = new EditorSelection(Chart, VocalContentOf);
         Tools = new EditorTools(this);
-        Fills = new FillProposals(this);
         TempoProposal = new TempoProposals(this);
         Reduce = new ReduceProposals(this);
         Sync = new SyncRegion(this);
@@ -110,7 +109,7 @@ public sealed class EditorSession
     /// <summary>Raised after the chart changes: a command done, undone or redone, or a preview applied or taken back.</summary>
     public event EventHandler<EditorChartChangedEventArgs>? ChartChanged;
 
-    /// <summary>Raised when the snap, the tool, the focused lane, the status or the proposed fills change.</summary>
+    /// <summary>Raised when the snap, the tool, the focused lane or the status changes.</summary>
     public event EventHandler? StateChanged;
 
     /// <summary>Raised each time a status is said, even one the same as the last, so a refusal repeated is said again.</summary>
@@ -148,7 +147,6 @@ public sealed class EditorSession
         _readOptions = null;
         _game.Clear();
         ForgetDiscoFlips();
-        Fills.OnChanged();
         SongSettingsChanged?.Invoke(this, EventArgs.Empty);
         PlaceSongEvents();
         RaiseState();
@@ -215,12 +213,6 @@ public sealed class EditorSession
 
     /// <summary>The tools, which turn clicks, drags and keys into commands.</summary>
     public EditorTools Tools { get; }
-
-    /// <summary>The run of Generate fills going on, if there's one (charter-spec C6 item 5).</summary>
-    public FillProposals Fills { get; }
-
-    /// <summary>The run of proposed phrases going on, Generate fills'; null for none.</summary>
-    public PhraseProposals? Proposals => Fills.IsActive ? Fills : null;
 
     /// <summary>The proposed tempo map being looked at, if there's one (charter-spec C14 item 4).</summary>
     public TempoProposals TempoProposal { get; }
@@ -774,7 +766,6 @@ public sealed class EditorSession
         {
             Selection.Reconcile();
             KeepPhraseKindOffered();
-            Fills.OnChanged();
             Reduce.OnChanged();
             Sync.OnChanged();
             PlaceSongEvents();

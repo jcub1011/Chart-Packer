@@ -22,8 +22,8 @@ public sealed class StarPowerPlanTests
         var withStarPower = Chart(starPower: true);
         var without = Chart(starPower: false);
 
-        var replacing = StarPowerPlan.Generate(withStarPower, ChartInstrument.Guitar, StarPowerOptions.Default, StarPowerMode.Replace, null);
-        var plain = StarPowerPlan.Generate(without, ChartInstrument.Guitar, StarPowerOptions.Default, StarPowerMode.Replace, null);
+        var replacing = StarPowerPlan.Generate(withStarPower, ChartInstrument.Guitar, StarPowerOptions.Default, GenerationMode.Replace, null);
+        var plain = StarPowerPlan.Generate(without, ChartInstrument.Guitar, StarPowerOptions.Default, GenerationMode.Replace, null);
 
         Assert.HasCount(1, replacing.Existing);
         Assert.IsTrue(replacing.HasProposals);
@@ -37,8 +37,8 @@ public sealed class StarPowerPlanTests
     {
         var chart = Chart(starPower: true);
 
-        var whole = StarPowerPlan.Generate(chart, ChartInstrument.Guitar, StarPowerOptions.Default, StarPowerMode.Add, null);
-        var span = StarPowerPlan.Generate(chart, ChartInstrument.Guitar, StarPowerOptions.Default, StarPowerMode.Add, (30 * Measure, (56 * Measure) - 1));
+        var whole = StarPowerPlan.Generate(chart, ChartInstrument.Guitar, StarPowerOptions.Default, GenerationMode.Add, null);
+        var span = StarPowerPlan.Generate(chart, ChartInstrument.Guitar, StarPowerOptions.Default, GenerationMode.Add, (30 * Measure, (56 * Measure) - 1));
 
         Assert.AreEqual(NoStarPowerReason.HasStarPower, whole.Reason);
         Assert.IsFalse(whole.HasProposals);
@@ -70,7 +70,7 @@ public sealed class StarPowerPlanTests
     {
         var chart = Chart(starPower: true);
         var session = Of(chart);
-        var plan = StarPowerPlan.Generate(chart, ChartInstrument.Guitar, StarPowerOptions.Default, StarPowerMode.Replace, null);
+        var plan = StarPowerPlan.Generate(chart, ChartInstrument.Guitar, StarPowerOptions.Default, GenerationMode.Replace, null);
         plan.DropAll();
         plan.SetKept(0, true);
         plan.SetKept(1, true);
@@ -97,7 +97,7 @@ public sealed class StarPowerPlanTests
         var straddler = new Phrase(PhraseKind.StarPower, (30 * Measure) - 480, 960);
         chart.PartOf(ChartInstrument.Guitar)!.Phrases.Add(straddler);
 
-        var plan = StarPowerPlan.Generate(chart, ChartInstrument.Guitar, StarPowerOptions.Default, StarPowerMode.Replace, (30 * Measure, (56 * Measure) - 1));
+        var plan = StarPowerPlan.Generate(chart, ChartInstrument.Guitar, StarPowerOptions.Default, GenerationMode.Replace, (30 * Measure, (56 * Measure) - 1));
         var command = plan.BuildCommand();
 
         Assert.IsFalse(plan.Existing.Contains(straddler));
@@ -137,7 +137,7 @@ public sealed class StarPowerPlanTests
     }
 
     private static StarPowerPlan Plan() =>
-        StarPowerPlan.Generate(Chart(starPower: false), ChartInstrument.Guitar, StarPowerOptions.Default, StarPowerMode.Replace, null);
+        StarPowerPlan.Generate(Chart(starPower: false), ChartInstrument.Guitar, StarPowerOptions.Default, GenerationMode.Replace, null);
 
     /// <summary>
     /// A chart of quarter notes on Expert for 64 measures (128 s), with star power at measure 20 when

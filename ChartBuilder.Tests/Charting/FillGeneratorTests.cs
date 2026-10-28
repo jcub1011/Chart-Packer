@@ -1,4 +1,5 @@
 using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Authoring;
 using ChartShared.Core.Charting.Commands;
 using ChartShared.Core.Charting.Lint;
 using ChartShared.Core.Charts;
@@ -274,6 +275,22 @@ public sealed class FillGeneratorTests
         Assert.IsEmpty(result.FindingsOf(ChrRules.Chr043));
     }
 
+    [TestMethod]
+    public void AddKeepsClearOfAFillAlreadyThereWhileReplaceIgnoresIt()
+    {
+        var chart = Chart(DrumsVariant.Pro);
+        var drums = chart.PartOf(ChartInstrument.Drums)!;
+        var existing = new Phrase(PhraseKind.DrumFill, 4 * Measure, Measure);
+        drums.Phrases.Add(existing);
+
+        var added = Propose(chart, DrumsVariant.Pro, mode: GenerationMode.Add);
+        Assert.IsFalse(added.Proposals.Any(p => p.Fill.Overlaps(existing)));
+        Assert.AreSequenceEqual([8L, 12L, 16L], StartMeasures(added));
+
+        var replaced = Propose(chart, DrumsVariant.Pro, mode: GenerationMode.Replace);
+        Assert.AreSequenceEqual([2L, 6L, 10L, 14L, 18L], StartMeasures(replaced));
+    }
+
     /// <summary>
     /// Drums of <paramref name="variant"/> with star power over measures 0 and 1 (or <paramref name="starPower"/>), and on
     /// Expert a note on <paramref name="crashPad"/> on the first beat of measures 0 to 20, with a kick and a red between;
@@ -296,8 +313,8 @@ public sealed class FillGeneratorTests
         return chart;
     }
 
-    private static FillGeneration Propose(EditableChart chart, DrumsVariant variant, FillOptions? options = null, (long From, long To)? span = null) =>
-        FillGenerator.Propose(chart, variant, options ?? FillOptions.Default, span);
+    private static FillGeneration Propose(EditableChart chart, DrumsVariant variant, FillOptions? options = null, (long From, long To)? span = null, GenerationMode mode = GenerationMode.Add) =>
+        FillGenerator.Propose(chart, variant, options ?? FillOptions.Default, span, mode);
 
     private static List<long> StartMeasures(FillGeneration generated) => [.. generated.Proposals.Select(p => p.Fill.Tick / Measure)];
 }

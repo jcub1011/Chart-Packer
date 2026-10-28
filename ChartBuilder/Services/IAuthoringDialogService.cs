@@ -18,11 +18,11 @@ namespace ChartBuilder.Services
         /// <summary>Asks for the lane mapping of a paste between 5-fret and GHL: the one confirmed, or null if cancelled.</summary>
         Task<LaneMapping?> AskLaneMappingAsync(LaneMappingViewModel viewModel);
 
-        /// <summary>Asks for Generate fills' options, picked in <paramref name="viewModel"/>: whether Generate was pressed.</summary>
-        Task<bool> AskGenerateFillsAsync(GenerateFillsViewModel viewModel);
-
-        /// <summary>Shows the star power generator's window for <paramref name="viewModel"/>: whether its plan was applied.</summary>
-        Task<bool> ShowStarPowerGeneratorAsync(GenerateStarPowerViewModel viewModel);
+        /// <summary>
+        /// Shows the generated-phrases window for <paramref name="viewModel"/>: whether its plan was applied. It is the
+        /// window Generate star power and Generate fills both use.
+        /// </summary>
+        Task<bool> ShowPhraseGeneratorAsync(GeneratePhrasesViewModel viewModel);
 
         /// <summary>
         /// Shows the highway preview in a window of its own beside the Editor, which can go full screen (charter-spec C18);
@@ -136,9 +136,7 @@ namespace ChartBuilder.Services
             return await dialog.ShowDialog<LaneMapping?>(window);
         }
 
-        public Task<bool> AskGenerateFillsAsync(GenerateFillsViewModel viewModel) => AskAsync(new GenerateFillsWindow { DataContext = viewModel });
-
-        public Task<bool> ShowStarPowerGeneratorAsync(GenerateStarPowerViewModel viewModel) => AskAsync(new GenerateStarPowerWindow { DataContext = viewModel });
+        public Task<bool> ShowPhraseGeneratorAsync(GeneratePhrasesViewModel viewModel) => AskAsync(new GeneratePhrasesWindow { DataContext = viewModel });
 
         // Shows a dialog that closes with whether it was confirmed; false when there's no window to show it over.
         private async Task<bool> AskAsync(Window dialog)

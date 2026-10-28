@@ -427,42 +427,8 @@
                           Background="{DynamicResource SubtleBorderBrush}"
                           IsVisible="{Binding !IsLeftPanelAutoHide}" />
 
-            <!-- The chart: its lanes, each a part's highway or a vocal part, docked as the user arranges them. Over them,
-                 while Generate fills runs (charter-spec C6 item 5), a bar to keep, drop, add or cancel its proposals. -->
+            <!-- The chart: its lanes, each a part's highway or a vocal part, docked as the user arranges them. -->
             <DockPanel Grid.Column="2">
-                <Border DockPanel.Dock="Top"
-                        IsVisible="{Binding Editor.IsProposalRunActive}"
-                        Background="{DynamicResource ToolbarBrush}"
-                        BorderBrush="{DynamicResource SubtleBorderBrush}"
-                        BorderThickness="0,0,0,1"
-                        Padding="12,4">
-                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
-                        <TextBlock Grid.Column="0" VerticalAlignment="Center" FontWeight="SemiBold" Text="{Binding Editor.ProposalRunText}" />
-                        <TextBlock Grid.Column="1"
-                                   Classes="muted"
-                                   FontSize="12"
-                                   VerticalAlignment="Center"
-                                   TextTrimming="CharacterEllipsis"
-                                   Text="{Binding Editor.ProposalRunHint}" />
-                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6">
-                            <Button Classes="labelled"
-                                    Content="{x:Static res:Strings.ProposalRunPrevious}"
-                                    Command="{Binding Editor.PreviousProposalCommand}"
-                                    ToolTip.Tip="{x:Static res:Strings.ProposalRunPreviousToolTip}" />
-                            <Button Classes="labelled"
-                                    Content="{x:Static res:Strings.ProposalRunNext}"
-                                    Command="{Binding Editor.NextProposalCommand}"
-                                    ToolTip.Tip="{x:Static res:Strings.ProposalRunNextToolTip}" />
-                            <Button Classes="labelled" Content="{x:Static res:Strings.FillRunKeepAll}" Command="{Binding Editor.KeepAllProposalsCommand}" />
-                            <Button Classes="labelled" Content="{x:Static res:Strings.FillRunDropAll}" Command="{Binding Editor.DropAllProposalsCommand}" />
-                            <Button Classes="labelled accent"
-                                    Content="{Binding Editor.ProposalRunAdd}"
-                                    Command="{Binding Editor.AddProposalsCommand}"
-                                    ToolTip.Tip="{Binding Editor.ProposalRunAddToolTip}" />
-                            <Button Classes="labelled" Content="{x:Static res:Strings.FillRunCancel}" Command="{Binding Editor.CancelProposalsCommand}" />
-                        </StackPanel>
-                    </Grid>
-                </Border>
                 <!-- While a proposed tempo map is reviewed (charter-spec C14 item 4): what it is, and to adjust, accept or
                      discard it. -->
                 <Border DockPanel.Dock="Top"

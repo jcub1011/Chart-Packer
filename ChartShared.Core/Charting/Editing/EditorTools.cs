@@ -140,8 +140,8 @@ public sealed partial class EditorTools
 
         if (point.Rail is not null)
         {
-            // The erase tool erases there too, as it shows; a proposed phrase's ghost is still kept or dropped.
-            bool erases = _session.Tool == EditorTool.Erase && !shift && _session.Proposals?.HitTest(point) is null;
+            // The erase tool erases there too, as it shows.
+            bool erases = _session.Tool == EditorTool.Erase && !shift;
             _gesture = erases ? new EraseGesture(this, point) : PressRail(point, shift);
             return;
         }
@@ -1232,21 +1232,13 @@ public sealed partial class EditorTools
     }
 
     /// <summary>
-    /// A press in the phrase rail, with any tool: on a proposed phrase's ghost, while Generate fills or Generate star power
-    /// runs, it keeps or drops the phrase (charter-spec C6 item 5, C8 item 1), before any bar under it. On a phrase's bar it
-    /// selects the phrase (Shift adds it or takes it away), and a drag moves it, or resizes it by the end grabbed; the same
-    /// on a disco flip section's bar. Elsewhere in the rail, the Select, Place and Phrase tools draw a phrase of the row's
-    /// kind, a click that draws nothing clearing the selection, and the others select no phrases or sections; Shift lends
-    /// the select tool's press there too.
+    /// A press in the phrase rail, with any tool: on a phrase's bar it selects the phrase (Shift adds it or takes it
+    /// away), and a drag moves it, or resizes it by the end grabbed; the same on a disco flip section's bar. Elsewhere in
+    /// the rail, the Select, Place and Phrase tools draw a phrase of the row's kind, a click that draws nothing clearing
+    /// the selection, and the others select no phrases or sections; Shift lends the select tool's press there too.
     /// </summary>
     private Gesture? PressRail(ChartPoint point, bool shift)
     {
-        if (_session.Proposals is { } run && run.HitTest(point) is { } ghost)
-        {
-            run.Toggle(ghost);
-            return null;
-        }
-
         var part = Chart.PartOf(point.Track.Instrument)!;
         var selection = _session.Selection;
         if (PhraseRail.HitTestDiscoFlip(point.Track.Difficulty, _session.DiscoFlipRangesOf(point.Track), point) is { } flip)
@@ -1321,8 +1313,7 @@ public sealed partial class EditorTools
 
         if (_session.Tool is not (EditorTool.Select or EditorTool.Place or EditorTool.Phrase))
             return null;
-        if (_session.Proposals?.HitTest(point) is not null
-            || PhraseRail.HitTestDiscoFlip(point.Track.Difficulty, _session.DiscoFlipRangesOf(point.Track), point) is not null
+        if (PhraseRail.HitTestDiscoFlip(point.Track.Difficulty, _session.DiscoFlipRangesOf(point.Track), point) is not null
             || PhraseRail.HitTest(part, point) is not null)
         {
             return null;
