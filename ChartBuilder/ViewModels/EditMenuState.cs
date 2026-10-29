@@ -25,6 +25,9 @@ namespace ChartBuilder.ViewModels
         /// <summary>Whether Quantize has notes selected in one track; vocal notes aren't quantized.</summary>
         public static bool CanQuantize(EditorSelection selection) => selection.Track is not null && selection.HasNotes;
 
+        /// <summary>Whether Next and Previous match have passages found to go to.</summary>
+        public static bool CanStepFind(EditorSession session) => session.Find.HasMatches;
+
         /// <summary>Whether Select all has a lane to select in: the focused highway or vocal part, or the vocal part being edited.</summary>
         public static bool CanSelectAll(EditorSession session) =>
             session.Focused is not null || session.FocusedVocal is not null || session.Selection.Vocal is not null;

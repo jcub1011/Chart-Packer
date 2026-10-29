@@ -119,9 +119,7 @@ public sealed class SyncRegion
         if (Track is not { } key || _session.Chart.PartOf(key.Instrument) is not { } part || to <= from || from < 0)
             return false;
         to = Math.Max(to, from + MinLength(_session.Chart.Resolution));
-        var track = part[key.Difficulty];
-        var region = PatternAt(part, track, from, to - from);
-        var matches = region.Notes.Count == 0 ? [] : FindMatches(part, track, from, to - from, region);
+        var matches = Matching(key, part, from, to);
         Span = (from, to);
         _found.Clear();
         _found.AddRange(matches);
@@ -135,6 +133,26 @@ public sealed class SyncRegion
                 : string.Format(CultureInfo.InvariantCulture, Synchronizing, matches.Count);
         _session.RaiseState();
         return true;
+    }
+
+    /// <summary>
+    /// The passages of <paramref name="track"/> that match what it holds from <paramref name="from"/> up to, not including,
+    /// <paramref name="to"/>, as the region would find them, earliest first, without drawing a region. Empty when the track
+    /// is gone or holds no notes there.
+    /// </summary>
+    public IReadOnlyList<long> Find(ChartTrackKey track, long from, long to)
+    {
+        if (_session.Chart.PartOf(track.Instrument) is not { } part || from < 0)
+            return [];
+        return Matching(track, part, from, Math.Max(to, from + MinLength(_session.Chart.Resolution)));
+    }
+
+    // The passages matching the track's notes from..to; none when it holds none there.
+    private List<long> Matching(ChartTrackKey key, EditablePart part, long from, long to)
+    {
+        var track = part[key.Difficulty];
+        var region = PatternAt(part, track, from, to - from);
+        return region.Notes.Count == 0 ? [] : FindMatches(part, track, from, to - from, region);
     }
 
     /// <summary>Takes the region away, syncing nothing more.</summary>

@@ -189,6 +189,12 @@ namespace ChartBuilder.Controls.Editing
                 case PhysicalKey.PageDown when plain:
                     tools.StepCursorMeasures(-1);
                     return true;
+                case PhysicalKey.Home when plain:
+                    tools.GoToStart();
+                    return true;
+                case PhysicalKey.End when plain:
+                    tools.GoToEnd();
+                    return true;
                 case PhysicalKey.BracketLeft when plain:
                     session.Snap = session.Snap.Coarser();
                     return true;
@@ -266,10 +272,12 @@ namespace ChartBuilder.Controls.Editing
                 case PhysicalKey.Delete or PhysicalKey.Backspace when plain:
                     tools.DeleteSelection();
                     return true;
-                // Esc takes back a gesture, else clears the selection.
+                // Esc takes back a gesture, else closes the Go to / Find flyout, else clears the selection.
                 case PhysicalKey.Escape when plain:
                     if (tools.IsActive)
                         tools.Cancel();
+                    else if (editor.Navigation.IsOpen)
+                        editor.Navigation.CloseCommand.Execute(null);
                     else
                         session.Selection.Clear();
                     return true;

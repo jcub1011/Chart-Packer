@@ -106,6 +106,7 @@ namespace ChartBuilder.ViewModels
             RefreshEditMenu();
             Editor.Session.Selection.Changed += OnEditMenuStateChanged;
             Editor.Session.StateChanged += OnEditMenuStateChanged;
+            Editor.Session.Find.Changed += OnEditMenuStateChanged;
             ChartClipboard.Shared.Changed += OnEditMenuStateChanged;
             Editor.PropertyChanged += OnEditorPropertyChanged;
         }
@@ -391,6 +392,21 @@ namespace ChartBuilder.ViewModels
         [RelayCommand(CanExecute = nameof(CanQuantize))]
         private void Quantize() => Editor.QuantizeSelection();
 
+        private bool CanStepFind() => EditMenuState.CanStepFind(Editor.Session);
+
+        // Always on, so Ctrl+F with no notes selected says what it needs instead of doing nothing.
+        [RelayCommand]
+        private void FindMatches() => Editor.Navigation.OpenFind();
+
+        [RelayCommand(CanExecute = nameof(CanStepFind))]
+        private void FindNext() => Editor.Navigation.StepFind(1);
+
+        [RelayCommand(CanExecute = nameof(CanStepFind))]
+        private void FindPrevious() => Editor.Navigation.StepFind(-1);
+
+        [RelayCommand]
+        private void GoToMeasure() => Editor.Navigation.OpenGoTo();
+
         /// <summary>The Edit menu's Quantize, naming the grid it puts the selected notes on.</summary>
         public string QuantizeMenuHeader => string.Format(CultureInfo.CurrentCulture, Strings.MenuQuantizeFormat, BuilderSettingsCatalog.SnapLabel(Editor.QuantizeGrid.Division));
 
@@ -402,13 +418,13 @@ namespace ChartBuilder.ViewModels
 
         // What the Edit menu's items were last enabled for, so a command is told only when its answer changes: a drag or a
         // record pass raises the selection's and the session's changes many times a second.
-        private (bool Copy, bool Paste, bool SelectAll, bool Delete, bool Quantize) _editMenu;
+        private (bool Copy, bool Paste, bool SelectAll, bool Delete, bool Quantize, bool StepFind) _editMenu;
 
         // What the Edit menu's items are enabled for follows the selection, the lane focused and the clipboard.
         private void RefreshEditMenu()
         {
             var before = _editMenu;
-            _editMenu = (CanCopy(), CanPaste(), CanSelectAll(), CanDelete(), CanQuantize());
+            _editMenu = (CanCopy(), CanPaste(), CanSelectAll(), CanDelete(), CanQuantize(), CanStepFind());
             if (_editMenu.Copy != before.Copy)
             {
                 CutCommand.NotifyCanExecuteChanged();
@@ -427,6 +443,11 @@ namespace ChartBuilder.ViewModels
                 DeleteCommand.NotifyCanExecuteChanged();
             if (_editMenu.Quantize != before.Quantize)
                 QuantizeCommand.NotifyCanExecuteChanged();
+            if (_editMenu.StepFind != before.StepFind)
+            {
+                FindNextCommand.NotifyCanExecuteChanged();
+                FindPreviousCommand.NotifyCanExecuteChanged();
+            }
         }
 
         // The commands' controls are the UI thread's, which a change raised from another thread is taken to.
@@ -472,6 +493,7 @@ namespace ChartBuilder.ViewModels
             Song.TracksChanged -= OnTracksChanged;
             Editor.Session.Selection.Changed -= OnEditMenuStateChanged;
             Editor.Session.StateChanged -= OnEditMenuStateChanged;
+            Editor.Session.Find.Changed -= OnEditMenuStateChanged;
             ChartClipboard.Shared.Changed -= OnEditMenuStateChanged;
             Editor.PropertyChanged -= OnEditorPropertyChanged;
             _tracksTimer.Stop();

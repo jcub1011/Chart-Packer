@@ -34,6 +34,86 @@ namespace ChartBuilder.Controls
             MoreHost.SizeChanged += (_, _) => FitHeader();
         }
 
+        private ViewModels.EditorLaneViewModel? _lane;
+        private ViewModels.ChartEditorViewModel? _editor;
+
+        protected override void OnDataContextChanged(System.EventArgs e)
+        {
+            base.OnDataContextChanged(e);
+            Unwatch();
+            _lane = DataContext as ViewModels.EditorLaneViewModel;
+            Watch();
+        }
+
+        protected override void OnAttachedToVisualTree(Avalonia.VisualTreeAttachmentEventArgs e)
+        {
+            base.OnAttachedToVisualTree(e);
+            Watch();
+        }
+
+        protected override void OnDetachedFromVisualTree(Avalonia.VisualTreeAttachmentEventArgs e)
+        {
+            base.OnDetachedFromVisualTree(e);
+            Unwatch();
+        }
+
+        // The flyout follows which lane the keys act on, and whether it's open.
+        private void Watch()
+        {
+            if (_editor is not null || VisualRoot is null || _lane?.Editor is not { } editor)
+                return;
+            _editor = editor;
+            editor.Session.StateChanged += OnNavigationState;
+            editor.Navigation.PropertyChanged += OnNavigationPropertyChanged;
+            _lane.PropertyChanged += OnLaneViewChanged;
+            ShowNavigation();
+        }
+
+        private void Unwatch()
+        {
+            if (_editor is null)
+                return;
+            _editor.Session.StateChanged -= OnNavigationState;
+            _editor.Navigation.PropertyChanged -= OnNavigationPropertyChanged;
+            if (_lane is not null)
+                _lane.PropertyChanged -= OnLaneViewChanged;
+            _editor = null;
+            Navigation.IsVisible = false;
+        }
+
+        // Switching the lane between the highway and the timeline turns the flyout's arrows; the lane getting a canvas, or
+        // being pointed at another track or part, changes whether the flyout is over the lane the keys act on.
+        private void OnLaneViewChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName is nameof(ViewModels.EditorLaneViewModel.View) or nameof(ViewModels.EditorLaneViewModel.HasCanvas)
+                or nameof(ViewModels.EditorLaneViewModel.Track) or nameof(ViewModels.EditorLaneViewModel.Vocal)
+                or nameof(ViewModels.EditorLaneViewModel.IsVocal))
+                ShowNavigation();
+        }
+
+        private void OnNavigationState(object? sender, System.EventArgs e) => ShowNavigation();
+
+        private void OnNavigationPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(ViewModels.NavigationFlyoutViewModel.IsOpen))
+                ShowNavigation();
+        }
+
+        private void ShowNavigation()
+        {
+            if (_editor is not { } editor || _lane is not { HasCanvas: true } lane)
+            {
+                Navigation.IsVisible = false;
+                return;
+            }
+
+            var session = editor.Session;
+            bool focused = lane.IsVocal ? session.FocusedVocal is { } vocal && vocal == lane.Vocal
+                : session.FocusedVocal is null && session.Focused is { } key && key == lane.Track;
+            Navigation.IsVisible = editor.Navigation.IsOpen && focused;
+            Navigation.IsTimeline = lane.IsTimeline;
+        }
+
         /// <summary>The header, which <see cref="LaneDockHost"/> drags the lane by.</summary>
         public Control DragHandle => Header;
 

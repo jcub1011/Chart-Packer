@@ -3005,6 +3005,10 @@ These are the defaults. Rebinding is future work.
 | `Alt`+`Shift`+`↑` / `↓` (vocal lane) | Move the selected vocal notes an octave |
 | `Alt`+drag (Select tool, not on a selected note) | Select a time range across the lanes shown |
 | `PgUp` / `PgDn` | Move the cursor one measure |
+| `Home` / `End` | Move the cursor to the chart's start / to where its last note lets go |
+| `Ctrl+G` | Go to a measure: asks for a measure number (1 up to the last measure with notes) and moves the cursor to its start |
+| `Ctrl+F` | Find the passages of the lane that match the selected notes (matched as the Sync tool matches), and go to the next after the cursor; again goes on to the next |
+| `F3` / `Shift+F3` | Go to the next / previous passage found, wrapping round |
 | `Ctrl`+`↑` / `Ctrl`+`↓` | Next or previous section |
 | `Ctrl`+`Shift`+`↑` / `Ctrl`+`Shift`+`↓` | Next or previous tempo or time signature change |
 | `[` / `]` | Coarser or finer snap |

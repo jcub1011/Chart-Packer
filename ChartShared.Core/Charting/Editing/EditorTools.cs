@@ -429,6 +429,15 @@ public sealed partial class EditorTools
         _session.MoveCursorTo(SnapGrid.StepMeasures(tick, measures, Map));
     }
 
+    /// <summary>Moves the cursor to the chart's start (Home).</summary>
+    public void GoToStart() => _session.MoveCursorTo(0);
+
+    /// <summary>Moves the cursor to where the chart's last note lets go (End).</summary>
+    public void GoToEnd() => _session.MoveCursorTo(_session.ChartEndTick);
+
+    /// <summary>Moves the cursor to the start of the measure numbered <paramref name="measure"/> (Ctrl+G).</summary>
+    public void GoToMeasure(long measure) => _session.MoveCursorTo(MeasureBeat.TickOf(Map, measure));
+
     /// <summary>
     /// Moves the selected notes <paramref name="steps"/> grid steps in time and <paramref name="lanes"/> columns across
     /// (charter-spec §9, Alt+arrows), as one step; across the columns as they're drawn (<see cref="MoveOf"/>).

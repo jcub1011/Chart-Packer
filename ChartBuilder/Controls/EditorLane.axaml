@@ -419,6 +419,13 @@
                                        WheelUpIsLater="{Binding Editor.WheelUpIsLater}"
                                        AccentBrush="{DynamicResource AccentTextBrush}"
                                        LabelBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
+            <!-- Go to measure and Find (Ctrl+G, Ctrl+F), shown in the focused lane only; EditorLane.axaml.cs shows it. -->
+            <bctl:NavigationFlyout x:Name="Navigation"
+                                   IsVisible="False"
+                                   HorizontalAlignment="Right"
+                                   VerticalAlignment="Top"
+                                   Margin="8"
+                                   DataContext="{Binding Editor.Navigation}" />
             <StackPanel Classes="placeholder" IsVisible="{Binding HasPlaceholder}">
                 <TextBlock Classes="muted centered" TextWrapping="Wrap" Text="{Binding Placeholder}" />
                 <!-- A vocal part the chart hasn't can be added here, to chart it from nothing (charter-spec C3 item 7). -->

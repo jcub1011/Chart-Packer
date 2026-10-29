@@ -266,6 +266,58 @@
     <value>_Quantize to {0}</value>
     <comment>Edit menu (Q): puts the selected notes, and their sustains' ends, on the quantize grid. {0} is the grid, e.g. 1/16.</comment>
   </data>
+  <data name="MenuGoToMeasure" xml:space="preserve">
+    <value>_Go to measure…</value>
+    <comment>Edit menu (Ctrl+G): asks for a measure and takes the cursor to it.</comment>
+  </data>
+  <data name="MenuFindMatches" xml:space="preserve">
+    <value>_Find matching passages</value>
+    <comment>Edit menu (Ctrl+F): finds the passages of the lane that match the selected notes, as Sync does, and goes to the next.</comment>
+  </data>
+  <data name="MenuFindNext" xml:space="preserve">
+    <value>Next _match</value>
+    <comment>Edit menu (F3): goes to the next passage found by Find.</comment>
+  </data>
+  <data name="MenuFindPrevious" xml:space="preserve">
+    <value>Pre_vious match</value>
+    <comment>Edit menu (Shift+F3): goes to the previous passage found by Find.</comment>
+  </data>
+  <data name="NavMeasureLabel" xml:space="preserve">
+    <value>Go to Measure</value>
+    <comment>The navigation flyout (Ctrl+G, Ctrl+F): the box for the measure to go to.</comment>
+  </data>
+  <data name="NavMeasureToolTipFormat" xml:space="preserve">
+    <value>Measure Number, 1 to {0}</value>
+    <comment>The navigation flyout's measure box tooltip. {0} is the last measure the chart has notes in.</comment>
+  </data>
+  <data name="NavGoButton" xml:space="preserve">
+    <value>Go</value>
+    <comment>The navigation flyout: goes to the measure typed.</comment>
+  </data>
+  <data name="NavFindButton" xml:space="preserve">
+    <value>Find Matches</value>
+    <comment>The navigation flyout: finds the passages matching the selected notes.</comment>
+  </data>
+  <data name="NavNextToolTip" xml:space="preserve">
+    <value>Next Match (F3)</value>
+    <comment>The navigation flyout's next match button tooltip.</comment>
+  </data>
+  <data name="NavPreviousToolTip" xml:space="preserve">
+    <value>Previous Match (Shift+F3)</value>
+    <comment>The navigation flyout's previous match button tooltip.</comment>
+  </data>
+  <data name="NavCloseToolTip" xml:space="preserve">
+    <value>Close (Esc)</value>
+    <comment>The navigation flyout's close button tooltip.</comment>
+  </data>
+  <data name="NavMatchCountFormat" xml:space="preserve">
+    <value>{0} of {1}</value>
+    <comment>The navigation flyout: which match the cursor is at, and how many were found.</comment>
+  </data>
+  <data name="NavNoMatches" xml:space="preserve">
+    <value>No Matches</value>
+    <comment>The navigation flyout: no passage has been found matching the selected notes.</comment>
+  </data>
   <data name="MenuView" xml:space="preserve">
     <value>_View</value>
     <comment>The editor title bar's View menu. The underscore marks its access key (Alt+V).</comment>
