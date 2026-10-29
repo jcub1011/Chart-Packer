@@ -59,6 +59,27 @@ public static class KeyNames
         ["ArrowRight"] = "Right",
     };
 
+    // Names an Avalonia Key goes by more than once (Key.OemOpenBrackets is Key.Oem4), where Enum.ToString picks one of them, and
+    // not always the one a binding is written with: a pressed Key.Enter is "Return", and a Key.OemTilde "Oem3".
+    private static readonly Dictionary<string, string> Aliases = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Return"] = "Enter",
+        ["Oem1"] = "OemSemicolon",
+        ["Oem2"] = "OemQuestion",
+        ["Oem3"] = "OemTilde",
+        ["Oem4"] = "OemOpenBrackets",
+        ["Oem5"] = "OemPipe",
+        ["Oem6"] = "OemCloseBrackets",
+        ["Oem7"] = "OemQuotes",
+        ["Oem102"] = "OemBackslash",
+    };
+
+    /// <summary>
+    /// The one name a key's token goes by, so a key pressed (<c>Oem4</c>) and the same key as a binding is written
+    /// (<c>OemOpenBrackets</c>) are the same token. A token with no other name is returned as it is.
+    /// </summary>
+    public static string Canonical(string token) => Aliases.TryGetValue(token, out var name) ? name : token;
+
     /// <summary>
     /// The name a key goes by on a keyboard, where the token isn't it: <c>KeyH</c> is <c>H</c>, <c>D1</c> and
     /// <c>Digit1</c> are <c>1</c>, <c>OemComma</c> is <c>,</c>. A token with no better name is returned as it is.

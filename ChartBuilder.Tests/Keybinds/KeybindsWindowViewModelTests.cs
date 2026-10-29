@@ -12,6 +12,9 @@ public sealed class KeybindsWindowViewModelTests
     {
         public ConfirmChoice Choice { get; set; } = ConfirmChoice.Cancel;
 
+        /// <summary>When set, a choice isn't answered until the test completes it, so the window can change while one is asked.</summary>
+        public TaskCompletionSource<ConfirmChoice>? Pending { get; set; }
+
         public bool Confirms { get; set; } = true;
 
         public List<string> Asked { get; } = [];
@@ -27,7 +30,7 @@ public sealed class KeybindsWindowViewModelTests
         public Task<ConfirmChoice> ChooseAsync(string title, string message, string firstLabel, string secondLabel, string? firstIcon = null, string? secondIcon = null)
         {
             Asked.Add(message);
-            return Task.FromResult(Choice);
+            return Pending?.Task ?? Task.FromResult(Choice);
         }
 
         public Task AlertAsync(string title, string message)
@@ -269,6 +272,37 @@ public sealed class KeybindsWindowViewModelTests
         Assert.AreEqual("Ctrl+F", Row(vm, "test.find").Chips.Single().Chord.ToString());
         StringAssert.Contains(Row(vm, SharedKeys.Save).ConflictNote, "Find");
         StringAssert.Contains(Row(vm, "test.find").ConflictNote, "Save");
+    }
+
+    [TestMethod]
+    public async Task RemovingTheKeyBeingReplacedWhileTheClashIsAskedAboutChangesNothingMore()
+    {
+        _confirmation.Pending = new TaskCompletionSource<ConfirmChoice>();
+        var vm = Open();
+
+        var capture = Capture(vm, Row(vm, SharedKeys.Save), "Ctrl+F", Row(vm, SharedKeys.Save).Chips[0]);
+        vm.Remove(Row(vm, SharedKeys.Save), Row(vm, SharedKeys.Save).Chips[0]);
+        _confirmation.Pending.SetResult(ConfirmChoice.First);
+        await capture;
+
+        Assert.IsFalse(vm.IsCapturing);
+        Assert.AreEqual(0, Row(vm, SharedKeys.Save).Chips.Count, "the key is removed, not replaced by the one that was awaited");
+        Assert.AreEqual("Ctrl+F", Row(vm, "test.find").Chips.Single().Chord.ToString(), "and the other shortcut keeps its key");
+    }
+
+    [TestMethod]
+    public async Task CancellingTheWaitWhileTheClashIsAskedAboutAddsNoKey()
+    {
+        _confirmation.Pending = new TaskCompletionSource<ConfirmChoice>();
+        var vm = Open();
+
+        var capture = Capture(vm, Row(vm, SharedKeys.Save), "Ctrl+F", Row(vm, SharedKeys.Save).Chips[0]);
+        vm.CancelCapture();
+        _confirmation.Pending.SetResult(ConfirmChoice.Second);
+        await capture;
+
+        Assert.AreEqual("Ctrl+S", Row(vm, SharedKeys.Save).Chips.Single().Chord.ToString());
+        Assert.AreEqual("Ctrl+F", Row(vm, "test.find").Chips.Single().Chord.ToString());
     }
 
     [TestMethod]

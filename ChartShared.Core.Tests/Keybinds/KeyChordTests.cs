@@ -55,6 +55,22 @@ public sealed class KeyChordTests
     }
 
     [TestMethod]
+    [DataRow("Oem4", "OemOpenBrackets")]
+    [DataRow("Oem6", "OemCloseBrackets")]
+    [DataRow("Oem3", "OemTilde")]
+    [DataRow("Return", "Enter")]
+    [DataRow("return", "Enter")]
+    public void ATokenOfAKeyWithTwoNamesIsTheOneItsBindingIsWrittenWith(string pressed, string written)
+    {
+        var chord = new KeyChord(pressed, KeyMods.Ctrl);
+
+        Assert.AreEqual(written, chord.Key);
+        Assert.AreEqual(KeyChord.Parse("Ctrl+" + written), chord);
+        Assert.AreEqual(KeyChord.Parse("Ctrl+" + pressed), chord);
+        Assert.AreEqual("Ctrl+" + written, chord.ToString());
+    }
+
+    [TestMethod]
     public void ALogicalAndAPhysicalTokenOfOneKeyShareAConflictKey()
     {
         Assert.AreEqual(KeyChord.Parse("Ctrl+OemOpenBrackets").ConflictKey, KeyChord.Parse("Ctrl+BracketLeft").ConflictKey);

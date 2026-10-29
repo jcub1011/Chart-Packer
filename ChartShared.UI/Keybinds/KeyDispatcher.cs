@@ -62,6 +62,13 @@ public sealed class KeyDispatcher
     /// <summary>Whether no key should be taken now (a song is opening); null for never.</summary>
     public Func<bool>? IsBlocked { get; set; }
 
+    /// <summary>
+    /// Runs when the window is deactivated, before the keys held are let go of, for what a window lets go of that a held key's
+    /// release depends on; null for nothing. Here rather than on the window's own <c>Deactivated</c>, so the order isn't that of
+    /// the subscriptions.
+    /// </summary>
+    public Action? OnDeactivated { get; set; }
+
     /// <summary>The dispatcher listening to <paramref name="top"/>, or null when none is.</summary>
     public static KeyDispatcher? Of(TopLevel? top) => top is not null && Attached.TryGetValue(top, out var dispatcher) ? dispatcher : null;
 
@@ -109,8 +116,11 @@ public sealed class KeyDispatcher
         if (e.Handled || KeyInput.HasMeta(e.KeyModifiers) || IsBlocked?.Invoke() == true)
             return;
 
+        // A press whose character isn't a key (an IME's, or Alt+digit where the platform says System) can still be a key where
+        // it is, which a physical scope reads.
         var logical = KeyInput.Logical(e);
-        if (logical.IsModifierOnly)
+        var physical = KeyInput.Physical(e);
+        if (logical.IsModifierOnly && physical.IsModifierOnly)
             return;
 
         // The repeat of a press that ran something isn't a new press: swallowed, or run again if its action repeats. One with
@@ -124,7 +134,7 @@ public sealed class KeyDispatcher
             return;
         }
 
-        var actions = _map.Resolve(ScopeProvider?.Invoke() ?? Scope, logical, KeyInput.Physical(e));
+        var actions = _map.Resolve(ScopeProvider?.Invoke() ?? Scope, logical, physical);
         bool typing = e.Source is TextBox || _top?.FocusManager?.GetFocusedElement() is TextBox;
         foreach (var action in actions)
         {
@@ -170,6 +180,7 @@ public sealed class KeyDispatcher
     // Lets go of everything held, as when the window is switched away from with a key down, so nothing stays on.
     private void ReleaseAll()
     {
+        OnDeactivated?.Invoke();
         foreach (var held in _pressed.Values)
             held.Up?.Invoke();
         _pressed.Clear();

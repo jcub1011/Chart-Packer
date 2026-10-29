@@ -55,17 +55,6 @@ namespace ChartBuilder.Views
 
         public EditorWindow()
         {
-            // Keys held in record mode or playtest are let go when the window loses focus, as their key-ups won't come here.
-            // First, so the Loop tool is no longer held when the key dispatcher, which lets go of the keys it holds as the window
-            // is deactivated too, lets go of L: that's the end of a hold, not a tap, which turns repeating the loop region on or off.
-            Deactivated += (_, _) =>
-            {
-                _viewModel?.Editor.RecordReleaseAll();
-                _viewModel?.Editor.Playtest.ReleaseKeys();
-                _viewModel?.Editor.HoldModifiers(EditorModifiers.None);
-                _viewModel?.Editor.HoldLoopTool(false);
-            };
-
             // While a song opens, keys don't reach the Editor being left: its edits would go with it, unsaved. First, so
             // nothing below sees them. Key-ups still go through, so a key held then is let go of.
             AddHandler(KeyDownEvent, OnOpeningInput, RoutingStrategies.Tunnel);
@@ -122,6 +111,16 @@ namespace ChartBuilder.Views
             {
                 ScopeProvider = () => FocusManager?.GetFocusedElement() is EditorCanvas ? BuilderKeys.Canvas : BuilderKeys.Tools,
                 IsBlocked = () => _viewModel is { IsOpening: true },
+            };
+            // Keys held in record mode or playtest are let go when the window loses focus, as their key-ups won't come here. Through
+            // the dispatcher, which does this before it lets go of the keys it holds: the Loop tool is no longer held when it lets
+            // go of L, which is then the end of a hold, not a tap, which turns repeating the loop region on or off.
+            keys.OnDeactivated = () =>
+            {
+                _viewModel?.Editor.RecordReleaseAll();
+                _viewModel?.Editor.Playtest.ReleaseKeys();
+                _viewModel?.Editor.HoldModifiers(EditorModifiers.None);
+                _viewModel?.Editor.HoldLoopTool(false);
             };
             keys.Attach(this);
 

@@ -40,7 +40,7 @@ public readonly struct KeyChord : IEquatable<KeyChord>
 
     public KeyChord(string key, KeyMods mods)
     {
-        _key = key;
+        _key = KeyNames.Canonical(key);
         Mods = mods;
     }
 

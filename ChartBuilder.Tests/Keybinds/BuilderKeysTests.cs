@@ -217,6 +217,39 @@ public sealed class BuilderKeysTests
         }
     }
 
+    // The table above writes a pressed key as a binding is written. What a window gets is the token of an Avalonia Key, which
+    // is Key.ToString(), and that isn't always the same for a key with two names (Key.Enter is "Return", Key.OemOpenBrackets
+    // is "Oem4"), so a default is pressed here the way the keyboard does it.
+    [TestMethod]
+    public void EveryLogicalDefaultKeyIsAnsweredByTheKeyAsAvaloniaNamesIt()
+    {
+        var map = DefaultMap();
+
+        foreach (var action in Catalog.Where(a => a.Scope.Match == KeyMatch.Logical))
+        {
+            foreach (var chord in action.Defaults)
+            {
+                var key = KeyInput.ToKey(chord);
+                Assert.IsNotNull(key, $"{action.Id}: {chord}");
+
+                var pressed = new KeyChord(key.Value.ToString(), chord.Mods);
+                var hits = map.Resolve(action.Scope, pressed, default);
+
+                Assert.IsTrue(hits.Any(h => h.Id == action.Id), $"{action.Id}: {chord} isn't answered when pressed as {pressed.Key}");
+            }
+        }
+    }
+
+    [TestMethod]
+    public void TheGeneratePhrasesKeysAnswerTheKeysThatArePressed()
+    {
+        var map = DefaultMap();
+
+        Assert.AreEqual(BuilderKeys.PreviousRegion, map.Resolve(BuilderKeys.GeneratePhrases, new KeyChord(Key.OemOpenBrackets.ToString(), KeyMods.None), default).Single().Id);
+        Assert.AreEqual(BuilderKeys.NextRegion, map.Resolve(BuilderKeys.GeneratePhrases, new KeyChord(Key.OemCloseBrackets.ToString(), KeyMods.None), default).Single().Id);
+        Assert.AreEqual(BuilderKeys.ApplyPhrases, map.Resolve(BuilderKeys.GeneratePhrases, new KeyChord(Key.Enter.ToString(), KeyMods.Ctrl), default).Single().Id);
+    }
+
     [TestMethod]
     public void EveryDefaultKeyOfTheCanvasIsInTheTable()
     {

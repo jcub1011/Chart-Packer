@@ -370,6 +370,8 @@ namespace ChartShared.UI.ViewModels.Keybinds
             if (_captureRow is not { } row || _resolving)
                 return;
 
+            // The chip being replaced, as it was pressed on: the wait can end while a clash is asked about.
+            var chip = _captureChip;
             var action = row.Action;
             var problem = KeyMap.Validate(action, chord);
             if (problem == ChordProblem.ModifierOnly)
@@ -389,7 +391,7 @@ namespace ChartShared.UI.ViewModels.Keybinds
             }
 
             var own = _working.ChordsOf(action.Id);
-            if (own.Contains(chord) && !(_captureChip is { } replaced && replaced.Chord == chord))
+            if (own.Contains(chord) && !(chip is { } replaced && replaced.Chord == chord))
             {
                 StatusMessage = string.Format(CultureInfo.CurrentCulture, SharedStrings.KeybindsDuplicateFormat, key);
                 return;
@@ -420,6 +422,10 @@ namespace ChartShared.UI.ViewModels.Keybinds
                         return;
                     }
 
+                    // Cancelled, removed or reset while the question was up: nothing is waiting for this key any more.
+                    if (!ReferenceEquals(_captureRow, row) || !ReferenceEquals(_captureChip, chip))
+                        return;
+
                     if (choice == ConfirmChoice.First)
                     {
                         string conflictKey = chord.ConflictKey;
@@ -434,7 +440,7 @@ namespace ChartShared.UI.ViewModels.Keybinds
             }
 
             var chords = _working.ChordsOf(action.Id).ToList();
-            int index = _captureChip is null ? -1 : chords.IndexOf(_captureChip.Chord);
+            int index = chip is null ? -1 : chords.IndexOf(chip.Chord);
             if (index >= 0)
                 chords[index] = chord;
             else

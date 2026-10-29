@@ -22,6 +22,20 @@ namespace ChartShared.UI.Views
 
         public KeybindsWindow()
         {
+            // Focus search is the key the Settings window has for it, or whatever the user has bound; the live keys, not the ones
+            // being edited here. While a key is awaited every key is the answer, so none of these run.
+            var keys = new KeyDispatcher(AppKeys.Map, SharedKeys.SettingsWindow)
+            {
+                IsBlocked = () => DataContext is KeybindsWindowViewModel { IsCapturing: true },
+            };
+            keys.Attach(this);
+            keys.On(SharedKeys.FocusSearch, () =>
+            {
+                SearchBox.Focus();
+                SearchBox.SelectAll();
+                return true;
+            });
+
             InitializeComponent();
             WindowChrome.ShowIcon(this, WindowTitleBar);
             WindowMemory.Remember(this);
@@ -91,12 +105,6 @@ namespace ChartShared.UI.Views
             if (e.Key == Key.Escape && e.KeyModifiers == KeyModifiers.None)
             {
                 Close();
-                e.Handled = true;
-            }
-            else if (e.Key == Key.E && e.KeyModifiers == KeyModifiers.Control)
-            {
-                SearchBox.Focus();
-                SearchBox.SelectAll();
                 e.Handled = true;
             }
         }
