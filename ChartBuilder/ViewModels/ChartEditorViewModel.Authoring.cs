@@ -131,6 +131,7 @@ namespace ChartBuilder.ViewModels
         [RelayCommand]
         public void ToggleRecord()
         {
+            CancelCountdown(announce: false);
             if (IsRecordArmed)
             {
                 IsRecordArmed = false;
@@ -165,6 +166,7 @@ namespace ChartBuilder.ViewModels
         [RelayCommand]
         public void TogglePlaytest()
         {
+            CancelCountdown(announce: false);
             if (Playtest.IsArmed)
             {
                 Playtest.Disarm();
@@ -181,10 +183,13 @@ namespace ChartBuilder.ViewModels
             Playtest.IsArmed = true;
             if (Playback.IsPlaying)
                 Playtest.Begin();
+            AnnouncePlaytestOn();
+        }
+
+        private void AnnouncePlaytestOn() =>
             Messages.Info(Session.Focused is { } key
                 ? string.Format(CultureInfo.CurrentCulture, Strings.PlaytestOnFormat, ChartLabels.InstrumentName(key.Instrument), ChartLabels.DifficultyName(key.Difficulty))
                 : Strings.PlaytestOnNoLane, RecordMessageKey);
-        }
 
         /// <summary>
         /// Lends the song's playback to a dialog over the Editor, as the Reduce dialog's preview has it: until it's given back,
@@ -195,6 +200,7 @@ namespace ChartBuilder.ViewModels
         {
             if (_playbackBorrows++ == 0)
             {
+                CancelCountdown(announce: false);
                 Playback.Pause();
                 _loopedBeforeBorrow = Playback.IsLooping;
                 Playback.IsLooping = false;

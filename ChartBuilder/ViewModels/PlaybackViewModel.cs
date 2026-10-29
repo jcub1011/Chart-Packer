@@ -435,8 +435,9 @@ namespace ChartBuilder.ViewModels
                 return;
 
             SeekTo(Math.Min(position, LengthSeconds));
+            // Straight to playing, not the play button's path: carrying on after a reload isn't the user starting the song, so no countdown.
             if (wasPlaying)
-                PlayPauseCommand.Execute(null);
+                StartPlayback();
         }
 
         /// <inheritdoc/>
@@ -488,6 +489,22 @@ namespace ChartBuilder.ViewModels
                 SetPlaying(false);
                 return;
             }
+
+            if (DeferPlayStart?.Invoke(StartPlayback) == true)
+                return;
+            StartPlayback();
+        }
+
+        /// <summary>
+        /// Asked before the song starts from the play button or key, with what starts it. Returns true when it took the start
+        /// over, to call that later or never, as a countdown does; false to start the song now.
+        /// </summary>
+        public Func<Action, bool>? DeferPlayStart { get; set; }
+
+        private void StartPlayback()
+        {
+            if (_player is not { IsPlaying: false } player)
+                return;
 
             // The volumes may have changed in Settings since.
             RefreshMasterVolume();

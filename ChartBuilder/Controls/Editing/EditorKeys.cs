@@ -224,9 +224,11 @@ namespace ChartBuilder.Controls.Editing
                     tools.DeleteSelection();
                     return true;
 
-                // Esc cancels a record pass; else takes back a gesture, else closes the Go to / Find flyout, else clears the selection.
+                // Esc ends the countdown to the song starting, else cancels a record pass; else takes back a gesture, else closes the Go to / Find flyout, else clears the selection.
                 case BuilderKeys.Cancel:
-                    if (session.Recording is not null)
+                    if (editor.IsCountingDown)
+                        editor.CancelCountdown();
+                    else if (session.Recording is not null)
                         editor.CancelRecording();
                     else if (tools.IsActive)
                         tools.Cancel();

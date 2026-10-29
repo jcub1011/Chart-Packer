@@ -118,6 +118,37 @@ namespace ChartBuilder.Services
                         Get = () => settings.Settings.GuitarRecordStyle,
                         Set = style => settings.Settings.GuitarRecordStyle = style,
                     },
+                    new ChoiceSetting<PlaybackCountdownMode>
+                    {
+                        Id = "input.playbackCountdown",
+                        Category = input,
+                        Label = Strings.PlaybackCountdownLabel,
+                        Description = Strings.PlaybackCountdownDescription,
+                        Keywords = SettingKeywords.Split(Strings.PlaybackCountdownKeywords),
+                        DefaultValue = PlaybackCountdownMode.Both,
+                        Choices =
+                        [
+                            new SettingChoice<PlaybackCountdownMode>(PlaybackCountdownMode.Off, Strings.PlaybackCountdownOff),
+                            new SettingChoice<PlaybackCountdownMode>(PlaybackCountdownMode.Record, Strings.PlaybackCountdownRecord),
+                            new SettingChoice<PlaybackCountdownMode>(PlaybackCountdownMode.Play, Strings.PlaybackCountdownPlay),
+                            new SettingChoice<PlaybackCountdownMode>(PlaybackCountdownMode.Both, Strings.PlaybackCountdownBoth),
+                        ],
+                        Get = () => settings.Settings.PlaybackCountdown,
+                        Set = mode => settings.Settings.PlaybackCountdown = mode,
+                    },
+                    new IntegerSetting
+                    {
+                        Id = "input.countdownSeconds",
+                        Category = input,
+                        Label = Strings.CountdownSecondsLabel,
+                        Description = Strings.CountdownSecondsDescription,
+                        Keywords = SettingKeywords.Split(Strings.CountdownSecondsKeywords),
+                        DefaultValue = BuilderSettings.DefaultCountdownSeconds,
+                        Minimum = BuilderSettings.MinCountdownSeconds,
+                        Maximum = BuilderSettings.MaxCountdownSeconds,
+                        Get = () => settings.Settings.CountdownSeconds,
+                        Set = seconds => settings.Settings.CountdownSeconds = seconds,
+                    },
                     new ToggleSetting
                     {
                         Id = "input.recordDynamics",

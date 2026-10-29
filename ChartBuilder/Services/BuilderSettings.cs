@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 using ChartShared.Audio.Waveforms;
@@ -31,6 +32,22 @@ namespace ChartBuilder.Services
 
         /// <summary>The wheel turned down is later.</summary>
         DownIsLater,
+    }
+
+    /// <summary>Which starts of playback count 3, 2, 1 before the song starts, so there's time to get ready.</summary>
+    public enum PlaybackCountdownMode
+    {
+        /// <summary>None: the song starts at once.</summary>
+        Off,
+
+        /// <summary>Starting a pass of record mode.</summary>
+        Record,
+
+        /// <summary>Starting a playtest, an instrument playing the chart.</summary>
+        Play,
+
+        /// <summary>Both of them.</summary>
+        Both,
     }
 
     /// <summary>What Chart Builder opens with when it starts with nothing on its command line.</summary>
@@ -291,6 +308,24 @@ namespace ChartBuilder.Services
 
         /// <summary>How a guitar controller records (charter-spec C19 item 7).</summary>
         public GuitarRecordStyle GuitarRecordStyle { get; set; } = GuitarRecordStyle.Strum;
+
+        /// <summary>Which starts of playback, of record mode and playtest, count 3, 2, 1 first.</summary>
+        public PlaybackCountdownMode PlaybackCountdown { get; set; } = PlaybackCountdownMode.Both;
+
+        /// <summary>The fewest seconds the countdown before the song starts counts.</summary>
+        public const int MinCountdownSeconds = 1;
+
+        /// <summary>The most seconds the countdown before the song starts counts.</summary>
+        public const int MaxCountdownSeconds = 10;
+
+        /// <summary>3, the seconds counted before the song starts, before it's set.</summary>
+        public const int DefaultCountdownSeconds = 3;
+
+        /// <summary>Keeps <paramref name="seconds"/> within the fewest and most the countdown counts.</summary>
+        public static int ClampCountdownSeconds(int seconds) => Math.Clamp(seconds, MinCountdownSeconds, MaxCountdownSeconds);
+
+        /// <summary>How many seconds <see cref="PlaybackCountdown"/> counts down from, to start the song.</summary>
+        public int CountdownSeconds { get; set; } = DefaultCountdownSeconds;
 
         /// <summary>Whether a MIDI kit's hard hits record as accents and its soft ones as ghosts.</summary>
         public bool RecordDynamicsFromVelocity { get; set; }

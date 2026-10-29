@@ -544,6 +544,16 @@
                                        GuideBorderBrush="{DynamicResource SubtleBorderBrush}"
                                        AccentBrush="{DynamicResource AccentTextBrush}"
                                        PreviewBrush="{DynamicResource AccentTintBrush}" />
+                    <!-- The 3, 2, 1 before record mode or a playtest starts the song. It's drawn over the lanes without taking
+                         their clicks, and the message bar says it too, for a screen reader. -->
+                    <TextBlock HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               FontSize="120"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource AccentHighlightBrush}"
+                               IsHitTestVisible="False"
+                               IsVisible="{Binding Editor.IsCountingDown}"
+                               Text="{Binding Editor.CountdownText}" />
                     <StackPanel Classes="placeholder" IsVisible="{Binding !Lanes.HasLanes}">
                         <TextBlock Classes="centered" FontWeight="SemiBold" Text="{x:Static res:Strings.NoLanesOpen}" />
                         <TextBlock Classes="muted centered" FontSize="12" Text="{x:Static res:Strings.NoLanesOpenHint}" />

@@ -126,6 +126,7 @@ namespace ChartBuilder.ViewModels
             Session.Viewport.Moved += OnCursorMoved;
             Session.Selection.Changed += OnSelectionChanged;
             Playback.PropertyChanged += OnPlaybackChanged;
+            Playback.DeferPlayStart = DeferPlayStart;
             Playback.Scrubbed += OnScrubbed;
             Lanes.LayoutChanged += OnLayoutChanged;
             Session.Focused = Lanes.Layout.Lanes.Select(l => l.Part.Track).FirstOrDefault(t => t is not null);
@@ -625,6 +626,8 @@ namespace ChartBuilder.ViewModels
         {
             _refresh.Stop();
             _tapEnd.Stop();
+            StopCountdown();
+            Playback.DeferPlayStart = null;
             Session.StateChanged -= OnSessionState;
             Session.StatusPosted -= OnStatusPosted;
             Session.ChartChanged -= OnChartChanged;
