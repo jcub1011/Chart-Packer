@@ -218,9 +218,9 @@
     <value>_Save</value>
     <comment>File menu: saves the chart and its song.ini changes (Ctrl+S).</comment>
   </data>
-  <data name="MenuSaveAndPack" xml:space="preserve">
-    <value>Save and _pack…</value>
-    <comment>File menu: saves, then reviews and exports the song to a .sng.</comment>
+  <data name="MenuPack" xml:space="preserve">
+    <value>_Pack…</value>
+    <comment>File menu: reviews and packs the song, with its unsaved changes, to a .sng.</comment>
   </data>
   <data name="MenuExportCopy" xml:space="preserve">
     <value>_Export copy…</value>
@@ -1515,12 +1515,12 @@ Open it anyway?</value>
     <value>Discard</value>
     <comment>Closes without saving, in the prompt when the Editor closes with unsaved edits.</comment>
   </data>
-  <data name="SaveAndPackToolTip" xml:space="preserve">
-    <value>Save, then review and export the song to a .sng</value>
+  <data name="PackToolTip" xml:space="preserve">
+    <value>Review and pack the song to a .sng, including its unsaved changes. The song itself isn't saved.</value>
   </data>
-  <data name="SaveAndPackSngToolTip" xml:space="preserve">
-    <value>Save, then review and save a copy of the .sng elsewhere</value>
-    <comment>Save and pack's tooltip when the song open is a .sng.</comment>
+  <data name="PackSngToolTip" xml:space="preserve">
+    <value>Review and save a copy of the .sng elsewhere, including its unsaved changes. The song itself isn't saved.</value>
+    <comment>Pack's tooltip when the song open is a .sng.</comment>
   </data>
   <data name="ExportCopyToolTip" xml:space="preserve">
     <value>Write a copy of the song, with the chart and song.ini changes, to another folder</value>
@@ -1729,9 +1729,9 @@ Saving also changes song.ini:
   <data name="PackFolderEmpty" xml:space="preserve">
     <value>Ask every time</value>
   </data>
-  <data name="SaveAndPackPickerTitle" xml:space="preserve">
+  <data name="PackPickerTitle" xml:space="preserve">
     <value>Pack the .sng Into</value>
-    <comment>The folder picker's title for Save and pack; the .sng is written inside the one picked.</comment>
+    <comment>The folder picker's title for Pack; the .sng is written inside the one picked.</comment>
   </data>
   <data name="ExportSngTitle" xml:space="preserve">
     <value>Export Song</value>
@@ -1844,7 +1844,7 @@ Saving also changes song.ini:
     <comment>Beside Export while it's off because of chart errors; ExportSngErrorsFormat explains it in full.</comment>
   </data>
   <data name="ExportSngPendingFormat" xml:space="preserve">
-    <value>{0} unsaved change(s) will be saved on Export.</value>
+    <value>{0} unsaved change(s) will be in the .sng; the song itself isn't saved.</value>
     <comment>{0} is the pending change count.</comment>
   </data>
   <data name="ExportSngExportButton" xml:space="preserve">
@@ -1852,18 +1852,6 @@ Saving also changes song.ini:
   </data>
   <data name="ExportSngNoFolder" xml:space="preserve">
     <value>Choose where the .sng goes.</value>
-  </data>
-  <data name="ExportSngCopiedFormat" xml:space="preserve">
-    <value>Saved and copied the .sng to {0}.</value>
-    <comment>{0} is the .sng written.</comment>
-  </data>
-  <data name="ExportSngSkippedInUseFormat" xml:space="preserve">
-    <value>Saved, but nothing written: {0} is being edited in another Chart Builder or Chart Packer window.</value>
-    <comment>{0} is the .sng that's open.</comment>
-  </data>
-  <data name="ExportSngSkippedExistsFormat" xml:space="preserve">
-    <value>Saved, but nothing written: {0} is already there, and the choice is to skip it.</value>
-    <comment>{0} is the .sng that exists.</comment>
   </data>
   <data name="ExportSngAudioHeading" xml:space="preserve">
     <value>Audio</value>
@@ -1946,11 +1934,14 @@ Saving also changes song.ini:
     <value>Fixed {0} {1} findings.</value>
     <comment>After Fix All. {0} is how many were fixed, {1} the rule ID (CHR023).</comment>
   </data>
-  <data name="SaveAndPackErrorsToolTipFormat" xml:space="preserve">
+  <data name="PackErrorsToolTipFormat" xml:space="preserve">
     <value>The chart has {0} errors the games read differently than written. Fix them before packing; Save still works.</value>
   </data>
-  <data name="SaveAndPackErrorsFormat" xml:space="preserve">
-    <value>Saved, but not packed: the chart has {0} errors. See Findings.</value>
+  <data name="PackErrorsFormat" xml:space="preserve">
+    <value>Not packed: the chart has {0} errors. See Findings.</value>
+  </data>
+  <data name="PackCopyUnreadable" xml:space="preserve">
+    <value>Not packed: the copy made to pack couldn't be read as a song.</value>
   </data>
   <data name="SectionsTab" xml:space="preserve">
     <value>Sections</value>

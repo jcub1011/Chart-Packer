@@ -34,7 +34,7 @@ public static class ChartPackerSettingsFile
     }
 
     /// <summary>
-    /// Chart Packer's packing settings, for Chart Builder's Save and pack (charter-spec C17 item 3): its output folder,
+    /// Chart Packer's packing settings, for Chart Builder's Pack (charter-spec C17 item 3): its output folder,
     /// overwrite policy and flat layout, and its library folder. A setting that's missing or unreadable has Chart
     /// Packer's default.
     /// </summary>

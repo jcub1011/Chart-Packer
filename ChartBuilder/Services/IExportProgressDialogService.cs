@@ -10,7 +10,7 @@ using ChartShared.UI.Views;
 
 namespace ChartBuilder.Services
 {
-    /// <summary>Shows the export progress dialog while Save and pack works: transcoding, then packing, with Cancel.</summary>
+    /// <summary>Shows the export progress dialog while Pack works: transcoding, then packing, with Cancel.</summary>
     public interface IExportProgressDialogService
     {
         /// <summary>

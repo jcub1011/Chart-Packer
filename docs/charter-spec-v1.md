@@ -508,7 +508,7 @@ no other process of either app writes to it meanwhile, however many of each are 
 - **Chart Builder** holds the lock while the song is open, and takes it for a new chart's first
   save. Opening a song another holds says who has it (another Chart Builder, or a Chart Packer with
   unsaved changes to it) and doesn't open it. Opening the song a window already has reads it again
-  under the lock it holds. Save and pack holds the `.sng` it writes, and skips one another holds.
+  under the lock it holds. Pack holds the `.sng` it writes, and skips one another holds.
 - **Chart Packer** holds a song from its first unsaved change until the change is saved or
   discarded (`SongLocks`, over a per-process `SongLockSet`, so its own holds don't refuse each
   other), and holds every song it writes for as long as it writes it: a metadata save, Save all, a
@@ -1422,9 +1422,8 @@ Acceptance criteria:
    - The editable model never holds them: commands undo by an event's place in `EVENTS`, so moving
      them outside the undo stack would shift what a later undo takes back. They're taken out as a
      chart is opened or recovered, duplicates included, and written into the snapshot a save,
-     first save or **Export copy** writes, one of each. A save waits for the stems to be read
-     (at most 30 s, then it goes with what was last heard). **Save and pack** saves first when the
-     file's song events aren't where they now go.
+     first save, **Export copy** or **Pack** writes, one of each. A save waits for the stems to be read
+     (at most 30 s, then it goes with what was last heard).
    - *Settled in CM3:* **Insert event**, in the Sections tab, inserts `[coda]` at the cursor, on the
      grid. Inserting, moving or deleting `[coda]` makes the drum fills and big rock endings what it
      then decides, in the same step (item 4).
@@ -2284,7 +2283,7 @@ Acceptance criteria:
    - Lint **never blocks saving**. A chart in progress must always be saveable.
    - **Errors** are things the author wrote that the games read differently, such as an open note
      in a chord (CHR022). The editor shows what the games read, so the read-back check
-     ([§4.3](#43-writing-midichartwriter)) passes. In Chart Builder, Errors block **Save and pack**,
+     ([§4.3](#43-writing-midichartwriter)) passes. In Chart Builder, Errors block **Pack**,
      the same way SNG errors block packing.
 5. **In Chart Packer's library.** The rules live in Core, so Chart Packer runs them too.
    - Validating a song from the library also runs chart lint, so charts made outside Chart Builder
@@ -2383,13 +2382,15 @@ Acceptance criteria:
 
    **Save asks first** only when it changes `song.ini` or removes a file, listing what it changes.
    An import's first save always asks, with **Remove notes.chart** and **Keep notes.chart**.
-3. **Save and pack** saves, then packs the song to a `.sng`
+3. **Pack** packs a copy of the song, with its unsaved changes, made in a temp folder, to a `.sng`; the song itself isn't saved (a new chart is saved first, to have a folder to name the `.sng` from)
    ([project-spec F1](project-spec-v1.md#f1-pack-song-folder--sng)) with Core's packing
    (`PackPlanner`, `SongJob`). It uses Chart Packer's output folder and overwrite settings, which
    Chart Builder reads from Chart Packer's settings file and never writes.
    - The `.sng` leaves out what only Chart Builder reads: the tempo anchors ([§7.3](#73-text-events))
      and the `song.ini` keys of parts the chart has no notes in (SNG062). A song opened from a
      `.sng` is copied the same way.
+   - The song itself isn't saved: the `.sng` is packed from a copy, made as **Export copy** makes it, in
+     a temp folder that is removed after. Only a new chart is saved first, as it has no folder yet.
 4. **Export copy** writes the song with its draft applied to another folder, using the existing
    `SongExport`.
 
@@ -2403,6 +2404,8 @@ Acceptance criteria:
   back the model, including accents, ghosts, phrases, events, anchors and `RawEvent`s, with
   `[music_start]`, `[music_end]` and `[end]` placed as [C8](#c8-phrases-and-events) item 5
   says.
+- **AC C17.5** Pack leaves the song's files and its unsaved state as they were, and the
+  `.sng` it writes has the unsaved changes.
 
 ### C18. Preview
 
@@ -2590,7 +2593,7 @@ Severity meanings:
 
 - **Error:** the author wrote something the games read differently. The editor shows what the games
   read, so the chart still saves ([§4.3](#43-writing-midichartwriter)). In Chart Builder, an Error
-  blocks **Save and pack**, not Save. In the library, it blocks nothing
+  blocks **Pack**, not Save. In the library, it blocks nothing
   ([C16](#c16-chart-lint)).
 - **Warning:** likely a mistake, or likely to play badly.
 - **Info:** for the author's awareness.
@@ -3081,7 +3084,7 @@ settings.
 
 | File | Owner | Holds |
 | ---- | ----- | ----- |
-| `settings.json` | Chart Packer (`AppSettings`) | Chart Packer's settings, as now. Chart Builder reads the output folder and overwrite policy from it for **Save and pack** ([C17](#c17-save-and-export)), and never writes it. |
+| `settings.json` | Chart Packer (`AppSettings`) | Chart Packer's settings, as now. Chart Builder reads the output folder and overwrite policy from it for **Pack** ([C17](#c17-save-and-export)), and never writes it. |
 | `builder-settings.json` | Chart Builder (`BuilderSettings`) | Every setting in the table below except the latency and the reduction rules, plus the Editor window's layout (each side panel's width and whether it's collapsed, and the timeline's height), the recent songs, the last parent folder used for a new chart, and how far ahead the preview looks |
 | `audio-latency.json` | The calibration tool, which both apps open | The audio/visual latency. Chart Packer reads it for the inspector ([C11](#c11-calibration-tool)), and re-reads it when the tool closes and when its window is activated ([§4.8](#48-launching-and-coordination)). |
 | `input-bindings.json` | Chart Builder's Input devices window | Each instrument profile's bindings, and each device's input offset and MIDI settings ([C19](#c19-playtest-and-instrument-input)). Enums are saved by name. |
