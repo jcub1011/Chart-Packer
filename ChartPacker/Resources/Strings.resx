@@ -477,7 +477,17 @@
     <comment>{0} is the number of items (always 2 or more).</comment>
   </data>
   <data name="DiscardAndCloseButton" xml:space="preserve">
-    <value>Discard and close</value>
+    <value>Discard and Close</value>
+  </data>
+  <data name="OpenUnsavedOne" xml:space="preserve">
+    <value>1 item has unsaved changes. Open the dropped folder and discard them?</value>
+  </data>
+  <data name="OpenUnsavedFormat" xml:space="preserve">
+    <value>{0:N0} items have unsaved changes. Open the dropped folder and discard them?</value>
+    <comment>{0} is the number of items (always 2 or more).</comment>
+  </data>
+  <data name="DiscardAndOpenButton" xml:space="preserve">
+    <value>Discard and Open</value>
   </data>
   <data name="AlbumArtName" xml:space="preserve">
     <value>Album art</value>

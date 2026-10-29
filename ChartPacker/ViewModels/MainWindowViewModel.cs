@@ -210,13 +210,24 @@ namespace ChartPacker.ViewModels
         public bool HasUnsavedDrafts => _drafts.DirtyCount > 0;
 
         /// <summary>Asks whether to close and lose the unsaved metadata changes.</summary>
-        public Task<bool> ConfirmDiscardDraftsAsync()
+        public Task<bool> ConfirmDiscardDraftsAsync() =>
+            ConfirmDiscardAsync(Strings.CloseUnsavedOne, Strings.CloseUnsavedFormat, Strings.DiscardAndCloseButton);
+
+        /// <summary>Asks whether to open a dropped folder and lose the unsaved metadata changes, and if so, discards them.</summary>
+        public async Task<bool> ConfirmDiscardDraftsForDropAsync()
+        {
+            if (!await ConfirmDiscardAsync(Strings.OpenUnsavedOne, Strings.OpenUnsavedFormat, Strings.DiscardAndOpenButton))
+                return false;
+
+            _drafts.DiscardAll();
+            return true;
+        }
+
+        private Task<bool> ConfirmDiscardAsync(string one, string format, string button)
         {
             int count = _drafts.DirtyCount;
-            string message = count == 1
-                ? Strings.CloseUnsavedOne
-                : string.Format(CultureInfo.CurrentCulture, Strings.CloseUnsavedFormat, count);
-            return _confirmation.ConfirmAsync(Strings.CloseUnsavedTitle, message, Strings.DiscardAndCloseButton);
+            string message = count == 1 ? one : string.Format(CultureInfo.CurrentCulture, format, count);
+            return _confirmation.ConfirmAsync(Strings.CloseUnsavedTitle, message, button, "TrashStroke");
         }
     }
 }

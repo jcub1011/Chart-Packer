@@ -51,6 +51,16 @@ namespace ChartPacker.Services
         /// <summary>Tells listeners that the draft for <paramref name="path"/> changed, and how.</summary>
         public void NotifyChanged(string path, DraftChange change = DraftChange.Edited) => DraftsChanged?.Invoke(path, change);
 
+        /// <summary>Clears every song's unsaved changes, as when the user agrees to lose them.</summary>
+        public void DiscardAll()
+        {
+            foreach (var (path, draft) in _drafts.Where(d => !d.Value.IsEmpty).ToList())
+            {
+                draft.Clear();
+                NotifyChanged(path);
+            }
+        }
+
         /// <summary>Drops the drafts of songs that are no longer on disk.</summary>
         public void DiscardMissing()
         {
