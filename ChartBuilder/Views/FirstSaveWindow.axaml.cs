@@ -11,6 +11,7 @@ namespace ChartBuilder.Views
         public FirstSaveWindow()
         {
             InitializeComponent();
+            WindowChrome.ShowIcon(this, WindowTitleBar);
             Opened += (_, _) => WindowChrome.UseDarkTitleBar(this);
         }
 

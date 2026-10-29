@@ -65,8 +65,8 @@ public sealed class KeybindsWindowViewModelTests
         _exportPath = null;
         _live = new KeyMap(new KeybindCatalog(
         [
-            // Without the Settings window's, whose category would only add a row to every count below.
-            .. SharedKeys.Actions().Where(a => a.Id != SharedKeys.FocusSearch),
+            // Without the Settings window's and Help's, whose categories would only add a row to every count below.
+            .. SharedKeys.Actions().Where(a => a.Id is not (SharedKeys.FocusSearch or SharedKeys.Help)),
             new KeyAction { Id = "test.find", Name = "Find", Category = "Search", Scope = Window, Defaults = KeyChord.List("Ctrl+F") },
             new KeyAction { Id = "test.hopo", Name = "Force HOPO", Category = Notes, Scope = Canvas, AllowBare = true, Defaults = KeyChord.List("KeyH") },
             new KeyAction { Id = "test.mouse", Name = "Add to selection", Category = Notes, Scope = Canvas, Locked = true, DisplayOverride = "Shift+Click" },

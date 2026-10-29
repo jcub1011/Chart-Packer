@@ -1,5 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:help="using:ChartShared.Core.Help"
+        xmlns:ui="using:ChartShared.UI.Controls"
         xmlns:vm="using:ChartBuilder.ViewModels"
         xmlns:res="using:ChartBuilder.Resources"
         xmlns:sres="using:ChartShared.UI.Resources"
@@ -15,37 +17,55 @@
         SizeToContent="Height"
         CanResize="False"
         ShowInTaskbar="False"
-        Width="360">
+        Width="360"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaTitleBarHeightHint="30"
+        WindowDecorationsTheme="{StaticResource TitleBarDecorations}">
 
-    <!-- A paste between 5-fret and GHL (charter-spec C15 item 3): where each lane of the passage goes. -->
-    <StackPanel Margin="20" Spacing="14">
-        <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap" Text="{Binding Intro}" />
+    <DockPanel>
+        <ui:TitleBar x:Name="WindowTitleBar"
+                     HelpPage="{x:Static help:HelpPages.LaneMapping}"
+                     DockPanel.Dock="Top"
+                     Height="31"
+                     BorderThickness="0,0,0,1"
+                     BorderBrush="{DynamicResource SubtleBorderBrush}">
+            <TextBlock Margin="8,0,12,0"
+                       FontSize="12"
+                       VerticalAlignment="Center"
+                       TextTrimming="CharacterEllipsis"
+                       Text="{x:Static res:Strings.LaneMappingTitle}" />
+        </ui:TitleBar>
 
-        <ItemsControl ItemsSource="{Binding Rows}">
-            <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="vm:LaneMappingRow">
-                    <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,6">
-                        <TextBlock Grid.Column="0" VerticalAlignment="Center" Text="{Binding Label}" />
-                        <ComboBox Grid.Column="1" Width="140"
-                                  ItemsSource="{Binding Choices}"
-                                  SelectedItem="{Binding Target}"
-                                  DisplayMemberBinding="{Binding Label, x:DataType=vm:LaneChoice}"
-                                  AutomationProperties.Name="{Binding Label}" />
-                    </Grid>
-                </DataTemplate>
-            </ItemsControl.ItemTemplate>
-        </ItemsControl>
+        <!-- A paste between 5-fret and GHL (charter-spec C15 item 3): where each lane of the passage goes. -->
+        <StackPanel Margin="20" Spacing="14">
+            <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap" Text="{Binding Intro}" />
 
-        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
-            <Button Classes="accent"
-                    Content="{x:Static res:Strings.LaneMappingPasteButton}"
-                    IsDefault="True"
-                    Click="OnPaste"
-                    AutomationProperties.Name="{x:Static res:Strings.LaneMappingPasteButton}" />
-            <Button Content="{x:Static sres:SharedStrings.CancelButton}"
-                    IsCancel="True"
-                    Click="OnCancel"
-                    AutomationProperties.Name="{x:Static sres:SharedStrings.CancelButton}" />
+            <ItemsControl ItemsSource="{Binding Rows}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:LaneMappingRow">
+                        <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,6">
+                            <TextBlock Grid.Column="0" VerticalAlignment="Center" Text="{Binding Label}" />
+                            <ComboBox Grid.Column="1" Width="140"
+                                      ItemsSource="{Binding Choices}"
+                                      SelectedItem="{Binding Target}"
+                                      DisplayMemberBinding="{Binding Label, x:DataType=vm:LaneChoice}"
+                                      AutomationProperties.Name="{Binding Label}" />
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+                <Button Classes="accent"
+                        Content="{x:Static res:Strings.LaneMappingPasteButton}"
+                        IsDefault="True"
+                        Click="OnPaste"
+                        AutomationProperties.Name="{x:Static res:Strings.LaneMappingPasteButton}" />
+                <Button Content="{x:Static sres:SharedStrings.CancelButton}"
+                        IsCancel="True"
+                        Click="OnCancel"
+                        AutomationProperties.Name="{x:Static sres:SharedStrings.CancelButton}" />
+            </StackPanel>
         </StackPanel>
-    </StackPanel>
+    </DockPanel>
 </Window>

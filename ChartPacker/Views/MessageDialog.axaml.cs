@@ -10,6 +10,7 @@ namespace ChartPacker.Views
         public MessageDialog()
         {
             InitializeComponent();
+            WindowChrome.ShowIcon(this, WindowTitleBar);
             Opened += (_, _) => WindowChrome.UseDarkTitleBar(this);
         }
 

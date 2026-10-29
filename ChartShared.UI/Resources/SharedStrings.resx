@@ -1493,4 +1493,16 @@
     <value>Shortcuts File</value>
     <comment>Name of the file type in the Import and Export pickers (a .json file).</comment>
   </data>
+  <data name="HelpButtonToolTip" xml:space="preserve">
+    <value>Help for this window</value>
+    <comment>Tooltip and screen-reader name of the ? button in a window's title bar; opens the window's help page in the browser.</comment>
+  </data>
+  <data name="KeyCategoryHelp" xml:space="preserve">
+    <value>Help</value>
+    <comment>Heading in the keyboard shortcuts list over the shortcut that opens a window's help page.</comment>
+  </data>
+  <data name="KeyActionHelp" xml:space="preserve">
+    <value>Open Help</value>
+    <comment>Name of the shortcut that opens the current window's help page, in the keyboard shortcuts list.</comment>
+  </data>
 </root>

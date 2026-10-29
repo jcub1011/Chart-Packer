@@ -11,6 +11,7 @@ namespace ChartBuilder.Views
         public LaneMappingWindow()
         {
             InitializeComponent();
+            WindowChrome.ShowIcon(this, WindowTitleBar);
             Opened += (_, _) => WindowChrome.UseDarkTitleBar(this);
         }
 

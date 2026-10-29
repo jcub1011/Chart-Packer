@@ -72,11 +72,17 @@ public sealed class KeyDispatcher
     /// <summary>The dispatcher listening to <paramref name="top"/>, or null when none is.</summary>
     public static KeyDispatcher? Of(TopLevel? top) => top is not null && Attached.TryGetValue(top, out var dispatcher) ? dispatcher : null;
 
-    /// <summary>Starts listening to <paramref name="top"/>'s keys. A window is only given one dispatcher.</summary>
+    /// <summary>
+    /// Starts listening to <paramref name="top"/>'s keys. A window is only given one dispatcher, so attach it in the window's
+    /// constructor, before it's shown: a title bar's help button gives a window that has none one of its own as it's shown.
+    /// </summary>
+    /// <exception cref="InvalidOperationException"><paramref name="top"/> already has a dispatcher.</exception>
     public void Attach(TopLevel top)
     {
         ArgumentNullException.ThrowIfNull(top);
-        Attached.Add(top, this);
+        if (!Attached.TryAdd(top, this))
+            throw new InvalidOperationException(
+                $"{top.GetType().Name} already has a KeyDispatcher. Attach the window's own in its constructor, before it's shown.");
         _top = top;
         top.AddHandler(InputElement.KeyDownEvent, OnKeyDown, RoutingStrategies.Tunnel);
         top.AddHandler(InputElement.KeyUpEvent, OnKeyUp, RoutingStrategies.Tunnel);
