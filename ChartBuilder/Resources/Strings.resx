@@ -3457,6 +3457,54 @@ Saving also changes song.ini:
     <value>Pressing frets</value>
     <comment>Settings: a guitar controller records a note on each fret pressed.</comment>
   </data>
+  <data name="PlaybackCountdownLabel" xml:space="preserve">
+    <value>Count down before starting</value>
+    <comment>Settings: whether record mode and playtest count 3, 2, 1 before the song starts.</comment>
+  </data>
+  <data name="PlaybackCountdownDescription" xml:space="preserve">
+    <value>Counts 3, 2, 1 before the song starts when you record or playtest, so you can get ready. Playing the song normally starts at once.</value>
+    <comment>Settings: what Count down before starting does.</comment>
+  </data>
+  <data name="PlaybackCountdownKeywords" xml:space="preserve">
+    <value>countdown;count in;count down;record;playtest;play;ready;delay</value>
+    <comment>Settings: search words for Count down before starting, separated by semicolons.</comment>
+  </data>
+  <data name="PlaybackCountdownOff" xml:space="preserve">
+    <value>Never</value>
+    <comment>Settings: no countdown before the song starts.</comment>
+  </data>
+  <data name="PlaybackCountdownRecord" xml:space="preserve">
+    <value>When recording</value>
+    <comment>Settings: a countdown before a pass of record mode starts.</comment>
+  </data>
+  <data name="PlaybackCountdownPlay" xml:space="preserve">
+    <value>When playtesting</value>
+    <comment>Settings: a countdown before a playtest, an instrument playing the chart, starts.</comment>
+  </data>
+  <data name="PlaybackCountdownBoth" xml:space="preserve">
+    <value>When recording and playtesting</value>
+    <comment>Settings: a countdown before record mode or a playtest starts.</comment>
+  </data>
+  <data name="CountdownSecondsLabel" xml:space="preserve">
+    <value>Countdown length (seconds)</value>
+    <comment>Settings: how many seconds the countdown before the song starts counts.</comment>
+  </data>
+  <data name="CountdownSecondsDescription" xml:space="preserve">
+    <value>How many seconds the countdown counts before recording or playtesting starts the song, from 1 to 10. It only counts when Count down before starting covers what you're starting.</value>
+    <comment>Settings: what Countdown length does.</comment>
+  </data>
+  <data name="CountdownSecondsKeywords" xml:space="preserve">
+    <value>countdown;count in;seconds;length;duration;delay;timer</value>
+    <comment>Settings: search words for Countdown length, separated by semicolons.</comment>
+  </data>
+  <data name="CountdownMessageFormat" xml:space="preserve">
+    <value>Starting in {0}… Press {1} or {2} to cancel.</value>
+    <comment>Message bar: the song starts after the countdown. {0} is the seconds left, {1} the key that plays and pauses, {2} the key that cancels.</comment>
+  </data>
+  <data name="CountdownCancelled" xml:space="preserve">
+    <value>Countdown cancelled.</value>
+    <comment>Message bar: the countdown before the song starts was stopped.</comment>
+  </data>
   <data name="RecordDynamicsLabel" xml:space="preserve">
     <value>Dynamics from velocity</value>
     <comment>Settings: whether a MIDI kit records accents and ghosts by how hard it is hit.</comment>

@@ -113,6 +113,9 @@ namespace ChartBuilder.Services
             settings.PlaytestLateMs = Math.Clamp(settings.PlaytestLateMs, (int)HitWindow.MinMs, (int)HitWindow.MaxMs);
             if (!Enum.IsDefined(settings.GuitarRecordStyle))
                 settings.GuitarRecordStyle = GuitarRecordStyle.Strum;
+            if (!Enum.IsDefined(settings.PlaybackCountdown))
+                settings.PlaybackCountdown = PlaybackCountdownMode.Both;
+            settings.CountdownSeconds = BuilderSettings.ClampCountdownSeconds(settings.CountdownSeconds);
 
             settings.EditorLeftPanelWidth = Size(settings.EditorLeftPanelWidth, BuilderSettings.MinEditorPanelWidth, BuilderSettings.DefaultEditorLeftPanelWidth);
             settings.EditorRightPanelWidth = Size(settings.EditorRightPanelWidth, BuilderSettings.MinEditorPanelWidth, BuilderSettings.DefaultEditorRightPanelWidth);
