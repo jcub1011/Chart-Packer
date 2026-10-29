@@ -9,6 +9,7 @@ namespace ChartBuilder.Views
         public ExportProgressWindow()
         {
             InitializeComponent();
+            WindowChrome.ShowIcon(this, WindowTitleBar);
             Opened += (_, _) => WindowChrome.UseDarkTitleBar(this);
         }
     }

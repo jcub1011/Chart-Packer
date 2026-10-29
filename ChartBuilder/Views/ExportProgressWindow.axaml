@@ -1,5 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:help="using:ChartShared.Core.Help"
+        xmlns:ui="using:ChartShared.UI.Controls"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="using:ChartBuilder.ViewModels"
@@ -14,25 +16,43 @@
         Width="440"
         CanResize="False"
         ShowInTaskbar="False"
-        WindowStartupLocation="CenterOwner">
+        WindowStartupLocation="CenterOwner"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaTitleBarHeightHint="30"
+        WindowDecorationsTheme="{StaticResource TitleBarDecorations}">
 
-    <!-- Export progress: what Pack is doing after the export dialog closes, with Cancel. -->
-    <StackPanel Margin="20" Spacing="14">
-        <TextBlock VerticalAlignment="Center"
-                   TextWrapping="Wrap"
-                   Text="{Binding StatusText}"
-                   AutomationProperties.Name="{Binding StatusText}" />
-        <ProgressBar Minimum="0"
-                     Maximum="100"
-                     Value="{Binding ProgressValue}"
-                     ShowProgressText="False"
-                     AutomationProperties.Name="{Binding StatusText}" />
-        <!-- Cancel stops the export; nothing is written. -->
-        <Button HorizontalAlignment="Right"
-                MinWidth="80"
-                HorizontalContentAlignment="Center"
-                Content="{x:Static sres:SharedStrings.CancelButton}"
-                Command="{Binding CancelCommand}"
-                AutomationProperties.Name="{x:Static sres:SharedStrings.CancelButton}" />
-    </StackPanel>
+    <DockPanel>
+        <ui:TitleBar x:Name="WindowTitleBar"
+                     HelpPage="{x:Static help:HelpPages.ExportProgress}"
+                     DockPanel.Dock="Top"
+                     Height="31"
+                     BorderThickness="0,0,0,1"
+                     BorderBrush="{DynamicResource SubtleBorderBrush}">
+            <TextBlock Margin="8,0,12,0"
+                       FontSize="12"
+                       VerticalAlignment="Center"
+                       TextTrimming="CharacterEllipsis"
+                       Text="{x:Static res:Strings.ExportProgressTitle}" />
+        </ui:TitleBar>
+
+        <!-- Export progress: what Pack is doing after the export dialog closes, with Cancel. -->
+        <StackPanel Margin="20" Spacing="14">
+            <TextBlock VerticalAlignment="Center"
+                       TextWrapping="Wrap"
+                       Text="{Binding StatusText}"
+                       AutomationProperties.Name="{Binding StatusText}" />
+            <ProgressBar Minimum="0"
+                         Maximum="100"
+                         Value="{Binding ProgressValue}"
+                         ShowProgressText="False"
+                         AutomationProperties.Name="{Binding StatusText}" />
+            <!-- Cancel stops the export; nothing is written. -->
+            <Button HorizontalAlignment="Right"
+                    MinWidth="80"
+                    HorizontalContentAlignment="Center"
+                    Content="{x:Static sres:SharedStrings.CancelButton}"
+                    Command="{Binding CancelCommand}"
+                    AutomationProperties.Name="{x:Static sres:SharedStrings.CancelButton}" />
+        </StackPanel>
+    </DockPanel>
 </Window>

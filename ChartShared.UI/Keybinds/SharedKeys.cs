@@ -18,6 +18,7 @@ namespace ChartShared.UI.Keybinds
         public const string NextChange = "reduction.nextChange";
         public const string PreviousChange = "reduction.previousChange";
         public const string FocusSearch = "settings.focusSearch";
+        public const string Help = "help.open";
 
         /// <summary>A window showing a reduction's preview, Chart Packer's lower difficulties and Chart Builder's Reduce.</summary>
         public static readonly KeyScope ReductionPreview = new("shared.reductionPreview");
@@ -75,6 +76,13 @@ namespace ChartShared.UI.Keybinds
             {
                 Id = FocusSearch, Name = SharedStrings.KeyActionFocusSearch, Category = SharedStrings.KeyCategorySettings, Scope = SettingsWindow,
                 Defaults = KeyChord.List("Ctrl+E"),
+            };
+
+            // A function key, so a text box doesn't keep it: help is for the window, wherever focus is.
+            yield return new KeyAction
+            {
+                Id = Help, Name = SharedStrings.KeyActionHelp, Category = SharedStrings.KeyCategoryHelp, Scope = KeyScope.Global,
+                Defaults = KeyChord.List("F1"), AllowBare = true,
             };
         }
     }

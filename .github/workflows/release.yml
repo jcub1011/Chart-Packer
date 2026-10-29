@@ -58,6 +58,14 @@ jobs:
           } >> "$GITHUB_OUTPUT"
           echo "Version $version, tag v$version"
 
+      # The tag doesn't exist yet, so each page is fetched at this run's commit, which the tag will point at and which holds the
+      # same files. A broken help link fails here, in seconds, rather than after a published release. A draft run publishes no
+      # tag, and fetching the pages needs the repository to be public, so it doesn't check.
+      - name: Check the help links
+        if: ${{ !inputs.draft }}
+        shell: bash
+        run: bash build/check-help-links.sh --remote "$GITHUB_SHA"
+
       - name: Check whether the release already exists
         id: exists
         shell: bash

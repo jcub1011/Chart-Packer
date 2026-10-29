@@ -13,7 +13,7 @@ namespace ChartShared.UI.Controls
 {
     /// <summary>
     /// The title bar a window draws for itself (<c>ExtendClientAreaToDecorationsHint</c>): the program's icon, its
-    /// <see cref="Menu"/>, then <see cref="Content"/>, such as the version. Dragging anywhere else on it moves the window.
+    /// <see cref="Menu"/>, then <see cref="Content"/>, such as the version, and its <see cref="HelpPage"/>'s <c>?</c> button. Dragging anywhere else on it moves the window.
     /// </summary>
     /// <remarks>
     /// Avalonia draws the caption buttons over its right end, which the last column keeps clear: minimize, maximize and
@@ -46,8 +46,12 @@ namespace ChartShared.UI.Controls
         public static readonly StyledProperty<Control?> ContentProperty =
             AvaloniaProperty.Register<TitleBar, Control?>(nameof(Content));
 
+        public static readonly StyledProperty<string?> HelpPageProperty =
+            AvaloniaProperty.Register<TitleBar, string?>(nameof(HelpPage));
+
         private readonly Grid _grid;
         private readonly Image _icon;
+        private HelpButton? _help;
 
         public TitleBar()
         {
@@ -69,6 +73,7 @@ namespace ChartShared.UI.Controls
                     new ColumnDefinition(GridLength.Auto),
                     new ColumnDefinition(GridLength.Auto),
                     new ColumnDefinition(GridLength.Star),
+                    new ColumnDefinition(GridLength.Auto),
                     new ColumnDefinition(CaptionButtonsWidth, GridUnitType.Pixel),
                 },
             };
@@ -108,6 +113,16 @@ namespace ChartShared.UI.Controls
             set => SetValue(ContentProperty, value);
         }
 
+        /// <summary>
+        /// The help page the window's <c>?</c> button opens, one of <see cref="ChartShared.Core.Help.HelpPages"/>; the button, and
+        /// the help key, aren't there while it's null.
+        /// </summary>
+        public string? HelpPage
+        {
+            get => GetValue(HelpPageProperty);
+            set => SetValue(HelpPageProperty, value);
+        }
+
         protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
         {
             base.OnPropertyChanged(change);
@@ -119,6 +134,29 @@ namespace ChartShared.UI.Controls
                 Place(change.GetOldValue<Control?>(), Menu, 1);
             else if (change.Property == ContentProperty)
                 Place(change.GetOldValue<Control?>(), Content, 2);
+            else if (change.Property == HelpPageProperty)
+                ShowHelp();
+        }
+
+        // The ? sits between the window's own content and the caption buttons.
+        private void ShowHelp()
+        {
+            if (HelpPage is null)
+            {
+                if (_help is not null)
+                    _grid.Children.Remove(_help);
+                _help = null;
+                return;
+            }
+
+            if (_help is null)
+            {
+                _help = new HelpButton();
+                Grid.SetColumn(_help, 3);
+                _grid.Children.Add(_help);
+            }
+
+            _help.Page = HelpPage;
         }
 
         private void Place(Control? old, Control? control, int column)

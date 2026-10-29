@@ -1,5 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:help="using:ChartShared.Core.Help"
         xmlns:vm="using:ChartPacker.ViewModels"
         xmlns:res="using:ChartPacker.Resources"
         xmlns:ctl="using:ChartShared.UI.Controls"
@@ -52,6 +53,7 @@
              panel (SongDetailView.axaml), while there are edits to save. Each item's tooltip says what it does, and while
              it's disabled, what it needs. -->
         <ctl:TitleBar Grid.Row="0"
+                      HelpPage="{x:Static help:HelpPages.ChartPacker}"
                       Grid.ColumnSpan="3"
                       Height="31"
                       BorderThickness="0,0,0,1"
@@ -210,6 +212,7 @@
                             <MenuItem.Icon><ctl:LineIcon Data="{StaticResource DedupStroke}" /></MenuItem.Icon>
                         </MenuItem>
                     </MenuItem>
+                    <ctl:AboutMenuItem />
                 </Menu>
             </ctl:TitleBar.Menu>
             <!-- The songs folder, an arrow, then the output folder: each a button (title-link, in Theme.axaml) that

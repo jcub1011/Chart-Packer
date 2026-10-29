@@ -97,6 +97,18 @@ public sealed class KeyInputTests
     }
 
     [TestMethod]
+    public void HelpIsF1AnywhereAndMayBeRebound()
+    {
+        var catalog = new KeybindCatalog(SharedKeys.Actions());
+
+        var help = catalog[SharedKeys.Help];
+
+        CollectionAssert.AreEqual(KeyChord.List("F1").ToArray(), help.Defaults.ToArray());
+        Assert.AreSame(KeyScope.Global, help.Scope);
+        Assert.IsFalse(help.Locked);
+    }
+
+    [TestMethod]
     public void UndoAndRedoAreFixedAndYieldToATextBox()
     {
         var catalog = new KeybindCatalog(SharedKeys.Actions());

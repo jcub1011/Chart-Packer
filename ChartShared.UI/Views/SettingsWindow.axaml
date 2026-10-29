@@ -1,5 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:help="using:ChartShared.Core.Help"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:svm="using:ChartShared.UI.ViewModels.Settings"
@@ -134,6 +135,7 @@
         <!-- The title bar, as the main windows' are: the icon (the owner's, set in code), the title and the search box.
              Dragging anywhere but the search box moves the window. -->
         <ctl:TitleBar x:Name="WindowTitleBar"
+                      HelpPage="{x:Static help:HelpPages.Settings}"
                       Grid.Row="0"
                       Height="31"
                       BorderThickness="0,0,0,1"

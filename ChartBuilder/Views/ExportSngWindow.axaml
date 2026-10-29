@@ -1,5 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:help="using:ChartShared.Core.Help"
         xmlns:vm="using:ChartBuilder.ViewModels"
         xmlns:res="using:ChartBuilder.Resources"
         xmlns:sres="using:ChartShared.UI.Resources"
@@ -93,6 +94,7 @@
     <DockPanel>
         <!-- The title bar, as the Editor's is: the icon and the title. -->
         <ui:TitleBar x:Name="WindowTitleBar"
+                     HelpPage="{x:Static help:HelpPages.ExportSng}"
                      DockPanel.Dock="Top"
                      Height="31"
                      BorderThickness="0,0,0,1"
