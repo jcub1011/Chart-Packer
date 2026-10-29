@@ -1353,6 +1353,32 @@
   <data name="MenuShortcutsToolTip" xml:space="preserve">
     <value>See and change the keyboard shortcuts</value>
   </data>
+  <data name="MenuAbout" xml:space="preserve">
+    <value>_About</value>
+    <comment>Top-level menu, after the others, with the documentation links. The underscore marks its access key, which must be unique among the top-level menus.</comment>
+  </data>
+  <data name="MenuGettingStarted" xml:space="preserve">
+    <value>_Getting Started</value>
+    <comment>Item of the About menu; opens the Getting Started guide in the browser. The underscore marks its access key.</comment>
+  </data>
+  <data name="MenuGettingStartedToolTip" xml:space="preserve">
+    <value>Open the Getting Started guide in your browser</value>
+  </data>
+  <data name="MenuThirdPartyNotices" xml:space="preserve">
+    <value>_Third Party Notices</value>
+    <comment>Item of the About menu; opens the file crediting the libraries, icons and references the program uses, in the browser. The underscore marks its access key.</comment>
+  </data>
+  <data name="MenuThirdPartyNoticesToolTip" xml:space="preserve">
+    <value>Open the third-party notices and licences in your browser</value>
+  </data>
+  <data name="HelpOpenFailedTitle" xml:space="preserve">
+    <value>Couldn't Open the Page</value>
+    <comment>Title of the alert shown when a link of the About menu couldn't be opened in the browser.</comment>
+  </data>
+  <data name="HelpOpenFailed" xml:space="preserve">
+    <value>The page couldn't be opened in your browser. Check that a default browser is set, then try again.</value>
+    <comment>Body of the alert shown when a link of the About menu couldn't be opened in the browser.</comment>
+  </data>
   <data name="KeybindsWindowTitle" xml:space="preserve">
     <value>Keyboard Shortcuts</value>
   </data>

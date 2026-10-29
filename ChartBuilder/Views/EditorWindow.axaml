@@ -208,6 +208,7 @@
                                     <MenuItem.Icon><ctl:LineIcon Data="{StaticResource SortAscendingStroke}" /></MenuItem.Icon>
                                 </MenuItem>
                             </MenuItem>
+                            <ctl:AboutMenuItem />
                         </Menu>
                     </ctl:TitleBar.Menu>
                     <!-- Left-aligned, so the version follows the title, and the title is trimmed when they don't fit. The title

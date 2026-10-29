@@ -48,6 +48,23 @@ public sealed class HelpPagesTests
     }
 
     [TestMethod]
+    [DataRow("v1.0.0", "https://github.com/jcub1011/Chart-Packer/blob/v1.0.0/THIRD-PARTY-NOTICES.md")]
+    [DataRow("release/1.0.0", "https://github.com/jcub1011/Chart-Packer/blob/release/1.0.0/THIRD-PARTY-NOTICES.md")]
+    [DataRow("a?b", "https://github.com/jcub1011/Chart-Packer/blob/a%3Fb/THIRD-PARTY-NOTICES.md")]
+    public void TheNoticesAreInTheRepositorysRootAtTheGivenRef(string gitRef, string url)
+    {
+        Assert.AreEqual(url, HelpPages.NoticesUrlFor(gitRef));
+    }
+
+    [TestMethod]
+    [DataRow("")]
+    [DataRow("  ")]
+    public void TheNoticesNeedARef(string gitRef)
+    {
+        Assert.ThrowsExactly<ArgumentException>(() => HelpPages.NoticesUrlFor(gitRef));
+    }
+
+    [TestMethod]
     [DataRow("1.0.0", "v1.0.0")]
     [DataRow("1.2.0-beta.1", "v1.2.0-beta.1")]
     [DataRow("1.0.0+3f9c2ab", "v1.0.0")]
@@ -111,6 +128,15 @@ public sealed class HelpPagesTests
 
         foreach (string page in Pages())
             Assert.IsTrue(File.Exists(Path.Combine(folder, page + ".md")), $"docs/help/{page}.md is missing.");
+    }
+
+    [TestMethod]
+    public void TheNoticesFileIsInTheRepositorysRoot()
+    {
+        // The name is read from the address, as the constant is private (every public one is a page).
+        string name = Path.GetFileName(new Uri(HelpPages.NoticesUrlFor("main")).AbsolutePath);
+
+        Assert.IsTrue(File.Exists(Path.Combine(RepositoryRoot(), name)), $"{name} is missing from the repository's root.");
     }
 
     // Up from the test's folder to the one holding the solution.

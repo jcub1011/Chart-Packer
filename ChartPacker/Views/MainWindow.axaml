@@ -212,6 +212,7 @@
                             <MenuItem.Icon><ctl:LineIcon Data="{StaticResource DedupStroke}" /></MenuItem.Icon>
                         </MenuItem>
                     </MenuItem>
+                    <ctl:AboutMenuItem />
                 </Menu>
             </ctl:TitleBar.Menu>
             <!-- The songs folder, an arrow, then the output folder: each a button (title-link, in Theme.axaml) that

@@ -12,7 +12,6 @@ using ChartShared.Core.Keybinds;
 using ChartShared.UI.Keybinds;
 using ChartShared.UI.Resources;
 using ChartShared.UI.Services;
-using Serilog;
 
 namespace ChartShared.UI.Controls
 {
@@ -96,19 +95,6 @@ namespace ChartShared.UI.Controls
             _ = OpenAsync();
         }
 
-        private async Task OpenAsync()
-        {
-            string? url = null;
-            try
-            {
-                url = HelpPages.UrlFor(Page, await HelpLinks.RefAsync());
-                if (TopLevel.GetTopLevel(this)?.Launcher is not { } launcher || !await launcher.LaunchUriAsync(new Uri(url)))
-                    Log.Warning("Couldn't open the help page {Url}", url);
-            }
-            catch (Exception ex)
-            {
-                Log.Warning(ex, "Couldn't open the help page {Page} ({Url})", Page ?? HelpPages.Home, url);
-            }
-        }
+        private Task OpenAsync() => HelpLauncher.OpenPageAsync(TopLevel.GetTopLevel(this), Page);
     }
 }

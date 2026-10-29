@@ -56,6 +56,8 @@ public static class HelpPages
 
     private const string Folder = "/docs/help/";
 
+    private const string NoticesFile = "THIRD-PARTY-NOTICES.md";
+
     /// <summary>The git tag of the release <paramref name="version"/>: <c>v1.2.0</c> for <c>1.2.0</c> or <c>1.2.0+abc123</c>.</summary>
     public static string TagFor(string version)
     {
@@ -91,10 +93,17 @@ public static class HelpPages
     /// <summary>The address of the help page <paramref name="page"/> as it is at <paramref name="gitRef"/> (a tag or branch); <see cref="Home"/> for no page.</summary>
     public static string UrlFor(string? page, string gitRef)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(gitRef);
         string name = string.IsNullOrWhiteSpace(page) ? Home : page.Trim();
+        return BlobUrl + EscapeRef(gitRef) + Folder + Uri.EscapeDataString(name) + ".md";
+    }
+
+    /// <summary>The address of the third-party notices file, in the repository's root, as it is at <paramref name="gitRef"/> (a tag or branch).</summary>
+    public static string NoticesUrlFor(string gitRef) => BlobUrl + EscapeRef(gitRef) + "/" + NoticesFile;
+
+    private static string EscapeRef(string gitRef)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(gitRef);
         // A ref's slashes stay (release/1.2.0), as GitHub reads the first part of the path after /blob/ as the ref.
-        string escaped = string.Join('/', gitRef.Trim().Split('/').Select(Uri.EscapeDataString));
-        return BlobUrl + escaped + Folder + Uri.EscapeDataString(name) + ".md";
+        return string.Join('/', gitRef.Trim().Split('/').Select(Uri.EscapeDataString));
     }
 }
