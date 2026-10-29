@@ -219,8 +219,9 @@ namespace ChartPacker.Services
                 reason = string.Format(CultureInfo.CurrentCulture, Strings.SongLockFailedFormat, System.IO.Path.GetFileName(path), e.Message);
             }
 
+            // Not a step to undo: redoing it would only be refused again.
             _drafts.Get(path).Clear();
-            _drafts.NotifyChanged(path);
+            _drafts.NotifyChanged(path, DraftChange.Saved);
             ChangeRefused?.Invoke(path, reason);
         }
 

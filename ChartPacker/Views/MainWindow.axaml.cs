@@ -34,12 +34,27 @@ namespace ChartPacker.Views
             AddHandler(DragDrop.DragOverEvent, OnDragOver);
             AddHandler(DragDrop.DropEvent, OnDrop);
 
+            // Ctrl+Shift+Z can't be a key binding, as a text box doesn't handle it and it would redo the song while typing.
+            AddHandler(KeyDownEvent, OnRedoKeyDown);
+
             // Coming back from Chart Builder, the songs it may have saved are read again (charter-spec §4.8).
             Activated += (_, _) =>
             {
                 if (DataContext is MainWindowViewModel vm)
                     _ = vm.OnActivatedAsync();
             };
+        }
+
+        private void OnRedoKeyDown(object? sender, KeyEventArgs e)
+        {
+            if (e is not { Key: Key.Z, KeyModifiers: KeyModifiers.Control | KeyModifiers.Shift } || e.Source is TextBox)
+                return;
+
+            if (DataContext is MainWindowViewModel vm && vm.Detail.RedoCommand.CanExecute(null))
+            {
+                vm.Detail.RedoCommand.Execute(null);
+                e.Handled = true;
+            }
         }
 
         private void OnDragOver(object? sender, DragEventArgs e)

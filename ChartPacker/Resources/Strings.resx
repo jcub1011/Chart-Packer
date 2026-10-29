@@ -276,6 +276,25 @@
     <value>_File</value>
     <comment>The title bar's menus. An underscore marks the access key, unique among a menu's items.</comment>
   </data>
+  <data name="MenuEdit" xml:space="preserve">
+    <value>_Edit</value>
+    <comment>The title bar's Edit menu, between File and Pack. The underscore marks its access key (Alt+E).</comment>
+  </data>
+  <data name="MenuUndo" xml:space="preserve">
+    <value>_Undo</value>
+    <comment>Edit menu (Ctrl+Z).</comment>
+  </data>
+  <data name="MenuRedo" xml:space="preserve">
+    <value>_Redo</value>
+    <comment>Edit menu (Ctrl+Y).</comment>
+  </data>
+  <data name="UndoToolTip" xml:space="preserve">
+    <value>Undo the last change to the selected song. Select one song to undo its changes (Ctrl+Z)</value>
+    <comment>Each song keeps its own undo history, so with several songs selected it's disabled rather than undoing them all.</comment>
+  </data>
+  <data name="RedoToolTip" xml:space="preserve">
+    <value>Apply again the change last undone to the selected song. Select one song to redo its changes (Ctrl+Y)</value>
+  </data>
   <data name="MenuChooseSongsFolder" xml:space="preserve">
     <value>_Choose Songs Folder…</value>
   </data>
