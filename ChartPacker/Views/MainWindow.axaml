@@ -27,6 +27,7 @@
     <Window.KeyBindings>
         <KeyBinding Gesture="F5" Command="{Binding Library.RescanCommand}" />
         <KeyBinding Gesture="Ctrl+OemComma" Command="{Binding OpenSettingsCommand}" />
+        <KeyBinding Gesture="Ctrl+S" Command="{Binding Detail.SaveCommand}" />
     </Window.KeyBindings>
 
     <Grid x:Name="RootGrid">
