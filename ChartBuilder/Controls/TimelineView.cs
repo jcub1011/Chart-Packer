@@ -100,6 +100,10 @@ namespace ChartBuilder.Controls
         private static readonly IBrush SyncRegionBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x30, 0xFF, 0x7A, 0x1A));
         private static readonly IPen SyncRegionPen = new ImmutablePen(Color.FromArgb(0xE0, 0xFF, 0x7A, 0x1A).ToUInt32(), 1);
 
+        // The passages Find found, as the synced passages are but in light blue, the one the cursor is at outlined like the region.
+        private static readonly IBrush FoundBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x60, 0x7F, 0xD0, 0xFF));
+        private static readonly IBrush FoundCurrentBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x30, 0x7F, 0xD0, 0xFF));
+        private static readonly IPen FoundCurrentPen = new ImmutablePen(Color.FromArgb(0xE0, 0x7F, 0xD0, 0xFF).ToUInt32(), 1);
         // A synchronized region nothing matched, hashed in yellow instead.
         private static readonly IBrush SyncUnmatchedBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x22, 0xE6, 0xC8, 0x00));
         private static readonly IPen SyncUnmatchedPen = new ImmutablePen(Color.FromArgb(0xE0, 0xE6, 0xC8, 0x00).ToUInt32(), 1);
@@ -527,6 +531,14 @@ namespace ChartBuilder.Controls
                     DrawSyncHash(context, band);
                 else
                     context.DrawRectangle(SyncRegionBrush, SyncRegionPen, band.Deflate(0.5));
+            }
+
+            foreach (var (start, end, current) in overview.Found)
+            {
+                var band = new Rect(XOf(start, width), top, Math.Max(1, XOf(end, width) - XOf(start, width)), bounds.Bottom - top);
+                context.FillRectangle(FoundBrush, band);
+                if (current)
+                    context.DrawRectangle(FoundCurrentBrush, FoundCurrentPen, band.Deflate(0.5));
             }
 
             DrawNotes(context, overview, width, top + (overview.Rows.Count * (BandHeight + BandGap)), bounds.Bottom);

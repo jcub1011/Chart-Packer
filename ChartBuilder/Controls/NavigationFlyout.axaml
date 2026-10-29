@@ -1,0 +1,92 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ChartBuilder.ViewModels"
+             xmlns:res="using:ChartBuilder.Resources"
+             xmlns:ctl="using:ChartShared.UI.Controls"
+             x:Class="ChartBuilder.Controls.NavigationFlyout"
+             x:DataType="vm:NavigationFlyoutViewModel">
+
+    <!-- Go to measure (Ctrl+G) and Find (Ctrl+F), in a toolbar-style card floating over the top right of the focused lane:
+         one row with the measure to go to, or the passages found matching the selected notes and which of them the cursor
+         is at, and a close button after a divider. The shadow lifts it off the notes behind it. -->
+    <Border Background="{DynamicResource ToolbarBrush}"
+            BorderBrush="{DynamicResource SubtleBorderBrush}"
+            BorderThickness="1"
+            CornerRadius="8"
+            Padding="6"
+            MinWidth="232"
+            BoxShadow="0 4 16 0 #66000000">
+        <Grid ColumnDefinitions="*,Auto,Auto">
+            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" Margin="4,0,0,0" IsVisible="{Binding ShowsGoTo}">
+                <TextBlock VerticalAlignment="Center"
+                           FontSize="12"
+                           FontWeight="SemiBold"
+                           Opacity="0.8"
+                           Text="{x:Static res:Strings.NavMeasureLabel}" />
+                <TextBox x:Name="MeasureBox"
+                         Width="72"
+                         Height="28"
+                         MinHeight="0"
+                         Padding="8,0"
+                         VerticalContentAlignment="Center"
+                         Text="{Binding MeasureText}"
+                         ToolTip.Tip="{Binding MeasureToolTip}"
+                         AutomationProperties.Name="{x:Static res:Strings.NavMeasureLabel}" />
+                <Button Classes="labelled accent"
+                        Content="{x:Static res:Strings.NavGoButton}"
+                        Command="{Binding GoCommand}"
+                        AutomationProperties.Name="{x:Static res:Strings.NavGoButton}" />
+            </StackPanel>
+
+            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4" Margin="4,0,0,0" IsVisible="{Binding IsFinding}">
+                <ctl:LineIcon Width="14" Height="14" Margin="0,0,2,0" Opacity="0.7" VerticalAlignment="Center"
+                              Data="{StaticResource SearchStroke}" />
+                <TextBlock VerticalAlignment="Center"
+                           Margin="0,0,6,0"
+                           FontSize="12"
+                           FontWeight="SemiBold"
+                           Opacity="0.8"
+                           Text="{x:Static res:Strings.NavFindButton}" />
+                <Button Classes="tool"
+                        Command="{Binding PreviousCommand}"
+                        IsEnabled="{Binding HasMatches}"
+                        ToolTip.Tip="{x:Static res:Strings.NavPreviousToolTip}"
+                        AutomationProperties.Name="{x:Static res:Strings.NavPreviousToolTip}">
+                    <ctl:LineIcon x:Name="PreviousIcon" Data="{StaticResource ChevronDownStroke}" />
+                </Button>
+                <Button Classes="tool"
+                        Command="{Binding NextCommand}"
+                        IsEnabled="{Binding HasMatches}"
+                        ToolTip.Tip="{x:Static res:Strings.NavNextToolTip}"
+                        AutomationProperties.Name="{x:Static res:Strings.NavNextToolTip}">
+                    <ctl:LineIcon x:Name="NextIcon" Data="{StaticResource ChevronDownStroke}" />
+                </Button>
+                <!-- The count as a small inset readout, dimmed while nothing is found. -->
+                <Border Margin="4,0,0,0"
+                        Padding="8,0"
+                        MinWidth="56"
+                        Height="24"
+                        VerticalAlignment="Center"
+                        CornerRadius="6"
+                        BorderThickness="1"
+                        BorderBrush="{DynamicResource SubtleBorderBrush}"
+                        Background="{DynamicResource ToolbarGroupBrush}">
+                    <TextBlock HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               FontSize="12"
+                               Classes.muted="{Binding !HasMatches}"
+                               Text="{Binding MatchText}" />
+                </Border>
+            </StackPanel>
+
+            <Border Grid.Column="1" Width="1" Margin="8,2" Background="{DynamicResource SubtleBorderBrush}" />
+            <Button Grid.Column="2"
+                    Classes="tool"
+                    Command="{Binding CloseCommand}"
+                    ToolTip.Tip="{x:Static res:Strings.NavCloseToolTip}"
+                    AutomationProperties.Name="{x:Static res:Strings.NavCloseToolTip}">
+                <ctl:LineIcon Data="{StaticResource ClearStroke}" />
+            </Button>
+        </Grid>
+    </Border>
+</UserControl>

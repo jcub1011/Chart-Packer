@@ -102,6 +102,7 @@ public sealed class EditorSession
         TempoProposal = new TempoProposals(this);
         Reduce = new ReduceProposals(this);
         Sync = new SyncRegion(this);
+        Find = new EditorFind(this);
         SongEventMarks = SongEventsWith(null);
         undo.Changed += OnUndoChanged;
     }
@@ -222,6 +223,9 @@ public sealed class EditorSession
 
     /// <summary>The synchronized region, if one is drawn: edits in it are made again in the passages that matched it.</summary>
     public SyncRegion Sync { get; }
+
+    /// <summary>The passages found matching the selected notes (Ctrl+F), to jump between.</summary>
+    public EditorFind Find { get; }
 
     /// <summary>
     /// The loop region the Loop tool draws, moves and resizes (charter-spec C10 item 2): playback's, in seconds of audio,
@@ -548,6 +552,26 @@ public sealed class EditorSession
 
     /// <summary>Moves the cursor to <paramref name="tick"/>.</summary>
     public void MoveCursorTo(long tick) => Viewport.MoveCursor(AudioAt(Math.Max(0, tick)));
+
+    /// <summary>Where the chart's last note, in any part, lets go; 0 for a chart with none.</summary>
+    public long ChartEndTick
+    {
+        get
+        {
+            long end = VocalSpan()?.End ?? 0;
+            foreach (var part in Chart.Parts)
+            {
+                foreach (var track in part.Tracks)
+                {
+                    // Notes are in start order, but a long sustain may let go after a later note's start.
+                    foreach (var note in track.Notes)
+                        end = Math.Max(end, note.Tick + note.Length);
+                }
+            }
+
+            return end;
+        }
+    }
 
     /// <summary>The columns or rows of <paramref name="instrument"/>'s lane in <paramref name="view"/>.</summary>
     public LaneSlots SlotsOf(ChartInstrument instrument, LaneView view) => LaneSlots.Of(ChartInstruments.KindOf(instrument), view, IsFiveLaneDrums);

@@ -106,6 +106,9 @@ namespace ChartBuilder.ViewModels
             Session.VisibleTracks = () => [.. Lanes.Layout.Lanes.Select(l => l.Part.Track).OfType<ChartTrackKey>()];
             Session.Loop = Playback;
             AudioAssist = new AudioAssistViewModel(this);
+            Navigation = new NavigationFlyoutViewModel(Session);
+            Session.Find.Changed += OnFindChanged;
+            Navigation.PropertyChanged += OnNavigationChanged;
             Preview = new PreviewViewModel(this, settings);
             Difficulty = new DifficultyViewModel(this);
             Playtest = new PlaytestViewModel(this, settings, input?.Settings.Settings, Devices);
@@ -141,6 +144,9 @@ namespace ChartBuilder.ViewModels
 
         /// <summary>Snap to onset, Nudge to onsets, and the proposed tempo map (charter-spec C14).</summary>
         public AudioAssistViewModel AudioAssist { get; }
+
+        /// <summary>The flyout in the focused lane that Go to measure (Ctrl+G) and Find (Ctrl+F) open.</summary>
+        public NavigationFlyoutViewModel Navigation { get; }
 
         /// <summary>The highway preview, docked in the side panel or in a window of its own (charter-spec C18).</summary>
         public PreviewViewModel Preview { get; }
@@ -857,6 +863,15 @@ namespace ChartBuilder.ViewModels
             await ApplyTempoEditAsync(blocked => TempoMapEdits.SetBpm(Session.Chart, tick, tempo, Session.Delay, Session.KeepTimes, blocked));
         }
 
+        // The passages found are marked in the bottom timeline only while the flyout is open to find them.
+        private void OnFindChanged(object? sender, EventArgs e) => ScheduleRefresh();
+
+        private void OnNavigationChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName is nameof(NavigationFlyoutViewModel.IsOpen) or nameof(NavigationFlyoutViewModel.IsFinding))
+                ScheduleRefresh();
+        }
+
         private void ScheduleRefresh()
         {
             _refresh.Stop();
@@ -887,7 +902,7 @@ namespace ChartBuilder.ViewModels
             }
         }
 
-        private OverviewData? OverviewOf(ChartTrackKey? key) => OverviewData.Of(Session, key, Playback.LengthSeconds);
+        private OverviewData? OverviewOf(ChartTrackKey? key) => OverviewData.Of(Session, key, Playback.LengthSeconds, showFound: Navigation is { IsOpen: true, IsFinding: true });
     }
 
     /// <summary>A section, at its time in the audio, for the overview.</summary>
@@ -927,6 +942,10 @@ namespace ChartBuilder.ViewModels
     /// The synchronized region and the passages synced with it: each band's start and end in audio seconds, whether it's
     /// the region itself, and whether the region is one nothing matched, which is drawn hashed in yellow.
     /// </param>
+    /// <param name="Found">
+    /// The passages Find found in the lane in focus, while the flyout that finds them is open: each one's start and end in
+    /// audio seconds, and whether the cursor was taken to it.
+    /// </param>
     public sealed record OverviewData(
         IReadOnlyList<OverviewSection> Sections,
         IReadOnlyList<double> TempoChanges,
@@ -935,7 +954,8 @@ namespace ChartBuilder.ViewModels
         IReadOnlyList<RailKind> Rows,
         IReadOnlyList<OverviewPhrase> Phrases,
         IReadOnlyList<OverviewProposal> Proposals,
-        IReadOnlyList<(double Start, double End, bool IsRegion, bool Unmatched)> Synced)
+        IReadOnlyList<(double Start, double End, bool IsRegion, bool Unmatched)> Synced,
+        IReadOnlyList<(double Start, double End, bool Current)> Found)
     {
         /// <summary>
         /// The overview of <paramref name="session"/>'s song, <paramref name="length"/> seconds long, for the lane
@@ -949,7 +969,8 @@ namespace ChartBuilder.ViewModels
             double length,
             IReadOnlyList<OverviewProposal>? proposals = null,
             bool replaceStarPower = false,
-            IReadOnlyList<Phrase>? replacedPhrases = null)
+            IReadOnlyList<Phrase>? replacedPhrases = null,
+            bool showFound = false)
         {
             if (!(length > 0))
                 return null;
@@ -1030,7 +1051,14 @@ namespace ChartBuilder.ViewModels
                     synced.Add((session.AudioAt(start), session.AudioAt(start + to - from), false, false));
             }
 
-            return new OverviewData(sections, tempoChanges, noteRows, notes, rows, phrases, ghosts, synced);
+            var found = new List<(double, double, bool)>();
+            if (showFound && session.Find is { Track: { } findTrack, Span: var (findFrom, findTo) } find && findTrack == key)
+            {
+                for (int i = 0; i < find.Matches.Count; i++)
+                    found.Add((session.AudioAt(find.Matches[i]), session.AudioAt(find.Matches[i] + findTo - findFrom), i == find.Current));
+            }
+
+            return new OverviewData(sections, tempoChanges, noteRows, notes, rows, phrases, ghosts, synced, found);
         }
     }
 }

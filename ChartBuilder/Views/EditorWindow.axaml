@@ -32,6 +32,10 @@
         <KeyBinding Gesture="Ctrl+Z" Command="{Binding UndoCommand}" />
         <KeyBinding Gesture="Ctrl+Y" Command="{Binding RedoCommand}" />
         <KeyBinding Gesture="Ctrl+Shift+Z" Command="{Binding RedoCommand}" />
+        <KeyBinding Gesture="Ctrl+G" Command="{Binding GoToMeasureCommand}" />
+        <KeyBinding Gesture="Ctrl+F" Command="{Binding FindMatchesCommand}" />
+        <KeyBinding Gesture="F3" Command="{Binding FindNextCommand}" />
+        <KeyBinding Gesture="Shift+F3" Command="{Binding FindPreviousCommand}" />
     </Window.KeyBindings>
 
     <Window.Styles>
@@ -187,6 +191,12 @@
                                 <MenuItem Header="{Binding QuantizeMenuHeader}" Command="{Binding QuantizeCommand}" InputGesture="Ctrl+Q">
                                     <MenuItem.Icon><ctl:LineIcon Data="{StaticResource QuantizeStroke}" /></MenuItem.Icon>
                                 </MenuItem>
+                                <Separator />
+                                <!-- Navigation: the window binds these keys, so they work wherever focus is. -->
+                                <MenuItem Header="{x:Static res:Strings.MenuGoToMeasure}" Command="{Binding GoToMeasureCommand}" InputGesture="Ctrl+G" />
+                                <MenuItem Header="{x:Static res:Strings.MenuFindMatches}" Command="{Binding FindMatchesCommand}" InputGesture="Ctrl+F" />
+                                <MenuItem Header="{x:Static res:Strings.MenuFindNext}" Command="{Binding FindNextCommand}" InputGesture="F3" />
+                                <MenuItem Header="{x:Static res:Strings.MenuFindPrevious}" Command="{Binding FindPreviousCommand}" InputGesture="Shift+F3" />
                             </MenuItem>
                             <MenuItem Header="{x:Static res:Strings.MenuView}">
                                 <MenuItem Header="{x:Static res:Strings.MenuShowMessages}" Command="{Binding ShowMessagesCommand}">
