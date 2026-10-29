@@ -370,26 +370,79 @@ public sealed class MetadataDraft
     /// <remarks>For work off the UI thread, which a draft the user can still change mustn't be read by.</remarks>
     public MetadataDraft Clone()
     {
-        var copy = new MetadataDraft
-        {
-            AlbumArt = AlbumArt,
-            BackgroundImage = BackgroundImage,
-            BackgroundVideo = BackgroundVideo,
-            Vocals = Vocals,
-            VocalsOffset = VocalsOffset,
-        };
-        copy._order.AddRange(_order);
-        foreach (var (key, change) in _changes)
-            copy._changes[key] = change;
-        copy._removedFiles.UnionWith(_removedFiles);
-        copy._addedFiles.AddRange(_addedFiles);
-        foreach (var (name, replaced) in _replacedBy)
-            copy._replacedBy[name] = [.. replaced];
-        foreach (var (name, keys) in _keysBy)
-            copy._keysBy[name] = new(keys, StringComparer.OrdinalIgnoreCase);
-        foreach (var (track, milliseconds) in _chartOffsets)
-            copy._chartOffsets[track] = milliseconds;
+        var copy = new MetadataDraft();
+        copy.CopyFrom(this);
         return copy;
+    }
+
+    /// <summary>
+    /// Replaces every change in this draft with a copy of those in <paramref name="other"/>, which later changes to
+    /// either draft don't reach. The draft stays the same object, for whatever holds it.
+    /// </summary>
+    public void CopyFrom(MetadataDraft other)
+    {
+        ArgumentNullException.ThrowIfNull(other);
+        if (ReferenceEquals(other, this))
+            return;
+
+        Clear();
+        AlbumArt = other.AlbumArt;
+        BackgroundImage = other.BackgroundImage;
+        BackgroundVideo = other.BackgroundVideo;
+        Vocals = other.Vocals;
+        VocalsOffset = other.VocalsOffset;
+        _order.AddRange(other._order);
+        foreach (var (key, change) in other._changes)
+            _changes[key] = change;
+        _removedFiles.UnionWith(other._removedFiles);
+        _addedFiles.AddRange(other._addedFiles);
+        foreach (var (name, replaced) in other._replacedBy)
+            _replacedBy[name] = [.. replaced];
+        foreach (var (name, keys) in other._keysBy)
+            _keysBy[name] = new(keys, StringComparer.OrdinalIgnoreCase);
+        foreach (var (track, milliseconds) in other._chartOffsets)
+            _chartOffsets[track] = milliseconds;
+    }
+
+    /// <summary>Whether <paramref name="other"/> holds exactly the same changes, in the same order.</summary>
+    public bool SameAs(MetadataDraft other) => SameApartFromKeys(other) && SameKeys(other);
+
+    /// <summary>
+    /// Whether <paramref name="other"/> holds the same changes to everything but the metadata keys: the album art, the
+    /// backgrounds, the files and the chart's vocals and timing. The keys an add of a file made are part of that add.
+    /// </summary>
+    public bool SameApartFromKeys(MetadataDraft other)
+    {
+        ArgumentNullException.ThrowIfNull(other);
+        return AlbumArt == other.AlbumArt
+            && BackgroundImage == other.BackgroundImage
+            && BackgroundVideo == other.BackgroundVideo
+            && Vocals == other.Vocals
+            && VocalsOffset == other.VocalsOffset
+            && _removedFiles.SetEquals(other._removedFiles)
+            && _addedFiles.SequenceEqual(other._addedFiles)
+            && SameEntries(_chartOffsets, other._chartOffsets)
+            && SameEntries(_replacedBy, other._replacedBy, (a, b) => a.SequenceEqual(b))
+            && SameEntries(_keysBy, other._keysBy, (a, b) => SameEntries(a, b));
+    }
+
+    private bool SameKeys(MetadataDraft other) =>
+        _order.SequenceEqual(other._order, StringComparer.OrdinalIgnoreCase) && SameEntries(_changes, other._changes);
+
+    private static bool SameEntries<TKey, TValue>(Dictionary<TKey, TValue> a, Dictionary<TKey, TValue> b, Func<TValue, TValue, bool>? same = null)
+        where TKey : notnull
+    {
+        if (a.Count != b.Count)
+            return false;
+        foreach (var (key, value) in a)
+        {
+            if (!b.TryGetValue(key, out var other))
+                return false;
+            if (!(same?.Invoke(value, other) ?? EqualityComparer<TValue>.Default.Equals(value, other)))
+                return false;
+        }
+
+        return true;
     }
 
     /// <summary>Gets the pending change to <paramref name="key"/>, if there is one.</summary>

@@ -28,6 +28,10 @@
         <KeyBinding Gesture="F5" Command="{Binding Library.RescanCommand}" />
         <KeyBinding Gesture="Ctrl+OemComma" Command="{Binding OpenSettingsCommand}" />
         <KeyBinding Gesture="Ctrl+S" Command="{Binding Detail.SaveCommand}" />
+
+        <!-- A text box being edited handles its own Ctrl+Z and Ctrl+Y first, so these are for when focus is elsewhere. -->
+        <KeyBinding Gesture="Ctrl+Z" Command="{Binding Detail.UndoCommand}" />
+        <KeyBinding Gesture="Ctrl+Y" Command="{Binding Detail.RedoCommand}" />
     </Window.KeyBindings>
 
     <Grid x:Name="RootGrid">
@@ -105,6 +109,24 @@
                                   Command="{Binding OpenSettingsCommand}"
                                   ToolTip.Tip="{x:Static res:Strings.SettingsToolTip}">
                             <MenuItem.Icon><ctl:LineIcon Data="{StaticResource SettingsStroke}" /></MenuItem.Icon>
+                        </MenuItem>
+                    </MenuItem>
+                    <!-- Undo and Redo for the one song selected, which keeps its own history: they're disabled while several are
+                         selected, so that a batch edit is undone for one song at a time. Redo is Undo's arrow mirrored. -->
+                    <MenuItem Header="{x:Static res:Strings.MenuEdit}">
+                        <MenuItem Header="{x:Static res:Strings.MenuUndo}"
+                                  Command="{Binding Detail.UndoCommand}"
+                                  InputGesture="Ctrl+Z"
+                                  ToolTip.Tip="{x:Static res:Strings.UndoToolTip}"
+                                  ToolTip.ShowOnDisabled="True">
+                            <MenuItem.Icon><ctl:LineIcon Data="{StaticResource UndoStroke}" /></MenuItem.Icon>
+                        </MenuItem>
+                        <MenuItem Header="{x:Static res:Strings.MenuRedo}"
+                                  Command="{Binding Detail.RedoCommand}"
+                                  InputGesture="Ctrl+Y"
+                                  ToolTip.Tip="{x:Static res:Strings.RedoToolTip}"
+                                  ToolTip.ShowOnDisabled="True">
+                            <MenuItem.Icon><ctl:LineIcon Data="{StaticResource UndoStroke}" RenderTransform="scaleX(-1)" /></MenuItem.Icon>
                         </MenuItem>
                     </MenuItem>
                     <!-- Packing the selection, and how: what to do when the output exists (the policy in use checked), and

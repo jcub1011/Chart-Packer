@@ -962,7 +962,12 @@ namespace ChartPacker.ViewModels
 
             // Drafts for songs that were deleted or moved can never be saved.
             if (completed)
+            {
                 _drafts.DiscardMissing();
+
+                // Songs without unsaved changes aren't held, so may have changed since their drafts' earlier states.
+                _drafts.ResetEmptyHistories();
+            }
 
             IsSearching = false;
             IsScanning = false;

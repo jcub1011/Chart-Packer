@@ -92,6 +92,10 @@ namespace ChartPacker.ViewModels
         {
             try
             {
+                // Chart Builder changed these on disk, so no earlier state of their drafts fits them.
+                foreach (var song in changed)
+                    _drafts.ResetHistory(song.FullPath);
+
                 var shown = Library.SelectedEntries;
                 bool showsChanged = changed.Any(c => shown.Any(s => s.FullPath == c.FullPath));
 
@@ -114,7 +118,10 @@ namespace ChartPacker.ViewModels
         private async Task<bool> PrepareEditChartAsync(SongEntry song)
         {
             if (!_drafts.HasDrafts(song.FullPath))
+            {
+                _drafts.ResetHistory(song.FullPath);
                 return true;
+            }
 
             var choice = await _confirmation.ChooseAsync(
                 Strings.EditChartUnsavedTitle,
@@ -141,6 +148,8 @@ namespace ChartPacker.ViewModels
                         _drafts.NotifyChanged(song.FullPath);
                     }
 
+                    // Chart Builder is about to change the song, so no earlier state of its draft fits it.
+                    _drafts.ResetHistory(song.FullPath);
                     return true;
 
                 default:
