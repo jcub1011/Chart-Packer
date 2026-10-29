@@ -425,7 +425,8 @@ namespace ChartPacker.ViewModels
             set => _settings.Settings.DedupKeepPreference = value;
         }
 
-        private bool CanBrowse() => !Job.IsRunning;
+        /// <summary>Whether a folder can be chosen, by browsing or dropping one on the window: not while a job is running.</summary>
+        public bool CanBrowse() => !Job.IsRunning;
 
         /// <summary>The title bar's songs folder tooltip: what it does, or while a job runs, why it can't.</summary>
         public string SongsFolderToolTip => Job.IsRunning ? Strings.BrowseBusyToolTip : Strings.BrowseToolTip;
@@ -440,8 +441,23 @@ namespace ChartPacker.ViewModels
             if (path is null)
                 return;
 
+            SetFolder(path);
+        }
+
+        private void SetFolder(string path)
+        {
             FolderPath = path;
             _settings.Settings.LastFolder = path;
+        }
+
+        /// <summary>Sets the library to <paramref name="path"/> and scans it, as a folder dropped on the window does.</summary>
+        public void OpenDroppedFolder(string path)
+        {
+            if (!CanBrowse() || !Directory.Exists(path))
+                return;
+
+            SetFolder(path);
+            Rescan();
         }
 
         private bool CanRescan() => FolderPath is not null && !Job.IsRunning;
