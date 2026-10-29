@@ -9,7 +9,7 @@ using CommunityToolkit.Mvvm.Input;
 namespace ChartBuilder.ViewModels
 {
     /// <summary>
-    /// The export progress dialog: what Save and pack is doing after the export dialog closes —
+    /// The export progress dialog: what Pack is doing after the export dialog closes —
     /// transcoding each stem, then packing — with a determinate bar and a Cancel button.
     /// Transcoding owns the first 85% of the bar, packing the rest.
     /// </summary>

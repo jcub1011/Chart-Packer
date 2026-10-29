@@ -16,7 +16,7 @@
         ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner">
 
-    <!-- Export progress: what Save and pack is doing after the export dialog closes, with Cancel. -->
+    <!-- Export progress: what Pack is doing after the export dialog closes, with Cancel. -->
     <StackPanel Margin="20" Spacing="14">
         <TextBlock VerticalAlignment="Center"
                    TextWrapping="Wrap"

@@ -136,9 +136,9 @@
                                 <MenuItem Header="{x:Static res:Strings.MenuSave}" Command="{Binding SaveCommand}" InputGesture="Ctrl+S">
                                     <MenuItem.Icon><ctl:LineIcon Data="{StaticResource SaveStroke}" /></MenuItem.Icon>
                                 </MenuItem>
-                                <MenuItem Header="{x:Static res:Strings.MenuSaveAndPack}"
-                                          Command="{Binding SaveAndPackCommand}"
-                                          ToolTip.Tip="{Binding SaveAndPackToolTip}"
+                                <MenuItem Header="{x:Static res:Strings.MenuPack}"
+                                          Command="{Binding PackCommand}"
+                                          ToolTip.Tip="{Binding PackToolTip}"
                                           ToolTip.ShowOnDisabled="True">
                                     <MenuItem.Icon><ctl:LineIcon Data="{StaticResource PackStroke}" /></MenuItem.Icon>
                                 </MenuItem>

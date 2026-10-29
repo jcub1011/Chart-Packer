@@ -286,7 +286,7 @@ namespace ChartBuilder.Services
                         Keywords = SettingKeywords.Split(Strings.PackFolderKeywords),
                         DefaultValue = null,
                         EmptyLabel = Strings.PackFolderEmpty,
-                        PickerTitle = Strings.SaveAndPackPickerTitle,
+                        PickerTitle = Strings.PackPickerTitle,
                         Get = () => settings.Settings.DefaultPackFolder,
                         Set = folder => settings.Settings.DefaultPackFolder = folder,
                     },
