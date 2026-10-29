@@ -1,6 +1,7 @@
 using System;
 using System.Runtime.CompilerServices;
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Input;
 
@@ -22,14 +23,18 @@ public static class Shortcut
     public static readonly AttachedProperty<string?> TipProperty =
         AvaloniaProperty.RegisterAttached<Control, Control, string?>("Tip");
 
+    public static readonly AttachedProperty<string?> TextProperty =
+        AvaloniaProperty.RegisterAttached<Control, Control, string?>("Text");
+
     // The controls on screen that show a key, each with its own subscription to a rebind. A subscription lasts from the
     // control's attaching to its detaching, and holds the control weakly, so a rebind never keeps a control alive.
     private static readonly ConditionalWeakTable<Control, Subscription> Subscriptions = new();
 
     static Shortcut()
     {
-        ActionProperty.Changed.AddClassHandler<Control>((c, _) => Track(c));
-        TipProperty.Changed.AddClassHandler<Control>((c, _) => Track(c));
+        ActionProperty.Changed.AddClassHandler<Control>((c, _) => Refresh(c));
+        TipProperty.Changed.AddClassHandler<Control>((c, _) => Refresh(c));
+        TextProperty.Changed.AddClassHandler<Control>((c, _) => Refresh(c));
     }
 
     public static string? GetAction(Control control) => control.GetValue(ActionProperty);
@@ -40,11 +45,23 @@ public static class Shortcut
 
     public static void SetTip(Control control, string? value) => control.SetValue(TipProperty, value);
 
+    public static string? GetText(Control control) => control.GetValue(TextProperty);
+
+    public static void SetText(Control control, string? value) => control.SetValue(TextProperty, value);
+
     /// <summary><paramref name="text"/> with the action's primary key after it in brackets; just the text when the action has none.</summary>
     public static string WithKey(string text, string actionId)
     {
         string key = AppKeys.Map.Display(actionId);
         return key.Length == 0 ? text : $"{text} ({key})";
+    }
+
+    // Draws the key now, attached or not, so a control that is measured offscreen or never attached has its text; the
+    // subscription then keeps it up to date once it is on screen.
+    private static void Refresh(Control control)
+    {
+        Track(control);
+        Update(control);
     }
 
     private static void Track(Control control)
@@ -114,11 +131,30 @@ public static class Shortcut
 
     private static void Update(Control control)
     {
-        if (GetAction(control) is not { Length: > 0 } id)
-            return;
+        // With no action (never set, or cleared) the tip and text are shown without a key, so a cleared action leaves none behind.
+        string id = GetAction(control) ?? "";
 
         if (GetTip(control) is { } text)
             ToolTip.SetTip(control, WithKey(text, id));
+
+        // A heading that names its key: the text is the name, and the key is whatever the user has made it.
+        if (control is TextBlock block && GetText(control) is { } name)
+            block.Text = WithKey(name, id);
+
+        if (id.Length == 0)
+        {
+            control.ClearValue(AutomationProperties.AcceleratorKeyProperty);
+            if (control is MenuItem cleared)
+                cleared.ClearValue(MenuItem.InputGestureProperty);
+            return;
+        }
+
+        // What a screen reader says the control's key is.
+        string key = AppKeys.Map.Display(id);
+        if (key.Length == 0)
+            control.ClearValue(AutomationProperties.AcceleratorKeyProperty);
+        else
+            AutomationProperties.SetAcceleratorKey(control, key);
 
         if (control is MenuItem item)
             item.InputGesture = MenuGesture(id);

@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using Avalonia.Input;
 using ChartBuilder.Resources;
 using ChartBuilder.Services;
 using ChartShared.Core.Charting;
@@ -40,7 +39,7 @@ namespace ChartBuilder.ViewModels
                 isEnabled: true,
                 editor.QuantizeSelection,
                 "QuantizeStroke",
-                new KeyGesture(Key.Q, KeyModifiers.Control));
+                BuilderKeys.Quantize);
             List<LaneMenuItem> edit = [quantize, LaneMenuItem.Separator, .. EditItems(editor, null)];
             return items.Count == 0 ? edit : [.. edit, LaneMenuItem.Separator, .. items];
         }
@@ -55,11 +54,11 @@ namespace ChartBuilder.ViewModels
             bool canPaste = EditMenuState.CanPaste(editor.Session, ChartClipboard.Shared, vocal);
             return
             [
-                LaneMenuItem.Action(Strings.LaneCut, true, editor.Cut, "CutStroke"),
-                LaneMenuItem.Action(Strings.LaneCopy, true, editor.Copy, "CopyStroke"),
-                LaneMenuItem.Action(Strings.LanePaste, canPaste, () => PasteFromClipboard(editor, PasteMode.Overwrite, vocal), "PasteStroke"),
-                LaneMenuItem.Action(Strings.LanePasteMerge, canPaste, () => PasteFromClipboard(editor, PasteMode.Merge, vocal), "PasteMergeStroke"),
-                LaneMenuItem.Action(Strings.LaneDelete, true, editor.Session.Tools.DeleteSelection, "TrashStroke"),
+                LaneMenuItem.Action(Strings.LaneCut, true, editor.Cut, "CutStroke", BuilderKeys.Cut),
+                LaneMenuItem.Action(Strings.LaneCopy, true, editor.Copy, "CopyStroke", BuilderKeys.Copy),
+                LaneMenuItem.Action(Strings.LanePaste, canPaste, () => PasteFromClipboard(editor, PasteMode.Overwrite, vocal), "PasteStroke", BuilderKeys.Paste),
+                LaneMenuItem.Action(Strings.LanePasteMerge, canPaste, () => PasteFromClipboard(editor, PasteMode.Merge, vocal), "PasteMergeStroke", BuilderKeys.PasteMerge),
+                LaneMenuItem.Action(Strings.LaneDelete, true, editor.Session.Tools.DeleteSelection, "TrashStroke", BuilderKeys.Delete),
             ];
         }
 

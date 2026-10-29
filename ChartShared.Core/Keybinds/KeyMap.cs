@@ -48,6 +48,10 @@ public sealed class KeyMap : INotifyPropertyChanged
     // Only the actions whose keys differ from their defaults, so a catalog that gains an action gives it its defaults.
     private readonly Dictionary<string, KeyChord[]> _overrides = new(StringComparer.Ordinal);
 
+    // The bare keys of the actions reserved during a playtest, as ConflictKeys, asked for on every key of a playtest; made when
+    // first asked for and dropped when the keys change.
+    private HashSet<string>? _reservedBare;
+
     public KeyMap(KeybindCatalog catalog)
     {
         ArgumentNullException.ThrowIfNull(catalog);
@@ -183,8 +187,24 @@ public sealed class KeyMap : INotifyPropertyChanged
         if (chord.IsEmpty || chord.Mods != KeyMods.None)
             return false;
 
-        string key = chord.ConflictKey;
-        return Catalog.Any(a => a.ReservedDuringPlaytest && ChordsOf(a.Id).Any(c => c.Mods == KeyMods.None && c.ConflictKey == key));
+        return (_reservedBare ??= ReservedBareKeys()).Contains(chord.ConflictKey);
+    }
+
+    private HashSet<string> ReservedBareKeys()
+    {
+        var keys = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var action in Catalog)
+        {
+            if (!action.ReservedDuringPlaytest)
+                continue;
+            foreach (var chord in ChordsOf(action.Id))
+            {
+                if (chord.Mods == KeyMods.None)
+                    keys.Add(chord.ConflictKey);
+            }
+        }
+
+        return keys;
     }
 
     /// <summary>
@@ -284,6 +304,7 @@ public sealed class KeyMap : INotifyPropertyChanged
     private void CopyFromQuietly(KeyMap other)
     {
         _overrides.Clear();
+        _reservedBare = null;
         foreach (var (id, chords) in other._overrides)
             _overrides[id] = chords;
     }
@@ -317,6 +338,7 @@ public sealed class KeyMap : INotifyPropertyChanged
 
     private void Raise()
     {
+        _reservedBare = null;
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("Item[]"));
         Changed?.Invoke(this, EventArgs.Empty);
     }

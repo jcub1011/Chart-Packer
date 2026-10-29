@@ -294,6 +294,10 @@ namespace ChartBuilder.ViewModels
                 autosave.Interval = TimeSpan.FromMinutes(_settings.Settings.AutosaveMinutes);
         }
 
+        /// <summary>The Edit menu's Shortcuts: the window where the keyboard shortcuts are changed.</summary>
+        [RelayCommand]
+        private Task OpenShortcutsAsync() => _services.Keybinds.ShowAsync();
+
         /// <summary>
         /// A change from Chart settings or the Art tab (charter-spec C1), as one undoable step. Playback goes on, so the
         /// tempo can be found by ear; the beats follow the change.

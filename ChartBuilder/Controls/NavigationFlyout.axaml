@@ -2,6 +2,8 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:ChartBuilder.ViewModels"
              xmlns:res="using:ChartBuilder.Resources"
+             xmlns:svc="using:ChartBuilder.Services"
+             xmlns:kb="using:ChartShared.UI.Keybinds"
              xmlns:ctl="using:ChartShared.UI.Controls"
              x:Class="ChartBuilder.Controls.NavigationFlyout"
              x:DataType="vm:NavigationFlyoutViewModel">
@@ -50,14 +52,14 @@
                 <Button Classes="tool"
                         Command="{Binding PreviousCommand}"
                         IsEnabled="{Binding HasMatches}"
-                        ToolTip.Tip="{x:Static res:Strings.NavPreviousToolTip}"
+                        kb:Shortcut.Tip="{x:Static res:Strings.NavPreviousToolTip}" kb:Shortcut.Action="{x:Static svc:BuilderKeys.FindPrevious}"
                         AutomationProperties.Name="{x:Static res:Strings.NavPreviousToolTip}">
                     <ctl:LineIcon x:Name="PreviousIcon" Data="{StaticResource ChevronDownStroke}" />
                 </Button>
                 <Button Classes="tool"
                         Command="{Binding NextCommand}"
                         IsEnabled="{Binding HasMatches}"
-                        ToolTip.Tip="{x:Static res:Strings.NavNextToolTip}"
+                        kb:Shortcut.Tip="{x:Static res:Strings.NavNextToolTip}" kb:Shortcut.Action="{x:Static svc:BuilderKeys.FindNext}"
                         AutomationProperties.Name="{x:Static res:Strings.NavNextToolTip}">
                     <ctl:LineIcon x:Name="NextIcon" Data="{StaticResource ChevronDownStroke}" />
                 </Button>

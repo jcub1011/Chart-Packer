@@ -248,6 +248,41 @@ public sealed class KeyMapTests
     }
 
     [TestMethod]
+    public void ReservedPlaytestKeysAreRemadeWhenTheKeysChangeInAnyWay()
+    {
+        var catalog = new KeybindCatalog(
+        [
+            new KeyAction
+            {
+                Id = "play", Name = "Play", Category = "Test", Scope = Editor, AllowBare = true, ReservedDuringPlaytest = true,
+                Defaults = KeyChord.List("Space"),
+            },
+        ]);
+        var map = new KeyMap(catalog);
+        Assert.IsTrue(map.IsReservedDuringPlaytest(KeyChord.Parse("Space")));
+
+        map.Set("play", KeyChord.List("KeyP"));
+        Assert.IsTrue(map.IsReservedDuringPlaytest(KeyChord.Parse("P")));
+
+        map.Reset("play");
+        Assert.IsTrue(map.IsReservedDuringPlaytest(KeyChord.Parse("Space")));
+        Assert.IsFalse(map.IsReservedDuringPlaytest(KeyChord.Parse("P")));
+
+        var edited = new KeyMap(catalog);
+        edited.Set("play", KeyChord.List("KeyN"));
+        map.CopyFrom(edited);
+        Assert.IsTrue(map.IsReservedDuringPlaytest(KeyChord.Parse("N")));
+        Assert.IsFalse(map.IsReservedDuringPlaytest(KeyChord.Parse("Space")));
+
+        map.ApplyLayout(new Dictionary<string, string[]> { ["play"] = ["KeyM"] }, replace: false);
+        Assert.IsTrue(map.IsReservedDuringPlaytest(KeyChord.Parse("M")));
+        Assert.IsFalse(map.IsReservedDuringPlaytest(KeyChord.Parse("N")));
+
+        map.ResetAll();
+        Assert.IsTrue(map.IsReservedDuringPlaytest(KeyChord.Parse("Space")));
+    }
+
+    [TestMethod]
     public void ALayoutIsAppliedWithBadEntriesIgnored()
     {
         var map = Map();

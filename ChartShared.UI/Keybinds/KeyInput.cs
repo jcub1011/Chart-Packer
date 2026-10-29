@@ -38,14 +38,37 @@ public static class KeyInput
     /// <summary>The press as a token of the character the layout gives the key (<c>Z</c>, <c>OemComma</c>).</summary>
     public static KeyChord Logical(KeyEventArgs e) => new(e.Key.ToString(), ModsOf(e.KeyModifiers));
 
-    /// <summary>The press as a token of where the key is (<c>KeyZ</c>, <c>BracketLeft</c>), whatever the layout.</summary>
+    /// <summary>The press as a token of where the key is (<c>Z</c>, <c>BracketLeft</c>, <c>Digit1</c>), whatever the layout.</summary>
     public static KeyChord Physical(KeyEventArgs e) => new(e.PhysicalKey.ToString(), ModsOf(e.KeyModifiers));
 
-    /// <summary>The chord as an Avalonia gesture, for a menu item; null when its token isn't a logical <see cref="Key"/>.</summary>
-    public static KeyGesture? ToGesture(KeyChord chord) =>
-        !chord.IsEmpty && Enum.TryParse(chord.Key, ignoreCase: true, out Key key) && key != Key.None
-            ? new KeyGesture(key, ToModifiers(chord.Mods))
-            : null;
+    /// <summary>
+    /// The chord as an Avalonia gesture, for a menu item; null when its token isn't a <see cref="Key"/>. A physical token
+    /// (<c>Digit1</c>, <c>ArrowUp</c>) is read as the key it types on a US layout, which is also how <see cref="KeyNames"/> labels
+    /// it everywhere, so a canvas's keys can be shown in a menu too. For display only, and a token with no such key
+    /// (<c>BracketLeft</c>) gives none: the key is in the tooltip instead.
+    /// </summary>
+    public static KeyGesture? ToGesture(KeyChord chord)
+    {
+        if (chord.IsEmpty)
+            return null;
+
+        return (ToKey(chord) ?? FromPhysicalToken(chord.Key)) is { } key ? new KeyGesture(key, ToModifiers(chord.Mods)) : null;
+    }
+
+    // The logical key a physical token's key types on a US layout: the one whose name differs from the token's. Only those
+    // whose key is named the same as the label (Digit1, ArrowUp, Backspace), as Shortcut shows no gesture Avalonia would print differently.
+    private static Key? FromPhysicalToken(string token)
+    {
+        string name = token switch
+        {
+            _ when token.Length == 6 && token.StartsWith("Digit", StringComparison.OrdinalIgnoreCase) => "D" + token[5],
+            _ when token.StartsWith("Arrow", StringComparison.OrdinalIgnoreCase) => token[5..],
+            _ when token.Equals("Backspace", StringComparison.OrdinalIgnoreCase) => "Back",
+            _ => token,
+        };
+
+        return Enum.TryParse(name, ignoreCase: true, out Key key) && key != Key.None ? key : null;
+    }
 
     /// <summary>The key a logical chord's token names, or null for a token that isn't one.</summary>
     public static Key? ToKey(KeyChord chord) =>

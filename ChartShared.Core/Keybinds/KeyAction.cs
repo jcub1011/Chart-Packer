@@ -53,8 +53,8 @@ public sealed class KeyAction
     public KeyActionKind Kind { get; init; }
 
     /// <summary>
-    /// Whether a focused text box gets the key first and the action only runs if it doesn't take it: Undo and Redo, since a
-    /// box with its own undo handles them itself.
+    /// Whether a focused text box keeps the key, and the action doesn't run while one has focus: Undo and Redo, since a box
+    /// with its own undo handles them itself, and the tool keys, which a box types or leaves alone.
     /// </summary>
     public bool YieldsToTextInput { get; init; }
 

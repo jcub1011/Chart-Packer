@@ -1,5 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics.CodeAnalysis;
+using System.Windows.Input;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -11,6 +14,8 @@ using ChartBuilder.Controls.Editing;
 using ChartBuilder.Services;
 using ChartBuilder.ViewModels;
 using ChartShared.Core.Charting.Editing;
+using ChartShared.Core.Keybinds;
+using ChartShared.UI.Keybinds;
 using ChartShared.UI.Views;
 
 namespace ChartBuilder.Views
@@ -36,16 +41,9 @@ namespace ChartBuilder.Views
 
         private bool _isOpen;
 
-        // Space played or paused and hasn't been let go yet, so its auto-repeat doesn't toggle again.
-        private bool _isSpaceHeld;
-
-        // L is holding the Loop tool on and hasn't been let go yet, so its auto-repeat doesn't hold it again, and its
-        // release, which may turn repeating the loop region on or off, comes once.
-        private bool _isLoopToolHeld;
-
-        // Alt picked a tool, and its release is still to come: it's taken then, so it isn't a lone Alt press, which Windows
-        // answers by moving focus to the menu bar.
-        private bool _isAltUsedForTool;
+        // The editor and lane a lane action (1 to 6, 0, 2× kick) was pressed on, by action, so its release goes to them even if
+        // focus has moved on by then.
+        private readonly Dictionary<string, LanePress> _pressedLanes = [];
 
         private bool _isApplying;
 
@@ -57,6 +55,34 @@ namespace ChartBuilder.Views
 
         public EditorWindow()
         {
+            // Keys held in record mode or playtest are let go when the window loses focus, as their key-ups won't come here.
+            // First, so the Loop tool is no longer held when the key dispatcher, which lets go of the keys it holds as the window
+            // is deactivated too, lets go of L: that's the end of a hold, not a tap, which turns repeating the loop region on or off.
+            Deactivated += (_, _) =>
+            {
+                _viewModel?.Editor.RecordReleaseAll();
+                _viewModel?.Editor.Playtest.ReleaseKeys();
+                _viewModel?.Editor.HoldModifiers(EditorModifiers.None);
+                _viewModel?.Editor.HoldLoopTool(false);
+            };
+
+            // While a song opens, keys don't reach the Editor being left: its edits would go with it, unsaved. First, so
+            // nothing below sees them. Key-ups still go through, so a key held then is let go of.
+            AddHandler(KeyDownEvent, OnOpeningInput, RoutingStrategies.Tunnel);
+            AddHandler(TextInputEvent, OnOpeningInput, RoutingStrategies.Tunnel);
+
+            // Playtest's keys, tunnelled, so they play wherever focus is: on the play button just clicked, say. Before the key
+            // dispatcher's, so a key bound to an instrument plays rather than editing.
+            AddHandler(KeyDownEvent, OnPlaytestKeyDown, RoutingStrategies.Tunnel);
+            AddHandler(KeyUpEvent, OnPlaytestKeyUp, RoutingStrategies.Tunnel);
+
+            // The modifier keys held, wherever focus is, even when something took the key: the place tool's options show
+            // what Ctrl and Alt swap while they're held.
+            AddHandler(KeyDownEvent, OnModifierKeys, RoutingStrategies.Tunnel, handledEventsToo: true);
+            AddHandler(KeyUpEvent, OnModifierKeys, RoutingStrategies.Tunnel, handledEventsToo: true);
+
+            // Before the panels are built, so what registers its keys as it attaches finds the dispatcher.
+            RegisterKeys();
             InitializeComponent();
             WindowMemory.Remember(this, position: true);
 
@@ -71,52 +97,151 @@ namespace ChartBuilder.Views
             };
             SizeChanged += (_, _) => ApplyLayout();
 
-            // Keys held in record mode or playtest are let go when the window loses focus, as their key-ups won't come here.
-            Deactivated += (_, _) =>
-            {
-                _isSpaceHeld = false;
-                _isLoopToolHeld = false;
-                _isAltUsedForTool = false;
-                _viewModel?.Editor.RecordReleaseAll();
-                _viewModel?.Editor.Playtest.ReleaseKeys();
-                _viewModel?.Editor.HoldModifiers(EditorModifiers.None);
-                _viewModel?.Editor.HoldLoopTool(false);
-            };
+            // Coming back from Chart Packer, the keys it may have rebound are read again.
+            Activated += (_, _) => AppKeys.ReloadIfChanged();
             TopBand.SizeChanged += (_, _) => ApplyLayout();
             TitleBand.SizeChanged += (_, e) => LoadingOverlay.Margin = new Thickness(0, e.NewSize.Height, 0, 0);
             Closing += (_, _) => CaptureLayout();
-
-            // While a song opens, keys don't reach the Editor being left: its edits would go with it, unsaved. First, so
-            // nothing below sees them. Key-ups still go through, so a key held then is let go of.
-            AddHandler(KeyDownEvent, OnOpeningInput, RoutingStrategies.Tunnel);
-            AddHandler(TextInputEvent, OnOpeningInput, RoutingStrategies.Tunnel);
 
             // Audio files dropped anywhere on the window start a new chart with them as its stems (charter-spec C1). A
             // song folder or .sng opens it (C2).
             DragDrop.SetAllowDrop(this, true);
             AddHandler(DragDrop.DragOverEvent, OnDragOver);
             AddHandler(DragDrop.DropEvent, OnDrop);
+        }
 
-            // Space plays or pauses, tunnelled so a focused button takes it as playback rather than as a click.
-            AddHandler(KeyDownEvent, OnSpaceKeyDown, RoutingStrategies.Tunnel);
-            AddHandler(KeyUpEvent, OnSpaceKeyUp, RoutingStrategies.Tunnel);
+        /// <summary>
+        /// The window's keys are the app's <see cref="KeyMap"/>, not bindings of its own, so rebinding one moves it here too. They
+        /// act on <see cref="_viewModel"/> as it is when pressed, as the Editor is swapped in place for each song opened. A command
+        /// that can't run now leaves its key to whatever else would take it.
+        /// </summary>
+        private void RegisterKeys()
+        {
+            // The canvas's keys are live only while a lane canvas has focus, so a focused combo box or button never takes them.
+            var keys = new KeyDispatcher(AppKeys.Map, BuilderKeys.Tools)
+            {
+                ScopeProvider = () => FocusManager?.GetFocusedElement() is EditorCanvas ? BuilderKeys.Canvas : BuilderKeys.Tools,
+                IsBlocked = () => _viewModel is { IsOpening: true },
+            };
+            keys.Attach(this);
 
-            // Playtest's keys, tunnelled, so they play wherever focus is: on the play button just clicked, say.
-            AddHandler(KeyDownEvent, OnPlaytestKeyDown, RoutingStrategies.Tunnel);
-            AddHandler(KeyUpEvent, OnPlaytestKeyUp, RoutingStrategies.Tunnel);
+            keys.On(SharedKeys.Save, () => Run(vm => vm.SaveCommand));
+            keys.On(SharedKeys.Settings, () => Run(vm => vm.OpenProgramSettingsCommand));
+            keys.On(SharedKeys.Undo, () => Run(vm => vm.UndoCommand));
+            keys.On(SharedKeys.Redo, () => Run(vm => vm.RedoCommand));
+            keys.On(BuilderKeys.NewChart, () => Run(vm => vm.NewChartCommand));
+            keys.On(BuilderKeys.OpenChart, () => Run(vm => vm.OpenChartCommand));
+            keys.On(BuilderKeys.GoToMeasure, () => Run(vm => vm.GoToMeasureCommand));
+            keys.On(BuilderKeys.Find, () => Run(vm => vm.FindMatchesCommand));
+            keys.On(BuilderKeys.FindNext, () => Run(vm => vm.FindNextCommand));
+            keys.On(BuilderKeys.FindPrevious, () => Run(vm => vm.FindPreviousCommand));
 
-            // The modifier keys held, wherever focus is, even when something took the key: the place tool's options show
-            // what Ctrl and Alt swap while they're held.
-            AddHandler(KeyDownEvent, OnModifierKeys, RoutingStrategies.Tunnel, handledEventsToo: true);
-            AddHandler(KeyUpEvent, OnModifierKeys, RoutingStrategies.Tunnel, handledEventsToo: true);
+            // Space plays or pauses, once a press however long it's held. Tunnelled, so a focused button or list plays rather
+            // than taking it. Not while a text box has focus: it types a space there.
+            keys.On(SharedKeys.PlayPause, () =>
+            {
+                if (_viewModel is not { } vm)
+                    return false;
+                vm.Editor.PlayPause();
+                return true;
+            });
 
-            // Holding L holds the Loop tool on, wherever focus is, as Ctrl+Shift holds the Sync tool.
-            AddHandler(KeyDownEvent, OnLoopToolKeys, RoutingStrategies.Tunnel, handledEventsToo: true);
-            AddHandler(KeyUpEvent, OnLoopToolKeys, RoutingStrategies.Tunnel, handledEventsToo: true);
+            // Alt and 1 to 6 pick the Select, Place, Erase, Phrase, Tempo and Sync tools, in the toolbar's order, wherever focus
+            // is: on a lane, on a button, in a panel. Picking a tool is what its button does (a gesture under way is cancelled),
+            // so it's allowed wherever the buttons are, a playtest or record pass included.
+            foreach (string id in BuilderKeys.ToolActions)
+            {
+                var tool = EditorKeys.ToolOf(id)!.Value;
+                keys.On(id, () =>
+                {
+                    if (_viewModel is not { } vm)
+                        return false;
+                    vm.Editor.Session.Tool = tool;
+                    return true;
+                });
+            }
 
-            // Alt+1 to Alt+6 pick the Select to Sync tools, wherever focus is.
-            AddHandler(KeyDownEvent, OnToolKeys, RoutingStrategies.Tunnel);
-            AddHandler(KeyUpEvent, OnToolKeyUp, RoutingStrategies.Tunnel, handledEventsToo: true);
+            // Holding L holds the Loop tool on, wherever focus is, as Ctrl+Shift holds the Sync tool, so the loop region can be
+            // drawn, moved or resized without picking the tool, and the toolbar's button is lit meanwhile; let go, the picked tool
+            // is in charge again. A short press that touched nothing is a tap, which turns repeating the region on or off; held
+            // longer, it's only the tool. While a playtest goes on it's the playtest's, as Space, Esc, P and N are, so a lane's key
+            // bound to L doesn't turn repeating off mid-pass.
+            keys.OnHold(
+                BuilderKeys.LoopTool,
+                () =>
+                {
+                    if (_viewModel is not { } vm || vm.Editor.Playtest is { IsActive: true })
+                        return false;
+                    vm.Editor.HoldLoopTool(true);
+                    return true;
+                },
+                () => _viewModel?.Editor.ReleaseLoopTool());
+
+            foreach (string id in BuilderKeys.CanvasActions(AppKeys.Map.Catalog))
+            {
+                if (EditorKeys.LaneNumberOf(id) is { } number)
+                    keys.OnHold(id, () => PressLane(id, number), () => ReleaseLane(id, number));
+                else
+                    keys.On(id, () => RunCanvas(id));
+            }
+        }
+
+        private bool Run(Func<EditorWindowViewModel, ICommand> command)
+        {
+            if (_viewModel is not { } vm || command(vm) is not { } run || !run.CanExecute(null))
+                return false;
+
+            run.Execute(null);
+            return true;
+        }
+
+        /// <summary>The lane canvas with focus and what it shows, when one has and it shows a lane.</summary>
+        private bool TryGetCanvas([NotNullWhen(true)] out ChartEditorViewModel? editor, [NotNullWhen(true)] out EditorLaneViewModel? lane, [NotNullWhen(true)] out EditorCanvas? canvas)
+        {
+            editor = null;
+            lane = null;
+            canvas = FocusManager?.GetFocusedElement() as EditorCanvas;
+            return canvas is not null && canvas.TryGetKeyContext(out editor, out lane);
+        }
+
+        private bool RunCanvas(string id) =>
+            TryGetCanvas(out var editor, out var lane, out var canvas) && EditorKeys.Run(id, editor, lane, canvas);
+
+        private bool PressLane(string id, int number)
+        {
+            // A second key of an action already held (NumPad1 over Digit1) joins the hold rather than pressing again.
+            if (_pressedLanes.TryGetValue(id, out var held))
+            {
+                held.Keys++;
+                return true;
+            }
+
+            if (!TryGetCanvas(out var editor, out var lane, out _))
+                return false;
+
+            if (!EditorKeys.PressLane(number, id == BuilderKeys.NoteDoubleKick, editor, lane))
+                return false;
+            _pressedLanes[id] = new LanePress(editor, lane);
+            return true;
+        }
+
+        private void ReleaseLane(string id, int number)
+        {
+            if (!_pressedLanes.TryGetValue(id, out var pressed) || --pressed.Keys > 0)
+                return;
+
+            _pressedLanes.Remove(id);
+            EditorKeys.ReleaseLane(number, id == BuilderKeys.NoteDoubleKick, pressed.Editor, pressed.Lane);
+        }
+
+        /// <summary>A lane action being held: where it was pressed, and how many of its keys are down.</summary>
+        private sealed class LanePress(ChartEditorViewModel editor, EditorLaneViewModel lane)
+        {
+            public ChartEditorViewModel Editor { get; } = editor;
+
+            public EditorLaneViewModel Lane { get; } = lane;
+
+            public int Keys { get; set; } = 1;
         }
 
         protected override void OnDataContextChanged(EventArgs e)
@@ -134,30 +259,7 @@ namespace ChartBuilder.Views
             _leftApplied = double.NaN;
             _rightApplied = double.NaN;
             _timelineApplied = double.NaN;
-            _isSpaceHeld = false;
-            _isLoopToolHeld = false;
             ApplyLayout();
-        }
-
-        /// <summary>
-        /// Space anywhere in the window plays or pauses, once a press however long it's held. Tunnelled, so a focused
-        /// button or list plays rather than taking it. Not while a text box has focus: it types a space there. Not a key
-        /// binding, which would run alongside the focused control's own Space.
-        /// </summary>
-        private void OnSpaceKeyDown(object? sender, KeyEventArgs e)
-        {
-            if (e.Key != Key.Space || e.KeyModifiers != KeyModifiers.None)
-                return;
-
-            if (e.Source is TextBox || FocusManager?.GetFocusedElement() is TextBox)
-                return;
-
-            e.Handled = true;
-            if (_isSpaceHeld)
-                return;
-
-            _isSpaceHeld = true;
-            _viewModel?.Editor.PlayPause();
         }
 
         /// <summary>
@@ -180,67 +282,6 @@ namespace ChartBuilder.Views
 
         private void OnModifierKeys(object? sender, KeyEventArgs e) => _viewModel?.Editor.HoldModifiers(EditorCanvas.ModifiersOf(e.KeyModifiers));
 
-        /// <summary>
-        /// Holding L holds the Loop tool on, wherever focus is, so the loop region can be drawn, moved or resized without
-        /// picking the tool, and the toolbar's button is lit meanwhile; let go, the picked tool is in charge again. A short
-        /// press that touched nothing is a tap, which turns repeating the region on or off; held longer, it's only the
-        /// tool. A text box types it instead, and with a modifier it's another key's. While a playtest goes on it's the
-        /// playtest's, as Space, Esc, P and N are, so a lane's key bound to L doesn't turn repeating off mid-pass. Not a
-        /// key binding, which fires once and never says when the key is let go.
-        /// </summary>
-        private void OnLoopToolKeys(object? sender, KeyEventArgs e)
-        {
-            if (e.PhysicalKey != PhysicalKey.L || IsTyping(e) || _viewModel is not { IsOpening: false } vm || vm.Editor.Playtest is { IsActive: true })
-                return;
-
-            if (e.RoutedEvent == KeyDownEvent)
-            {
-                if (e.KeyModifiers != KeyModifiers.None || _isLoopToolHeld)
-                    return;
-                _isLoopToolHeld = true;
-                e.Handled = true;
-                vm.Editor.HoldLoopTool(true);
-                return;
-            }
-
-            // Let go of even as a modifier is let go first, which the key-up after it would be too late for.
-            if (!_isLoopToolHeld)
-                return;
-            _isLoopToolHeld = false;
-            e.Handled = true;
-            vm.Editor.ReleaseLoopTool();
-        }
-
-        /// <summary>
-        /// Alt and 1 to 6 pick the Select, Place, Erase, Phrase, Tempo and Sync tools, in the toolbar's order, wherever focus
-        /// is: on a lane, on a button, in a panel. A text box types it instead. Not a key binding, which would run alongside
-        /// a focused control's own handling. Picking a tool is what its button does (a gesture under way is cancelled), so
-        /// it's allowed wherever the buttons are, a playtest or record pass included.
-        /// </summary>
-        private void OnToolKeys(object? sender, KeyEventArgs e)
-        {
-            if (e.Handled || IsTyping(e) || _viewModel is not { IsOpening: false } vm || EditorKeys.ToolOf(e.PhysicalKey, e.KeyModifiers) is not { } tool)
-                return;
-
-            e.Handled = true;
-            _isAltUsedForTool = true;
-            vm.Editor.Session.Tool = tool;
-        }
-
-        /// <summary>
-        /// Letting go of the Alt that picked a tool is taken, so the focus stays where it was, rather than going to the menu
-        /// bar as it does after Alt pressed and released alone. Even when something else took the key-up, so the next lone
-        /// Alt isn't taken in its place.
-        /// </summary>
-        private void OnToolKeyUp(object? sender, KeyEventArgs e)
-        {
-            if (!_isAltUsedForTool || e.Key is not (Key.LeftAlt or Key.RightAlt))
-                return;
-
-            _isAltUsedForTool = false;
-            e.Handled = true;
-        }
-
         private void OnOpeningInput(object? sender, RoutedEventArgs e)
         {
             if (_viewModel is { IsOpening: true })
@@ -248,16 +289,6 @@ namespace ChartBuilder.Views
         }
 
         private bool IsTyping(KeyEventArgs e) => e.Source is TextBox || FocusManager?.GetFocusedElement() is TextBox;
-
-        /// <summary>Letting go of a Space that played or paused, so the focused control doesn't see half a press.</summary>
-        private void OnSpaceKeyUp(object? sender, KeyEventArgs e)
-        {
-            if (e.Key != Key.Space || !_isSpaceHeld)
-                return;
-
-            _isSpaceHeld = false;
-            e.Handled = true;
-        }
 
         private void OnDragOver(object? sender, DragEventArgs e) =>
             e.DragEffects = DroppedFiles.SongOf(e) is not null || DroppedFiles.AudioOf(e).Count > 0 ? DragDropEffects.Copy : DragDropEffects.None;

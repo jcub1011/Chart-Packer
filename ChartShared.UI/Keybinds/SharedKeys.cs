@@ -17,9 +17,13 @@ namespace ChartShared.UI.Keybinds
         public const string PlayPause = "media.playPause";
         public const string NextChange = "reduction.nextChange";
         public const string PreviousChange = "reduction.previousChange";
+        public const string FocusSearch = "settings.focusSearch";
 
         /// <summary>A window showing a reduction's preview, Chart Packer's lower difficulties and Chart Builder's Reduce.</summary>
         public static readonly KeyScope ReductionPreview = new("shared.reductionPreview");
+
+        /// <summary>The Settings window, both apps'.</summary>
+        public static readonly KeyScope SettingsWindow = new("shared.settingsWindow");
 
         /// <summary>The shared actions, in the order they're listed in.</summary>
         public static IEnumerable<KeyAction> Actions()
@@ -65,6 +69,12 @@ namespace ChartShared.UI.Keybinds
             {
                 Id = PreviousChange, Name = SharedStrings.KeyActionPreviousChange, Category = playback, Scope = ReductionPreview,
                 Defaults = KeyChord.List("Shift+N"),
+            };
+
+            yield return new KeyAction
+            {
+                Id = FocusSearch, Name = SharedStrings.KeyActionFocusSearch, Category = SharedStrings.KeyCategorySettings, Scope = SettingsWindow,
+                Defaults = KeyChord.List("Ctrl+E"),
             };
         }
     }

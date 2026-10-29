@@ -69,7 +69,7 @@ namespace ChartShared.UI.ViewModels.Keybinds
         public partial bool IsExpanded { get; set; }
     }
 
-    /// <summary>One key of a shortcut, as a button: it changes the key, and a second removes it.</summary>
+    /// <summary>One key of a shortcut, as a button: it opens a menu to change the key or remove it.</summary>
     public sealed partial class KeyChipViewModel : ObservableObject
     {
         private readonly KeybindsWindowViewModel _owner;

@@ -2,6 +2,8 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:ChartBuilder.ViewModels"
              xmlns:res="using:ChartBuilder.Resources"
+             xmlns:svc="using:ChartBuilder.Services"
+             xmlns:kb="using:ChartShared.UI.Keybinds"
              xmlns:ctl="using:ChartShared.UI.Controls"
              xmlns:bctl="using:ChartBuilder.Controls"
              xmlns:edit="using:ChartBuilder.Controls.Editing"
@@ -35,7 +37,7 @@
                         </ComboBox>
                     </StackPanel>
                     <StackPanel Spacing="2">
-                        <TextBlock Text="{x:Static res:Strings.LaneShowLabel}" ToolTip.Tip="{x:Static res:Strings.LaneShowToolTip}" />
+                        <TextBlock Text="{x:Static res:Strings.LaneShowLabel}" kb:Shortcut.Tip="{x:Static res:Strings.LaneShowToolTip}" kb:Shortcut.Action="{x:Static svc:BuilderKeys.AudioBackdrop}" />
                         <StackPanel Orientation="Horizontal" Spacing="12">
                             <RadioButton Content="{x:Static res:Strings.LaneShowWaveform}" IsChecked="{Binding IsWaveform}" />
                             <RadioButton Content="{x:Static res:Strings.LaneShowSpectrogram}" IsChecked="{Binding IsSpectrogram}" />
@@ -291,7 +293,7 @@
                                         Classes.expert="{Binding IsExpert}"
                                         Content="{Binding Letter}"
                                         Command="{Binding Show}"
-                                        ToolTip.Tip="{Binding Name, StringFormat={x:Static res:Strings.LaneDifficultyToolTipFormat}}"
+                                        kb:Shortcut.Tip="{Binding Name}" kb:Shortcut.Action="{Binding KeyAction}"
                                         AutomationProperties.Name="{Binding Name}" />
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
@@ -350,7 +352,7 @@
                         <Button Classes="tool"
                                 IsVisible="{Binding !IsVocal}"
                                 Command="{Binding ToggleViewCommand}"
-                                ToolTip.Tip="{Binding ViewToolTip}"
+                                kb:Shortcut.Tip="{Binding ViewToolTip}" kb:Shortcut.Action="{x:Static svc:BuilderKeys.ToggleView}"
                                 AutomationProperties.Name="{Binding ViewToolTip}">
                             <Panel>
                                 <PathIcon Width="14" Height="14" Data="{StaticResource WaveformIconGeometry}" IsVisible="{Binding !IsTimeline}" />

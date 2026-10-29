@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq;
 using Avalonia;
@@ -1152,22 +1153,26 @@ namespace ChartBuilder.Controls.Editing
             e.Handled = true;
         }
 
+        // The canvas's keys are the window's key dispatcher's, which finds the canvas with focus and runs the key's action on it
+        // (EditorKeys); here, only the modifiers held are taken in.
         protected override void OnKeyDown(KeyEventArgs e)
         {
             base.OnKeyDown(e);
             TakeKeys(e.KeyModifiers);
-            if (e.Handled || _editor is not { } editor || _lane is not { } lane || Session is not { })
-                return;
-            e.Handled = EditorKeys.Handle(e.PhysicalKey, e.KeyModifiers, editor, lane, this);
         }
 
         protected override void OnKeyUp(KeyEventArgs e)
         {
             base.OnKeyUp(e);
             TakeKeys(e.KeyModifiers);
-            if (e.Handled || _editor is not { } editor || _lane is not { } lane || Session is not { })
-                return;
-            e.Handled = EditorKeys.HandleUp(e.PhysicalKey, editor, lane);
+        }
+
+        /// <summary>The editor and the lane this canvas shows, for a key that acts on them; false while it shows none.</summary>
+        internal bool TryGetKeyContext([NotNullWhen(true)] out ChartEditorViewModel? editor, [NotNullWhen(true)] out EditorLaneViewModel? lane)
+        {
+            editor = _editor;
+            lane = _lane;
+            return editor is not null && lane is not null && Session is not null;
         }
 
         /// <summary>

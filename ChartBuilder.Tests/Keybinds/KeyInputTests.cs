@@ -40,10 +40,26 @@ public sealed class KeyInputTests
     }
 
     [TestMethod]
-    public void APhysicalTokenIsNotAGesture()
+    public void APhysicalTokenWithNoLogicalNameIsNotAGesture()
     {
         Assert.IsNull(KeyInput.ToGesture(KeyChord.Parse("Ctrl+BracketLeft")));
         Assert.AreEqual(PhysicalKey.BracketLeft, KeyInput.ToPhysicalKey(KeyChord.Parse("BracketLeft")));
+    }
+
+    [TestMethod]
+    [DataRow("Ctrl+X", Key.X, KeyModifiers.Control)]
+    [DataRow("Alt+Shift+ArrowRight", Key.Right, KeyModifiers.Alt | KeyModifiers.Shift)]
+    [DataRow("Delete", Key.Delete, KeyModifiers.None)]
+    [DataRow("Backspace", Key.Back, KeyModifiers.None)]
+    [DataRow("Ctrl+Digit1", Key.D1, KeyModifiers.Control)]
+    [DataRow("NumPad1", Key.NumPad1, KeyModifiers.None)]
+    public void APhysicalTokenIsReadAsTheKeyItTypes(string text, Key expected, KeyModifiers modifiers)
+    {
+        var gesture = KeyInput.ToGesture(KeyChord.Parse(text));
+
+        Assert.IsNotNull(gesture);
+        Assert.AreEqual(expected, gesture.Key);
+        Assert.AreEqual(modifiers, gesture.KeyModifiers);
     }
 
     [TestMethod]

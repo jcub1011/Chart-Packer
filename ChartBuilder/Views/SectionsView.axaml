@@ -2,6 +2,8 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:ChartBuilder.ViewModels"
              xmlns:res="using:ChartBuilder.Resources"
+             xmlns:svc="using:ChartBuilder.Services"
+             xmlns:kb="using:ChartShared.UI.Keybinds"
              xmlns:ctl="using:ChartShared.UI.Controls"
              xmlns:bctl="using:ChartBuilder.Controls"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -159,12 +161,18 @@
                         </Button>
                     </WrapPanel>
 
-                    <TextBlock DockPanel.Dock="Bottom"
-                               Classes="muted"
-                               FontSize="11"
-                               Margin="12,4,12,8"
-                               TextWrapping="Wrap"
-                               Text="{x:Static res:Strings.SectionsKeysHint}" />
+                    <StackPanel DockPanel.Dock="Bottom" Margin="12,4,12,8" Spacing="2">
+                        <TextBlock Classes="muted"
+                                   FontSize="11"
+                                   TextWrapping="Wrap"
+                                   kb:Shortcut.Action="{x:Static svc:BuilderKeys.SectionNext}"
+                                   kb:Shortcut.Text="{x:Static res:Strings.SectionsKeysHint}" />
+                        <TextBlock Classes="muted"
+                                   FontSize="11"
+                                   TextWrapping="Wrap"
+                                   kb:Shortcut.Action="{x:Static svc:BuilderKeys.SectionPrevious}"
+                                   kb:Shortcut.Text="{x:Static res:Strings.SectionsPreviousKeysHint}" />
+                    </StackPanel>
 
                     <TextBlock DockPanel.Dock="Top"
                                Classes="muted"

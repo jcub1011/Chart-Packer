@@ -16,8 +16,8 @@ public enum KeyMods
 /// <remarks>
 /// <para>
 /// The key is a token, not a code: the name of an Avalonia <c>Key</c> for a <see cref="KeyMatch.Logical"/> scope
-/// (<c>Z</c>, <c>OemComma</c>), or of a <c>PhysicalKey</c> for a <see cref="KeyMatch.Physical"/> one (<c>KeyH</c>,
-/// <c>BracketLeft</c>). This type is in Core, which has no Avalonia, so it only checks a token's shape; the UI layer
+/// (<c>Z</c>, <c>OemComma</c>), or of a <c>PhysicalKey</c> for a <see cref="KeyMatch.Physical"/> one (<c>H</c>,
+/// <c>BracketLeft</c>, <c>Digit1</c>). This type is in Core, which has no Avalonia, so it only checks a token's shape; the UI layer
 /// turns tokens into keys and back.
 /// </para>
 /// <para>

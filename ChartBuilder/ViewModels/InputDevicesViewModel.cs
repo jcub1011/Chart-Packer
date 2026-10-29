@@ -12,7 +12,9 @@ using ChartBuilder.Instruments;
 using ChartBuilder.Resources;
 using ChartBuilder.Services;
 using ChartShared.Core.Input;
+using ChartShared.Core.Keybinds;
 using ChartShared.UI.Controls.Highway;
+using ChartShared.UI.Keybinds;
 using ChartShared.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -303,7 +305,7 @@ namespace ChartBuilder.ViewModels
 
         /// <summary>
         /// A key pressed or let go in the window: it lights the chips it's bound to, and while Bind waits, it's the control to
-        /// bind, and Esc stops waiting. Space, Esc, P and N are the editor's and can't be bound. Only a key to bind is played
+        /// bind, and Esc stops waiting. The keys the editor reserves during a playtest (Space, Esc, P and N by default) can't be bound. Only a key to bind is played
         /// through the devices; the hub only sees the rest (<see cref="InputHub.Observe"/>), so a playtest running meanwhile
         /// isn't played by typing here.
         /// </summary>
@@ -328,7 +330,7 @@ namespace ChartBuilder.ViewModels
                 return true;
             }
 
-            if (key is PhysicalKey.Space or PhysicalKey.Escape or PhysicalKey.P or PhysicalKey.N)
+            if (AppKeys.Map.IsReservedDuringPlaytest(new KeyChord(key.ToString(), KeyMods.None)))
             {
                 _input.ObserveKey(key, down);
                 if (down)

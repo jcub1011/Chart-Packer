@@ -65,7 +65,7 @@
             <Setter Property="TextWrapping" Value="Wrap" />
             <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
         </Style>
-        <!-- A key: a button that waits for its replacement, labelled as the key is on a keyboard. -->
+        <!-- A key: a button that opens a menu to change or delete it, labelled as the key is on a keyboard. -->
         <Style Selector="Button.keycap">
             <Setter Property="MinWidth" Value="30" />
             <Setter Property="Padding" Value="8,3" />
@@ -85,11 +85,6 @@
         </Style>
         <Style Selector="Button.keycap.capturing /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource AccentTintBrush}" />
-        </Style>
-        <!-- The small remove button beside a key. -->
-        <Style Selector="Button.tool.mini">
-            <Setter Property="Width" Value="22" />
-            <Setter Property="Height" Value="22" />
         </Style>
         <Style Selector="TreeViewItem" x:DataType="kvm:KeybindNodeViewModel">
             <Setter Property="IsExpanded" Value="{Binding IsExpanded}" />
@@ -188,22 +183,23 @@
                                                             </ItemsControl.ItemsPanel>
                                                             <ItemsControl.ItemTemplate>
                                                                 <DataTemplate DataType="kvm:KeyChipViewModel">
-                                                                    <StackPanel Orientation="Horizontal" Spacing="2">
-                                                                        <Button Classes="keycap"
-                                                                                Classes.capturing="{Binding IsCapturing}"
-                                                                                Content="{Binding Label}"
-                                                                                Command="{Binding ChangeCommand}"
-                                                                                IsEnabled="{Binding Row.IsEditable}"
-                                                                                ToolTip.Tip="{x:Static res:SharedStrings.KeybindsChangeToolTip}"
-                                                                                AutomationProperties.Name="{Binding Label}" />
-                                                                        <Button Classes="tool mini"
-                                                                                Command="{Binding RemoveCommand}"
-                                                                                IsVisible="{Binding Row.IsEditable}"
-                                                                                ToolTip.Tip="{x:Static res:SharedStrings.KeybindsRemoveToolTip}"
-                                                                                AutomationProperties.Name="{x:Static res:SharedStrings.KeybindsRemoveToolTip}">
-                                                                            <ctl:LineIcon Data="{StaticResource ClearStroke}" />
-                                                                        </Button>
-                                                                    </StackPanel>
+                                                                    <Button Classes="keycap"
+                                                                            Classes.capturing="{Binding IsCapturing}"
+                                                                            Content="{Binding Label}"
+                                                                            IsEnabled="{Binding Row.IsEditable}"
+                                                                            ToolTip.Tip="{x:Static res:SharedStrings.KeybindsChangeToolTip}"
+                                                                            AutomationProperties.Name="{Binding Label}">
+                                                                        <Button.Flyout>
+                                                                            <MenuFlyout Placement="BottomEdgeAlignedLeft">
+                                                                                <MenuItem Header="{x:Static res:SharedStrings.KeybindsChangeBinding}" Command="{Binding ChangeCommand}">
+                                                                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource PencilStroke}" /></MenuItem.Icon>
+                                                                                </MenuItem>
+                                                                                <MenuItem Header="{x:Static res:SharedStrings.KeybindsDeleteBinding}" Command="{Binding RemoveCommand}">
+                                                                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource TrashStroke}" /></MenuItem.Icon>
+                                                                                </MenuItem>
+                                                                            </MenuFlyout>
+                                                                        </Button.Flyout>
+                                                                    </Button>
                                                                 </DataTemplate>
                                                             </ItemsControl.ItemTemplate>
                                                         </ItemsControl>
@@ -225,23 +221,26 @@
                                                                        IsVisible="{Binding IsLocked}"
                                                                        Text="{x:Static res:SharedStrings.KeybindsFixed}"
                                                                        ToolTip.Tip="{x:Static res:SharedStrings.KeybindsFixedToolTip}" />
+                                                            <!-- Fixed width, so the keys don't shift when the button appears. -->
+                                                            <Panel Width="32">
+                                                                <Button Classes="tool"
+                                                                        Command="{Binding ResetCommand}"
+                                                                        IsVisible="{Binding IsModified}"
+                                                                        ToolTip.Tip="{x:Static res:SharedStrings.KeybindsResetToolTip}"
+                                                                        AutomationProperties.Name="{x:Static res:SharedStrings.KeybindsResetToolTip}">
+                                                                    <ctl:LineIcon Data="{StaticResource UndoStroke}" />
+                                                                </Button>
+                                                            </Panel>
+                                                        </StackPanel>
+
+                                                        <!-- Fixed width too, so the buttons line up down the list when a shortcut can't take another key. -->
+                                                        <Panel Grid.Column="3" Width="32" VerticalAlignment="Center">
                                                             <Button Classes="tool"
                                                                     Command="{Binding AddCommand}"
                                                                     IsVisible="{Binding CanAdd}"
                                                                     ToolTip.Tip="{x:Static res:SharedStrings.KeybindsAddToolTip}"
                                                                     AutomationProperties.Name="{x:Static res:SharedStrings.KeybindsAddToolTip}">
                                                                 <ctl:LineIcon Data="{StaticResource AddStroke}" />
-                                                            </Button>
-                                                        </StackPanel>
-
-                                                        <!-- Fixed width, so the keys don't shift when the button appears. -->
-                                                        <Panel Grid.Column="3" Width="32" VerticalAlignment="Center">
-                                                            <Button Classes="tool"
-                                                                    Command="{Binding ResetCommand}"
-                                                                    IsVisible="{Binding IsModified}"
-                                                                    ToolTip.Tip="{x:Static res:SharedStrings.KeybindsResetToolTip}"
-                                                                    AutomationProperties.Name="{x:Static res:SharedStrings.KeybindsResetToolTip}">
-                                                                <ctl:LineIcon Data="{StaticResource UndoStroke}" />
                                                             </Button>
                                                         </Panel>
                                                     </Grid>
