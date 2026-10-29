@@ -6,6 +6,8 @@ using Avalonia;
 using Avalonia.Controls;
 using ChartPacker.Services;
 using ChartPacker.ViewModels;
+using ChartShared.Core.Keybinds;
+using ChartShared.UI.Keybinds;
 using ChartShared.UI.Views;
 
 namespace ChartPacker.Views
@@ -45,6 +47,8 @@ namespace ChartPacker.Views
 
         public MergeWindow()
         {
+            // Before the preview panel is built, so it finds this window's dispatcher as it attaches and its play/pause key works.
+            new KeyDispatcher(AppKeys.Map, KeyScope.Global).Attach(this);
             InitializeComponent();
             WindowChrome.ShowIcon(this, WindowTitleBar);
             WindowMemory.Remember(this);

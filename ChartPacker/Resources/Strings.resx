@@ -51,13 +51,14 @@
     <value>No folder selected</value>
   </data>
   <data name="RescanToolTip" xml:space="preserve">
-    <value>Search the chosen folder for songs (F5)</value>
+    <value>Search the chosen folder for songs</value>
+    <comment>The shortcut is added after this, as the user has set it.</comment>
   </data>
   <data name="NotScannedHint" xml:space="preserve">
-    <value>Select Scan (F5) to search this folder</value>
+    <value>Select Scan to search this folder</value>
   </data>
   <data name="StaleHint" xml:space="preserve">
-    <value>The list is out of date. Select Scan (F5) to update it.</value>
+    <value>The list is out of date. Select Scan to update it.</value>
   </data>
   <data name="ScanDepthLabel" xml:space="preserve">
     <value>Search depth</value>
@@ -282,18 +283,18 @@
   </data>
   <data name="MenuUndo" xml:space="preserve">
     <value>_Undo</value>
-    <comment>Edit menu (Ctrl+Z).</comment>
+    <comment>Edit menu.</comment>
   </data>
   <data name="MenuRedo" xml:space="preserve">
     <value>_Redo</value>
-    <comment>Edit menu (Ctrl+Y).</comment>
+    <comment>Edit menu.</comment>
   </data>
   <data name="UndoToolTip" xml:space="preserve">
-    <value>Undo the last change to the selected song. Select one song to undo its changes (Ctrl+Z)</value>
+    <value>Undo the last change to the selected song. Select one song to undo its changes</value>
     <comment>Each song keeps its own undo history, so with several songs selected it's disabled rather than undoing them all.</comment>
   </data>
   <data name="RedoToolTip" xml:space="preserve">
-    <value>Apply again the change last undone to the selected song. Select one song to redo its changes (Ctrl+Y)</value>
+    <value>Apply again the change last undone to the selected song. Select one song to redo its changes</value>
   </data>
   <data name="MenuChooseSongsFolder" xml:space="preserve">
     <value>_Choose Songs Folder…</value>
@@ -637,10 +638,10 @@
     <value>Pause</value>
   </data>
   <data name="PlayShortcutToolTip" xml:space="preserve">
-    <value>Play (Space)</value>
+    <value>Play</value>
   </data>
   <data name="PauseShortcutToolTip" xml:space="preserve">
-    <value>Pause (Space)</value>
+    <value>Pause</value>
   </data>
   <data name="StopToolTip" xml:space="preserve">
     <value>Stop and go back to the start</value>
@@ -793,7 +794,7 @@
     <comment>{0} is the file name.</comment>
   </data>
   <data name="SettingsToolTip" xml:space="preserve">
-    <value>Change how songs are scanned, packed and played (Ctrl+,)</value>
+    <value>Change how songs are scanned, packed and played</value>
   </data>
   <data name="SettingsCategoryLibrary" xml:space="preserve">
     <value>Library</value>
@@ -834,7 +835,7 @@
     <value>Scan on launch</value>
   </data>
   <data name="ScanOnLaunchDescription" xml:space="preserve">
-    <value>Scan the songs folder from last time as the app starts. When off, use Scan (F5) to search it.</value>
+    <value>Scan the songs folder from last time as the app starts. When off, use Scan to search it.</value>
   </data>
   <data name="ScanOnLaunchKeywords" xml:space="preserve">
     <value>startup start open automatic auto rescan refresh</value>
@@ -2766,5 +2767,17 @@ Each song is rechecked first. Changed songs, or ones whose kept copy is missing,
   </data>
   <data name="LowerDifficultiesIncludeAllToolTip" xml:space="preserve">
     <value>Tick or untick every song listed here that has something to generate.</value>
+  </data>
+  <data name="KeyCategoryLibrary" xml:space="preserve">
+    <value>Library</value>
+    <comment>Heading in the keyboard shortcuts list over the shortcuts for scanning and searching the song list.</comment>
+  </data>
+  <data name="KeyActionRescan" xml:space="preserve">
+    <value>Rescan Songs Folder</value>
+    <comment>Name of the shortcut that searches the songs folder again, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionSearch" xml:space="preserve">
+    <value>Search Song List</value>
+    <comment>Name of the shortcut that moves focus to the song search box, in the keyboard shortcuts list.</comment>
   </data>
 </root>

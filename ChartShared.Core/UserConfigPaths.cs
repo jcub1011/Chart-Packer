@@ -53,6 +53,12 @@ public static class UserConfigPaths
     public static string UpdateSettingsFile => Path.Combine(ConfigFolder, "update-settings.json");
 
     /// <summary>
+    /// The keyboard shortcuts the user changed, read and written by both apps. Separate from the settings files so a layout
+    /// can be copied, shared and imported on its own.
+    /// </summary>
+    public static string KeybindsFile => Path.Combine(ConfigFolder, "keybinds.json");
+
+    /// <summary>
     /// Where Chart Builder autosaves the chart open, for recovery after a crash (charter-spec C15 item 6,
     /// <c>RecoveryStore</c>). Never inside a song.
     /// </summary>

@@ -15,10 +15,12 @@ using ChartPacker.Views;
 using ChartShared.Audio.Playback;
 using ChartShared.Core;
 using ChartShared.Core.Charting.Saving;
+using ChartShared.Core.Keybinds;
 using ChartShared.Core.Scanning;
 using ChartShared.Core.Settings;
 using ChartShared.Ffmpeg;
 using ChartShared.UI;
+using ChartShared.UI.Keybinds;
 using ChartShared.UI.Services;
 using ChartShared.UI.ViewModels.Settings;
 using ChartShared.UI.Views;
@@ -43,6 +45,8 @@ namespace ChartPacker
                 var settings = SettingsService.Load(UserConfigPaths.SettingsFile);
                 // Every window opens as it last closed, the main window where it was too, so this comes before any is made.
                 WindowMemory.Use(settings.Settings, settings.Save);
+                // The keys come before any window, which registers its handlers and shows them in its menus as it's made.
+                AppKeys.Use(KeybindsService.Load(UserConfigPaths.KeybindsFile, PackerKeys.Catalog()));
                 var window = new MainWindow();
                 var folderPicker = new AvaloniaFolderPickerService(() => window);
                 var imagePicker = new AvaloniaImagePickerService(() => window);
@@ -151,6 +155,7 @@ namespace ChartPacker
                     drafts,
                     confirmation,
                     settingsWindow,
+                    new AvaloniaKeybindsWindowService(() => window, Strings.AppName),
                     notice,
                     downloads,
                     folderPicker);
