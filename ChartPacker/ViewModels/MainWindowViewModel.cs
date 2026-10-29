@@ -22,6 +22,7 @@ namespace ChartPacker.ViewModels
         private readonly MetadataDraftStore _drafts;
         private readonly IConfirmationService _confirmation;
         private readonly ISettingsWindowService _settingsWindow;
+        private readonly IKeybindsWindowService _keybindsWindow;
         private readonly DownloadService _downloads;
         private readonly IFolderPickerService _folderPicker;
 
@@ -32,6 +33,7 @@ namespace ChartPacker.ViewModels
             MetadataDraftStore drafts,
             IConfirmationService confirmation,
             ISettingsWindowService settingsWindow,
+            IKeybindsWindowService keybindsWindow,
             NoticeViewModel notice,
             DownloadService downloads,
             IFolderPickerService folderPicker)
@@ -42,6 +44,7 @@ namespace ChartPacker.ViewModels
             _drafts = drafts;
             _confirmation = confirmation;
             _settingsWindow = settingsWindow;
+            _keybindsWindow = keybindsWindow;
             _downloads = downloads;
             _folderPicker = folderPicker;
             Notice = notice;
@@ -179,6 +182,10 @@ namespace ChartPacker.ViewModels
 
         [RelayCommand]
         private Task OpenSettingsAsync() => _settingsWindow.ShowAsync();
+
+        /// <summary>The Edit menu's Shortcuts: the window where the keyboard shortcuts are changed.</summary>
+        [RelayCommand]
+        private Task OpenShortcutsAsync() => _keybindsWindow.ShowAsync();
 
         /// <summary>The File menu's Choose Download Location tooltip: the folder downloads go to.</summary>
         [ObservableProperty]

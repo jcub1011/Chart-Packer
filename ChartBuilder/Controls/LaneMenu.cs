@@ -7,6 +7,7 @@ using Avalonia;
 using Avalonia.Controls;
 using ChartBuilder.ViewModels;
 using ChartShared.UI.Controls;
+using ChartShared.UI.Keybinds;
 
 namespace ChartBuilder.Controls
 {
@@ -40,15 +41,24 @@ namespace ChartBuilder.Controls
         public static void SetItems(Control control, IReadOnlyList<LaneMenuItem>? items) => control.SetValue(ItemsProperty, items);
 
         /// <summary>The menu items of <paramref name="items"/>, for a <c>MenuFlyout</c>'s <c>ItemsSource</c>.</summary>
-        public static List<Control> MenuItems(IReadOnlyList<LaneMenuItem> items) => [.. items.Select(item => item.IsSeparator ? (Control)new Separator() : new MenuItem
+        public static List<Control> MenuItems(IReadOnlyList<LaneMenuItem> items) => [.. items.Select(item => item.IsSeparator ? (Control)new Separator() : MenuItemOf(item))];
+
+        private static MenuItem MenuItemOf(LaneMenuItem item)
         {
-            Header = item.Header,
-            Command = item.Command,
-            InputGesture = item.Gesture,
-            IsEnabled = item.IsEnabled,
-            ItemsSource = item.Items is { } inner ? MenuItems(inner) : null,
-            Icon = LineIcon.For(item.IsChecked ? "CheckStroke" : item.Icon),
-        })];
+            var menuItem = new MenuItem
+            {
+                Header = item.Header,
+                Command = item.Command,
+                IsEnabled = item.IsEnabled,
+                ItemsSource = item.Items is { } inner ? MenuItems(inner) : null,
+                Icon = LineIcon.For(item.IsChecked ? "CheckStroke" : item.Icon),
+            };
+
+            // Its shortcut text is the action's key as it is when the menu is shown.
+            if (item.ActionId is { } action)
+                Shortcut.SetAction(menuItem, action);
+            return menuItem;
+        }
 
         // A submenu has to have its items before it opens, to show it has any; a button's are made as its menu opens.
         private static void OnItemsChanged(Control control, AvaloniaPropertyChangedEventArgs e)

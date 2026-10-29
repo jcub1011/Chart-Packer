@@ -2,6 +2,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:ChartBuilder.ViewModels"
         xmlns:res="using:ChartBuilder.Resources"
+        xmlns:svc="using:ChartBuilder.Services"
+        xmlns:kb="using:ChartShared.UI.Keybinds"
         xmlns:sres="using:ChartShared.UI.Resources"
         xmlns:ui="using:ChartShared.UI.Controls"
         xmlns:hw="using:ChartShared.UI.Controls.Highway"
@@ -439,7 +441,7 @@
                                 <Button Classes="tool"
                                         Command="{Binding Playback.PlayPauseCommand}"
                                         IsEnabled="{Binding Playback.IsReady}"
-                                        ToolTip.Tip="{Binding Playback.PlayPauseToolTip}"
+                                        kb:Shortcut.Tip="{Binding Playback.PlayPauseToolTip}" kb:Shortcut.Action="{x:Static kb:SharedKeys.PlayPause}"
                                         AutomationProperties.Name="{x:Static res:Strings.PlayPauseButton}">
                                     <Panel>
                                         <ui:LineIcon Width="12" Height="12" Data="{StaticResource PlayStroke}" IsVisible="{Binding !Playback.IsPlaying}" />
@@ -572,7 +574,7 @@
                             Content="{Binding ApplyText}"
                             IsEnabled="{Binding CanApply}"
                             Click="OnApply"
-                            ToolTip.Tip="{Binding ApplyToolTip}"
+                            kb:Shortcut.Tip="{Binding ApplyToolTip}" kb:Shortcut.Action="{x:Static svc:BuilderKeys.ApplyPhrases}"
                             AutomationProperties.Name="{Binding ApplyText}" />
                 </StackPanel>
             </Grid>

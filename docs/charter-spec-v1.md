@@ -2987,12 +2987,30 @@ it is made):
 
 ## 9. Keyboard shortcuts
 
-These are the defaults. Rebinding is future work.
+These are the defaults. Every shortcut can be rebound in the **Shortcuts** window (Edit menu, in
+both apps) except the fixed ones: Undo and Redo, Cut, Copy, Paste, Select all, Delete, Esc, and
+the mouse gestures, which the window lists but doesn't change. Each is an *action* with an id
+(`file.save`, `builder.note.forceHopo`), listed under a category, and may have several keys. The
+window stages its edits (Cancel drops them), warns when a key is already another action's in a
+window where both are live, refuses a key the operating system keeps (`Alt+F4`, and the like) and a
+key with no modifier for an action that doesn't allow one, and imports, exports and resets layouts. The
+changes are kept in `keybinds.json`, which both apps share ([§10](#10-settings)): a rebind made in
+one is picked up by the other when its window is next activated.
 
-- Shortcuts act on the focused editor canvas. Tab is never taken, so focus can always move out of
-  the canvas.
+- The canvas's shortcuts act on the focused lane canvas, and only while it has focus, so a focused
+  combo box or button never takes them. Tab is never taken, so focus can always move out of the
+  canvas. The window's own (New, Open, Save, Settings, Go to, Find, Undo, Redo, Space, and the tool
+  keys with `L`) act wherever focus is, except in a text box, which keeps every key that types, and
+  Undo and Redo.
 - Letter, digit and bracket keys are matched by **physical key** (Avalonia's `PhysicalKey`), so
-  they sit in the same place on every keyboard layout.
+  they sit in the same place on every keyboard layout. The window's commands (`Ctrl+N`, `F3`, and so
+  on) are matched by the character the layout gives the key.
+- A key pressed and held runs its action once, except the ones that repeat: the cursor, section,
+  tempo change and measure steps, moving the selection, snap, look-ahead.
+- During a playtest the keys of play/pause, playtest on or off, the next problem and cancel
+  (Space, `P`, `N` and Esc by default) are the editor's, and can't be instrument keys; those come
+  from `input-bindings.json` ([C19](#c19-playtest-and-instrument-input)), which the Input devices
+  window won't let bind them.
 - On macOS, `Ctrl` in this table is `Cmd`.
 
 | Keys | Action |
@@ -3001,7 +3019,7 @@ These are the defaults. Rebinding is future work.
 | `0` | Open note, or drum kick (as `1`–`5`, while the song plays) |
 | `Shift`+`0` | 2× kick (Expert drums; as `1`–`5`, while the song plays) |
 | `Space` | Play or pause from the cursor |
-| `↑` / `↓` (Highway), `→` / `←` (Timeline) | Move the cursor one grid step later or earlier |
+| `↑` / `↓` (Highway), `→` / `←` (Timeline) | Move the cursor one grid step later or earlier; `Shift` with them does the same |
 | `Alt`+arrows | Move the selection one grid step in time, or one lane across |
 | `Alt`+`Shift`+arrows across | Shift the selected notes a lane, each stopping at the edge |
 | `Alt`+`→` / `←`, `Alt`+`↑` / `↓` (vocal lane) | Move the selected vocal notes one grid step, or one semitone |
@@ -3042,6 +3060,9 @@ These are the defaults. Rebinding is future work.
 | `Esc` | Cancel a pass of record mode; else take back a drag; else clear the selection |
 | `F11` | In the preview's window, full screen on or off; Esc leaves it |
 | `Ctrl`+`S` | Save |
+| `Ctrl`+`N` / `Ctrl`+`O` | New chart; open a song |
+| `Ctrl`+`,` | Program settings |
+| `Ctrl`+`E` | In the Settings window (both apps): go to the search box |
 
 Mouse gestures on a highway's lane (a vocal lane keeps its own, [C3](#c3-editor-layout) item 7).
 Switching tools keeps the selection; placing notes, by mouse or key, leaves nothing selected.
@@ -3088,6 +3109,7 @@ settings.
 | `builder-settings.json` | Chart Builder (`BuilderSettings`) | Every setting in the table below except the latency and the reduction rules, plus the Editor window's layout (each side panel's width and whether it's collapsed, and the timeline's height), the recent songs, the last parent folder used for a new chart, and how far ahead the preview looks |
 | `audio-latency.json` | The calibration tool, which both apps open | The audio/visual latency. Chart Packer reads it for the inspector ([C11](#c11-calibration-tool)), and re-reads it when the tool closes and when its window is activated ([§4.8](#48-launching-and-coordination)). |
 | `input-bindings.json` | Chart Builder's Input devices window | Each instrument profile's bindings, and each device's input offset and MIDI settings ([C19](#c19-playtest-and-instrument-input)). Enums are saved by name. |
+| `keybinds.json` | Both apps (the Shortcuts window) | The keyboard shortcuts the user changed ([§9](#9-keyboard-shortcuts)): action id to its keys, with only the actions that differ from their defaults, so an action a later version adds has its defaults. Shared by both apps and merged by action id, so rebinding Save in one rebinds it in the other. Keys are written as `Ctrl+Shift+Z`, `Alt+Digit1`: a key's name for a window's commands, a key's position for the canvas's. |
 | `reduction-rules.json` | Both apps | The default difficulty reduction rules ([C9](#c9-difficulty-authoring)): Chart Builder's Reduce dialog and Settings, and Chart Packer's Validator, which generates a song's missing difficulties by them ([C16](#c16-chart-lint)). Each saves only the sets it changed. Until it's first saved, they're read from `builder-settings.json`'s `ReductionRules`, where an older Chart Builder kept them. |
 
 Settings are edited in Chart Builder's own Settings window, which uses the shared settings window
@@ -3201,7 +3223,6 @@ fails the run if anything there changes anyway.
   ([C19](#c19-playtest-and-instrument-input)).
 - MIDI devices on macOS and Linux.
 - Keeping and replaying a playtest performance, judged again against the chart as it changes.
-- Rebindable editor shortcuts (instrument bindings are in C19).
 - The suggested rating shown in the library and inspector as well as Chart Builder.
 - The difficulty model's values used by other tools for drums and six-fret, such as finding solos
   or placing star power.

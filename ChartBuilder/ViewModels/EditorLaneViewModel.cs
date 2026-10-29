@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using Avalonia.Input;
 using ChartBuilder.Resources;
+using ChartBuilder.Services;
 using ChartShared.Core.Charting;
 using ChartShared.Core.Charting.Authoring;
 using ChartShared.Core.Charting.Commands;
@@ -31,7 +31,7 @@ namespace ChartBuilder.ViewModels
 
         // What the header's letters and menus were made from last, so an edit that changes none of it doesn't make them
         // again: the track, the ghost, the part, which of its difficulties have notes, and a vocal part as read.
-        private (ChartTrackKey? Track, ChartDifficulty? Ghost, EditablePart? Part, int WithNotes, VocalLane? Vocals)? _difficultiesOf;
+        private (ChartTrackKey? Track, ChartDifficulty? Ghost, EditablePart? Part, int WithNotes, VocalLane? Vocals, LaneView View)? _difficultiesOf;
 
         internal EditorLaneViewModel(LaneDockViewModel dock, DockLane lane)
         {
@@ -224,7 +224,7 @@ namespace ChartBuilder.ViewModels
 
             // A vocal track re-ticked or put back by an undo is read again, so it's another part as read.
             var vocals = Vocal is { } vocal ? Editor?.Session.VocalsOf(vocal) : null;
-            var of = (Track, Ghost, part, withNotes, vocals);
+            var of = (Track, Ghost, part, withNotes, vocals, View);
             if (_difficultiesOf == of)
                 return;
             _difficultiesOf = of;
@@ -298,20 +298,21 @@ namespace ChartBuilder.ViewModels
                 LaneMenuItem.Action(Strings.LaneReduce, part.HasNotes, () => _ = editor.ReduceAsync(track), "SortDescendingStroke"),
                 .. generate,
                 LaneMenuItem.Action(Strings.LaneSelectLane, hasNotes, () => editor.Session.Tools.SelectLane(track), "SelectStroke"),
-                LaneMenuItem.Action(Strings.LaneSelectSection, true, () => editor.Session.Tools.SelectSectionAtCursor(), "SelectStroke"),
-                LaneMenuItem.Action(Strings.LaneCut, true, editor.Cut, "CutStroke"),
-                LaneMenuItem.Action(Strings.LaneCopy, true, editor.Copy, "CopyStroke"),
+                LaneMenuItem.Action(Strings.LaneSelectSection, true, () => editor.Session.Tools.SelectSectionAtCursor(), "SelectStroke", BuilderKeys.SelectSection),
+                LaneMenuItem.Action(Strings.LaneCut, true, editor.Cut, "CutStroke", BuilderKeys.Cut),
+                LaneMenuItem.Action(Strings.LaneCopy, true, editor.Copy, "CopyStroke", BuilderKeys.Copy),
                 // This menu is made ahead of the selection and the clipboard, which it can't follow, so these stay on and say
                 // why when there's nothing to do; the right-click menu is made as it opens, and dims them.
-                LaneMenuItem.Action(Strings.LanePaste, true, () => PasteFromClipboard(editor, PasteMode.Overwrite, null), "PasteStroke"),
-                LaneMenuItem.Action(Strings.LanePasteMerge, true, () => PasteFromClipboard(editor, PasteMode.Merge, null), "PasteMergeStroke"),
-                LaneMenuItem.Action(Strings.LaneDelete, true, editor.Session.Tools.DeleteSelection, "TrashStroke"),
-                LaneMenuItem.Action(Strings.LaneQuantize, true, editor.QuantizeSelection, "QuantizeStroke", new KeyGesture(Key.Q, KeyModifiers.Control)),
+                LaneMenuItem.Action(Strings.LanePaste, true, () => PasteFromClipboard(editor, PasteMode.Overwrite, null), "PasteStroke", BuilderKeys.Paste),
+                LaneMenuItem.Action(Strings.LanePasteMerge, true, () => PasteFromClipboard(editor, PasteMode.Merge, null), "PasteMergeStroke", BuilderKeys.PasteMerge),
+                LaneMenuItem.Action(Strings.LaneDelete, true, editor.Session.Tools.DeleteSelection, "TrashStroke", BuilderKeys.Delete),
+                LaneMenuItem.Action(Strings.LaneQuantize, true, editor.QuantizeSelection, "QuantizeStroke", BuilderKeys.Quantize),
                 LaneMenuItem.Submenu(Strings.LaneTransform,
                 [
                     LaneMenuItem.Action(Strings.TransformLeftyFlip, true, editor.Session.Tools.LeftyFlip, "FlipStroke"),
-                    LaneMenuItem.Action(Strings.TransformShiftUp, true, () => editor.Session.Tools.ShiftLanes(1), "ArrowRightStroke"),
-                    LaneMenuItem.Action(Strings.TransformShiftDown, true, () => editor.Session.Tools.ShiftLanes(-1), "ArrowLeftStroke"),
+                    // The keys that shift a lane across are the arrows across the view: right and left up a highway, down and up a timeline.
+                    LaneMenuItem.Action(Strings.TransformShiftUp, true, () => editor.Session.Tools.ShiftLanes(1), "ArrowRightStroke", IsTimeline ? BuilderKeys.SelectionShiftDown : BuilderKeys.SelectionShiftRight),
+                    LaneMenuItem.Action(Strings.TransformShiftDown, true, () => editor.Session.Tools.ShiftLanes(-1), "ArrowLeftStroke", IsTimeline ? BuilderKeys.SelectionShiftUp : BuilderKeys.SelectionShiftLeft),
                     LaneMenuItem.Action(Strings.TransformClearSustains, true, () => editor.Session.Tools.SetSustains(SustainChange.Clear), "ClearStroke"),
                     LaneMenuItem.Action(Strings.TransformGridSustains, true, () => editor.Session.Tools.SetSustains(SustainChange.GridStep), "SustainStroke"),
                     LaneMenuItem.Action(Strings.TransformSustainsUntilNext, true, () => editor.Session.Tools.SetSustains(SustainChange.UntilNextNote), "SustainToNextStroke"),
@@ -328,6 +329,9 @@ namespace ChartBuilder.ViewModels
         }
 
         partial void OnGhostChanged(ChartDifficulty? value) => RefreshDifficulties();
+
+        // The edit menu's shortcut keys follow the view: the arrows that shift a lane across differ between a highway and a timeline.
+        partial void OnViewChanged(LaneView value) => RefreshDifficulties();
 
         partial void OnLookAheadChanged(double value)
         {
@@ -355,6 +359,7 @@ namespace ChartBuilder.ViewModels
         {
             Difficulty = difficulty;
             Name = name;
+            KeyAction = BuilderKeys.DifficultyActions[Math.Clamp((int)difficulty, 0, BuilderKeys.DifficultyActions.Count - 1)];
             HasNotes = hasNotes;
             IsCurrent = isCurrent;
             Show = show;
@@ -363,6 +368,9 @@ namespace ChartBuilder.ViewModels
         public ChartDifficulty Difficulty { get; }
 
         public string Name { get; }
+
+        /// <summary>The action whose key shows this difficulty: Ctrl and 1 to 4 by default.</summary>
+        public string KeyAction { get; }
 
         [ObservableProperty]
         public partial bool HasNotes { get; set; }

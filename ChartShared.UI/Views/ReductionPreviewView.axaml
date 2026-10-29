@@ -6,6 +6,7 @@
              xmlns:res="using:ChartShared.UI.Resources"
              xmlns:ui="using:ChartShared.UI.Controls"
              xmlns:hw="using:ChartShared.UI.Controls.Highway"
+             xmlns:kb="using:ChartShared.UI.Keybinds"
              mc:Ignorable="d" d:DesignWidth="560" d:DesignHeight="520"
              x:Class="ChartShared.UI.Views.ReductionPreviewView"
              x:DataType="vm:ReductionPreviewViewModel">
@@ -19,7 +20,8 @@
                     <Button Classes="tool"
                             Command="{Binding PlayPauseCommand}"
                             IsEnabled="{Binding Playback.IsReady}"
-                            ToolTip.Tip="{x:Static res:SharedStrings.ReductionPreviewPlayToolTip}"
+                            kb:Shortcut.Action="media.playPause"
+                            kb:Shortcut.Tip="{x:Static res:SharedStrings.ReductionPreviewPlayPauseButton}"
                             AutomationProperties.Name="{x:Static res:SharedStrings.ReductionPreviewPlayPauseButton}">
                         <Panel>
                             <ui:LineIcon Width="12" Height="12" Data="{StaticResource PlayStroke}" IsVisible="{Binding !Playback.IsPlaying}" />
@@ -28,14 +30,16 @@
                     </Button>
                     <Button Classes="tool"
                             Command="{Binding PreviousChangeCommand}"
-                            ToolTip.Tip="{x:Static res:SharedStrings.ReductionPreviewPreviousToolTip}"
+                            kb:Shortcut.Action="reduction.previousChange"
+                            kb:Shortcut.Tip="{x:Static res:SharedStrings.ReductionPreviewPreviousToolTip}"
                             AutomationProperties.Name="{x:Static res:SharedStrings.ReductionPreviewPreviousToolTip}">
                         <ui:LineIcon Width="12" Height="12" Data="{StaticResource SkipPreviousStroke}" />
                     </Button>
                     <TextBlock FontSize="12" FontFeatures="tnum" VerticalAlignment="Center" MinWidth="48" TextAlignment="Center" Text="{Binding StopText}" />
                     <Button Classes="tool"
                             Command="{Binding NextChangeCommand}"
-                            ToolTip.Tip="{x:Static res:SharedStrings.ReductionPreviewNextToolTip}"
+                            kb:Shortcut.Action="reduction.nextChange"
+                            kb:Shortcut.Tip="{x:Static res:SharedStrings.ReductionPreviewNextToolTip}"
                             AutomationProperties.Name="{x:Static res:SharedStrings.ReductionPreviewNextToolTip}">
                         <ui:LineIcon Width="12" Height="12" Data="{StaticResource SkipNextStroke}" />
                     </Button>

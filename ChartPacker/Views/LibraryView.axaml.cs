@@ -1,25 +1,21 @@
+using System;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using ChartPacker.Services;
 using ChartPacker.ViewModels;
-using CommunityToolkit.Mvvm.Input;
+using ChartShared.UI.Keybinds;
 
 namespace ChartPacker.Views
 {
     public partial class LibraryView : UserControl
     {
-        // Ctrl+F anywhere in the window goes to the search box.
-        private readonly KeyBinding _focusSearch;
+        // The search key, anywhere in the window, goes to the search box, while the list is in one.
+        private IDisposable? _searchKey;
 
         public LibraryView()
         {
             InitializeComponent();
-
-            _focusSearch = new KeyBinding
-            {
-                Gesture = new KeyGesture(Key.F, KeyModifiers.Control),
-                Command = new RelayCommand(FocusSearch),
-            };
 
             // The list only creates rows for what's on screen; the view model loads album art for those.
             EntryList.ContainerPrepared += (_, e) =>
@@ -37,19 +33,23 @@ namespace ChartPacker.Views
         protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
         {
             base.OnAttachedToVisualTree(e);
-            TopLevel.GetTopLevel(this)?.KeyBindings.Add(_focusSearch);
+            _searchKey = KeyDispatcher.Of(TopLevel.GetTopLevel(this))?.On(PackerKeys.Search, FocusSearch);
         }
 
         protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
         {
-            TopLevel.GetTopLevel(this)?.KeyBindings.Remove(_focusSearch);
+            _searchKey?.Dispose();
+            _searchKey = null;
             base.OnDetachedFromVisualTree(e);
         }
 
-        private void FocusSearch()
+        private bool FocusSearch()
         {
-            if (SearchBox.IsEffectivelyVisible && SearchBox.Focus(NavigationMethod.Tab))
-                SearchBox.SelectAll();
+            if (!SearchBox.IsEffectivelyVisible || !SearchBox.Focus(NavigationMethod.Tab))
+                return false;
+
+            SearchBox.SelectAll();
+            return true;
         }
     }
 }

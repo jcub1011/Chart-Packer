@@ -12,6 +12,7 @@ using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charting.Layout;
 using ChartShared.Core.Charts;
 using ChartShared.Core.Input;
+using ChartShared.UI.Keybinds;
 using ChartShared.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -262,7 +263,10 @@ namespace ChartBuilder.ViewModels
                 CultureInfo.CurrentCulture,
                 mode == RecordMode.Overwrite ? Strings.RecordingOverwriteFormat : Strings.RecordingMergeFormat,
                 ChartLabels.InstrumentName(key.Instrument),
-                ChartLabels.DifficultyName(key.Difficulty)),
+                ChartLabels.DifficultyName(key.Difficulty),
+                AppKeys.Map.Display(SharedKeys.PlayPause),
+                AppKeys.Map.Display(BuilderKeys.Cancel),
+                AppKeys.Map.Display(BuilderKeys.RecordToggle)),
                 RecordMessageKey);
         }
 

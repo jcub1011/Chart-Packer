@@ -1,7 +1,9 @@
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Input;
+using ChartBuilder.Services;
 using ChartBuilder.ViewModels;
+using ChartShared.Core.Keybinds;
+using ChartShared.UI.Keybinds;
 using ChartShared.UI.Views;
 
 namespace ChartBuilder.Views
@@ -11,6 +13,7 @@ namespace ChartBuilder.Views
     {
         public PreviewWindow()
         {
+            RegisterKeys();
             InitializeComponent();
             WindowChrome.ShowIcon(this, WindowTitleBar);
             WindowMemory.Remember(this);
@@ -25,27 +28,35 @@ namespace ChartBuilder.Views
                 titleBar.IsVisible = change.GetNewValue<WindowState>() != WindowState.FullScreen;
         }
 
-        protected override void OnKeyDown(KeyEventArgs e)
+        /// <summary>
+        /// The window's keys are the app's <see cref="KeyMap"/>: Space plays or pauses, F11 goes full screen and back, and Esc
+        /// leaves it. Before the window's content is built, so what it holds finds the dispatcher as it attaches.
+        /// </summary>
+        private void RegisterKeys()
         {
-            base.OnKeyDown(e);
-            if (e.Handled)
-                return;
-            switch (e.Key)
+            var keys = new KeyDispatcher(AppKeys.Map, BuilderKeys.Preview);
+            keys.Attach(this);
+
+            keys.On(SharedKeys.PlayPause, () =>
             {
-                case Key.F11:
-                    WindowState = WindowState == WindowState.FullScreen ? WindowState.Normal : WindowState.FullScreen;
-                    e.Handled = true;
-                    break;
-                case Key.Escape when WindowState == WindowState.FullScreen:
-                    WindowState = WindowState.Normal;
-                    e.Handled = true;
-                    break;
-                case Key.Space when e.KeyModifiers == KeyModifiers.None && DataContext is PreviewViewModel preview:
-                    if (preview.Playback.PlayPauseCommand.CanExecute(null))
-                        preview.Playback.PlayPauseCommand.Execute(null);
-                    e.Handled = true;
-                    break;
-            }
+                if (DataContext is not PreviewViewModel preview)
+                    return false;
+                if (preview.Playback.PlayPauseCommand.CanExecute(null))
+                    preview.Playback.PlayPauseCommand.Execute(null);
+                return true;
+            });
+            keys.On(BuilderKeys.PreviewFullScreen, () =>
+            {
+                WindowState = WindowState == WindowState.FullScreen ? WindowState.Normal : WindowState.FullScreen;
+                return true;
+            });
+            keys.On(BuilderKeys.PreviewExitFullScreen, () =>
+            {
+                if (WindowState != WindowState.FullScreen)
+                    return false;
+                WindowState = WindowState.Normal;
+                return true;
+            });
         }
     }
 }

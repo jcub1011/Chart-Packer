@@ -1,8 +1,11 @@
 using System;
+using System.Windows.Input;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Threading;
+using ChartPacker.Services;
 using ChartPacker.ViewModels;
+using ChartShared.UI.Keybinds;
 using ChartShared.UI.Views;
 
 namespace ChartPacker.Views
@@ -17,6 +20,8 @@ namespace ChartPacker.Views
 
         public MainWindow()
         {
+            // Before the panels are built, so the library and the detail panel find the dispatcher as they attach.
+            RegisterKeys();
             InitializeComponent();
 
             // The splitter positions are view state, so they're applied and captured here rather than bound.
@@ -34,27 +39,39 @@ namespace ChartPacker.Views
             AddHandler(DragDrop.DragOverEvent, OnDragOver);
             AddHandler(DragDrop.DropEvent, OnDrop);
 
-            // Ctrl+Shift+Z can't be a key binding, as a text box doesn't handle it and it would redo the song while typing.
-            AddHandler(KeyDownEvent, OnRedoKeyDown);
-
-            // Coming back from Chart Builder, the songs it may have saved are read again (charter-spec §4.8).
+            // Coming back from Chart Builder, the songs it may have saved are read again (charter-spec §4.8), and so are
+            // the keys it may have rebound.
             Activated += (_, _) =>
             {
+                AppKeys.ReloadIfChanged();
                 if (DataContext is MainWindowViewModel vm)
                     _ = vm.OnActivatedAsync();
             };
         }
 
-        private void OnRedoKeyDown(object? sender, KeyEventArgs e)
+        /// <summary>
+        /// The window's keys are the app's <see cref="KeyMap"/>, not bindings of its own, so rebinding one moves it here too. A
+        /// command that can't run now leaves its key to whatever else would take it.
+        /// </summary>
+        private void RegisterKeys()
         {
-            if (e is not { Key: Key.Z, KeyModifiers: KeyModifiers.Control | KeyModifiers.Shift } || e.Source is TextBox)
-                return;
+            var keys = new KeyDispatcher(AppKeys.Map, PackerKeys.Main);
+            keys.Attach(this);
 
-            if (DataContext is MainWindowViewModel vm && vm.Detail.RedoCommand.CanExecute(null))
-            {
-                vm.Detail.RedoCommand.Execute(null);
-                e.Handled = true;
-            }
+            keys.On(PackerKeys.Rescan, () => Run(vm => vm.Library.RescanCommand));
+            keys.On(SharedKeys.Settings, () => Run(vm => vm.OpenSettingsCommand));
+            keys.On(SharedKeys.Save, () => Run(vm => vm.Detail.SaveCommand));
+            keys.On(SharedKeys.Undo, () => Run(vm => vm.Detail.UndoCommand));
+            keys.On(SharedKeys.Redo, () => Run(vm => vm.Detail.RedoCommand));
+        }
+
+        private bool Run(Func<MainWindowViewModel, ICommand> command)
+        {
+            if (DataContext is not MainWindowViewModel vm || command(vm) is not { } run || !run.CanExecute(null))
+                return false;
+
+            run.Execute(null);
+            return true;
         }
 
         private void OnDragOver(object? sender, DragEventArgs e)

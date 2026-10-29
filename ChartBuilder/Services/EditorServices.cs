@@ -27,6 +27,7 @@ namespace ChartBuilder.Services
     /// <param name="OpenInputDevices">Opens the Input devices window, where the bindings are set.</param>
     /// <param name="Reveal">Shows the song's folder or <c>.sng</c> in the file manager, from the title bar.</param>
     /// <param name="JumpList">The recent songs in the taskbar button's right-click menu, listed again as the Recent list changes.</param>
+    /// <param name="Keybinds">Shows the Shortcuts window, where the keyboard shortcuts are changed.</param>
     public sealed record EditorServices(
         BuilderSettingsService Settings,
         ISettingsWindowService SettingsWindow,
@@ -48,5 +49,6 @@ namespace ChartBuilder.Services
         InputService Input,
         Action OpenInputDevices,
         IFileRevealService Reveal,
-        IJumpListService JumpList);
+        IJumpListService JumpList,
+        IKeybindsWindowService Keybinds);
 }

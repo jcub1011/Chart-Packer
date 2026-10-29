@@ -16,6 +16,7 @@ using ChartShared.Audio.Waveforms;
 using ChartShared.Core.Metadata;
 using ChartShared.Core.Scanning;
 using ChartShared.Core.Settings;
+using ChartShared.UI.Keybinds;
 using ChartShared.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -124,6 +125,9 @@ namespace ChartPacker.ViewModels
         {
             _settings = settings;
             _latencyFile = latency;
+            // The tooltip shows the play/pause key, so it's worded again when that's rebound. Undone in Dispose: the event
+            // outlives this, and a window's player is made and disposed with it.
+            AppKeys.Changed += OnKeysChanged;
             Volume = settings.Settings.MasterVolume;
             PlaybackSpeed = settings.PlaybackSpeed;
             PitchCorrection = settings.Settings.PitchCorrection;
@@ -500,7 +504,8 @@ namespace ChartPacker.ViewModels
         public string? LengthToolTip => IsLengthKnown ? null : Strings.LengthPendingToolTip;
 
         /// <summary>What the play button does now, with Space, which does the same from anywhere in the window.</summary>
-        public string PlayPauseToolTip => FilesHeldNote ?? (IsPlaying ? Strings.PauseShortcutToolTip : Strings.PlayShortcutToolTip);
+        public string PlayPauseToolTip =>
+            FilesHeldNote ?? Shortcut.WithKey(IsPlaying ? Strings.PauseShortcutToolTip : Strings.PlayShortcutToolTip, SharedKeys.PlayPause);
 
         /// <summary>
         /// Shows <paramref name="tracks"/> of <paramref name="entry"/>. When they're the tracks
@@ -646,8 +651,11 @@ namespace ChartPacker.ViewModels
             return true;
         }
 
+        private void OnKeysChanged(object? sender, EventArgs e) => OnPropertyChanged(nameof(PlayPauseToolTip));
+
         public void Dispose()
         {
+            AppKeys.Changed -= OnKeysChanged;
             _timer.Stop();
             _waveformsChangedTimer?.Dispose();
             _waveformsChangedTimer = null;

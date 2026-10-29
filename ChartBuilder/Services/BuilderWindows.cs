@@ -175,7 +175,8 @@ namespace ChartBuilder.Services
             input,
             ShowInputDevices,
             new FileRevealService(() => editor),
-            jumpList);
+            jumpList,
+            new AvaloniaKeybindsWindowService(() => editor, Strings.AppName));
 
         /// <summary>
         /// Opens the Editor <paramref name="create"/> makes in the Editor window in place of what's open, letting go of that

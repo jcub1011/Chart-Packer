@@ -5,8 +5,11 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
+using ChartBuilder.Services;
 using ChartBuilder.ViewModels;
+using ChartShared.Core.Keybinds;
 using ChartShared.UI.Controls;
+using ChartShared.UI.Keybinds;
 using ChartShared.UI.Views;
 
 namespace ChartBuilder.Views
@@ -17,12 +20,13 @@ namespace ChartBuilder.Views
     /// </summary>
     public partial class GeneratePhrasesWindow : Window
     {
-        private bool _spaceHeld;
         private Flyout? _regenerateFlyout;
         private GeneratePhrasesViewModel? _attached;
 
         public GeneratePhrasesWindow()
         {
+            // Before the window's content is built, so what it holds finds the dispatcher as it attaches.
+            RegisterKeys();
             InitializeComponent();
             WindowChrome.ShowIcon(this, WindowTitleBar);
             WindowMemory.Remember(this);
@@ -30,10 +34,49 @@ namespace ChartBuilder.Views
             DataContextChanged += (_, _) => AttachViewModel();
             Closed += (_, _) => DetachViewModel();
 
-            // Space is the transport's, never a focused button's: a button would click on the key up of a space it never
-            // saw pressed, so both are taken first.
+            // Esc closes the question first, rather than cancelling the window's plan while it's still open. Not a shortcut
+            // to change: it's what the window's Cancel does, as its default button does Enter.
             AddHandler(KeyDownEvent, OnPreviewKeyDown, RoutingStrategies.Tunnel);
-            AddHandler(KeyUpEvent, OnPreviewKeyUp, RoutingStrategies.Tunnel);
+        }
+
+        /// <summary>
+        /// The window's keys are the app's <see cref="KeyMap"/>. Space is the transport's, never a focused button's: the dispatcher
+        /// takes the press and its release, so a button doesn't click on the key up of a space it never saw pressed.
+        /// </summary>
+        private void RegisterKeys()
+        {
+            var keys = new KeyDispatcher(AppKeys.Map, BuilderKeys.GeneratePhrases);
+            keys.Attach(this);
+
+            keys.On(SharedKeys.PlayPause, () =>
+            {
+                if (ViewModel is not { } viewModel)
+                    return false;
+                if (viewModel.Playback.PlayPauseCommand.CanExecute(null))
+                    viewModel.Playback.PlayPauseCommand.Execute(null);
+                return true;
+            });
+            keys.On(BuilderKeys.PreviousRegion, () =>
+            {
+                if (ViewModel is not { } viewModel)
+                    return false;
+                viewModel.PreviousRegion();
+                return true;
+            });
+            keys.On(BuilderKeys.NextRegion, () =>
+            {
+                if (ViewModel is not { } viewModel)
+                    return false;
+                viewModel.NextRegion();
+                return true;
+            });
+            keys.On(BuilderKeys.ApplyPhrases, () =>
+            {
+                if (ViewModel is null)
+                    return false;
+                OnApply(null, new RoutedEventArgs());
+                return true;
+            });
         }
 
         private GeneratePhrasesViewModel? ViewModel => DataContext as GeneratePhrasesViewModel;
@@ -124,47 +167,6 @@ namespace ChartBuilder.Views
             {
                 confirming.CancelRegenerate();
                 e.Handled = true;
-                return;
-            }
-
-            if (e.Key != Key.Space || e.KeyModifiers != KeyModifiers.None || ViewModel is not { } viewModel)
-                return;
-
-            if (!_spaceHeld && viewModel.Playback.PlayPauseCommand.CanExecute(null))
-                viewModel.Playback.PlayPauseCommand.Execute(null);
-            _spaceHeld = true;
-            e.Handled = true;
-        }
-
-        private void OnPreviewKeyUp(object? sender, KeyEventArgs e)
-        {
-            if (e.Key != Key.Space || e.KeyModifiers != KeyModifiers.None)
-                return;
-
-            _spaceHeld = false;
-            e.Handled = true;
-        }
-
-        protected override void OnKeyDown(KeyEventArgs e)
-        {
-            base.OnKeyDown(e);
-            if (e.Handled || ViewModel is not { } viewModel)
-                return;
-
-            switch (e.Key)
-            {
-                case Key.OemOpenBrackets when e.KeyModifiers == KeyModifiers.None:
-                    viewModel.PreviousRegion();
-                    e.Handled = true;
-                    break;
-                case Key.OemCloseBrackets when e.KeyModifiers == KeyModifiers.None:
-                    viewModel.NextRegion();
-                    e.Handled = true;
-                    break;
-                case Key.Enter when e.KeyModifiers == KeyModifiers.Control:
-                    OnApply(null, new RoutedEventArgs());
-                    e.Handled = true;
-                    break;
             }
         }
     }
