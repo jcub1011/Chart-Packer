@@ -4,7 +4,7 @@ Chart Packer is used to view and manage your chart library. Once pointed at a fo
 
 ## Good to Know
 
-- Dropping a folder anywhere on the window sets the songs folder and scans it.
+- Dropping a folder anywhere on the window, or choosing one with Browse, sets the songs folder and scans it, unless Scan on folder change is off in Settings.
 - Edit Chart needs Chart Builder installed.
 
 [Back to Home](Home.md)

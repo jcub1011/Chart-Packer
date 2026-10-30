@@ -21,6 +21,7 @@ namespace ChartPacker.Services
         public static readonly int DefaultScanParallelism = Environment.ProcessorCount;
         public const int MinScanParallelism = 1;
         public const bool DefaultScanOnLaunch = true;
+        public const bool DefaultScanOnFolderChange = true;
         public const double DefaultMasterVolume = 1;
         public const bool DefaultPitchCorrection = true;
         public const OverwritePolicy DefaultOverwritePolicy = OverwritePolicy.Skip;
@@ -64,6 +65,9 @@ namespace ChartPacker.Services
 
         /// <summary>Whether the app scans <see cref="LastFolder"/> as it starts. When off, the folder is restored but not scanned.</summary>
         public bool ScanOnLaunch { get; set; } = DefaultScanOnLaunch;
+
+        /// <summary>Whether choosing a songs folder, with Browse or by dropping it on the window, scans it straight away. When off, the folder is set but not scanned.</summary>
+        public bool ScanOnFolderChange { get; set; } = DefaultScanOnFolderChange;
 
         /// <summary>The last folder picked in the library panel. It is restored at launch, and scanned then when <see cref="ScanOnLaunch"/> is on.</summary>
         public string? LastFolder { get; set; }
