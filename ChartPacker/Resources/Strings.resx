@@ -917,6 +917,16 @@
     <value>startup start open automatic auto rescan refresh</value>
     <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
   </data>
+  <data name="ScanOnFolderChangeLabel" xml:space="preserve">
+    <value>Scan on folder change</value>
+  </data>
+  <data name="ScanOnFolderChangeDescription" xml:space="preserve">
+    <value>Scan a songs folder as soon as you choose or drop it. When off, use Scan to search it.</value>
+  </data>
+  <data name="ScanOnFolderChangeKeywords" xml:space="preserve">
+    <value>browse drop drag choose pick select open automatic auto rescan refresh</value>
+    <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
+  </data>
   <data name="ChooseSongsFolderButton" xml:space="preserve">
     <value>Choose Songs Folder…</value>
     <comment>Button in the empty library list, shown when no songs folder is set.</comment>

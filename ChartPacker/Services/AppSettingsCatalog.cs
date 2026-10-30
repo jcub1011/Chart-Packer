@@ -61,6 +61,17 @@ namespace ChartPacker.Services
                         Get = () => library.ScanOnLaunch,
                         Set = scan => library.ScanOnLaunch = scan,
                     },
+                    new ToggleSetting
+                    {
+                        Id = "library.scanOnFolderChange",
+                        Category = scanning,
+                        Label = Strings.ScanOnFolderChangeLabel,
+                        Description = Strings.ScanOnFolderChangeDescription,
+                        Keywords = SettingKeywords.Split(Strings.ScanOnFolderChangeKeywords),
+                        DefaultValue = AppSettings.DefaultScanOnFolderChange,
+                        Get = () => library.ScanOnFolderChange,
+                        Set = scan => library.ScanOnFolderChange = scan,
+                    },
                     new IntegerSetting
                     {
                         Id = "library.scanDepth",

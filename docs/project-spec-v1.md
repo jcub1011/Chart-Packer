@@ -753,6 +753,7 @@ Settings are stored as JSON (source-generated serialization) in the per-user con
 | Theme | Follow OS |
 | Library sort ([F8](#f8-library-search-sort-and-filter)) | Scan order, first to last |
 | Scan on launch | On. The songs folder from last time is scanned as the app starts. When off, the empty list shows a Scan button instead. |
+| Scan on folder change | On. Choosing a songs folder, with Browse or by dropping it on the window, scans it straight away. When off, the folder is set but not scanned until you use Scan. |
 
 ## 9. Non-functional requirements
 

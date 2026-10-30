@@ -13,7 +13,7 @@ When Chart Builder is installed, it becomes the default program for `.sng` files
 
 ## Pack and Unpack Songs With Chart Packer
 
-1. Open Chart Packer, choose **File**, then **Choose Songs Folder…**, and then **File**, **Rescan** (F5) to scan for `.sng` files and song folders. Dragging a folder onto the window sets it and scans straight away.
+1. Open Chart Packer, choose **File**, then **Choose Songs Folder…**. Press F5 to scan if auto-scan is disabled.
 2. Select songs in the library list. The right side shows each song's details.
 3. Use the **Pack** menu to pack song folders into `.sng` files, or to unpack `.sng` files into folders.
 4. Click the status bar at the bottom to see the results in [Job Progress](Job-Progress.md).

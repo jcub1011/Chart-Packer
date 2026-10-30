@@ -411,6 +411,13 @@ namespace ChartPacker.ViewModels
             set => _settings.Settings.ScanOnLaunch = value;
         }
 
+        /// <summary>Whether choosing a songs folder, with Browse or by dropping it on the window, scans it straight away.</summary>
+        public bool ScanOnFolderChange
+        {
+            get => _settings.Settings.ScanOnFolderChange;
+            set => _settings.Settings.ScanOnFolderChange = value;
+        }
+
         /// <summary>Scans the remembered folder if <see cref="ScanOnLaunch"/> is on and there is one. Called once, as the app starts.</summary>
         public void StartLaunchScan()
         {
@@ -438,10 +445,10 @@ namespace ChartPacker.ViewModels
         private async Task BrowseAsync()
         {
             var path = await _folderPicker.PickFolderAsync(Strings.BrowseDialogTitle, FolderPath);
-            if (path is null)
+            if (path is null || !CanBrowse())
                 return;
 
-            SetFolder(path);
+            SetFolderAndMaybeScan(path);
         }
 
         private void SetFolder(string path)
@@ -450,14 +457,21 @@ namespace ChartPacker.ViewModels
             _settings.Settings.LastFolder = path;
         }
 
-        /// <summary>Sets the library to <paramref name="path"/> and scans it, as a folder dropped on the window does.</summary>
+        /// <summary>Sets the library to <paramref name="path"/>, then scans it when <see cref="ScanOnFolderChange"/> is on and a scan can start.</summary>
+        private void SetFolderAndMaybeScan(string path)
+        {
+            SetFolder(path);
+            if (ScanOnFolderChange && RescanCommand.CanExecute(null))
+                RescanCommand.Execute(null);
+        }
+
+        /// <summary>Sets the library to <paramref name="path"/> as a folder dropped on the window does, and scans it when <see cref="ScanOnFolderChange"/> is on.</summary>
         public void OpenDroppedFolder(string path)
         {
             if (!CanBrowse() || !Directory.Exists(path))
                 return;
 
-            SetFolder(path);
-            Rescan();
+            SetFolderAndMaybeScan(path);
         }
 
         private bool CanRescan() => FolderPath is not null && !Job.IsRunning;
