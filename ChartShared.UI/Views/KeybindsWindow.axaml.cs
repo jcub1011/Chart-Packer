@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -57,24 +58,24 @@ namespace ChartShared.UI.Views
             };
         }
 
-        /// <summary>Scrolls the list to a shortcut jumped to from the tree, once the list has been laid out with it in.</summary>
+        /// <summary>Scrolls the list to a shortcut jumped to from the keyboard view, once the list has been laid out with it in.</summary>
         private void OnRevealRequested(object? sender, KeybindRowViewModel row) =>
             Dispatcher.UIThread.Post(
                 () => this.GetVisualDescendants()
                     .OfType<Border>()
-                    .FirstOrDefault(b => b.Classes.Contains("key-row") && ReferenceEquals(b.DataContext, row))
+                    .FirstOrDefault(b => b.Classes.Contains("row") && ReferenceEquals(b.DataContext, row))
                     ?.BringIntoView(),
                 DispatcherPriority.Loaded);
 
-        /// <summary>
-        /// A click on a shortcut in the tree jumps to it, as picking it does, so clicking it again after the list has been
-        /// scrolled away brings it back; picking an entry that is already picked changes nothing.
-        /// </summary>
-        private void OnTreeTapped(object? sender, TappedEventArgs e)
+        /// <summary>A drop-down opened to pick a shortcut for the key: its search box takes what is typed.</summary>
+        private void OnAssignOpened(object? sender, EventArgs e) =>
+            Dispatcher.UIThread.Post(() => AssignSearchBox.Focus(), DispatcherPriority.Input);
+
+        /// <summary>A shortcut picked from the drop-down closes it; the view model binds the key to it.</summary>
+        private void OnAssignPicked(object? sender, SelectionChangedEventArgs e)
         {
-            if (DataContext is KeybindsWindowViewModel vm
-                && e.Source is Control { DataContext: KeybindNodeViewModel { Shortcut: { } row } })
-                vm.Reveal(row);
+            if (e.AddedItems.Count > 0)
+                AssignButton.Flyout?.Hide();
         }
 
         /// <summary>The program's name, which screen readers give the title bar's icon.</summary>

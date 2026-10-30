@@ -11,46 +11,78 @@ using CommunityToolkit.Mvvm.Input;
 
 namespace ChartShared.UI.ViewModels.Settings
 {
-    /// <summary>A category in the Settings window's tree, or the "All settings" entry at its top.</summary>
+    /// <summary>A top-level category in the Settings window's list, or the "All Settings" entry at its top.</summary>
     public sealed partial class SettingsCategoryViewModel : ObservableObject
     {
-        public SettingsCategoryViewModel(SettingCategory category, IReadOnlyList<SettingsCategoryViewModel> children)
+        private readonly IReadOnlyList<SettingViewModel> _settings;
+
+        /// <param name="settings">Every setting in the category and the ones nested in it, whether or not a search shows it.</param>
+        /// <param name="subtitle">The page header's second line: what the category holds.</param>
+        /// <param name="matchCount">How many of its settings match the search, or <see langword="null"/> when not searching.</param>
+        public SettingsCategoryViewModel(SettingCategory category, IReadOnlyList<SettingViewModel> settings, string subtitle, int? matchCount)
+            : this(category.Label, category.IconKey, settings, subtitle, matchCount)
         {
             Category = category;
-            Label = category.Label;
-            Children = children;
         }
 
-        private SettingsCategoryViewModel(string label)
+        private SettingsCategoryViewModel(string label, string? iconKey, IReadOnlyList<SettingViewModel> settings, string subtitle, int? matchCount)
         {
             Label = label;
-            Children = [];
+            IconKey = iconKey;
+            Subtitle = subtitle;
+            MatchCount = matchCount;
+            _settings = settings;
+            ModifiedCount = settings.Count(s => s.IsModified);
         }
 
         /// <summary>The entry that shows every category, so there's always a way back from a selected one.</summary>
-        public static SettingsCategoryViewModel All() => new(SharedStrings.SettingsAllCategories);
+        public static SettingsCategoryViewModel All(IReadOnlyList<SettingViewModel> settings, int? matchCount) =>
+            new(SharedStrings.SettingsAllCategories, "MoreStroke", settings, "", matchCount);
 
-        /// <summary>The category, or <see langword="null"/> for the "All settings" entry.</summary>
+        /// <summary>The category, or <see langword="null"/> for the "All Settings" entry.</summary>
         public SettingCategory? Category { get; }
 
         public string Label { get; }
 
-        public IReadOnlyList<SettingsCategoryViewModel> Children { get; }
+        /// <summary>The key of the category's line icon, or <see langword="null"/> when it has none.</summary>
+        public string? IconKey { get; }
 
+        public bool HasIcon => IconKey is not null;
+
+        /// <summary>The names of the sections under the category's heading, comma separated.</summary>
+        public string Subtitle { get; }
+
+        public bool HasSubtitle => Subtitle.Length > 0;
+
+        /// <summary>How many settings match the search, or <see langword="null"/> while there isn't one.</summary>
+        public int? MatchCount { get; }
+
+        public bool HasMatchCount => MatchCount is not null;
+
+        /// <summary>How many of its settings have a change that OK or Apply hasn't written yet.</summary>
         [ObservableProperty]
-        public partial bool IsExpanded { get; set; } = true;
+        [NotifyPropertyChangedFor(nameof(HasModified))]
+        public partial int ModifiedCount { get; private set; }
+
+        public bool HasModified => ModifiedCount > 0;
+
+        /// <summary>Counts the modified settings again, after one is staged or the staged changes are written.</summary>
+        public void RefreshModified() => ModifiedCount = _settings.Count(s => s.IsModified);
     }
 
-    /// <summary>The settings of one category, under its path as a heading.</summary>
+    /// <summary>The settings of one category, under a section heading.</summary>
     public sealed class SettingsGroupViewModel(string title, IReadOnlyList<SettingViewModel> items)
     {
+        /// <summary>The heading, or empty for a category's own settings under its page header.</summary>
         public string Title { get; } = title;
+
+        public bool HasTitle => Title.Length > 0;
 
         public IReadOnlyList<SettingViewModel> Items { get; } = items;
     }
 
     /// <summary>
-    /// The Settings window: a category tree, the selected category's settings, and a search box that
+    /// The Settings window: a list of categories, the selected category's settings, and a search box that
     /// narrows both. Edits are staged in a <see cref="SettingsSession"/> until OK or Apply.
     /// </summary>
     public sealed partial class SettingsWindowViewModel : ViewModelBase
@@ -61,7 +93,8 @@ namespace ChartShared.UI.ViewModels.Settings
         private readonly SettingsSession _session;
         private readonly Action _save;
         private readonly Dictionary<SettingDefinition, SettingViewModel> _editors = [];
-        private readonly SettingsCategoryViewModel _all = SettingsCategoryViewModel.All();
+        private SettingsCategoryViewModel _all;
+        private HashSet<SettingDefinition> _matches = [];
 
         /// <param name="folderPicker">Picks folders for folder settings; its dialogs should be owned by the Settings window.</param>
         /// <param name="save">Persists the settings after changes are applied.</param>
@@ -81,25 +114,55 @@ namespace ChartShared.UI.ViewModels.Settings
                 ApplyCommand.NotifyCanExecuteChanged();
             };
 
-            RebuildTree();
+            foreach (var editor in _editors.Values)
+            {
+                editor.PropertyChanged += (_, e) =>
+                {
+                    if (e.PropertyName == nameof(SettingViewModel.IsModified))
+                        RefreshModifiedCounts();
+                };
+            }
+
+            _all = SettingsCategoryViewModel.All([.. _editors.Values], null);
+            RebuildCategories();
         }
 
         [ObservableProperty]
         public partial string SearchText { get; set; } = "";
 
-        /// <summary>The category tree; while searching, only the categories with a match.</summary>
+        /// <summary>The top-level categories; while searching, only the ones with a match. "All Settings" comes first.</summary>
         [ObservableProperty]
         public partial IReadOnlyList<SettingsCategoryViewModel> Categories { get; set; } = [];
 
-        /// <summary>The category whose settings are shown, with its children's. "All settings" (or none) shows every category.</summary>
+        /// <summary>The category whose settings are shown, with its children's. "All Settings" (or none) shows every category.</summary>
         [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(PageTitle), nameof(PageSubtitle), nameof(HasPageSubtitle))]
         public partial SettingsCategoryViewModel? SelectedCategory { get; set; }
 
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasNoMatches))]
         public partial IReadOnlyList<SettingsGroupViewModel> Groups { get; set; } = [];
 
+        /// <summary>The page header: the selected category's name.</summary>
+        public string PageTitle => SelectedCategory?.Label ?? _all.Label;
+
+        /// <summary>What the page holds: the selected category's sections.</summary>
+        public string PageSubtitle => SelectedCategory?.Subtitle ?? "";
+
+        public bool HasPageSubtitle => PageSubtitle.Length > 0;
+
         public bool HasChanges => _session.HasChanges;
+
+        /// <summary>How many settings have a change that OK or Apply hasn't written yet.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasUnsaved), nameof(UnsavedText))]
+        public partial int UnsavedCount { get; private set; }
+
+        public bool HasUnsaved => UnsavedCount > 0;
+
+        public string UnsavedText => UnsavedCount == 1
+            ? SharedStrings.SettingsUnsavedOne
+            : string.Format(CultureInfo.CurrentCulture, SharedStrings.SettingsUnsavedFormat, UnsavedCount);
 
         public bool HasNoMatches => Groups.Count == 0;
 
@@ -118,57 +181,82 @@ namespace ChartShared.UI.ViewModels.Settings
         partial void OnSearchTextChanged(string value)
         {
             OnPropertyChanged(nameof(NoMatchesText));
-            RebuildTree();
+            RebuildCategories();
         }
 
         partial void OnSelectedCategoryChanged(SettingsCategoryViewModel? value) => RefreshGroups();
 
-        /// <summary>Rebuilds the tree for the search, and selects "All settings" so every match shows until a category is picked.</summary>
-        private void RebuildTree()
+        private void RefreshModifiedCounts()
         {
-            var matches = _catalog.Search(SearchText).ToHashSet();
-            Categories = [_all, .. _catalog.RootCategories.Select(c => BuildCategory(c, matches)).OfType<SettingsCategoryViewModel>()];
+            foreach (var category in Categories)
+                category.RefreshModified();
+            UnsavedCount = _editors.Values.Count(e => e.IsModified);
+        }
 
-            if (SelectedCategory == _all)
-                RefreshGroups();
-            else
-                SelectedCategory = _all;
+        /// <summary>Rebuilds the list for the search, and selects "All Settings" so every match shows until a category is picked.</summary>
+        private void RebuildCategories()
+        {
+            var matches = _matches = _catalog.Search(SearchText).ToHashSet();
+            bool searching = !string.IsNullOrWhiteSpace(SearchText);
+
+            // A new "All Settings" entry each time, to carry the match count, so it's never the one already selected and
+            // the page is rebuilt for the new matches.
+            _all = SettingsCategoryViewModel.All([.. _editors.Values], searching ? matches.Count : null);
+            Categories = [_all, .. _catalog.RootCategories.Select(c => BuildCategory(c, matches, searching)).OfType<SettingsCategoryViewModel>()];
+            UnsavedCount = _editors.Values.Count(e => e.IsModified);
+            SelectedCategory = _all;
         }
 
         /// <returns><see langword="null"/> when neither the category nor its children have a match.</returns>
-        private SettingsCategoryViewModel? BuildCategory(SettingCategory category, HashSet<SettingDefinition> matches)
+        private SettingsCategoryViewModel? BuildCategory(SettingCategory category, HashSet<SettingDefinition> matches, bool searching)
         {
-            var children = _catalog.ChildrenOf(category)
-                .Select(c => BuildCategory(c, matches))
-                .OfType<SettingsCategoryViewModel>()
-                .ToList();
+            var under = DefinitionsUnder(category).ToList();
+            int matching = under.Count(matches.Contains);
+            if (matching == 0)
+                return null;
 
-            bool hasMatch = children.Count > 0 || _catalog.DefinitionsIn(category).Any(matches.Contains);
-            return hasMatch ? new SettingsCategoryViewModel(category, children) : null;
+            // While searching, only the sections that have a match, which are the ones the page shows.
+            string subtitle = string.Join(
+                ", ",
+                _catalog.ChildrenOf(category).Where(c => !searching || DefinitionsUnder(c).Any(matches.Contains)).Select(c => c.Label));
+            return new SettingsCategoryViewModel(category, [.. under.Select(d => _editors[d])], subtitle, searching ? matching : null);
         }
+
+        /// <summary>The settings in <paramref name="category"/> and the categories nested in it.</summary>
+        private IEnumerable<SettingDefinition> DefinitionsUnder(SettingCategory category) =>
+            _catalog.DefinitionsIn(category).Concat(_catalog.ChildrenOf(category).SelectMany(DefinitionsUnder));
 
         private void RefreshGroups()
         {
-            var matches = _catalog.Search(SearchText).ToHashSet();
+            var matches = _matches;
             var groups = new List<SettingsGroupViewModel>();
+
+            // Under "All Settings" each group says where it is; under one category the page header does, so only its
+            // nested categories need a heading.
+            bool showPath = SelectedCategory?.Category is null;
             IReadOnlyList<SettingCategory> roots = SelectedCategory?.Category is { } selected ? [selected] : _catalog.RootCategories;
             foreach (var root in roots)
-                AddGroups(root, matches, groups);
+                AddGroups(root, matches, groups, showPath);
 
             Groups = groups;
         }
 
-        private void AddGroups(SettingCategory category, HashSet<SettingDefinition> matches, List<SettingsGroupViewModel> groups)
+        private void AddGroups(SettingCategory category, HashSet<SettingDefinition> matches, List<SettingsGroupViewModel> groups, bool showPath)
         {
             var items = _catalog.DefinitionsIn(category)
                 .Where(matches.Contains)
                 .Select(d => _editors[d])
                 .ToList();
             if (items.Count > 0)
-                groups.Add(new SettingsGroupViewModel(string.Join(PathSeparator, category.Path), items));
+            {
+                string title = showPath
+                    ? string.Join(PathSeparator, category.Path)
+                    : category.Parent is null ? "" : category.Label;
+                groups.Add(new SettingsGroupViewModel(title, items));
+            }
 
             foreach (var child in _catalog.ChildrenOf(category))
-                AddGroups(child, matches, groups);
+                AddGroups(child, matches, groups, showPath);
         }
     }
 }

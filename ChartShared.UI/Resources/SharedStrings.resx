@@ -193,14 +193,22 @@
     <value>Settings</value>
   </data>
   <data name="SettingsSearchWatermark" xml:space="preserve">
-    <value>Search settings (Ctrl+E)</value>
+    <value>Search Settings (Ctrl+E)</value>
   </data>
   <data name="SettingsAllCategories" xml:space="preserve">
-    <value>All settings</value>
+    <value>All Settings</value>
     <comment>First entry in the Settings category tree; shows every category.</comment>
   </data>
+  <data name="SettingsUnsavedOne" xml:space="preserve">
+    <value>1 Unsaved Change</value>
+    <comment>Left of the Settings window's buttons while one setting has a change that OK or Apply hasn't written yet.</comment>
+  </data>
+  <data name="SettingsUnsavedFormat" xml:space="preserve">
+    <value>{0} Unsaved Changes</value>
+    <comment>Left of the Settings window's buttons while several settings have changes that OK or Apply hasn't written yet. {0} is how many.</comment>
+  </data>
   <data name="SettingsCategoriesName" xml:space="preserve">
-    <value>Setting categories</value>
+    <value>Setting Categories</value>
     <comment>Accessible name of the Settings category tree.</comment>
   </data>
   <data name="SettingsNoMatchesFormat" xml:space="preserve">
@@ -208,7 +216,7 @@
     <comment>{0} is the search text.</comment>
   </data>
   <data name="SettingsResetToolTip" xml:space="preserve">
-    <value>Reset to default</value>
+    <value>Reset to Default</value>
   </data>
   <data name="SettingsBrowseButton" xml:space="preserve">
     <value>Browse…</value>
@@ -1382,6 +1390,82 @@
     <value>All Shortcuts</value>
     <comment>Top entry of the category tree in the keyboard shortcuts window; shows every shortcut.</comment>
   </data>
+  <data name="KeybindsViewName" xml:space="preserve">
+    <value>Shortcuts View</value>
+    <comment>Accessible name of the toggle between the list of shortcuts and the keyboard.</comment>
+  </data>
+  <data name="KeybindsListView" xml:space="preserve">
+    <value>List</value>
+    <comment>Button in the Shortcuts window that shows the shortcuts as a list.</comment>
+  </data>
+  <data name="KeybindsKeyboardView" xml:space="preserve">
+    <value>Keyboard</value>
+    <comment>Button in the Shortcuts window that shows the shortcuts on the keys of a keyboard.</comment>
+  </data>
+  <data name="KeybindsMapTitle" xml:space="preserve">
+    <value>Keyboard Map</value>
+    <comment>Heading of the Shortcuts window while it shows the keyboard.</comment>
+  </data>
+  <data name="KeybindsMapSubtitle" xml:space="preserve">
+    <value>Choose which modifier keys are held, then pick a key to see what it does.</value>
+    <comment>Under the keyboard map heading.</comment>
+  </data>
+  <data name="KeybindsMapOtherKeys" xml:space="preserve">
+    <value>Other Keys</value>
+    <comment>Heading over the keys of shortcuts that are not on the keyboard drawn, such as number pad keys.</comment>
+  </data>
+  <data name="KeybindsMapLegendBound" xml:space="preserve">
+    <value>Bound</value>
+    <comment>Legend of the keyboard map: a key that has a shortcut.</comment>
+  </data>
+  <data name="KeybindsMapLegendShared" xml:space="preserve">
+    <value>Shared</value>
+    <comment>Legend of the keyboard map: a key that shortcuts which can be live together share.</comment>
+  </data>
+  <data name="KeybindsMapLegendFixed" xml:space="preserve">
+    <value>Fixed</value>
+    <comment>Legend of the keyboard map: a key that only has shortcuts that cannot be changed.</comment>
+  </data>
+  <data name="KeybindsMapLegendElsewhere" xml:space="preserve">
+    <value>Other layer</value>
+    <comment>Legend of the keyboard map: a key with no shortcut in the modifiers shown that has one with other modifiers.</comment>
+  </data>
+  <data name="KeybindsMapElsewhereFormat" xml:space="preserve">
+    <value>Also in other layers: {0}</value>
+    <comment>Under the picked key, and in a key's tooltip, for shortcuts the key has with other modifiers. {0} is the list of them, each as its key with modifiers and the shortcut's name.</comment>
+  </data>
+  <data name="KeybindsMapAssignFailed" xml:space="preserve">
+    <value>Couldn't bind the shortcut to that key.</value>
+    <comment>Line under the keyboard map when binding a shortcut to the picked key failed unexpectedly.</comment>
+  </data>
+  <data name="KeybindsMapPickKey" xml:space="preserve">
+    <value>Pick a key to see what it does.</value>
+    <comment>Under the keyboard map until a key is picked.</comment>
+  </data>
+  <data name="KeybindsMapUnboundFormat" xml:space="preserve">
+    <value>Nothing is bound to {0}.</value>
+    <comment>Under the keyboard map for a picked key with no shortcut. {0} is the key, with its modifiers.</comment>
+  </data>
+  <data name="KeybindsMapAssignFormat" xml:space="preserve">
+    <value>Bind {0} to…</value>
+    <comment>Placeholder of the list that binds a shortcut to the picked key. {0} is the key, with its modifiers.</comment>
+  </data>
+  <data name="KeybindsMapAssignSearch" xml:space="preserve">
+    <value>Search Shortcuts</value>
+    <comment>Placeholder of the box that narrows the list of shortcuts to bind to the picked key.</comment>
+  </data>
+  <data name="KeybindsMapAssignNoMatches" xml:space="preserve">
+    <value>No shortcuts match.</value>
+    <comment>Under the box that narrows the list of shortcuts to bind to the picked key, when none does.</comment>
+  </data>
+  <data name="KeybindsMapShowInList" xml:space="preserve">
+    <value>Show in List</value>
+    <comment>Tooltip of the button that finds a shortcut in the list of shortcuts.</comment>
+  </data>
+  <data name="KeybindsMapRemoveFromKey" xml:space="preserve">
+    <value>Remove from Key</value>
+    <comment>Tooltip of the button that takes the picked key off a shortcut.</comment>
+  </data>
   <data name="KeybindsCategoriesName" xml:space="preserve">
     <value>Shortcut Categories</value>
     <comment>Name of the category tree, which screen readers give it.</comment>
@@ -1409,7 +1493,7 @@
     <comment>Shown in place of a key while the window waits for the user to press the key they want.</comment>
   </data>
   <data name="KeybindsChangeToolTip" xml:space="preserve">
-    <value>Change or delete shortcut</value>
+    <value>Change or Delete Shortcut</value>
   </data>
   <data name="KeybindsChangeBinding" xml:space="preserve">
     <value>Change Binding</value>
@@ -1420,7 +1504,7 @@
     <comment>Menu item on a key in the keyboard shortcuts window: removes the key from its shortcut.</comment>
   </data>
   <data name="KeybindsAddToolTip" xml:space="preserve">
-    <value>Add alternate shortcut</value>
+    <value>Add Alternate Shortcut</value>
   </data>
   <data name="KeybindsResetToolTip" xml:space="preserve">
     <value>Restore Defaults</value>

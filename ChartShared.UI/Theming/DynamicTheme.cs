@@ -55,6 +55,33 @@ namespace ChartShared.UI.Theming
 
         public static void SetDuration(Control element, TimeSpan value) => element.SetValue(DurationProperty, value);
 
+        /// <summary>
+        /// Themes <paramref name="dialog"/> as <paramref name="owner"/> is themed, so a window opened over it doesn't show
+        /// the app's own colours against the owner's. It takes the owner's seed as it opens rather than fading to it, then
+        /// follows the owner, fading, until it closes: a modal dialog can still change its owner's theme (a setting applied
+        /// while it is open, art that finishes loading). An owner with no seed leaves the dialog as it is, until it has one.
+        /// </summary>
+        public static void InheritFrom(Control owner, Window dialog)
+        {
+            if (GetSeed(owner) is { } seed)
+            {
+                SetDuration(dialog, TimeSpan.Zero);
+                SetSeed(dialog, seed);
+            }
+
+            void OnOwnerChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
+            {
+                if (e.Property != SeedProperty)
+                    return;
+
+                dialog.ClearValue(DurationProperty);
+                SetSeed(dialog, GetSeed(owner));
+            }
+
+            owner.PropertyChanged += OnOwnerChanged;
+            dialog.Closed += (_, _) => owner.PropertyChanged -= OnOwnerChanged;
+        }
+
         private static ThemeColor ToTheme(Color color) => new(color.A, color.R, color.G, color.B);
 
         private static Color ToAvalonia(ThemeColor color) => Color.FromArgb(color.A, color.R, color.G, color.B);

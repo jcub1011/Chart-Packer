@@ -124,7 +124,7 @@
     <value>New Charts</value>
   </data>
   <data name="DefaultCharterNameLabel" xml:space="preserve">
-    <value>Default charter name</value>
+    <value>Default Charter Name</value>
   </data>
   <data name="DefaultCharterNameDescription" xml:space="preserve">
     <value>Filled in as the charter of a new chart.</value>
@@ -133,10 +133,10 @@
     <value>charter author name new chart</value>
   </data>
   <data name="DefaultCharterNamePlaceholder" xml:space="preserve">
-    <value>Your name</value>
+    <value>Your Name</value>
   </data>
   <data name="DefaultChartResolutionLabel" xml:space="preserve">
-    <value>Default resolution</value>
+    <value>Default Resolution</value>
   </data>
   <data name="DefaultChartResolutionDescription" xml:space="preserve">
     <value>The resolution a new chart starts with, in ticks per beat. At 192, 480 and 960 every common snap lands on a whole tick.</value>
@@ -601,7 +601,7 @@
     <comment>{0} is the song's path.</comment>
   </data>
   <data name="StartupActionLabel" xml:space="preserve">
-    <value>What opens on startup</value>
+    <value>What Opens on Startup</value>
   </data>
   <data name="StartupActionDescription" xml:space="preserve">
     <value>What Chart Builder opens with when started with no command line.</value>
@@ -610,10 +610,10 @@
     <value>startup open blank new chart recent start launch</value>
   </data>
   <data name="StartupBlankChart" xml:space="preserve">
-    <value>A blank new chart</value>
+    <value>A Blank New Chart</value>
   </data>
   <data name="StartupReopenRecent" xml:space="preserve">
-    <value>The most recently opened song</value>
+    <value>The Most Recently Opened Song</value>
   </data>
   <data name="UnsavedRecoverTitle" xml:space="preserve">
     <value>Recover Unsaved Chart</value>
@@ -757,7 +757,7 @@ Open it anyway?</value>
     <value>Audio</value>
   </data>
   <data name="AudioLatencyLabel" xml:space="preserve">
-    <value>Audio/visual latency</value>
+    <value>Audio/Visual Latency</value>
   </data>
   <data name="AudioLatencyDescription" xml:space="preserve">
     <value>How much later audio is heard than the screen shows it, per output device.</value>
@@ -766,7 +766,7 @@ Open it anyway?</value>
     <value>latency delay offset sync calibrate calibration audio video lag bluetooth</value>
   </data>
   <data name="DetectLatencyLabel" xml:space="preserve">
-    <value>Detect output latency</value>
+    <value>Detect Output Latency</value>
     <comment>A switch: whether the latency read from the output device's buffers is added to its calibrated latency.</comment>
   </data>
   <data name="DetectLatencyDescription" xml:space="preserve">
@@ -779,7 +779,7 @@ Open it anyway?</value>
     <value>Calibrate…</value>
   </data>
   <data name="PromptForCalibrationLabel" xml:space="preserve">
-    <value>Offer to calibrate a new output device</value>
+    <value>Offer to Calibrate a New Output Device</value>
   </data>
   <data name="PromptForCalibrationDescription" xml:space="preserve">
     <value>When a song first plays on an uncalibrated device, ask whether to calibrate it.</value>
@@ -791,7 +791,7 @@ Open it anyway?</value>
     <value>Editing</value>
   </data>
   <data name="TempoEditsLabel" xml:space="preserve">
-    <value>When a tempo changes</value>
+    <value>When a Tempo Changes</value>
   </data>
   <data name="TempoEditsDescription" xml:space="preserve">
     <value>Whether notes keep their ticks and move with the grid, or keep their times and stay put in the audio. Keep ticks while building the tempo map.</value>
@@ -800,10 +800,10 @@ Open it anyway?</value>
     <value>tempo bpm keep ticks times retick grid</value>
   </data>
   <data name="TempoEditsKeepTicks" xml:space="preserve">
-    <value>Notes keep their ticks</value>
+    <value>Notes Keep Their Ticks</value>
   </data>
   <data name="TempoEditsKeepTimes" xml:space="preserve">
-    <value>Notes keep their times</value>
+    <value>Notes Keep Their Times</value>
   </data>
   <data name="ChartSettingsTab" xml:space="preserve">
     <value>Chart Settings</value>
@@ -977,7 +977,7 @@ Open it anyway?</value>
     <value>{0}'s name doesn't say which stem it is, or another file is already that stem</value>
   </data>
   <data name="DefaultSnapLabel" xml:space="preserve">
-    <value>Default snap</value>
+    <value>Default Snap</value>
     <comment>A setting: the grid notes snap to when the editor opens.</comment>
   </data>
   <data name="DefaultSnapDescription" xml:space="preserve">
@@ -993,7 +993,7 @@ Open it anyway?</value>
     <comment>A snap, as a fraction of a whole note, e.g. "1/16".</comment>
   </data>
   <data name="DefaultEditorViewLabel" xml:space="preserve">
-    <value>Default view</value>
+    <value>Default View</value>
     <comment>A setting: how a lane shows the chart when it's opened.</comment>
   </data>
   <data name="DefaultEditorViewDescription" xml:space="preserve">
@@ -1013,7 +1013,7 @@ Open it anyway?</value>
     <comment>A lane's view: horizontal, time running left to right.</comment>
   </data>
   <data name="EditorHighwaySpeedLabel" xml:space="preserve">
-    <value>Highway speed</value>
+    <value>Highway Speed</value>
     <comment>A setting: how fast notes go by in the editor.</comment>
   </data>
   <data name="EditorHighwaySpeedDescription" xml:space="preserve">
@@ -1025,7 +1025,7 @@ Open it anyway?</value>
     <comment>Search words for the highway speed setting, separated by spaces.</comment>
   </data>
   <data name="WheelDirectionLabel" xml:space="preserve">
-    <value>Wheel scroll direction</value>
+    <value>Wheel Scroll Direction</value>
     <comment>A setting: which way the mouse wheel moves through the song in the editor.</comment>
   </data>
   <data name="WheelDirectionDescription" xml:space="preserve">
@@ -1037,15 +1037,15 @@ Open it anyway?</value>
     <comment>Search words for the wheel scroll direction setting, separated by spaces.</comment>
   </data>
   <data name="WheelDirectionUpIsLater" xml:space="preserve">
-    <value>Wheel up moves later</value>
+    <value>Wheel Up Moves Later</value>
     <comment>A wheel scroll direction: turning the wheel up moves later in the song.</comment>
   </data>
   <data name="WheelDirectionDownIsLater" xml:space="preserve">
-    <value>Wheel down moves later</value>
+    <value>Wheel Down Moves Later</value>
     <comment>A wheel scroll direction: turning the wheel down moves later in the song.</comment>
   </data>
   <data name="MetronomeVolumeLabel" xml:space="preserve">
-    <value>Metronome volume</value>
+    <value>Metronome Volume</value>
     <comment>A setting: how loud the metronome is.</comment>
   </data>
   <data name="MetronomeVolumeDescription" xml:space="preserve">
@@ -1057,7 +1057,7 @@ Open it anyway?</value>
     <comment>Search words for the metronome volume setting, separated by spaces.</comment>
   </data>
   <data name="HitSoundVolumeLabel" xml:space="preserve">
-    <value>Hit sound volume</value>
+    <value>Hit Sound Volume</value>
     <comment>A setting: how loud the hit sounds are.</comment>
   </data>
   <data name="HitSoundVolumeDescription" xml:space="preserve">
@@ -1069,7 +1069,7 @@ Open it anyway?</value>
     <comment>Search words for the hit sound volume setting, separated by spaces.</comment>
   </data>
   <data name="MasterVolumeLabel" xml:space="preserve">
-    <value>Master volume</value>
+    <value>Master Volume</value>
     <comment>A setting: how loud everything is.</comment>
   </data>
   <data name="MasterVolumeDescription" xml:space="preserve">
@@ -1786,7 +1786,7 @@ Saving also changes song.ini:
     <value>The chart's star power is saved on note 116, so multiplier_note no longer applies.</value>
   </data>
   <data name="AutosaveMinutesLabel" xml:space="preserve">
-    <value>Autosave every</value>
+    <value>Autosave Every</value>
     <comment>The Settings row for how often the chart is autosaved.</comment>
   </data>
   <data name="AutosaveMinutesDescription" xml:space="preserve">
@@ -1796,7 +1796,7 @@ Saving also changes song.ini:
     <value>autosave recovery crash backup minutes interval</value>
   </data>
   <data name="PackFolderLabel" xml:space="preserve">
-    <value>Pack folder</value>
+    <value>Pack Folder</value>
   </data>
   <data name="PackFolderDescription" xml:space="preserve">
     <value>The export dialog's default .sng location. When empty, it starts at the song's parent folder. The dialog always asks before writing.</value>
@@ -2354,7 +2354,7 @@ Saving also changes song.ini:
     <comment>Settings: the category of the waveforms and spectrograms drawn while playing.</comment>
   </data>
   <data name="LaneBackdropLabel" xml:space="preserve">
-    <value>Lanes show</value>
+    <value>Lanes Show</value>
   </data>
   <data name="LaneBackdropDescription" xml:space="preserve">
     <value>Whether a lane draws audio as a waveform or spectrogram until switched</value>
@@ -2363,7 +2363,7 @@ Saving also changes song.ini:
     <value>waveform spectrogram audio lane behind beside</value>
   </data>
   <data name="WaveformFidelityLabel" xml:space="preserve">
-    <value>Waveform detail</value>
+    <value>Waveform Detail</value>
     <comment>Settings: the row that picks how finely waveforms are read.</comment>
   </data>
   <data name="WaveformFidelityDescription" xml:space="preserve">
@@ -2391,7 +2391,7 @@ Saving also changes song.ini:
     <comment>A choice of Waveform detail: how long each bar of the waveform is.</comment>
   </data>
   <data name="SpectrogramBudgetLabel" xml:space="preserve">
-    <value>Spectrogram memory budget (MB)</value>
+    <value>Spectrogram Memory Budget (MB)</value>
   </data>
   <data name="SpectrogramBudgetDescription" xml:space="preserve">
     <value>How much memory all stems' spectrograms may take together.</value>
@@ -2841,7 +2841,7 @@ Saving also changes song.ini:
     <value>Show</value>
   </data>
   <data name="ReductionRulesLabel" xml:space="preserve">
-    <value>Default reduction rules</value>
+    <value>Default Reduction Rules</value>
   </data>
   <data name="ReductionRulesDescription" xml:space="preserve">
     <value>The rules Reduce starts from: chord size, frets, thinning by grid and time, forcing, sustains, and drum pads and kick. Each run can change them.</value>
@@ -3356,7 +3356,7 @@ Saving also changes song.ini:
     <comment>Settings: the category of the instrument devices, their bindings and playtest.</comment>
   </data>
   <data name="InputDevicesLabel" xml:space="preserve">
-    <value>Instrument devices</value>
+    <value>Instrument Devices</value>
     <comment>Settings: the row that opens the Input devices window.</comment>
   </data>
   <data name="InputDevicesDescription" xml:space="preserve">
@@ -3368,15 +3368,15 @@ Saving also changes song.ini:
     <comment>Settings: search words for the Instrument devices row, separated by semicolons.</comment>
   </data>
   <data name="InputDevicesButton" xml:space="preserve">
-    <value>Input devices…</value>
+    <value>Input Devices…</value>
     <comment>Settings: the button that opens the Input devices window.</comment>
   </data>
   <data name="InputResetBindingsButton" xml:space="preserve">
-    <value>Reset bindings</value>
+    <value>Reset Bindings</value>
     <comment>Settings: the button that puts every instrument's bindings back to the keyboard's defaults.</comment>
   </data>
   <data name="PlaytestEarlyLabel" xml:space="preserve">
-    <value>Playtest hit window, early (ms)</value>
+    <value>Playtest Hit Window, Early (ms)</value>
     <comment>Settings: how long before a note a playtest takes a hit for it.</comment>
   </data>
   <data name="PlaytestEarlyDescription" xml:space="preserve">
@@ -3388,7 +3388,7 @@ Saving also changes song.ini:
     <comment>Settings: search words for the early hit window, separated by semicolons.</comment>
   </data>
   <data name="PlaytestLateLabel" xml:space="preserve">
-    <value>Playtest hit window, late (ms)</value>
+    <value>Playtest Hit Window, Late (ms)</value>
     <comment>Settings: how long after a note a playtest takes a hit for it.</comment>
   </data>
   <data name="PlaytestLateDescription" xml:space="preserve">
@@ -3400,7 +3400,7 @@ Saving also changes song.ini:
     <comment>Settings: search words for the late hit window, separated by semicolons.</comment>
   </data>
   <data name="PlaytestCymbalsLabel" xml:space="preserve">
-    <value>Cymbals must match</value>
+    <value>Cymbals Must Match</value>
     <comment>Settings: whether Pro drums cymbal notes need a cymbal hit.</comment>
   </data>
   <data name="PlaytestCymbalsDescription" xml:space="preserve">
@@ -3412,7 +3412,7 @@ Saving also changes song.ini:
     <comment>Settings: search words for Cymbals must match, separated by semicolons.</comment>
   </data>
   <data name="PlaytestDoubleKickLabel" xml:space="preserve">
-    <value>Judge the 2× kick</value>
+    <value>Judge the 2× Kick</value>
     <comment>Settings: whether a playtest judges Expert+ double kick notes.</comment>
   </data>
   <data name="PlaytestDoubleKickDescription" xml:space="preserve">
@@ -3424,7 +3424,7 @@ Saving also changes song.ini:
     <comment>Settings: search words for Judge the 2× kick, separated by semicolons.</comment>
   </data>
   <data name="PlaytestOverhitsLabel" xml:space="preserve">
-    <value>Overhits break the combo</value>
+    <value>Overhits Break the Combo</value>
     <comment>Settings: whether a drum hit with no note to hit breaks the playtest combo.</comment>
   </data>
   <data name="PlaytestOverhitsDescription" xml:space="preserve">
@@ -3436,7 +3436,7 @@ Saving also changes song.ini:
     <comment>Settings: search words for Overhits break the combo, separated by semicolons.</comment>
   </data>
   <data name="PlaytestDynamicsLabel" xml:space="preserve">
-    <value>Judge accents and ghosts</value>
+    <value>Judge Accents and Ghosts</value>
     <comment>Settings: whether a playtest checks how hard drum accents and ghosts are hit.</comment>
   </data>
   <data name="PlaytestDynamicsDescription" xml:space="preserve">
@@ -3448,7 +3448,7 @@ Saving also changes song.ini:
     <comment>Settings: search words for Judge accents and ghosts, separated by semicolons.</comment>
   </data>
   <data name="GuitarRecordStyleLabel" xml:space="preserve">
-    <value>Guitar records by</value>
+    <value>Guitar Records By</value>
     <comment>Settings: how a guitar controller records notes in record mode.</comment>
   </data>
   <data name="GuitarRecordStyleDescription" xml:space="preserve">
@@ -3464,11 +3464,11 @@ Saving also changes song.ini:
     <comment>Settings: a guitar controller records a note on each strum.</comment>
   </data>
   <data name="GuitarRecordStyleFrets" xml:space="preserve">
-    <value>Pressing frets</value>
+    <value>Pressing Frets</value>
     <comment>Settings: a guitar controller records a note on each fret pressed.</comment>
   </data>
   <data name="PlaybackCountdownLabel" xml:space="preserve">
-    <value>Count down before starting</value>
+    <value>Count Down Before Starting</value>
     <comment>Settings: whether record mode and playtest count 3, 2, 1 before the song starts.</comment>
   </data>
   <data name="PlaybackCountdownDescription" xml:space="preserve">
@@ -3484,19 +3484,19 @@ Saving also changes song.ini:
     <comment>Settings: no countdown before the song starts.</comment>
   </data>
   <data name="PlaybackCountdownRecord" xml:space="preserve">
-    <value>When recording</value>
+    <value>When Recording</value>
     <comment>Settings: a countdown before a pass of record mode starts.</comment>
   </data>
   <data name="PlaybackCountdownPlay" xml:space="preserve">
-    <value>When playtesting</value>
+    <value>When Playtesting</value>
     <comment>Settings: a countdown before a playtest, an instrument playing the chart, starts.</comment>
   </data>
   <data name="PlaybackCountdownBoth" xml:space="preserve">
-    <value>When recording and playtesting</value>
+    <value>When Recording and Playtesting</value>
     <comment>Settings: a countdown before record mode or a playtest starts.</comment>
   </data>
   <data name="CountdownSecondsLabel" xml:space="preserve">
-    <value>Countdown length (seconds)</value>
+    <value>Countdown Length (Seconds)</value>
     <comment>Settings: how many seconds the countdown before the song starts counts.</comment>
   </data>
   <data name="CountdownSecondsDescription" xml:space="preserve">
@@ -3516,7 +3516,7 @@ Saving also changes song.ini:
     <comment>Message bar: the countdown before the song starts was stopped.</comment>
   </data>
   <data name="RecordDynamicsLabel" xml:space="preserve">
-    <value>Dynamics from velocity</value>
+    <value>Dynamics from Velocity</value>
     <comment>Settings: whether a MIDI kit records accents and ghosts by how hard it is hit.</comment>
   </data>
   <data name="RecordDynamicsDescription" xml:space="preserve">

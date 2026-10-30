@@ -27,14 +27,14 @@ namespace ChartBuilder.Services
         /// <param name="resetBindings">Puts every instrument profile's bindings back to the keyboard's defaults.</param>
         public static SettingsCatalog Create(BuilderSettingsService settings, AudioLatencyService latency, Action calibrate, Action editReductionRules, Action openInputDevices, Action resetBindings)
         {
-            var charter = new SettingCategory("charter", Strings.SettingsCategoryCharter);
+            var charter = new SettingCategory("charter", Strings.SettingsCategoryCharter, iconKey: "EditChartStroke");
             var newCharts = new SettingCategory("charter.newCharts", Strings.SettingsCategoryNewCharts, charter);
             var editing = new SettingCategory("charter.editing", Strings.SettingsCategoryEditing, charter);
-            var playback = new SettingCategory("playback", Strings.SettingsCategoryPlayback);
+            var playback = new SettingCategory("playback", Strings.SettingsCategoryPlayback, iconKey: "VolumeStroke");
             var audio = new SettingCategory("playback.audio", Strings.SettingsCategoryAudio, playback);
             var visualizers = new SettingCategory("playback.visualizers", Strings.SettingsCategoryVisualizers, playback);
-            var input = new SettingCategory("input", Strings.SettingsCategoryInput);
-            var general = new SettingCategory("general", SharedStrings.SettingsCategoryGeneral);
+            var input = new SettingCategory("input", Strings.SettingsCategoryInput, iconKey: "MidiStroke");
+            var general = new SettingCategory("general", SharedStrings.SettingsCategoryGeneral, iconKey: "SettingsStroke");
             var logging = new SettingCategory("general.logging", SharedStrings.SettingsCategoryLogging, general);
 
             return new SettingsCatalog(
