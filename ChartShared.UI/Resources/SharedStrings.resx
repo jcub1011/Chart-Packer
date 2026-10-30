@@ -755,10 +755,6 @@
   <data name="RemovedTracksListName" xml:space="preserve">
     <value>Removed tracks</value>
   </data>
-  <data name="ReplaceTrackFormat" xml:space="preserve">
-    <value>Replace {0}</value>
-    <comment>{0} is the stem, e.g. "guitar".</comment>
-  </data>
   <data name="TrackNotAudioFormat" xml:space="preserve">
     <value>{0} isn't an ogg, opus, mp3 or wav file.</value>
     <comment>{0} is the file name.</comment>

@@ -131,8 +131,7 @@ namespace ChartShared.UI.ViewModels
     }
 
     /// <summary>
-    /// An entry of the Add track menu: a stem, labelled to say whether choosing it replaces the song's track for it. The
-    /// command is given the stem.
+    /// An entry of the Add track menu: a stem, labelled with its name. The command is given the stem.
     /// </summary>
     public sealed record StemOption(string Stem, string Label, ICommand Command);
 }

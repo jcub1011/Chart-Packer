@@ -176,6 +176,7 @@ namespace ChartPacker.ViewModels
 
         // One command per stem for the Add track menu, whose labels change with the song's tracks.
         private readonly Dictionary<string, IAsyncRelayCommand> _addTrackCommands = [];
+        private readonly IReadOnlyList<StemOption> _addTrackOptions;
 
         /// <param name="downloads">Saves copies of the song's files from their right-click menus; none for a panel that only previews.</param>
         /// <param name="reveal">Shows the selected songs in the file manager; none for a panel that only previews.</param>
@@ -265,6 +266,7 @@ namespace ChartPacker.ViewModels
             };
             foreach (string stem in AudioStems.Stems)
                 _addTrackCommands[stem] = new AsyncRelayCommand(() => AddTrackAsync(stem), CanChangeFiles);
+            _addTrackOptions = TrackStaging.OptionsFor(stem => _addTrackCommands[stem]);
             _job.PropertyChanged += OnJobPropertyChanged;
         }
 
@@ -325,7 +327,7 @@ namespace ChartPacker.ViewModels
         /// <summary>How far the one selected song's draft moves its background video, as its <c>video_start_time</c>; in the background's caption.</summary>
         public TimingOffsetViewModel VideoOffset { get; } = new(TimingOffsets.VideoKey);
 
-        /// <summary>The Add track menu: every stem, labelled to replace the ones the song already has.</summary>
+        /// <summary>The Add track menu: every stem, labelled with its name.</summary>
         [ObservableProperty]
         public partial IReadOnlyList<StemOption> AddTrackOptions { get; set; } = [];
 
@@ -2237,7 +2239,7 @@ namespace ChartPacker.ViewModels
 
         /// <summary>
         /// Gives the player the one selected song's tracks once its draft is applied, each with its
-        /// size; lists the tracks the draft removes without replacing; and labels the Add track menu to match.
+        /// size; lists the tracks the draft removes without replacing; and shows the Add track menu.
         /// </summary>
         private void RefreshTracks()
         {
@@ -2282,7 +2284,7 @@ namespace ChartPacker.ViewModels
 
             OnPropertyChanged(nameof(HasRemovedTracks));
 
-            AddTrackOptions = TrackStaging.OptionsFor(tracks.Select(t => t.Stem), stem => _addTrackCommands[stem]);
+            AddTrackOptions = _addTrackOptions;
         }
 
         /// <summary><paramref name="track"/>'s file size, formatted: the file to be added, or the one stored.</summary>
