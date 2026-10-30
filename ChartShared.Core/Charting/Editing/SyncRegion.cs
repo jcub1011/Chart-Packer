@@ -10,9 +10,10 @@ namespace ChartShared.Core.Charting.Editing;
 /// session owns it (<see cref="EditorSession.Sync"/>).
 /// </summary>
 /// <remarks>
-/// <para>The passages are found once, as the region is drawn, and never again: one made to match later isn't synced. A
-/// region needs two chords to be drawn, so a lone note or chord, which matches nearly everywhere, can't be; once drawn,
-/// it stays however few notes it's left with.</para>
+/// <para>The passages are found as the region is drawn, moved or resized, and never again between: one made to match
+/// later isn't synced. A region is kept however few notes it's drawn over, even none; with nothing matching it, it's
+/// drawn hashed in yellow (<see cref="IsUnmatched"/>) and syncs nothing. A region is never shorter than a 32nd note
+/// (<see cref="MinLength"/>).</para>
 /// <para>An edit is copied as what it leaves in the region, not as the command that made it, so every way of editing is
 /// synced alike. A passage found is synced only while it holds what the region holds: one edited by hand stops being
 /// synced, rather than being written over, as soon as it's edited, and is synced again once it matches again, as when
@@ -20,7 +21,6 @@ namespace ChartShared.Core.Charting.Editing;
 /// </remarks>
 public sealed class SyncRegion
 {
-    private const string TooFewChords = "A synchronized region needs at least two chords in it, or it would match nearly everywhere.";
     private const string NoMatches = "No other passage of this lane matches the region exactly, so there's nothing to synchronize.";
     private const string Synchronizing = "Synchronizing {0} passage(s) with the region.";
     private const string StoppedSyncing = "{0} passage(s) no longer match the region, so they aren't synchronized. Undo the edit to synchronize them again.";
@@ -34,6 +34,9 @@ public sealed class SyncRegion
 
     internal SyncRegion(EditorSession session) => _session = session;
 
+    /// <summary>How short a region may be: one 32nd note's worth of ticks at <paramref name="resolution"/>.</summary>
+    public static long MinLength(int resolution) => Math.Max(1, resolution / 8);
+
     /// <summary>Whether a region is drawn.</summary>
     public bool IsActive => Track is not null;
 
@@ -43,7 +46,13 @@ public sealed class SyncRegion
     /// <summary>The region's ticks, from its start up to, not including, its end; null with no region.</summary>
     public (long From, long To)? Span { get; private set; }
 
-    /// <summary>Where each passage found as the region was drawn starts, earliest first; each is as long as the region.</summary>
+    /// <summary>
+    /// Whether nothing matched the region as it was last drawn, moved or resized, which draws it hashed in yellow. It
+    /// says nothing of matches lost since, as passages were edited.
+    /// </summary>
+    public bool IsUnmatched { get; private set; }
+
+    /// <summary>Where each passage found as the region was last drawn, moved or resized starts, earliest first; each is as long as the region.</summary>
     public IReadOnlyList<long> Found => _found;
 
     /// <summary>
@@ -67,37 +76,83 @@ public sealed class SyncRegion
 
     /// <summary>
     /// Draws the region over <paramref name="from"/> up to, not including, <paramref name="to"/> of <paramref name="track"/>,
-    /// in place of any drawn, and finds the passages that match it. With fewer than two chords in it, or no passage
-    /// matching it, no region is drawn, and the status says why.
+    /// in place of any drawn, and finds the passages that match it. A stretch shorter than a 32nd note is drawn one 32nd
+    /// long; one with nothing matching it is kept all the same, hashed in yellow.
     /// </summary>
     /// <returns>Whether it was drawn.</returns>
     public bool Define(ChartTrackKey track, long from, long to)
     {
         Clear();
-        if (_session.Chart.PartOf(track.Instrument) is not { } part || to <= from || from < 0)
-            return false;
-        var region = PatternAt(part, part[track.Difficulty], from, to - from);
-        if (region.Notes.Select(static n => n.Offset).Distinct().Count() < 2)
-        {
-            _session.Status = TooFewChords;
-            return false;
-        }
-
-        var matches = FindMatches(part, part[track.Difficulty], from, to - from, region);
-        if (matches.Count == 0)
-        {
-            _session.Status = NoMatches;
-            return false;
-        }
-
         Track = track;
+        if (Set(from, to))
+            return true;
+        Track = null;
+        return false;
+    }
+
+    /// <summary>
+    /// Moves or resizes the region to <paramref name="from"/> up to, not including, <paramref name="to"/>, and finds the
+    /// passages that match it there again, in place of those found before. A stretch shorter than a 32nd note is drawn
+    /// one 32nd long.
+    /// </summary>
+    /// <returns>Whether it was redrawn.</returns>
+    public bool Redefine(long from, long to) => Set(from, to);
+
+    /// <summary>
+    /// Makes the passage the region's matched passage at <paramref name="start"/> the region itself, so syncing goes on
+    /// from it, and finds the passages that match it there again.
+    /// </summary>
+    /// <returns>Whether it was redrawn.</returns>
+    public bool MakeSource(long start) => Span is var (from, to) && Set(start, start + (to - from));
+
+    /// <summary>
+    /// Moves or resizes the region to <paramref name="from"/> up to, not including, <paramref name="to"/> as a gesture
+    /// drags, finding the passages that match it there again, without saying anything; <see cref="Redefine"/> says what
+    /// was found as the gesture ends.
+    /// </summary>
+    internal void DragTo(long from, long to) => Set(from, to, say: false);
+
+    // Puts the region over from..to of its track and finds the passages that match it there again, keeping it however
+    // few notes it holds; says what was found, unless say is off. False when there's no region there to redraw.
+    private bool Set(long from, long to, bool say = true)
+    {
+        if (Track is not { } key || _session.Chart.PartOf(key.Instrument) is not { } part || to <= from || from < 0)
+            return false;
+        to = Math.Max(to, from + MinLength(_session.Chart.Resolution));
+        var matches = Matching(key, part, from, to);
         Span = (from, to);
+        _found.Clear();
         _found.AddRange(matches);
+        _matches.Clear();
         _matches.AddRange(matches);
+        IsUnmatched = matches.Count == 0;
         _resolution = _session.Chart.Resolution;
-        _session.Status = string.Format(CultureInfo.InvariantCulture, Synchronizing, matches.Count);
+        if (say)
+            _session.Status = IsUnmatched
+                ? NoMatches
+                : string.Format(CultureInfo.InvariantCulture, Synchronizing, matches.Count);
         _session.RaiseState();
         return true;
+    }
+
+    /// <summary>
+    /// The passages of <paramref name="track"/> that match what it holds from <paramref name="from"/> up to, not including,
+    /// <paramref name="to"/>, as the region would find them, earliest first, without drawing a region. Empty when the track
+    /// is gone or holds no notes there.
+    /// </summary>
+    public IReadOnlyList<long> Find(ChartTrackKey track, long from, long to)
+    {
+        if (_session.Chart.PartOf(track.Instrument) is not { } part || from < 0)
+            return [];
+        return Matching(track, part, from, Math.Max(to, from + MinLength(_session.Chart.Resolution)));
+    }
+
+    // The passages matching the track's notes from..to; none when it holds none there.
+    private List<long> Matching(ChartTrackKey key, EditablePart part, long from, long to)
+    {
+        var track = part[key.Difficulty];
+        var region = PatternAt(part, track, from, to - from);
+        return region.Notes.Count == 0 ? [] : FindMatches(part, track, from, to - from, region);
     }
 
     /// <summary>Takes the region away, syncing nothing more.</summary>
@@ -107,6 +162,7 @@ public sealed class SyncRegion
             return;
         Track = null;
         Span = null;
+        IsUnmatched = false;
         _found.Clear();
         _matches.Clear();
         _session.RaiseState();
@@ -300,3 +356,21 @@ public sealed class SyncRegion
         public bool SameAs(Pattern other) => Notes.SequenceEqual(other.Notes) && Flags.SequenceEqual(other.Flags);
     }
 }
+
+/// <summary>
+/// Which part of a synchronized region under the pointer is grabbed: an end, to resize it; its body, to move it; or a
+/// passage synced with it, to make the region's source.
+/// </summary>
+public enum SyncGrip
+{
+    Start,
+    End,
+    Body,
+    Match,
+}
+
+/// <summary>
+/// What a press takes hold of on the synchronized region (<see cref="EditorTools.SyncHitOf"/>): which part, and the tick
+/// that part begins at — a matched passage's first tick, or the region's own start or end.
+/// </summary>
+public readonly record struct SyncHit(SyncGrip Grip, long Start);

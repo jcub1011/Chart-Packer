@@ -1,7 +1,7 @@
 using System;
+using ChartShared.Core.Charting;
 using ChartShared.Core.Library;
 using ChartShared.Core.Settings;
-using ChartShared.UI.Services;
 using ChartShared.UI.Views;
 
 namespace ChartPacker.Services
@@ -22,6 +22,9 @@ namespace ChartPacker.Services
             Settings = settings;
         }
 
+        /// <summary>The schema version this build writes to <c>settings.json</c>.</summary>
+        public const int SchemaVersion = 1;
+
         /// <summary>The slowest <see cref="PlaybackSpeed"/>: 1%.</summary>
         public const double MinPlaybackSpeed = 0.01;
 
@@ -39,7 +42,8 @@ namespace ChartPacker.Services
         /// <summary>Loads settings from <paramref name="filePath"/>, falling back to defaults when it's missing or unreadable.</summary>
         public static SettingsService Load(string filePath)
         {
-            var file = new JsonSettingsFile<AppSettings>(filePath, AppSettingsJsonContext.Default.AppSettings);
+            // Each window's placement is merged on its own, so processes closing different windows keep both.
+            var file = new JsonSettingsFile<AppSettings>(filePath, AppSettingsJsonContext.Default.AppSettings, [nameof(AppSettings.Windows)], SchemaVersion);
             var settings = file.Load();
             Sanitize(settings);
             return new SettingsService(file, settings);
@@ -96,9 +100,15 @@ namespace ChartPacker.Services
                 ? Math.Clamp(settings.MasterVolume, 0, 1)
                 : AppSettings.DefaultMasterVolume;
 
-            settings.HighwayNoteSpeed = double.IsFinite(settings.HighwayNoteSpeed)
-                ? Math.Clamp(settings.HighwayNoteSpeed, AppSettings.MinHighwayNoteSpeed, AppSettings.MaxHighwayNoteSpeed)
-                : AppSettings.DefaultHighwayNoteSpeed;
+            // A file an older Chart Packer saved has the highway's note speed rather than its look-ahead.
+            if (settings.HighwayNoteSpeed is { } speed)
+            {
+                settings.HighwayLookAhead = HighwayLookAhead.FromNoteSpeed(speed, AppSettings.DefaultHighwayLookAhead);
+                settings.HighwayNoteSpeed = null;
+            }
+
+            settings.HighwayLookAhead = HighwayLookAhead.Clamp(settings.HighwayLookAhead, AppSettings.DefaultHighwayLookAhead);
+            settings.GenerateDifficultiesLookAhead = HighwayLookAhead.Clamp(settings.GenerateDifficultiesLookAhead, AppSettings.DefaultGenerateDifficultiesLookAhead);
 
             settings.FineScrubMilliseconds = double.IsFinite(settings.FineScrubMilliseconds)
                 ? Math.Clamp(settings.FineScrubMilliseconds, AppSettings.MinFineScrubMilliseconds, AppSettings.MaxFineScrubMilliseconds)
@@ -108,18 +118,7 @@ namespace ChartPacker.Services
                 ? Math.Clamp(settings.LaneFineScrubFactor, AppSettings.MinLaneFineScrubFactor, AppSettings.MaxLaneFineScrubFactor)
                 : AppSettings.DefaultLaneFineScrubFactor;
 
-            SanitizeMainWindowBounds(settings);
-            SettingsWindowSize.Sanitize(settings);
-        }
-
-        /// <summary>The main window's saved normal bounds, as <see cref="WindowBounds.FromSaved"/> reads them: dropped whole when half-saved.</summary>
-        private static void SanitizeMainWindowBounds(AppSettings settings)
-        {
-            var bounds = WindowBounds.FromSaved(settings.MainWindowX, settings.MainWindowY, settings.MainWindowWidth, settings.MainWindowHeight);
-            settings.MainWindowX = bounds?.Position.X;
-            settings.MainWindowY = bounds?.Position.Y;
-            settings.MainWindowWidth = bounds?.Size.Width;
-            settings.MainWindowHeight = bounds?.Size.Height;
+            WindowMemory.Sanitize(settings);
         }
     }
 }

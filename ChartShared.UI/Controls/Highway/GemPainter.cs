@@ -23,6 +23,9 @@ namespace ChartShared.UI.Controls.Highway
         private const double GhostDash = 2;
         private const double GhostGap = 1.5;
 
+        // How far a HOPO open's bar is lightened toward white, all over, instead of a white strip.
+        private const double HopoOpenLighten = 0.9;
+
         private readonly Dictionary<Color, IBrush> _brushes = [];
         private readonly Dictionary<(Color, double), IPen> _pens = [];
 
@@ -92,10 +95,27 @@ namespace ChartShared.UI.Controls.Highway
             }
         }
 
-        /// <summary>Draws an open note or a kick: a flat bar across the lanes, with an inner edge for a 2× kick.</summary>
-        public void DrawBar(DrawingContext context, ChartNote note, Color color, Rect bar, bool outlined)
+        /// <summary>Draws an open note or a kick: a flat bar across the lanes, with an inner edge for a 2× kick. A HOPO open is brighter, edged in its lane's base colour so it still reads in star power.</summary>
+        /// <param name="kind">How the part's notes are laid out, which says whether the bar is an open note or a kick.</param>
+        public void DrawBar(DrawingContext context, ChartInstrumentKind kind, ChartNote note, Color color, Rect bar, bool outlined)
         {
-            DrawFlat(context, bar, color, outlined: outlined);
+            if ((note.Flags & NoteFlags.Hopo) == 0)
+            {
+                DrawFlat(context, bar, color, outlined: outlined);
+            }
+            else if (outlined)
+            {
+                // No fill to brighten: the paler edge alone marks it a HOPO.
+                DrawFlat(context, bar, HighwayPalette.Lighten(color, HopoOpenLighten), outlined: true);
+            }
+            else
+            {
+                // The lane's own colour, before star power, so a star-powered HOPO keeps its hue.
+                var edge = kind == ChartInstrumentKind.Drums ? HighwayPalette.Kick : HighwayPalette.Open;
+                DrawFlat(context, bar, HighwayPalette.Lighten(color, HopoOpenLighten));
+                double radius = CornerOf(bar);
+                context.DrawRectangle(null, Pen(edge, 2), bar, radius, radius);
+            }
             if ((note.Flags & NoteFlags.DoubleKick) != 0)
                 context.DrawRectangle(null, Pen(HighwayPalette.WhiteFret, 1), bar.Deflate(1.5), 1, 1);
         }

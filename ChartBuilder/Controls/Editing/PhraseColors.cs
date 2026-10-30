@@ -6,8 +6,8 @@ using ChartShared.UI.Controls.Highway;
 namespace ChartBuilder.Controls.Editing
 {
     /// <summary>
-    /// The colour of each kind of phrase, as the lanes' phrase rail and the bottom timeline both draw it, and of the ghosts
-    /// of a run of Generate fills or Generate star power (charter-spec C3 item 2, C6 item 5, C8 item 1).
+    /// The colour of each kind of phrase, as the lanes' phrase rail and the bottom timeline both draw it, and of the amber
+    /// a generator's proposals are drawn in (charter-spec C3 item 2).
     /// </summary>
     internal static class PhraseColors
     {
@@ -22,7 +22,7 @@ namespace ChartBuilder.Controls.Editing
         /// A proposed phrase's ghost, whatever its kind: a bright amber no phrase is drawn in, so the ghosts stand out from
         /// the phrases there already.
         /// </summary>
-        public static readonly Color Proposal = Color.FromRgb(0xFF, 0xB0, 0x00);
+        public static readonly Color Proposal = HighwayPalette.Proposal;
 
         /// <summary>The colour of a phrase of <paramref name="kind"/>.</summary>
         public static Color Of(PhraseKind kind) => kind switch
@@ -37,5 +37,11 @@ namespace ChartBuilder.Controls.Editing
 
         /// <summary>The colour of a row of the phrase rail: its phrases', or disco flip's.</summary>
         public static Color Of(RailKind row) => row.Phrase is { } kind ? Of(kind) : DiscoFlip;
+
+        // How far a rail row's background is darkened from its kind's colour.
+        private const double RowDarken = 0.6;
+
+        /// <summary>The dark background of a row of the phrase rail, in its kind's colour.</summary>
+        public static Color RailBackground(RailKind row) => HighwayPalette.Darken(Of(row), RowDarken);
     }
 }

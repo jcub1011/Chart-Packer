@@ -1,10 +1,86 @@
 <?xml version="1.0" encoding="utf-8"?>
 <root>
+  <!-- 
+    Microsoft ResX Schema 
+    
+    Version 2.0
+    
+    The primary goals of this format is to allow a simple XML format 
+    that is mostly human readable. The generation and parsing of the 
+    various data types are done through the TypeConverter classes 
+    associated with the data types.
+    
+    Example:
+    
+    ... ado.net/XML headers & schema ...
+    <resheader name="resmimetype">text/microsoft-resx</resheader>
+    <resheader name="version">2.0</resheader>
+    <resheader name="reader">System.Resources.ResXResourceReader, System.Windows.Forms, ...</resheader>
+    <resheader name="writer">System.Resources.ResXResourceWriter, System.Windows.Forms, ...</resheader>
+    <data name="Name1"><value>this is my long string</value><comment>this is a comment</comment></data>
+    <data name="Color1" type="System.Drawing.Color, System.Drawing">Blue</data>
+    <data name="Bitmap1" mimetype="application/x-microsoft.net.object.binary.base64">
+        <value>[base64 mime encoded serialized .NET Framework object]</value>
+    </data>
+    <data name="Icon1" type="System.Drawing.Icon, System.Drawing" mimetype="application/x-microsoft.net.object.bytearray.base64">
+        <value>[base64 mime encoded string representing a byte array form of the .NET Framework object]</value>
+        <comment>This is a comment</comment>
+    </data>
+                
+    There are any number of "resheader" rows that contain simple 
+    name/value pairs.
+    
+    Each data row contains a name, and value. The row also contains a 
+    type or mimetype. Type corresponds to a .NET class that support 
+    text/value conversion through the TypeConverter architecture. 
+    Classes that don't support this are serialized and stored with the 
+    mimetype set.
+    
+    The mimetype is used for serialized objects, and tells the 
+    ResXResourceReader how to depersist the object. This is currently not 
+    extensible. For a given mimetype the value must be set accordingly:
+    
+    Note - application/x-microsoft.net.object.binary.base64 is the format 
+    that the ResXResourceWriter will generate, however the reader can 
+    read any of the formats listed below.
+    
+    mimetype: application/x-microsoft.net.object.binary.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Binary.BinaryFormatter
+            : and then encoded with base64 encoding.
+    
+    mimetype: application/x-microsoft.net.object.soap.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Soap.SoapFormatter
+            : and then encoded with base64 encoding.
+
+    mimetype: application/x-microsoft.net.object.bytearray.base64
+    value   : The object must be serialized into a byte array 
+            : using a System.ComponentModel.TypeConverter
+            : and then encoded with base64 encoding.
+    -->
   <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
     <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
     <xsd:element name="root" msdata:IsDataSet="true">
       <xsd:complexType>
         <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
           <xsd:element name="data">
             <xsd:complexType>
               <xsd:sequence>
@@ -51,16 +127,17 @@
     <value>No folder selected</value>
   </data>
   <data name="RescanToolTip" xml:space="preserve">
-    <value>Search the chosen folder for songs (F5)</value>
+    <value>Search the chosen folder for songs</value>
+    <comment>The shortcut is added after this, as the user has set it.</comment>
   </data>
   <data name="NotScannedHint" xml:space="preserve">
-    <value>Select Scan (F5) to search this folder</value>
+    <value>Select Scan to search this folder</value>
   </data>
   <data name="StaleHint" xml:space="preserve">
-    <value>The list is out of date. Select Scan (F5) to update it.</value>
+    <value>The list is out of date. Select Scan to update it.</value>
   </data>
   <data name="ScanDepthLabel" xml:space="preserve">
-    <value>Search depth</value>
+    <value>Search Depth</value>
   </data>
   <data name="LibraryListName" xml:space="preserve">
     <value>Songs</value>
@@ -171,7 +248,7 @@
     <value>Write next to the scanned songs again</value>
   </data>
   <data name="OverwriteLabel" xml:space="preserve">
-    <value>If the output exists</value>
+    <value>If the Output Exists</value>
   </data>
   <data name="OverwriteToolTip" xml:space="preserve">
     <value>What to do when the .sng or folder being written already exists</value>
@@ -275,6 +352,25 @@
   <data name="MenuFile" xml:space="preserve">
     <value>_File</value>
     <comment>The title bar's menus. An underscore marks the access key, unique among a menu's items.</comment>
+  </data>
+  <data name="MenuEdit" xml:space="preserve">
+    <value>_Edit</value>
+    <comment>The title bar's Edit menu, between File and Pack. The underscore marks its access key (Alt+E).</comment>
+  </data>
+  <data name="MenuUndo" xml:space="preserve">
+    <value>_Undo</value>
+    <comment>Edit menu.</comment>
+  </data>
+  <data name="MenuRedo" xml:space="preserve">
+    <value>_Redo</value>
+    <comment>Edit menu.</comment>
+  </data>
+  <data name="UndoToolTip" xml:space="preserve">
+    <value>Undo the last change to the selected song. Select one song to undo its changes</value>
+    <comment>Each song keeps its own undo history, so with several songs selected it's disabled rather than undoing them all.</comment>
+  </data>
+  <data name="RedoToolTip" xml:space="preserve">
+    <value>Apply again the change last undone to the selected song. Select one song to redo its changes</value>
   </data>
   <data name="MenuChooseSongsFolder" xml:space="preserve">
     <value>_Choose Songs Folder…</value>
@@ -403,7 +499,7 @@
     <value>Pack and unpack results</value>
   </data>
   <data name="FlatPackLabel" xml:space="preserve">
-    <value>Pack into one folder (flat)</value>
+    <value>Pack into One Folder (Flat)</value>
   </data>
   <data name="FlatPackToolTip" xml:space="preserve">
     <value>Put every packed .sng directly in the output folder instead of mirroring the scanned layout. On name conflicts, the first packed keeps the name; others are skipped or renamed with "Keep both".</value>
@@ -477,7 +573,17 @@
     <comment>{0} is the number of items (always 2 or more).</comment>
   </data>
   <data name="DiscardAndCloseButton" xml:space="preserve">
-    <value>Discard and close</value>
+    <value>Discard and Close</value>
+  </data>
+  <data name="OpenUnsavedOne" xml:space="preserve">
+    <value>1 item has unsaved changes. Open the dropped folder and discard them?</value>
+  </data>
+  <data name="OpenUnsavedFormat" xml:space="preserve">
+    <value>{0:N0} items have unsaved changes. Open the dropped folder and discard them?</value>
+    <comment>{0} is the number of items (always 2 or more).</comment>
+  </data>
+  <data name="DiscardAndOpenButton" xml:space="preserve">
+    <value>Discard and Open</value>
   </data>
   <data name="AlbumArtName" xml:space="preserve">
     <value>Album art</value>
@@ -608,10 +714,10 @@
     <value>Pause</value>
   </data>
   <data name="PlayShortcutToolTip" xml:space="preserve">
-    <value>Play (Space)</value>
+    <value>Play</value>
   </data>
   <data name="PauseShortcutToolTip" xml:space="preserve">
-    <value>Pause (Space)</value>
+    <value>Pause</value>
   </data>
   <data name="StopToolTip" xml:space="preserve">
     <value>Stop and go back to the start</value>
@@ -630,7 +736,7 @@
     <value>Playback position</value>
   </data>
   <data name="VolumeName" xml:space="preserve">
-    <value>Master volume</value>
+    <value>Master Volume</value>
   </data>
   <data name="PlaybackSpeedLabel" xml:space="preserve">
     <value>Speed</value>
@@ -743,13 +849,13 @@
     <value>Lyrics offset</value>
   </data>
   <data name="LyricsOffsetToolTip" xml:space="preserve">
-    <value>Moves lyrics and vocal notes later (positive) or earlier (negative). Saving rewrites the chart.</value>
+    <value>Moves lyrics and vocal notes later (positive) or earlier (negative).</value>
   </data>
   <data name="LyricsRevertOffsetToolTip" xml:space="preserve">
     <value>Reset the lyrics offset</value>
   </data>
   <data name="LyricsOffsetBeforeStartFormat" xml:space="preserve">
-    <value>The lyrics would start {0} ms before the song, so this can't be saved. Move them at least that much later.</value>
+    <value>The lyrics would start {0} ms before the song, so this can't be saved.</value>
     <comment>{0} is a number of milliseconds: how much later the lyrics must move to start with the song.</comment>
   </data>
   <data name="PickLyricsTitle" xml:space="preserve">
@@ -764,7 +870,7 @@
     <comment>{0} is the file name.</comment>
   </data>
   <data name="SettingsToolTip" xml:space="preserve">
-    <value>Change how songs are scanned, packed and played (Ctrl+,)</value>
+    <value>Change how songs are scanned, packed and played</value>
   </data>
   <data name="SettingsCategoryLibrary" xml:space="preserve">
     <value>Library</value>
@@ -792,17 +898,45 @@
     <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
   </data>
   <data name="ScanParallelismLabel" xml:space="preserve">
-    <value>Parallel reads</value>
+    <value>Parallel Reads</value>
   </data>
   <data name="ScanParallelismDescription" xml:space="preserve">
-    <value>How many folders a scan searches and songs it reads at once. Deduplicate compares this many files at once too. Higher is faster on SSDs and network drives; 1 reads one at a time.</value>
+    <value>How many folders a scan searches and songs it reads at once. Deduplicate compares this many files at once too.</value>
   </data>
   <data name="ScanParallelismKeywords" xml:space="preserve">
     <value>threads parallel parallelism concurrency workers speed performance</value>
     <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
   </data>
+  <data name="ScanOnLaunchLabel" xml:space="preserve">
+    <value>Scan on Launch</value>
+  </data>
+  <data name="ScanOnLaunchDescription" xml:space="preserve">
+    <value>Scan the songs folder from last time as the app starts. When off, use Scan to search it.</value>
+  </data>
+  <data name="ScanOnLaunchKeywords" xml:space="preserve">
+    <value>startup start open automatic auto rescan refresh</value>
+    <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
+  </data>
+  <data name="ScanOnFolderChangeLabel" xml:space="preserve">
+    <value>Scan on Folder Change</value>
+  </data>
+  <data name="ScanOnFolderChangeDescription" xml:space="preserve">
+    <value>Scan a songs folder as soon as you choose or drop it. When off, use Scan to search it.</value>
+  </data>
+  <data name="ScanOnFolderChangeKeywords" xml:space="preserve">
+    <value>browse drop drag choose pick select open automatic auto rescan refresh</value>
+    <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
+  </data>
+  <data name="ChooseSongsFolderButton" xml:space="preserve">
+    <value>Choose Songs Folder…</value>
+    <comment>Button in the empty library list, shown when no songs folder is set.</comment>
+  </data>
+  <data name="ScanButton" xml:space="preserve">
+    <value>Scan</value>
+    <comment>Button in the empty library list, shown when a songs folder is set but hasn't been scanned.</comment>
+  </data>
   <data name="OutputFolderLabel" xml:space="preserve">
-    <value>Output folder</value>
+    <value>Output Folder</value>
   </data>
   <data name="OutputFolderDescription" xml:space="preserve">
     <value>Where Pack and Unpack write.</value>
@@ -831,7 +965,7 @@
     <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
   </data>
   <data name="PitchCorrectionLabel" xml:space="preserve">
-    <value>Keep pitch when changing speed</value>
+    <value>Keep Pitch When Changing Speed</value>
   </data>
   <data name="PitchCorrectionDescription" xml:space="preserve">
     <value>Play songs faster or slower at their own pitch by stretching the audio in time. When off, pitch rises and falls with speed.</value>
@@ -844,17 +978,17 @@
     <value>Visualizers</value>
   </data>
   <data name="ShowWaveformsLabel" xml:space="preserve">
-    <value>Show waveforms</value>
+    <value>Show Waveforms</value>
   </data>
   <data name="ShowWaveformsDescription" xml:space="preserve">
-    <value>Draw the song's and each track's waveform. When off, tracks aren't read ahead, saving work on slower computers. The song's length shows once played.</value>
+    <value>Draw the song's and each track's waveform.</value>
   </data>
   <data name="ShowWaveformsKeywords" xml:space="preserve">
     <value>waveform peaks visualizer visualiser performance slow</value>
     <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
   </data>
   <data name="ShowSpectrumLabel" xml:space="preserve">
-    <value>Show spectrum</value>
+    <value>Show Spectrum</value>
   </data>
   <data name="ShowSpectrumDescription" xml:space="preserve">
     <value>Draw the moving spectrum behind the details panel during playback. When off, it isn't computed at all.</value>
@@ -867,10 +1001,10 @@
     <value>Appearance</value>
   </data>
   <data name="AlbumArtThemeLabel" xml:space="preserve">
-    <value>Take colors from album art</value>
+    <value>Take Colors from Album Art</value>
   </data>
   <data name="AlbumArtThemeDescription" xml:space="preserve">
-    <value>Tints the main window, its accent color, and the spectrum to match the selected song's album art, fading between songs. When off, the app keeps its own colors.</value>
+    <value>Tints the main window, its accent color, and the spectrum to match the selected song's album art. When off, the app keeps its own colors.</value>
   </data>
   <data name="AlbumArtThemeKeywords" xml:space="preserve">
     <value>colour color theme dynamic accent tint cover art album artwork palette</value>
@@ -1092,7 +1226,7 @@
     <value>Audio offset</value>
   </data>
   <data name="AudioOffsetToolTip" xml:space="preserve">
-    <value>Moves all audio later (positive) or earlier (negative) relative to the chart and lyrics. The background video stays with the audio and has its own offset. Saved as song.ini's delay.</value>
+    <value>Moves all audio later (positive) or earlier (negative) relative to the chart and lyrics.</value>
   </data>
   <data name="AudioRevertOffsetToolTip" xml:space="preserve">
     <value>Reset the audio offset</value>
@@ -1101,7 +1235,7 @@
     <value>Video Offset</value>
   </data>
   <data name="VideoOffsetToolTip" xml:space="preserve">
-    <value>Moves the background video later (positive) or earlier (negative) relative to the audio. Saved as song.ini's video_start_time.</value>
+    <value>Moves the background video later (positive) or earlier (negative) relative to the audio.</value>
   </data>
   <data name="VideoOffsetButtonToolTip" xml:space="preserve">
     <value>Line the video up with the audio</value>
@@ -1109,18 +1243,18 @@
   <data name="VideoRevertOffsetToolTip" xml:space="preserve">
     <value>Reset the video offset</value>
   </data>
-  <data name="HighwayNoteSpeedLabel" xml:space="preserve">
-    <value>Note speed</value>
+  <data name="HighwayLookAheadLabel" xml:space="preserve">
+    <value>Seek Ahead</value>
   </data>
-  <data name="HighwayNoteSpeedDescription" xml:space="preserve">
-    <value>How fast notes fall down the note highway.</value>
+  <data name="HighwayLookAheadDescription" xml:space="preserve">
+    <value>How many seconds ahead of the strike line the note highway shows.</value>
   </data>
-  <data name="HighwayNoteSpeedKeywords" xml:space="preserve">
-    <value>highway scroll speed hyperspeed notes chart falling</value>
+  <data name="HighwayLookAheadKeywords" xml:space="preserve">
+    <value>highway look ahead lookahead scroll speed hyperspeed note speed notes chart falling</value>
     <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
   </data>
   <data name="ShowHighwayLabel" xml:space="preserve">
-    <value>Show note highway</value>
+    <value>Show Note Highway</value>
   </data>
   <data name="ShowHighwayDescription" xml:space="preserve">
     <value>Draw the chart's notes falling with the audio. Pick instruments from the note highway's button: next to the Image and Video switch, or in its row's caption.</value>
@@ -1130,36 +1264,36 @@
     <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
   </data>
   <data name="HighwayPlacementLabel" xml:space="preserve">
-    <value>Note highway position</value>
+    <value>Note Highway Position</value>
   </data>
   <data name="HighwayPlacementDescription" xml:space="preserve">
-    <value>Where the note highway is drawn: over the background, as in a game, or in its own row below the lyrics, leaving the background clear. Needs Show note highway.</value>
+    <value>Where the note highway is drawn: over the background, as in a game, or in its own row below the lyrics, leaving the background clear. Needs Show Note Highway.</value>
   </data>
   <data name="HighwayPlacementKeywords" xml:space="preserve">
     <value>highway position placement location row lane overlay background video lyrics</value>
     <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
   </data>
   <data name="HighwayPlacementBackground" xml:space="preserve">
-    <value>Over the background</value>
+    <value>Over the Background</value>
   </data>
   <data name="HighwayPlacementRow" xml:space="preserve">
-    <value>In its own row</value>
+    <value>In Its Own Row</value>
   </data>
   <data name="ShowLaneWaveformsLabel" xml:space="preserve">
-    <value>Show waveforms in lanes</value>
+    <value>Show Waveforms in Lanes</value>
   </data>
   <data name="ShowLaneWaveformsDescription" xml:space="preserve">
-    <value>Draw each instrument's track behind its notes, and the vocals track behind the lyrics, to align the chart with the audio. A lane with no track of its own shows the song's track. Needs Show waveforms.</value>
+    <value>Draw each instrument's track behind its notes, and the vocals track behind the lyrics, to align the chart with the audio. A lane with no track of its own shows the song's track. Needs Show Waveforms.</value>
   </data>
   <data name="ShowLaneWaveformsKeywords" xml:space="preserve">
     <value>waveform lanes highway lyrics align alignment offset sync timing audio track stem</value>
     <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
   </data>
   <data name="WaveformFidelityLabel" xml:space="preserve">
-    <value>Waveform detail</value>
+    <value>Waveform Detail</value>
   </data>
   <data name="WaveformFidelityDescription" xml:space="preserve">
-    <value>How finely each track's waveform is read: finer detail shows note starts more sharply in the lanes but takes longer to read and more memory. Changing it re-reads the tracks. Needs Show waveforms.</value>
+    <value>How finely each track's waveform is read: finer detail shows note starts more sharply in the lanes but takes longer to read and more memory. Changing it re-reads the tracks. Needs Show Waveforms.</value>
   </data>
   <data name="WaveformFidelityKeywords" xml:space="preserve">
     <value>waveform resolution fidelity detail quality precision sharp fine lanes highway</value>
@@ -1298,7 +1432,7 @@
     <value>Alignment</value>
   </data>
   <data name="MergeAlignmentDescription" xml:space="preserve">
-    <value>How far each song's chart shifts to match the kept audio; its parts, lyrics, and video shift with it. Auto-align matches each song to one already aligned: by a shared part, its full or opening note pattern, or by mixed-down audio. Then fine-tune each part with the note highway's offsets.</value>
+    <value>How far each song's chart shifts to match the kept audio; its parts, lyrics, and video shift with it. Fine-tune each part with the note highway's offsets.</value>
   </data>
   <data name="MergeAlignmentLabel" xml:space="preserve">
     <value>Offset</value>
@@ -1621,10 +1755,10 @@
     <value>The preview can't be put together: {0}</value>
   </data>
   <data name="MergePreviewNote" xml:space="preserve">
-    <value>Preview of the merged song. Offsets set on its note highway apply at merge; everything else can be edited after merging.</value>
+    <value>Preview of the merged song.</value>
   </data>
   <data name="DedupToolTip" xml:space="preserve">
-    <value>Find duplicate songs across the library, including different charts of the same song, and move unneeded copies to the trash. Rescans first to compare what's on disk now.</value>
+    <value>Find duplicate songs across the library. Rescans first to compare what's on disk now.</value>
   </data>
   <data name="DedupWindowTitle" xml:space="preserve">
     <value>Deduplicate Library</value>
@@ -1633,7 +1767,7 @@
     <value>Duplicates</value>
   </data>
   <data name="DedupKeepLabel" xml:space="preserve">
-    <value>Keep by default</value>
+    <value>Keep by Default</value>
   </data>
   <data name="DedupKeepByDefaultLabel" xml:space="preserve">
     <value>Keep by Default</value>
@@ -1643,7 +1777,7 @@
     <value>The .sng</value>
   </data>
   <data name="DedupKeepFolder" xml:space="preserve">
-    <value>The folder</value>
+    <value>The Folder</value>
   </data>
   <data name="DedupKeepDescription" xml:space="preserve">
     <value>Which copy Deduplicate keeps by default when a song exists both as a folder and a .sng. You can still pick another copy in each group.</value>
@@ -1695,7 +1829,7 @@
     <value>Every file and all metadata match, so deleting a copy loses nothing. One copy per group is kept.</value>
   </data>
   <data name="DedupSameChartDescription" xml:space="preserve">
-    <value>The chart matches, but metadata or other files differ. Review the differences, then delete by group or all at once, or open a group in Merge to combine metadata and files.</value>
+    <value>The chart matches, but metadata or other files differ.</value>
   </data>
   <data name="DedupMergeDescription" xml:space="preserve">
     <value>Same artist and title with different charts. Merge them into one new .sng, then delete the charts it came from.</value>
@@ -1984,7 +2118,7 @@ Each song is rechecked first. Changed songs, or ones whose kept copy is missing,
     <value>Downloads</value>
   </data>
   <data name="DownloadFolderLabel" xml:space="preserve">
-    <value>Download folder</value>
+    <value>Download Folder</value>
   </data>
   <data name="DownloadFolderDescription" xml:space="preserve">
     <value>Where files and songs saved from a right-click menu go.</value>
@@ -2001,7 +2135,7 @@ Each song is rechecked first. Changed songs, or ones whose kept copy is missing,
     <value>Choose the Download Folder</value>
   </data>
   <data name="AskDownloadLocationLabel" xml:space="preserve">
-    <value>Ask where to save each download</value>
+    <value>Ask Where to Save Each Download</value>
   </data>
   <data name="AskDownloadLocationDescription" xml:space="preserve">
     <value>Shows a save dialog for every download, starting in the download folder.</value>
@@ -2015,7 +2149,7 @@ Each song is rechecked first. Changed songs, or ones whose kept copy is missing,
     <comment>A settings category: moving through the song by dragging the seek bar or a lane, or with the wheel.</comment>
   </data>
   <data name="ScrubStepLabel" xml:space="preserve">
-    <value>Ctrl+scroll step</value>
+    <value>Ctrl+Scroll Step</value>
   </data>
   <data name="ScrubStepDescription" xml:space="preserve">
     <value>How far each wheel notch moves the song with Ctrl held over the seek bar, highway, or lyrics: to the next note of this length on the chart's beat grid.</value>
@@ -2051,7 +2185,7 @@ Each song is rechecked first. Changed songs, or ones whose kept copy is missing,
     <value>Thirty-second note</value>
   </data>
   <data name="FineScrubSpeedLabel" xml:space="preserve">
-    <value>Seek bar Ctrl+drag speed</value>
+    <value>Seek Bar Ctrl+Drag Speed</value>
   </data>
   <data name="FineScrubSpeedDescription" xml:space="preserve">
     <value>How far the song moves per pixel dragged with Ctrl held on the seek bar, regardless of song length.</value>
@@ -2061,7 +2195,7 @@ Each song is rechecked first. Changed songs, or ones whose kept copy is missing,
     <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
   </data>
   <data name="LaneFineScrubLabel" xml:space="preserve">
-    <value>Highway and lyrics Ctrl+drag</value>
+    <value>Highway and Lyrics Ctrl+Drag</value>
   </data>
   <data name="LaneFineScrubDescription" xml:space="preserve">
     <value>How much finer a Ctrl+drag is than a plain drag on a highway or the lyrics.</value>
@@ -2342,20 +2476,20 @@ Each song is rechecked first. Changed songs, or ones whose kept copy is missing,
     <comment>{0} is the output path.</comment>
   </data>
   <data name="AudioLatencyLabel" xml:space="preserve">
-    <value>Audio/visual latency</value>
+    <value>Audio/Visual Latency</value>
   </data>
   <data name="AudioLatencyDescription" xml:space="preserve">
-    <value>How much later audio is heard than shown, measured per output device by the calibration tool. The highway, lyrics, and background are drawn that much earlier. This adds to the latency detected from the device.</value>
+    <value>How much later audio is heard than shown, measured per output device by the calibration tool. This adds to the latency detected from the device.</value>
   </data>
   <data name="AudioLatencyKeywords" xml:space="preserve">
     <value>latency delay offset sync calibrate calibration audio video lag bluetooth</value>
   </data>
   <data name="DetectLatencyLabel" xml:space="preserve">
-    <value>Detect output latency</value>
+    <value>Detect Output Latency</value>
     <comment>A switch: whether the latency read from the output device's buffers is added to its calibrated latency.</comment>
   </data>
   <data name="DetectLatencyDescription" xml:space="preserve">
-    <value>Read the output device's buffer latency from the system and add it to the calibrated latency. Excludes Bluetooth and display delay, so calibrate to cover those. Shared with Chart Builder.</value>
+    <value>Read the output device's buffer latency from the system and add it to the calibrated latency. You still need to do manual calibration with this enabled. Shared with Chart Builder.</value>
   </data>
   <data name="DetectLatencyKeywords" xml:space="preserve">
     <value>detect automatic auto latency delay buffer hardware device sync calibration audio lag</value>
@@ -2486,7 +2620,7 @@ Each song is rechecked first. Changed songs, or ones whose kept copy is missing,
     <comment>Library right-click menu: opens the Generate lower difficulties window for the selected songs.</comment>
   </data>
   <data name="GenerateLowerDifficultiesToolTip" xml:space="preserve">
-    <value>Fill in Hard, Medium, and Easy from the difficulty above each, skipping charted ones. New charts go into the songs' drafts until saved.</value>
+    <value>Fill in Hard, Medium, and Easy from the difficulty above each, skipping charted ones.</value>
   </data>
   <data name="LowerDifficultiesTitle" xml:space="preserve">
     <value>Generate Lower Difficulties</value>
@@ -2719,5 +2853,17 @@ Each song is rechecked first. Changed songs, or ones whose kept copy is missing,
   </data>
   <data name="LowerDifficultiesIncludeAllToolTip" xml:space="preserve">
     <value>Tick or untick every song listed here that has something to generate.</value>
+  </data>
+  <data name="KeyCategoryLibrary" xml:space="preserve">
+    <value>Library</value>
+    <comment>Heading in the keyboard shortcuts list over the shortcuts for scanning and searching the song list.</comment>
+  </data>
+  <data name="KeyActionRescan" xml:space="preserve">
+    <value>Rescan Songs Folder</value>
+    <comment>Name of the shortcut that searches the songs folder again, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionSearch" xml:space="preserve">
+    <value>Search Song List</value>
+    <comment>Name of the shortcut that moves focus to the song search box, in the keyboard shortcuts list.</comment>
   </data>
 </root>

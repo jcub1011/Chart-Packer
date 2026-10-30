@@ -218,7 +218,7 @@ public sealed class ReduceProposalsTests
     [TestMethod]
     public async Task TheCheckShowsTheDraftsFindingsAndRatings()
     {
-        // Sixteenths held under the sustain cutoff, which Medium keeps: CHR021 on the draft, as well as on Expert.
+        // Sixteenths held for 150 ticks, which Medium keeps; the check shows the draft's ratings.
         var chart = Guitar();
         new AddNotes(ChartInstrument.Guitar, Expert, [.. Enumerable.Range(0, 64).Select(i => new EditableNote(i * 120L, 150, i % 5))]).Apply(chart);
         var session = Of(chart);
@@ -226,7 +226,6 @@ public sealed class ReduceProposalsTests
 
         var check = (await session.Reduce.CheckAsync())!;
 
-        Assert.Contains(f => f.RuleId == ChrRules.Chr021, check.Findings);
         Assert.IsTrue(check.Findings.All(f => f.Location!.Difficulty == Medium || (f.RuleId == ChrRules.Chr081 && f.Location.Difficulty == Easy)));
         Assert.IsTrue(check.Estimates.ContainsKey(Expert));
         Assert.IsTrue(check.Estimates.ContainsKey(Medium));

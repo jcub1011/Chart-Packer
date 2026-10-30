@@ -52,6 +52,24 @@ public readonly record struct EditableNote(long Tick, long Length, int Lane, Not
     /// <summary>The length the editor gives a note without a sustain, as <see cref="ChartToMidi"/> writes one.</summary>
     public const long PlainLength = 1;
 
+    /// <summary>
+    /// The shortest hold Chart Builder treats as a sustain: shorter is a plain note, in the editor and in what it saves.
+    /// </summary>
+    public const long MinimumSustainLength = SustainCutoff.MinimumSustain;
+
+    /// <summary>
+    /// <paramref name="length"/> as Chart Builder gives a note: a plain note for a hold under
+    /// <see cref="MinimumSustainLength"/>, otherwise the length itself.
+    /// </summary>
+    public static long SustainOrPlain(long length) => length < MinimumSustainLength ? PlainLength : length;
+
+    /// <summary>
+    /// <paramref name="length"/> as a loaded chart has it, with a hold under <see cref="MinimumSustainLength"/> made a
+    /// plain note, keeping an already plain note's 0 as it is.
+    /// </summary>
+    public static long NormalizeSustain(long length) =>
+        length > PlainLength && length < MinimumSustainLength ? PlainLength : length;
+
     /// <summary>The lowest lane an instrument of <paramref name="kind"/> has.</summary>
     public static int FirstLane(ChartInstrumentKind kind) => kind == ChartInstrumentKind.Drums ? 0 : ChartNote.OpenLane;
 

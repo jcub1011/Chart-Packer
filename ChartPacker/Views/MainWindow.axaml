@@ -1,10 +1,13 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:help="using:ChartShared.Core.Help"
         xmlns:vm="using:ChartPacker.ViewModels"
         xmlns:res="using:ChartPacker.Resources"
         xmlns:ctl="using:ChartShared.UI.Controls"
         xmlns:chrome="using:Avalonia.Controls.Chrome"
         xmlns:theme="using:ChartShared.UI.Theming"
+        xmlns:kb="using:ChartShared.UI.Keybinds"
+        xmlns:shared="using:ChartShared.UI.Resources"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="1080" d:DesignHeight="800"
@@ -24,10 +27,8 @@
     <!-- The whole window, and the menus and flyouts it opens, take their colours from the selected song's album art
          (DynamicTheme), fading from song to song; see SongDetailViewModel.ThemeSeed. -->
 
-    <Window.KeyBindings>
-        <KeyBinding Gesture="F5" Command="{Binding Library.RescanCommand}" />
-        <KeyBinding Gesture="Ctrl+OemComma" Command="{Binding OpenSettingsCommand}" />
-    </Window.KeyBindings>
+    <!-- The keys (F5, Ctrl+S, Undo and the rest) aren't bindings here: MainWindow.axaml.cs registers each with the app's
+         KeyMap, which the user can rebind, and the menus and tooltips below show whatever they are now (kb:Shortcut). -->
 
     <Grid x:Name="RootGrid">
         <Grid.RowDefinitions>
@@ -52,6 +53,7 @@
              panel (SongDetailView.axaml), while there are edits to save. Each item's tooltip says what it does, and while
              it's disabled, what it needs. -->
         <ctl:TitleBar Grid.Row="0"
+                      HelpPage="{x:Static help:HelpPages.ChartPacker}"
                       Grid.ColumnSpan="3"
                       Height="31"
                       BorderThickness="0,0,0,1"
@@ -61,8 +63,9 @@
             <ctl:TitleBar.Menu>
                 <Menu chrome:WindowDecorationProperties.ElementRole="User">
                     <!-- Where songs are found, where Pack and Unpack write and where downloads go; then the logs and
-                         Settings. Settings' Ctrl+, isn't shown, as Avalonia
-                         would print it as Ctrl+OemComma. -->
+                         Settings. A menu item shows a key as its shortcut text only when Avalonia would print it as the
+                         key is named (Shortcut.Update), so Settings' Ctrl+, isn't shown there (Avalonia would print
+                         Ctrl+OemComma) but is in its tooltip. -->
                     <MenuItem Header="{x:Static res:Strings.MenuFile}">
                         <MenuItem Header="{x:Static res:Strings.MenuChooseSongsFolder}"
                                   Command="{Binding Library.BrowseCommand}"
@@ -71,8 +74,8 @@
                         </MenuItem>
                         <MenuItem Header="{x:Static res:Strings.MenuRescan}"
                                   Command="{Binding Library.RescanCommand}"
-                                  InputGesture="F5"
-                                  ToolTip.Tip="{x:Static res:Strings.RescanToolTip}"
+                                  kb:Shortcut.Action="packer.rescan"
+                                  kb:Shortcut.Tip="{x:Static res:Strings.RescanToolTip}"
                                   ToolTip.ShowOnDisabled="True">
                             <MenuItem.Icon><ctl:LineIcon Data="{StaticResource ScanStroke}" /></MenuItem.Icon>
                         </MenuItem>
@@ -102,7 +105,33 @@
                         </MenuItem>
                         <MenuItem Header="{x:Static res:Strings.MenuSettings}"
                                   Command="{Binding OpenSettingsCommand}"
-                                  ToolTip.Tip="{x:Static res:Strings.SettingsToolTip}">
+                                  kb:Shortcut.Action="app.settings"
+                                  kb:Shortcut.Tip="{x:Static res:Strings.SettingsToolTip}">
+                            <MenuItem.Icon><ctl:LineIcon Data="{StaticResource SettingsStroke}" /></MenuItem.Icon>
+                        </MenuItem>
+                    </MenuItem>
+                    <!-- Undo and Redo for the one song selected, which keeps its own history: they're disabled while several are
+                         selected, so that a batch edit is undone for one song at a time. Redo is Undo's arrow mirrored. -->
+                    <MenuItem Header="{x:Static res:Strings.MenuEdit}">
+                        <MenuItem Header="{x:Static res:Strings.MenuUndo}"
+                                  Command="{Binding Detail.UndoCommand}"
+                                  kb:Shortcut.Action="edit.undo"
+                                  kb:Shortcut.Tip="{x:Static res:Strings.UndoToolTip}"
+                                  ToolTip.ShowOnDisabled="True">
+                            <MenuItem.Icon><ctl:LineIcon Data="{StaticResource UndoStroke}" /></MenuItem.Icon>
+                        </MenuItem>
+                        <MenuItem Header="{x:Static res:Strings.MenuRedo}"
+                                  Command="{Binding Detail.RedoCommand}"
+                                  kb:Shortcut.Action="edit.redo"
+                                  kb:Shortcut.Tip="{x:Static res:Strings.RedoToolTip}"
+                                  ToolTip.ShowOnDisabled="True">
+                            <MenuItem.Icon><ctl:LineIcon Data="{StaticResource UndoStroke}" RenderTransform="scaleX(-1)" /></MenuItem.Icon>
+                        </MenuItem>
+                        <!-- The window where every keyboard shortcut is listed and changed. -->
+                        <Separator />
+                        <MenuItem Header="{x:Static shared:SharedStrings.MenuShortcuts}"
+                                  Command="{Binding OpenShortcutsCommand}"
+                                  ToolTip.Tip="{x:Static shared:SharedStrings.MenuShortcutsToolTip}">
                             <MenuItem.Icon><ctl:LineIcon Data="{StaticResource SettingsStroke}" /></MenuItem.Icon>
                         </MenuItem>
                     </MenuItem>
@@ -183,6 +212,7 @@
                             <MenuItem.Icon><ctl:LineIcon Data="{StaticResource DedupStroke}" /></MenuItem.Icon>
                         </MenuItem>
                     </MenuItem>
+                    <ctl:AboutMenuItem />
                 </Menu>
             </ctl:TitleBar.Menu>
             <!-- The songs folder, an arrow, then the output folder: each a button (title-link, in Theme.axaml) that

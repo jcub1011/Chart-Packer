@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
@@ -42,6 +43,10 @@ namespace ChartBuilder.ViewModels
         // Tap tempo's message, which each tap updates.
         private const string TapTempoMessageKey = "tap-tempo";
 
+        // How long L may be held and still be a tap of the Loop tool rather than holding it: a tap turns what repeating
+        // the loop region does on or off (C10 item 2), a longer press only uses the tool.
+        private static readonly TimeSpan LoopTapTime = TimeSpan.FromMilliseconds(400);
+
         // The Phrase tool's kinds, for 5-fret and GHL, for 4-lane and 5-lane drums, and for Pro drums, which have disco flip.
         private static readonly IReadOnlyList<PhraseKindChoice> FretPhraseChoices = PhraseChoicesOf(ChartInstrumentKind.FiveFret, proDrums: false);
         private static readonly IReadOnlyList<PhraseKindChoice> DrumPhraseChoices = PhraseChoicesOf(ChartInstrumentKind.Drums, proDrums: false);
@@ -66,6 +71,9 @@ namespace ChartBuilder.ViewModels
 
         // The frame the playhead was last followed in.
         private TimeSpan? _followed;
+
+        // When L was pressed, to tell a tap of it from the tool's being held.
+        private long _loopHeldAt;
 
         /// <param name="messages">Where what the editor has to say goes, for the window's message bar.</param>
         /// <param name="audio">The song's audio as the lanes draw and analyse it.</param>
@@ -96,7 +104,11 @@ namespace ChartBuilder.ViewModels
             Properties = new PropertiesViewModel(this);
             Session.Onsets = new LaneOnsetSource(this);
             Session.VisibleTracks = () => [.. Lanes.Layout.Lanes.Select(l => l.Part.Track).OfType<ChartTrackKey>()];
+            Session.Loop = Playback;
             AudioAssist = new AudioAssistViewModel(this);
+            Navigation = new NavigationFlyoutViewModel(Session);
+            Session.Find.Changed += OnFindChanged;
+            Navigation.PropertyChanged += OnNavigationChanged;
             Preview = new PreviewViewModel(this, settings);
             Difficulty = new DifficultyViewModel(this);
             Playtest = new PlaytestViewModel(this, settings, input?.Settings.Settings, Devices);
@@ -114,6 +126,7 @@ namespace ChartBuilder.ViewModels
             Session.Viewport.Moved += OnCursorMoved;
             Session.Selection.Changed += OnSelectionChanged;
             Playback.PropertyChanged += OnPlaybackChanged;
+            Playback.DeferPlayStart = DeferPlayStart;
             Playback.Scrubbed += OnScrubbed;
             Lanes.LayoutChanged += OnLayoutChanged;
             Session.Focused = Lanes.Layout.Lanes.Select(l => l.Part.Track).FirstOrDefault(t => t is not null);
@@ -132,6 +145,9 @@ namespace ChartBuilder.ViewModels
 
         /// <summary>Snap to onset, Nudge to onsets, and the proposed tempo map (charter-spec C14).</summary>
         public AudioAssistViewModel AudioAssist { get; }
+
+        /// <summary>The flyout in the focused lane that Go to measure (Ctrl+G) and Find (Ctrl+F) open.</summary>
+        public NavigationFlyoutViewModel Navigation { get; }
 
         /// <summary>The highway preview, docked in the side panel or in a window of its own (charter-spec C18).</summary>
         public PreviewViewModel Preview { get; }
@@ -158,7 +174,14 @@ namespace ChartBuilder.ViewModels
         public LaneView DefaultView => _settings.Settings.DefaultEditorView;
 
         /// <summary>The look-ahead of a lane that hasn't had its own set: the highway speed setting's.</summary>
-        public double DefaultLookAhead => BuilderSettings.LookAheadAtSpeedOne / _settings.Settings.EditorHighwaySpeed;
+        public double DefaultLookAhead => HighwayLookAhead.Clamp(BuilderSettings.LookAheadAtSpeedOne / _settings.Settings.EditorHighwaySpeed);
+
+        /// <summary>How many seconds ahead the Generate fills and star power window's highway shows, as it was last left; kept with the settings.</summary>
+        public double GeneratePhrasesLookAhead
+        {
+            get => _settings.Settings.GeneratePhrasesLookAhead;
+            set => _settings.Settings.GeneratePhrasesLookAhead = value;
+        }
 
         /// <summary>
         /// Marks on the bottom timeline the span the lane in focus shows, from its look-ahead, after the cursor, the focus
@@ -241,26 +264,46 @@ namespace ChartBuilder.ViewModels
         }
 
         /// <summary>
-        /// Whether the Sync tool's button is down: the tool is picked, or a synchronized region is drawn. Pressed while a
-        /// region is drawn, it takes the region away rather than picking the tool.
+        /// Whether the Sync tool's button is down: the tool is picked, or Ctrl + Shift is held, which holds it on for as
+        /// long as they're held. A synchronized region drawn is kept whatever tool is picked, and only the X over it takes
+        /// it away.
         /// </summary>
         public bool IsSyncTool
         {
-            get => Session.Tool == EditorTool.Sync || Session.Sync.IsActive;
-            set
-            {
-                if (Session.Sync.IsActive)
-                {
-                    Session.Sync.Clear();
-                    if (Session.Tool == EditorTool.Sync)
-                        Session.Tool = EditorTool.Select;
-                    OnSessionState(this, EventArgs.Empty);
-                }
-                else
-                {
-                    SetTool(EditorTool.Sync, value);
-                }
-            }
+            get => Session.Tool == EditorTool.Sync || (IsCtrlHeld && IsShiftHeld);
+            set => SetTool(EditorTool.Sync, value);
+        }
+
+        /// <summary>
+        /// Whether the Loop tool's button is down: the tool is picked, or L is held, which holds it on for as long as it
+        /// is. A loop region drawn is kept whatever tool is picked (charter-spec C10 item 2), and only its X, or the
+        /// middle button with the tool active, takes it away.
+        /// </summary>
+        public bool IsLoopTool
+        {
+            get => Session.Tool == EditorTool.Loop || Session.LoopToolHeld;
+            set => SetTool(EditorTool.Loop, value);
+        }
+
+        /// <summary>Holds the Loop tool on while L is down: the toolbar's button is lit meanwhile.</summary>
+        public void HoldLoopTool(bool held)
+        {
+            if (held)
+                _loopHeldAt = Stopwatch.GetTimestamp();
+            Session.LoopToolHeld = held;
+        }
+
+        /// <summary>
+        /// Lets the Loop tool go as L is released. A tap of L (a press held no longer than <see cref="LoopTapTime"/>) that
+        /// drew, moved, resized or cleared nothing turns what repeating the region does on or off (charter-spec C10 item
+        /// 2); a longer press is the tool held, which only lets it go.
+        /// </summary>
+        public void ReleaseLoopTool()
+        {
+            bool tapped = Stopwatch.GetElapsedTime(_loopHeldAt) <= LoopTapTime;
+            if (tapped && Session.LoopToolHeld && !Session.LoopTouched && Playback.HasLoop)
+                Playback.IsLooping = !Playback.IsLooping;
+            Session.LoopToolHeld = false;
         }
 
         /// <summary>
@@ -347,9 +390,11 @@ namespace ChartBuilder.ViewModels
         {
             if (modifiers == _heldModifiers)
                 return;
-            bool swapsOpen = IsAltHeld, swapsDrag = IsCtrlHeld;
+            bool swapsOpen = IsAltHeld, swapsDrag = IsCtrlHeld, syncHeld = IsCtrlHeld && IsShiftHeld;
             _heldModifiers = modifiers;
             ModifiersHeld?.Invoke(this, modifiers);
+            if ((IsCtrlHeld && IsShiftHeld) != syncHeld)
+                OnPropertyChanged(nameof(IsSyncTool));
             if (IsAltHeld != swapsOpen)
                 OnPropertyChanged(nameof(PlaceOpen));
             if (IsCtrlHeld != swapsDrag)
@@ -368,6 +413,8 @@ namespace ChartBuilder.ViewModels
         private bool IsAltHeld => _heldModifiers.HasFlag(EditorModifiers.Alt);
 
         private bool IsCtrlHeld => _heldModifiers.HasFlag(EditorModifiers.Control);
+
+        private bool IsShiftHeld => _heldModifiers.HasFlag(EditorModifiers.Shift);
 
         /// <summary>
         /// Whether a click of the place tool puts down an open note: <see cref="PlaceOptions.Open"/>, swapped while Alt is
@@ -435,23 +482,6 @@ namespace ChartBuilder.ViewModels
             set => Session.Placing = Session.Placing with { DoubleKick = value };
         }
 
-        /// <summary>Whether a run of Generate fills or Generate star power is going on, with its proposals shown as ghosts to keep or drop.</summary>
-        public bool IsProposalRunActive => Session.Proposals is not null;
-
-        /// <summary>How many of the run's proposals are kept, of how many.</summary>
-        public string ProposalRunText => Session.Proposals is { } run
-            ? string.Format(CultureInfo.CurrentCulture, run is StarPowerProposals ? Strings.StarPowerRunFormat : Strings.FillRunFormat, run.KeptCount, run.Phrases.Count)
-            : string.Empty;
-
-        /// <summary>How the run's proposals are kept or dropped.</summary>
-        public string ProposalRunHint => Session.Proposals is StarPowerProposals ? Strings.StarPowerRunHint : Strings.FillRunHint;
-
-        /// <summary>What adding the run's kept proposals is called.</summary>
-        public string ProposalRunAdd => Session.Proposals is StarPowerProposals ? Strings.StarPowerRunAdd : Strings.FillRunAdd;
-
-        /// <summary>What adding the run's kept proposals does.</summary>
-        public string ProposalRunAddToolTip => Session.Proposals is StarPowerProposals ? Strings.StarPowerRunAddToolTip : Strings.FillRunAddToolTip;
-
         /// <summary>What the bottom timeline shows of the whole song for the lane in focus (charter-spec C3 item 2).</summary>
         [ObservableProperty]
         public partial OverviewData? Overview { get; private set; }
@@ -507,19 +537,10 @@ namespace ChartBuilder.ViewModels
                 Playback.PlayPauseCommand.Execute(null);
         }
 
-        /// <summary>Plays the selection's span, then pauses (Shift+Space).</summary>
-        public void PlaySelection()
-        {
-            if (Session.Selection.Span is not { } span)
-            {
-                Session.Status = Strings.NothingToPlayStatus;
-                return;
-            }
-
-            Playback.PlayRegion(Session.AudioAt(span.From), Session.AudioAt(span.To));
-        }
-
-        /// <summary>Sets the loop region to the selection's span (L).</summary>
+        /// <summary>
+        /// Sets the loop region to the selection's span: what preview practice starts from when there's no region yet
+        /// (charter-spec C18 item 2). The Loop tool and L are how a region is drawn by hand (C10 item 2).
+        /// </summary>
         public void SetLoopFromSelection()
         {
             if (Session.Selection.Span is not { } span)
@@ -598,38 +619,6 @@ namespace ChartBuilder.ViewModels
         [RelayCommand]
         private void CoarserSnap() => Session.Snap = Session.Snap.Coarser();
 
-        [RelayCommand(CanExecute = nameof(IsProposalRunActive))]
-        private void KeepAllProposals() => Session.Proposals?.KeepAll();
-
-        [RelayCommand(CanExecute = nameof(IsProposalRunActive))]
-        private void DropAllProposals() => Session.Proposals?.DropAll();
-
-        /// <summary>Adds the run's kept proposals as one undoable step, ending the run.</summary>
-        [RelayCommand(CanExecute = nameof(CanAddProposals))]
-        private void AddProposals() => Session.Proposals?.Accept();
-
-        private bool CanAddProposals() => Session.Proposals is { KeptCount: > 0 };
-
-        /// <summary>Ends the run, adding nothing (Esc).</summary>
-        [RelayCommand(CanExecute = nameof(IsProposalRunActive))]
-        private void CancelProposals() => Session.Proposals?.Cancel();
-
-        /// <summary>Moves the cursor to the start of the run's proposal before it, which scrolls the lanes there.</summary>
-        [RelayCommand(CanExecute = nameof(IsProposalRunActive))]
-        private void PreviousProposal()
-        {
-            if (Session.Proposals is { } run && !run.GoToPrevious())
-                Session.Status = Strings.ProposalRunNoneBefore;
-        }
-
-        /// <summary>Moves the cursor to the start of the run's proposal after it, which scrolls the lanes there.</summary>
-        [RelayCommand(CanExecute = nameof(IsProposalRunActive))]
-        private void NextProposal()
-        {
-            if (Session.Proposals is { } run && !run.GoToNext())
-                Session.Status = Strings.ProposalRunNoneAfter;
-        }
-
         [RelayCommand]
         private void FinerSnap() => Session.Snap = Session.Snap.Finer();
 
@@ -637,6 +626,8 @@ namespace ChartBuilder.ViewModels
         {
             _refresh.Stop();
             _tapEnd.Stop();
+            StopCountdown();
+            Playback.DeferPlayStart = null;
             Session.StateChanged -= OnSessionState;
             Session.StatusPosted -= OnStatusPosted;
             Session.ChartChanged -= OnChartChanged;
@@ -689,6 +680,7 @@ namespace ChartBuilder.ViewModels
             OnPropertyChanged(nameof(IsPhraseTool));
             OnPropertyChanged(nameof(IsTempoTool));
             OnPropertyChanged(nameof(IsSyncTool));
+            OnPropertyChanged(nameof(IsLoopTool));
             OnPropertyChanged(nameof(IsRecording));
             OnPropertyChanged(nameof(RecordToolTip));
 
@@ -701,7 +693,6 @@ namespace ChartBuilder.ViewModels
                 RefreshPlacing();
             }
 
-            RefreshProposalRun();
             RefreshPhraseChoices();
             RefreshVisibleSpan();
             AudioAssist.Refresh();
@@ -728,22 +719,6 @@ namespace ChartBuilder.ViewModels
             OnPropertyChanged(nameof(IsAccentPlace));
             OnPropertyChanged(nameof(IsGhostPlace));
             OnPropertyChanged(nameof(PlaceDoubleKick));
-        }
-
-        /// <summary>The bar over the lanes while a run of Generate fills or Generate star power goes on, after the run changes.</summary>
-        private void RefreshProposalRun()
-        {
-            OnPropertyChanged(nameof(IsProposalRunActive));
-            OnPropertyChanged(nameof(ProposalRunText));
-            OnPropertyChanged(nameof(ProposalRunHint));
-            OnPropertyChanged(nameof(ProposalRunAdd));
-            OnPropertyChanged(nameof(ProposalRunAddToolTip));
-            KeepAllProposalsCommand.NotifyCanExecuteChanged();
-            DropAllProposalsCommand.NotifyCanExecuteChanged();
-            AddProposalsCommand.NotifyCanExecuteChanged();
-            CancelProposalsCommand.NotifyCanExecuteChanged();
-            PreviousProposalCommand.NotifyCanExecuteChanged();
-            NextProposalCommand.NotifyCanExecuteChanged();
         }
 
         /// <summary>
@@ -891,6 +866,15 @@ namespace ChartBuilder.ViewModels
             await ApplyTempoEditAsync(blocked => TempoMapEdits.SetBpm(Session.Chart, tick, tempo, Session.Delay, Session.KeepTimes, blocked));
         }
 
+        // The passages found are marked in the bottom timeline only while the flyout is open to find them.
+        private void OnFindChanged(object? sender, EventArgs e) => ScheduleRefresh();
+
+        private void OnNavigationChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName is nameof(NavigationFlyoutViewModel.IsOpen) or nameof(NavigationFlyoutViewModel.IsFinding))
+                ScheduleRefresh();
+        }
+
         private void ScheduleRefresh()
         {
             _refresh.Stop();
@@ -921,16 +905,17 @@ namespace ChartBuilder.ViewModels
             }
         }
 
-        private OverviewData? OverviewOf(ChartTrackKey? key) => OverviewData.Of(Session, key, Playback.LengthSeconds);
+        private OverviewData? OverviewOf(ChartTrackKey? key) => OverviewData.Of(Session, key, Playback.LengthSeconds, showFound: Navigation is { IsOpen: true, IsFinding: true });
     }
 
     /// <summary>A section, at its time in the audio, for the overview.</summary>
     public sealed record OverviewSection(double Seconds, string Name);
 
     /// <summary>A phrase of the lane in focus, in the audio, and the phrase rail's row it's drawn in, for the overview.</summary>
-    public readonly record struct OverviewPhrase(double Start, double End, RailKind Row);
+    /// <param name="Replaced">Whether it's star power the star power window is replacing, drawn muted.</param>
+    public readonly record struct OverviewPhrase(double Start, double End, RailKind Row, bool Replaced = false);
 
-    /// <summary>A proposal of the run of Generate fills or Generate star power going on, in the audio, for the overview.</summary>
+    /// <summary>A proposal of the generation window, in the audio, for the overview.</summary>
     public readonly record struct OverviewProposal(double Start, double End, bool Kept);
 
     /// <summary>
@@ -942,10 +927,12 @@ namespace ChartBuilder.ViewModels
     public readonly record struct OverviewNote(double Start, double End, int Row, Color Color, bool Top = false);
 
     /// <summary>
-    /// What the bottom timeline shows of the whole song (charter-spec C3 item 2): sections, the notes of the lane in focus,
-    /// every one of its phrases, a row for each of the phrase rail's rows, the ghosts of a run of Generate fills or Generate
-    /// star power going on, and the synchronized region and the passages synced with it, each as audio seconds.
+    /// What the bottom timeline shows of the whole song (charter-spec C3 item 2): sections, the chart's tempo and time
+    /// signature changes, the notes of the lane in focus, every one of its phrases, a row for each of the phrase rail's
+    /// rows, a generation window's proposals, and the synchronized region and the passages synced with it, each as audio
+    /// seconds.
     /// </summary>
+    /// <param name="TempoChanges">The chart's tempo and time signature changes, in audio seconds, each earliest first.</param>
     /// <param name="NoteRows">How many rows the notes are drawn in: a fret, pad or column each; none with no lane.</param>
     /// <param name="Notes">The notes of the lane in focus, as the games read them, in time order.</param>
     /// <param name="Rows">The rows of the phrase rail of the lane in focus, in order; none with no lane.</param>
@@ -953,21 +940,40 @@ namespace ChartBuilder.ViewModels
     /// Its phrases: star power as the games read it, overlapping phrases as one; disco flips of the difficulty shown; and
     /// every other kind as charted.
     /// </param>
-    /// <param name="Proposals">The run's proposals, whichever lane is in focus, so they can always be found; none without a run.</param>
+    /// <param name="Proposals">The generation window's proposals, whichever lane is in focus, so they can always be found; none without one.</param>
+    /// <param name="Synced">
+    /// The synchronized region and the passages synced with it: each band's start and end in audio seconds, whether it's
+    /// the region itself, and whether the region is one nothing matched, which is drawn hashed in yellow.
+    /// </param>
+    /// <param name="Found">
+    /// The passages Find found in the lane in focus, while the flyout that finds them is open: each one's start and end in
+    /// audio seconds, and whether the cursor was taken to it.
+    /// </param>
     public sealed record OverviewData(
         IReadOnlyList<OverviewSection> Sections,
+        IReadOnlyList<double> TempoChanges,
         int NoteRows,
         IReadOnlyList<OverviewNote> Notes,
         IReadOnlyList<RailKind> Rows,
         IReadOnlyList<OverviewPhrase> Phrases,
         IReadOnlyList<OverviewProposal> Proposals,
-        IReadOnlyList<(double Start, double End, bool IsRegion)> Synced)
+        IReadOnlyList<(double Start, double End, bool IsRegion, bool Unmatched)> Synced,
+        IReadOnlyList<(double Start, double End, bool Current)> Found)
     {
         /// <summary>
         /// The overview of <paramref name="session"/>'s song, <paramref name="length"/> seconds long, for the lane
-        /// <paramref name="key"/>; null while the length isn't known.
+        /// <paramref name="key"/>; null while the length isn't known. <paramref name="proposals"/> are the ghosts to draw,
+        /// or null for none; <paramref name="replaceStarPower"/> shows the chart's star power as being replaced, and
+        /// <paramref name="replacedPhrases"/> marks the phrases a generator's plan replaces, whatever their kind.
         /// </summary>
-        internal static OverviewData? Of(EditorSession session, ChartTrackKey? key, double length)
+        internal static OverviewData? Of(
+            EditorSession session,
+            ChartTrackKey? key,
+            double length,
+            IReadOnlyList<OverviewProposal>? proposals = null,
+            bool replaceStarPower = false,
+            IReadOnlyList<Phrase>? replacedPhrases = null,
+            bool showFound = false)
         {
             if (!(length > 0))
                 return null;
@@ -979,6 +985,8 @@ namespace ChartBuilder.ViewModels
                 if (SectionEvents.NameOf(e.Text) is { } name)
                     sections.Add(new OverviewSection(session.AudioAt(e.Tick), name));
             }
+
+            var tempoChanges = TempoMapRows.Of(chart.TempoMap).Select(row => session.AudioAt(row.Tick)).ToList();
 
             int noteRows = 0;
             var notes = new List<OverviewNote>();
@@ -1001,7 +1009,11 @@ namespace ChartBuilder.ViewModels
                     double start = session.AudioAt(note.Tick);
                     double end = note.Length > 0 ? session.AudioAt(note.Tick + note.Length) : start;
                     int row = note.Lane == ChartNote.OpenLane ? -1 : HighwayPalette.Column(kind, laneCount, note.Lane);
-                    var color = HighwayPalette.NoteColor(kind, laneCount, note);
+                    var color = replaceStarPower
+                        && (replacedPhrases is null
+                            || replacedPhrases.Any(p => p.Kind == PhraseKind.StarPower && p.Covers(note.Tick)))
+                        ? HighwayPalette.NoteColor(kind, laneCount, note with { Flags = note.Flags & ~NoteFlags.StarPower })
+                        : HighwayPalette.NoteColor(kind, laneCount, note);
                     bool top = HighwayPalette.IsBlackFret(kind, note.Lane) && whites.Contains((note.Tick, note.Lane - 3));
                     notes.Add(new OverviewNote(start, end, row, color == HighwayPalette.BlackFret ? HighwayPalette.BlackFretOutline : color, top));
                 }
@@ -1009,12 +1021,20 @@ namespace ChartBuilder.ViewModels
                 rows = PhraseRail.RowsOf(part.Kind);
                 var starPower = new RailKind(PhraseKind.StarPower);
                 foreach (var phrase in game.StarPower)
-                    phrases.Add(new OverviewPhrase(session.AudioAt(phrase.Tick), session.AudioAt(phrase.Tick + phrase.Length), starPower));
+                {
+                    bool replaced = replacedPhrases is not null
+                        && replacedPhrases.Any(p => p.Kind == PhraseKind.StarPower && p.Tick == phrase.Tick && p.Length == phrase.Length);
+                    phrases.Add(new OverviewPhrase(session.AudioAt(phrase.Tick), session.AudioAt(phrase.Tick + phrase.Length), starPower, replaced));
+                }
                 foreach (var phrase in part.Phrases)
                 {
                     RailKind row = PhraseRail.RowOf(part.Kind, phrase.Kind);
                     if (phrase.Kind != PhraseKind.StarPower && rows.Contains(row))
-                        phrases.Add(new OverviewPhrase(session.AudioAt(phrase.Tick), session.AudioAt(phrase.Tick + phrase.Length), row));
+                    {
+                        bool replaced = replacedPhrases is not null
+                            && replacedPhrases.Any(p => p.Kind == phrase.Kind && p.Tick == phrase.Tick && p.Length == phrase.Length);
+                        phrases.Add(new OverviewPhrase(session.AudioAt(phrase.Tick), session.AudioAt(phrase.Tick + phrase.Length), row, replaced));
+                    }
                 }
 
                 if (rows.Contains(RailKind.DiscoFlip))
@@ -1024,22 +1044,24 @@ namespace ChartBuilder.ViewModels
                 }
             }
 
-            var proposals = new List<OverviewProposal>();
-            if (session.Proposals is { } run)
-            {
-                for (int i = 0; i < run.Phrases.Count; i++)
-                    proposals.Add(new OverviewProposal(session.AudioAt(run.Phrases[i].Tick), session.AudioAt(run.Phrases[i].CoverEnd), run.IsKept(i)));
-            }
+            var ghosts = proposals ?? [];
 
-            var synced = new List<(double, double, bool)>();
+            var synced = new List<(double, double, bool, bool)>();
             if (session.Sync is { Span: var (from, to) } sync)
             {
-                synced.Add((session.AudioAt(from), session.AudioAt(to), true));
+                synced.Add((session.AudioAt(from), session.AudioAt(to), true, sync.IsUnmatched));
                 foreach (long start in sync.Matches)
-                    synced.Add((session.AudioAt(start), session.AudioAt(start + to - from), false));
+                    synced.Add((session.AudioAt(start), session.AudioAt(start + to - from), false, false));
             }
 
-            return new OverviewData(sections, noteRows, notes, rows, phrases, proposals, synced);
+            var found = new List<(double, double, bool)>();
+            if (showFound && session.Find is { Track: { } findTrack, Span: var (findFrom, findTo) } find && findTrack == key)
+            {
+                for (int i = 0; i < find.Matches.Count; i++)
+                    found.Add((session.AudioAt(find.Matches[i]), session.AudioAt(find.Matches[i] + findTo - findFrom), i == find.Current));
+            }
+
+            return new OverviewData(sections, tempoChanges, noteRows, notes, rows, phrases, ghosts, synced, found);
         }
     }
 }

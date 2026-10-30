@@ -1029,7 +1029,7 @@ public static class Reducer
             {
                 long length = Math.Max(EditableNote.PlainLength, after - note.Tick);
                 bool drafted = range is not { } r || (note.Tick >= r.From && note.Tick <= r.To);
-                notes[i] = note with { Length = drafted && length < shortest ? EditableNote.PlainLength : length };
+                notes[i] = note with { Length = drafted && length < shortest ? EditableNote.PlainLength : EditableNote.SustainOrPlain(length) };
             }
 
             next[note.Lane] = note.Tick;

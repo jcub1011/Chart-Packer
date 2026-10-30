@@ -22,6 +22,7 @@ namespace ChartPacker.ViewModels
         private readonly MetadataDraftStore _drafts;
         private readonly IConfirmationService _confirmation;
         private readonly ISettingsWindowService _settingsWindow;
+        private readonly IKeybindsWindowService _keybindsWindow;
         private readonly DownloadService _downloads;
         private readonly IFolderPickerService _folderPicker;
 
@@ -32,6 +33,7 @@ namespace ChartPacker.ViewModels
             MetadataDraftStore drafts,
             IConfirmationService confirmation,
             ISettingsWindowService settingsWindow,
+            IKeybindsWindowService keybindsWindow,
             NoticeViewModel notice,
             DownloadService downloads,
             IFolderPickerService folderPicker)
@@ -42,6 +44,7 @@ namespace ChartPacker.ViewModels
             _drafts = drafts;
             _confirmation = confirmation;
             _settingsWindow = settingsWindow;
+            _keybindsWindow = keybindsWindow;
             _downloads = downloads;
             _folderPicker = folderPicker;
             Notice = notice;
@@ -92,6 +95,10 @@ namespace ChartPacker.ViewModels
         {
             try
             {
+                // Chart Builder changed these on disk, so no earlier state of their drafts fits them.
+                foreach (var song in changed)
+                    _drafts.ResetHistory(song.FullPath);
+
                 var shown = Library.SelectedEntries;
                 bool showsChanged = changed.Any(c => shown.Any(s => s.FullPath == c.FullPath));
 
@@ -114,7 +121,10 @@ namespace ChartPacker.ViewModels
         private async Task<bool> PrepareEditChartAsync(SongEntry song)
         {
             if (!_drafts.HasDrafts(song.FullPath))
+            {
+                _drafts.ResetHistory(song.FullPath);
                 return true;
+            }
 
             var choice = await _confirmation.ChooseAsync(
                 Strings.EditChartUnsavedTitle,
@@ -141,6 +151,8 @@ namespace ChartPacker.ViewModels
                         _drafts.NotifyChanged(song.FullPath);
                     }
 
+                    // Chart Builder is about to change the song, so no earlier state of its draft fits it.
+                    _drafts.ResetHistory(song.FullPath);
                     return true;
 
                 default:
@@ -170,6 +182,10 @@ namespace ChartPacker.ViewModels
 
         [RelayCommand]
         private Task OpenSettingsAsync() => _settingsWindow.ShowAsync();
+
+        /// <summary>The Edit menu's Shortcuts: the window where the keyboard shortcuts are changed.</summary>
+        [RelayCommand]
+        private Task OpenShortcutsAsync() => _keybindsWindow.ShowAsync();
 
         /// <summary>The File menu's Choose Download Location tooltip: the folder downloads go to.</summary>
         [ObservableProperty]
@@ -210,13 +226,24 @@ namespace ChartPacker.ViewModels
         public bool HasUnsavedDrafts => _drafts.DirtyCount > 0;
 
         /// <summary>Asks whether to close and lose the unsaved metadata changes.</summary>
-        public Task<bool> ConfirmDiscardDraftsAsync()
+        public Task<bool> ConfirmDiscardDraftsAsync() =>
+            ConfirmDiscardAsync(Strings.CloseUnsavedOne, Strings.CloseUnsavedFormat, Strings.DiscardAndCloseButton);
+
+        /// <summary>Asks whether to open a dropped folder and lose the unsaved metadata changes, and if so, discards them.</summary>
+        public async Task<bool> ConfirmDiscardDraftsForDropAsync()
+        {
+            if (!await ConfirmDiscardAsync(Strings.OpenUnsavedOne, Strings.OpenUnsavedFormat, Strings.DiscardAndOpenButton))
+                return false;
+
+            _drafts.DiscardAll();
+            return true;
+        }
+
+        private Task<bool> ConfirmDiscardAsync(string one, string format, string button)
         {
             int count = _drafts.DirtyCount;
-            string message = count == 1
-                ? Strings.CloseUnsavedOne
-                : string.Format(CultureInfo.CurrentCulture, Strings.CloseUnsavedFormat, count);
-            return _confirmation.ConfirmAsync(Strings.CloseUnsavedTitle, message, Strings.DiscardAndCloseButton);
+            string message = count == 1 ? one : string.Format(CultureInfo.CurrentCulture, format, count);
+            return _confirmation.ConfirmAsync(Strings.CloseUnsavedTitle, message, button, "TrashStroke");
         }
     }
 }

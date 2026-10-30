@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using ChartBuilder.Resources;
 using ChartShared.Audio.Encoding;
 using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Commands;
 using ChartShared.Core.Charting.Saving;
 using ChartShared.Core.Charts;
 using ChartShared.Core.Jobs;
@@ -23,7 +24,7 @@ using Serilog;
 
 namespace ChartBuilder.ViewModels
 {
-    /// <summary>The Editor window's saving: Save, a new chart's first save, Save and pack, Export copy, and closing.</summary>
+    /// <summary>The Editor window's saving: Save, a new chart's first save, Pack, Export copy, and closing.</summary>
     /// <remarks>
     /// A save takes its snapshot of the chart on the UI thread, then writes and checks it and saves it off it, so editing
     /// goes on meanwhile; the chart counts as saved as it was at the snapshot (charter-spec C17 item 1, §4.6).
@@ -37,7 +38,7 @@ namespace ChartBuilder.ViewModels
 
         /// <summary>Whether a save, a pack or an export is running.</summary>
         [ObservableProperty]
-        [NotifyCanExecuteChangedFor(nameof(SaveCommand), nameof(SaveAndPackCommand), nameof(ExportCopyCommand), nameof(NewChartCommand), nameof(OpenChartCommand), nameof(OpenRecentCommand))]
+        [NotifyCanExecuteChangedFor(nameof(SaveCommand), nameof(PackCommand), nameof(ExportCopyCommand), nameof(NewChartCommand), nameof(OpenChartCommand), nameof(OpenRecentCommand))]
         public partial bool IsSaving { get; private set; }
 
         /// <summary>
@@ -49,10 +50,10 @@ namespace ChartBuilder.ViewModels
         // Whether the user chose to close without saving, so the edits no longer count as unsaved.
         private bool _discarded;
 
-        /// <summary>What Save and pack does, or why it can't run, for its tooltip.</summary>
-        public string SaveAndPackToolTip => Song.Entry is { Kind: SongEntryKind.SngFile } ? Strings.SaveAndPackSngToolTip
-            : Findings.ErrorCount > 0 ? string.Format(CultureInfo.CurrentCulture, Strings.SaveAndPackErrorsToolTipFormat, Findings.ErrorCount)
-            : Strings.SaveAndPackToolTip;
+        /// <summary>What Pack does, or why it can't run, for its tooltip.</summary>
+        public string PackToolTip => Song.Entry is { Kind: SongEntryKind.SngFile } ? Strings.PackSngToolTip
+            : Findings.ErrorCount > 0 ? string.Format(CultureInfo.CurrentCulture, Strings.PackErrorsToolTipFormat, Findings.ErrorCount)
+            : Strings.PackToolTip;
 
         /// <summary>Why Export copy can't run, for its tooltip.</summary>
         public string ExportCopyToolTip => Song.IsNew ? Strings.ExportCopyNewChartToolTip : Strings.ExportCopyToolTip;
@@ -96,8 +97,8 @@ namespace ChartBuilder.ViewModels
 
         private bool CanSave() => !IsSaving;
 
-        [RelayCommand(CanExecute = nameof(CanSaveAndPack))]
-        private async Task SaveAndPackAsync()
+        [RelayCommand(CanExecute = nameof(CanPack))]
+        private async Task PackAsync()
         {
             // A new chart has no folder to name the .sng from until it's first saved.
             if (Song.IsNew && !await SaveCoreAsync())
@@ -110,7 +111,7 @@ namespace ChartBuilder.ViewModels
             await Findings.SettleAsync();
             if (Findings.ErrorCount > 0)
             {
-                Messages.Error(string.Format(CultureInfo.CurrentCulture, Strings.SaveAndPackErrorsFormat, Findings.ErrorCount));
+                Messages.Error(string.Format(CultureInfo.CurrentCulture, Strings.PackErrorsFormat, Findings.ErrorCount));
                 return;
             }
 
@@ -127,39 +128,79 @@ namespace ChartBuilder.ViewModels
             remembered.LastTranscodeBitrateKbps = dialog.TranscodeBitrateKbps;
             _settings.Save();
 
-            // The song events on disk are put where they now go, too, so the .sng packed has them there.
-            bool songEventsMoved = !SongEventPlacement.Matches(Song.SongEventsOnDisk, Editor.Session.SongEventMarks);
-            if ((HasUnsavedChanges || Song.PendingChanges().Count > 0 || Song.Media.Count > 0 || songEventsMoved) && !await SaveCoreAsync())
-                return;
-            if (Song.Entry is not { } savedEntry)
-                return;
-
-            await Findings.SettleAsync();
-            if (Findings.ErrorCount > 0)
-            {
-                Messages.Error(string.Format(CultureInfo.CurrentCulture, Strings.SaveAndPackErrorsFormat, Findings.ErrorCount));
-                return;
-            }
-
+            // The song itself isn't saved: what's packed is a copy of it with its unsaved changes, made in a temp folder.
+            // Editing stops while IsSaving, so what's checked below is what's copied.
+            Editor.Session.Tools.Cancel();
             IsSaving = true;
+            string? staging = null;
             try
             {
-                if (savedEntry.Kind == SongEntryKind.SongFolder)
-                    await PackToSngAsync(savedEntry, dialog);
-                else
-                    await CopySngAsync(savedEntry, dialog);
+                // Edits made while the dialog was open may have brought in Errors.
+                await Findings.SettleAsync();
+                if (Findings.ErrorCount > 0)
+                {
+                    Messages.Error(string.Format(CultureInfo.CurrentCulture, Strings.PackErrorsFormat, Findings.ErrorCount));
+                    return;
+                }
+
+                var temp = Directory.CreateTempSubdirectory("chartbuilder-pack-");
+                staging = temp.FullName;
+
+                // The copy sits where the song does under the pack's scan root, so the layout puts the .sng where the dialog said.
+                var (scanRoot, _, layout) = ChartPackerSettingsFile.PackSettings(_services.ChartPackerSettingsFile).PackOf(entry);
+                bool isSng = entry.Kind == SongEntryKind.SngFile;
+                string name = isSng ? Path.GetFileNameWithoutExtension(entry.FullPath) : Path.GetFileName(Path.TrimEndingDirectorySeparator(entry.FullPath));
+                if (name.Length == 0)
+                    name = "song";
+                string relativeParent = "";
+                if (!isSng && layout == OutputLayout.Mirror)
+                {
+                    string root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(scanRoot));
+                    string item = Path.TrimEndingDirectorySeparator(Path.GetFullPath(entry.FullPath));
+                    if (!OutputPaths.PathComparer.Equals(item, root))
+                        relativeParent = Path.GetDirectoryName(Path.GetRelativePath(root, item)) ?? "";
+
+                    // A song outside the scan root has no place under it: the copy goes at the top of the staging folder
+                    // rather than out of it, or, rooted, over the song itself.
+                    if (Path.IsPathRooted(relativeParent) || relativeParent == ".." || relativeParent.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+                        relativeParent = "";
+                }
+
+                string copy = Path.Combine(staging, relativeParent, name);
+                var result = await WriteCopyAsync(entry, copy);
+                if (result is null)
+                    return;
+                if (!result.Extracted)
+                {
+                    Messages.Error(string.Format(CultureInfo.CurrentCulture, Strings.ExportFailedFormat, FirstError(result.Findings) ?? ""));
+                    return;
+                }
+
+                var copyEntry = SongOpener.EntryOf(copy);
+                if (copyEntry is null)
+                {
+                    Messages.Error(Strings.PackCopyUnreadable);
+                    return;
+                }
+
+                await PackToSngAsync(copyEntry, staging, isSng ? OutputLayout.Flat : layout, dialog);
             }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
             {
                 Messages.Error(string.Format(CultureInfo.CurrentCulture, Strings.PackFailedFormat, ex.Message));
             }
+            catch (OperationCanceledException)
+            {
+            }
             finally
             {
+                if (staging is not null)
+                    StagingPath.TryDeleteDirectory(staging);
                 IsSaving = false;
             }
         }
 
-        private bool CanSaveAndPack() => !IsSaving && Findings.ErrorCount == 0;
+        private bool CanPack() => !IsSaving && Findings.ErrorCount == 0;
 
         /// <summary>The export dialog for <paramref name="entry"/>, pre-filled with the last choices and the song as Export leaves it.</summary>
         private ExportSngViewModel BuildExportDialog(SongEntry entry)
@@ -220,16 +261,14 @@ namespace ChartBuilder.ViewModels
                 _settings.Settings.LastTranscodeToOpus,
                 targetFor,
                 _services.FolderPicker,
-                Strings.SaveAndPackPickerTitle,
+                Strings.PackPickerTitle,
                 transcodeAvailable: OpusTranscoder.IsAvailable,
                 initialBitrateKbps: _settings.Settings.LastTranscodeBitrateKbps);
         }
 
         /// <summary>Packs a song folder to the dialog's location with its if-exists choice, transcoding first when asked, behind a progress dialog.</summary>
-        private async Task PackToSngAsync(SongEntry entry, ExportSngViewModel dialog)
+        private async Task PackToSngAsync(SongEntry entry, string scanRoot, OutputLayout layout, ExportSngViewModel dialog)
         {
-            var settings = ChartPackerSettingsFile.PackSettings(_services.ChartPackerSettingsFile);
-            var (scanRoot, _, layout) = settings.PackOf(entry);
             var options = new PackOptions(
                 TranscodeToOpus: dialog.TranscodeToOpus,
                 OpusBitrateKbps: dialog.TranscodeBitrateKbps);
@@ -266,45 +305,6 @@ namespace ChartBuilder.ViewModels
             Messages.Post(severity, message);
         }
 
-        /// <summary>
-        /// Saves a copy of a <c>.sng</c>-opened song elsewhere (Save as <c>.sng</c>), with the dialog's if-exists choice,
-        /// without what a packed <c>.sng</c> leaves out (<see cref="ExportCleanup"/>).
-        /// </summary>
-        private async Task CopySngAsync(SongEntry entry, ExportSngViewModel dialog)
-        {
-            string target = Path.Combine(dialog.ExportFolder, Path.GetFileName(entry.FullPath));
-            string? resolved = OutputPaths.Resolve(target, dialog.Policy, isDirectory: false);
-            if (resolved is null)
-            {
-                Messages.Post(Severity.Warning, string.Format(CultureInfo.CurrentCulture, Strings.ExportSngSkippedExistsFormat, target));
-                return;
-            }
-
-            try
-            {
-                bool copied = await Task.Run(async () =>
-                {
-                    Directory.CreateDirectory(dialog.ExportFolder);
-
-                    // Held while it's written, so a song open elsewhere isn't written over (charter-spec §4.8).
-                    using SongLock? held = SongLock.TryAcquire(resolved, SongLockHolder.ChartBuilder);
-                    if (held is null)
-                        return false;
-                    await ExportCleanup.CopySngAsync(entry.FullPath, resolved);
-                    return true;
-                });
-
-                if (copied)
-                    Messages.Info(string.Format(CultureInfo.CurrentCulture, Strings.ExportSngCopiedFormat, resolved));
-                else
-                    Messages.Post(Severity.Warning, string.Format(CultureInfo.CurrentCulture, Strings.ExportSngSkippedInUseFormat, resolved));
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
-            {
-                Messages.Error(string.Format(CultureInfo.CurrentCulture, Strings.ExportFailedFormat, ex.Message));
-            }
-        }
-
         [RelayCommand(CanExecute = nameof(CanExportCopy))]
         private async Task ExportCopyAsync()
         {
@@ -319,17 +319,9 @@ namespace ChartBuilder.ViewModels
             IsSaving = true;
             try
             {
-                // The copy is written as a save would write it, with the song events placed.
-                var snapshot = await SnapshotToWriteAsync();
-                var request = ChartSaver.RequestFor(Song, snapshot, Song.PendingChanges(), Song.IsImport ? Song.Opened!.ChartName : null);
-                var written = await Task.Run(() => ChartSaver.Check(request));
-                if (!written.IsValid)
-                {
-                    Messages.Error(ReadBackFailedNotice(written));
+                var result = await WriteCopyAsync(entry, target);
+                if (result is null)
                     return;
-                }
-
-                var result = await Task.Run(() => ChartSaver.ExportAsync(entry, request, written, target));
                 if (result.Extracted)
                     Messages.Info(string.Format(CultureInfo.CurrentCulture, Strings.ExportedFormat, target));
                 else
@@ -346,6 +338,25 @@ namespace ChartBuilder.ViewModels
             {
                 IsSaving = false;
             }
+        }
+
+        /// <summary>
+        /// Writes a copy of <paramref name="entry"/> as the song folder <paramref name="target"/>, as a save would write it, with
+        /// the song events placed and the unsaved changes applied; the song itself is left as it is.
+        /// </summary>
+        /// <returns>The result of the copy, or <see langword="null"/> when the chart didn't read back as written, which is on the message bar.</returns>
+        private async Task<UnpackResult?> WriteCopyAsync(SongEntry entry, string target)
+        {
+            var snapshot = await SnapshotToWriteAsync();
+            var request = ChartSaver.RequestFor(Song, snapshot, Song.PendingChanges(), Song.IsImport ? Song.Opened!.ChartName : null);
+            var written = await Task.Run(() => ChartSaver.Check(request));
+            if (!written.IsValid)
+            {
+                Messages.Error(ReadBackFailedNotice(written));
+                return null;
+            }
+
+            return await Task.Run(() => ChartSaver.ExportAsync(entry, request, written, target));
         }
 
         private bool CanExportCopy() => !IsSaving && !Song.IsNew;
@@ -481,9 +492,10 @@ namespace ChartBuilder.ViewModels
         }
 
         /// <summary>
-        /// A new chart's first save (charter-spec C1): once Chart settings has its name and artist, asks where its
+        /// A new chart's first save (charter-spec C1): asks for its name and artist if either isn't set, then where its
         /// song folder goes, makes the folder, then locks the song, puts it on the recent songs and goes on with it as a
-        /// song opened from there.
+        /// song opened from there. The name and artist are put in the chart only once the folder is chosen, so cancelling
+        /// leaves the chart as it was.
         /// </summary>
         private async Task<bool> FirstSaveAsync()
         {
@@ -491,13 +503,17 @@ namespace ChartBuilder.ViewModels
             string Value(string key) => pairs.LastOrDefault(p => p.Key.Equals(key, StringComparison.OrdinalIgnoreCase)).Value?.Trim() ?? "";
             string name = Value("name");
             string artist = Value("artist");
+            bool asked = false;
             if (name.Length == 0 || artist.Length == 0)
             {
-                // They're set in Chart settings' Metadata, which is brought up, expanded, to set them in.
-                Messages.Error(Strings.FirstSaveNeedsNameAndArtist);
-                PanelLayout.SetCollapsed(ChartSettingsTab, MetadataSection, false);
-                ShowLeftPanel(ChartSettingsTab);
-                return false;
+                // Whichever is set starts filled in; both are needed for the folder's name.
+                var info = new SongInfoViewModel(name, artist);
+                if (!await _services.FirstSave.AskSongInfoAsync(info))
+                    return false;
+
+                name = info.Name.Trim();
+                artist = info.Artist.Trim();
+                asked = true;
             }
 
             var dialog = new FirstSaveViewModel(
@@ -525,6 +541,14 @@ namespace ChartBuilder.ViewModels
                 await _confirmations.AlertAsync(
                     Strings.SongLockedTitle,
                     LockedText(target.FullPath, Strings.FirstSaveLockedFormat, Strings.FirstSaveLockedInPackerFormat, Strings.FirstSaveLockedElsewhereFormat));
+                return false;
+            }
+
+            if (asked && SongCommands.SetValues(Song, new Dictionary<string, string?> { ["name"] = name, ["artist"] = artist }) is { } set
+                && !TryApplyChartSettings(set))
+            {
+                // Refused, so the song folder would be named for values the chart doesn't have.
+                songLock.Dispose();
                 return false;
             }
 
@@ -560,6 +584,7 @@ namespace ChartBuilder.ViewModels
                 settings.RecentSongs = RecentSongs.Add(settings.RecentSongs, new RecentSong { Path = entry.FullPath, Title = Song.Title ?? "", OpenedAt = DateTimeOffset.Now });
                 _settings.Save();
                 RefreshRecent();
+                _services.JumpList.Refresh();
                 Messages.Info(string.Format(CultureInfo.CurrentCulture, Strings.FirstSavedStatusFormat, folder));
                 return true;
             }
@@ -629,10 +654,10 @@ namespace ChartBuilder.ViewModels
         {
             Title = TitleOf();
             OnPropertyChanged(nameof(HasUnsavedChanges));
-            OnPropertyChanged(nameof(SaveAndPackToolTip));
+            OnPropertyChanged(nameof(PackToolTip));
             OnPropertyChanged(nameof(ExportCopyToolTip));
             OnPropertyChanged(nameof(ShowSongToolTip));
-            SaveAndPackCommand.NotifyCanExecuteChanged();
+            PackCommand.NotifyCanExecuteChanged();
             ExportCopyCommand.NotifyCanExecuteChanged();
             ShowSongCommand.NotifyCanExecuteChanged();
         }

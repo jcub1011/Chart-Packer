@@ -6,6 +6,8 @@ using Avalonia;
 using Avalonia.Controls;
 using ChartPacker.Services;
 using ChartPacker.ViewModels;
+using ChartShared.Core.Keybinds;
+using ChartShared.UI.Keybinds;
 using ChartShared.UI.Views;
 
 namespace ChartPacker.Views
@@ -45,13 +47,16 @@ namespace ChartPacker.Views
 
         public MergeWindow()
         {
+            // Before the preview panel is built, so it finds this window's dispatcher as it attaches and its play/pause key works.
+            new KeyDispatcher(AppKeys.Map, KeyScope.Global).Attach(this);
             InitializeComponent();
             WindowChrome.ShowIcon(this, WindowTitleBar);
-            // The splitter position and maximized state are view state, so they're applied and captured here rather than bound.
+            WindowMemory.Remember(this);
+            // The splitter position is view state, so it's applied and captured here rather than bound.
             Opened += (_, _) =>
             {
                 WindowChrome.UseDarkTitleBar(this);
-                RestoreWindowState();
+                RestoreSplit();
                 FitColumns();
             };
 
@@ -184,15 +189,13 @@ namespace ChartPacker.Views
         protected override void OnClosing(WindowClosingEventArgs e)
         {
             if (DataContext is MergeWindowViewModel viewModel)
-                CaptureWindowState(viewModel);
+                CaptureSplit(viewModel);
 
             base.OnClosing(e);
         }
 
-        private void CaptureWindowState(MergeWindowViewModel viewModel)
+        private void CaptureSplit(MergeWindowViewModel viewModel)
         {
-            viewModel.MergeWindowMaximized = WindowState == WindowState.Maximized;
-
             double left = ChoicesColumn.ActualWidth;
             double right = PreviewColumn.ActualWidth;
             double total = left + right;
@@ -206,13 +209,10 @@ namespace ChartPacker.Views
             viewModel.OnClosed();
         }
 
-        private void RestoreWindowState()
+        private void RestoreSplit()
         {
             if (DataContext is not MergeWindowViewModel viewModel)
                 return;
-
-            if (viewModel.MergeWindowMaximized)
-                WindowState = WindowState.Maximized;
 
             double fraction = viewModel.MergePreviewFraction;
             if (!double.IsFinite(fraction))

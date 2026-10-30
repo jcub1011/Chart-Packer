@@ -75,16 +75,6 @@ public sealed class ReducePreviewNavigationTests
     }
 
     [TestMethod]
-    public void TheLookAheadIsInHalfSecondStepsFromHalfASecondToTen()
-    {
-        Assert.AreEqual(1.5, BuilderSettings.SnapReducePreviewLookAhead(1.4));
-        Assert.AreEqual(8.0, BuilderSettings.SnapReducePreviewLookAhead(8.2));
-        Assert.AreEqual(0.5, BuilderSettings.SnapReducePreviewLookAhead(0));
-        Assert.AreEqual(10.0, BuilderSettings.SnapReducePreviewLookAhead(30));
-        Assert.AreEqual(1.5, BuilderSettings.SnapReducePreviewLookAhead(double.NaN), "A setting that isn't a number is the default.");
-    }
-
-    [TestMethod]
     public void APressGoesToTheNearestMarkOnItsRowWithinReach()
     {
         ChangeStripMark[] marks = [new(1, 0, ChangeStripKind.Reshape), new(1.05, 1, ChangeStripKind.Removal), new(1.2, 0, ChangeStripKind.Sustain)];

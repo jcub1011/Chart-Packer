@@ -10,9 +10,9 @@ using static ChartBuilder.Tests.Editing.EditorSessions;
 namespace ChartBuilder.Tests.Editing;
 
 /// <summary>
-/// What the bottom timeline shows of the whole song (charter-spec C3 item 2): the notes of the lane in focus, in its rows
-/// and colours, every one of its phrases, in the row of the phrase rail it's drawn in, and the ghosts of a run of Generate
-/// fills or Generate star power. At 480 ticks a beat and 120 BPM, a beat is half a second.
+/// What the bottom timeline shows of the whole song (charter-spec C3 item 2): its tempo and time signature changes, the
+/// notes of the lane in focus in its rows and colours, every one of its phrases in the row of the phrase rail it's drawn
+/// in, and a generation window's proposals. At 480 ticks a beat and 120 BPM, a beat is half a second.
 /// </summary>
 [TestClass]
 public sealed class OverviewDataTests
@@ -67,7 +67,7 @@ public sealed class OverviewDataTests
     }
 
     [TestMethod]
-    public void ARunsProposalsShowKeptAndDroppedWhicheverLaneIsInFocus()
+    public void AWindowsProposalsShowKeptAndDroppedWhicheverLaneIsInFocus()
     {
         var chart = EditableChart.CreateNew(new NewChartSettings("Song", 480, 120, 4, 4, new HashSet<ChartInstrument> { ChartInstrument.Guitar, ChartInstrument.Drums }, DrumsVariant.Pro));
         var expert = chart.PartOf(ChartInstrument.Guitar)![ChartDifficulty.Expert];
@@ -80,16 +80,55 @@ public sealed class OverviewDataTests
         var session = Of(chart, focused: DrumsExpert);
         Assert.IsEmpty(Overview(session, DrumsExpert).Proposals);
 
-        session.StarPower.Start(ChartInstrument.Guitar, StarPowerOptions.Default, null);
-        session.StarPower.Toggle(0);
-        var overview = Overview(session, DrumsExpert);
+        var proposals = new List<OverviewProposal>
+        {
+            new(session.AudioAt(0), session.AudioAt(Measure), Kept: false),
+            new(session.AudioAt(Measure), session.AudioAt(2 * Measure), Kept: true),
+        };
+        var overview = OverviewData.Of(session, DrumsExpert, 100, proposals)!;
 
-        Assert.HasCount(session.StarPower.Proposals.Count, overview.Proposals);
+        Assert.HasCount(2, overview.Proposals);
         Assert.IsFalse(overview.Proposals[0].Kept);
-        Assert.IsTrue(overview.Proposals.Skip(1).All(p => p.Kept));
-        var first = session.StarPower.Proposals[0].Phrase;
-        Assert.AreEqual(session.AudioAt(first.Tick), overview.Proposals[0].Start, 1e-9);
-        Assert.AreEqual(session.AudioAt(first.CoverEnd), overview.Proposals[0].End, 1e-9);
+        Assert.IsTrue(overview.Proposals[1].Kept);
+        Assert.AreEqual(session.AudioAt(0), overview.Proposals[0].Start, 1e-9);
+        Assert.AreEqual(session.AudioAt(Measure), overview.Proposals[0].End, 1e-9);
+    }
+
+    [TestMethod]
+    public void AReplacedFillsPhraseIsMarkedAsReplaced()
+    {
+        var chart = Drums();
+        var drums = chart.PartOf(ChartInstrument.Drums)!;
+        drums[ChartDifficulty.Expert].Notes.Add(new EditableNote(0, 1, 1));
+        var fill = new Phrase(PhraseKind.DrumFill, 0, Beat);
+        drums.Phrases.Add(fill);
+        var session = Of(chart, focused: DrumsExpert);
+
+        var overview = OverviewData.Of(session, DrumsExpert, 100, [], replacedPhrases: [fill])!;
+
+        RailKind fillRow = PhraseKind.DrumFill;
+        Assert.IsTrue(overview.Phrases.Single(p => p.Row == fillRow).Replaced);
+    }
+
+    [TestMethod]
+    public void APhraseOfAnotherKindIsNotMarkedAsReplacedAtAReplacedPhrasesTickAndLength()
+    {
+        // A solo over a replaced star power section of the same span isn't star power, so the plan doesn't replace it.
+        var chart = Guitar();
+        var guitar = chart.PartOf(ChartInstrument.Guitar)!;
+        guitar[ChartDifficulty.Expert].Notes.Add(new EditableNote(0, 1, 0));
+        var starPower = new Phrase(PhraseKind.StarPower, 0, Beat);
+        var solo = new Phrase(PhraseKind.Solo, 0, Beat);
+        guitar.Phrases.Add(starPower);
+        guitar.Phrases.Add(solo);
+        var session = Of(chart, focused: GuitarExpert);
+
+        var overview = OverviewData.Of(session, GuitarExpert, 100, [], replacedPhrases: [starPower])!;
+
+        RailKind starPowerRow = PhraseKind.StarPower;
+        RailKind soloRow = PhraseKind.Solo;
+        Assert.IsTrue(overview.Phrases.Single(p => p.Row == starPowerRow).Replaced);
+        Assert.IsFalse(overview.Phrases.Single(p => p.Row == soloRow).Replaced);
     }
 
     [TestMethod]
@@ -162,6 +201,23 @@ public sealed class OverviewDataTests
         Assert.AreSequenceEqual([0.0], Overview(Of(chart), GuitarExpert).Notes.Select(n => n.Start).ToList());
         Assert.AreSequenceEqual([0.5], Overview(Of(chart, focused: guitarHard), guitarHard).Notes.Select(n => n.Start).ToList());
         Assert.AreSequenceEqual([2.0], Overview(Of(chart, focused: DrumsExpert), DrumsExpert).Notes.Select(n => n.Start).ToList());
+    }
+
+    [TestMethod]
+    public void TempoAndTimeSignatureChangesAreShownAtTheirTimes()
+    {
+        var chart = Guitar();
+        chart.TempoMap.Tempos.Add(new TempoChange(960, 500_000));
+        chart.TempoMap.TimeSignatures.Add(new TimeSignatureMarker(960, 3, 4));
+        chart.TempoMap.Tempos.Add(new TempoChange(1920, 400_000));
+        var session = Of(chart);
+
+        var overview = Overview(session, GuitarExpert);
+
+        Assert.AreSequenceEqual(
+            new[] { session.AudioAt(0), session.AudioAt(960), session.AudioAt(1920) },
+            overview.TempoChanges.ToList(),
+            "A tempo marker and a time signature at one tick are one change.");
     }
 
     [TestMethod]

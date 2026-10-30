@@ -17,7 +17,7 @@ namespace ChartBuilder.ViewModels
     /// </summary>
     public sealed class LaneMenuItem
     {
-        private LaneMenuItem(string header, IReadOnlyList<LaneMenuItem>? items, ICommand? command, bool isEnabled, bool isChecked, string? icon = null)
+        private LaneMenuItem(string header, IReadOnlyList<LaneMenuItem>? items, ICommand? command, bool isEnabled, bool isChecked, string? icon = null, string? actionId = null)
         {
             Header = header;
             Items = items;
@@ -25,6 +25,7 @@ namespace ChartBuilder.ViewModels
             IsEnabled = isEnabled;
             IsChecked = isChecked;
             Icon = icon;
+            ActionId = actionId;
         }
 
         public string Header { get; }
@@ -45,6 +46,12 @@ namespace ChartBuilder.ViewModels
         /// on a choice, whose place it is to show the tick.
         /// </summary>
         public string? Icon { get; }
+
+        /// <summary>
+        /// The action whose key is shown beside the item as its shortcut, which the canvas handles and which follows the key as
+        /// it's rebound (<c>Shortcut.Action</c>); null for none.
+        /// </summary>
+        public string? ActionId { get; }
 
         /// <summary>
         /// Every part a lane can show, grouped by instrument, then the vocals. A part <paramref name="canPick"/> refuses
@@ -71,10 +78,10 @@ namespace ChartBuilder.ViewModels
 
         /// <summary>
         /// An item that runs <paramref name="run"/>, greyed out unless <paramref name="isEnabled"/>, beside the line icon
-        /// keyed <paramref name="icon"/>.
+        /// keyed <paramref name="icon"/>, with the key of the action <paramref name="actionId"/> shown as its shortcut.
         /// </summary>
-        public static LaneMenuItem Action(string header, bool isEnabled, Action run, string? icon = null) =>
-            new(header, null, new RelayCommand(run), isEnabled, isChecked: false, icon);
+        public static LaneMenuItem Action(string header, bool isEnabled, Action run, string? icon = null, string? actionId = null) =>
+            new(header, null, new RelayCommand(run), isEnabled, isChecked: false, icon, actionId);
 
         /// <summary>
         /// A submenu of <paramref name="items"/>, greyed out when none of them can be picked, beside the line icon keyed

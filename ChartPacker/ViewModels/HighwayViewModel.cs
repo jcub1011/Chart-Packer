@@ -9,6 +9,7 @@ using ChartPacker.Controls;
 using ChartPacker.Resources;
 using ChartPacker.Services;
 using ChartShared.Audio.Waveforms;
+using ChartShared.Core.Charting;
 using ChartShared.Core.Charts;
 using ChartShared.Core.Library;
 using ChartShared.Core.Metadata;
@@ -48,15 +49,12 @@ namespace ChartPacker.ViewModels
     /// and <see cref="OffsetsChanged"/> tells the details panel so. What's drawn is the chart
     /// <see cref="ChartShifter"/> makes from the draft, read back, so it's exactly what saving writes.
     /// Every instrument is shown until it's unchecked, which lasts for that song until the app closes.
-    /// Which difficulties are shown, and the note speed, are app settings. Each highway draws the waveform
+    /// Which difficulties are shown, and the look-ahead, are app settings. Each highway draws the waveform
     /// of the track its instrument is played against, or of one picked in its place, which likewise lasts
     /// for that song until the app closes.
     /// </remarks>
     public sealed partial class HighwayViewModel : ViewModelBase
     {
-        // How far ahead of the strike line the highway shows at the normal note speed, in seconds.
-        private const double BaseLookAhead = 1.4;
-
         // The notes stepped through without a chart: 120 BPM from the start, as a chart is before its first tempo.
         private static readonly TempoMap NoChartTempo = new(192, [], []);
 
@@ -117,7 +115,7 @@ namespace ChartPacker.ViewModels
             Clock = () => player.DrawnPosition;
             IsEnabled = settings.Settings.ShowNoteHighway;
             Placement = settings.Settings.HighwayPlacement;
-            NoteSpeed = settings.Settings.HighwayNoteSpeed;
+            LookAhead = settings.Settings.HighwayLookAhead;
             player.TrackWaveformsChanged += (_, e) =>
             {
                 // More read of a track only changes what's drawn, and only for the highways drawing it.
@@ -156,10 +154,9 @@ namespace ChartPacker.ViewModels
         [NotifyPropertyChangedFor(nameof(IsShownOverBackground))]
         public partial HighwayPlacement Placement { get; set; }
 
-        /// <summary>How fast the notes fall, as a multiple of the normal speed.</summary>
+        /// <summary>How far ahead of the strike line the highway shows, in seconds (<see cref="HighwayLookAhead"/>).</summary>
         [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(LookAhead))]
-        public partial double NoteSpeed { get; set; }
+        public partial double LookAhead { get; set; }
 
         /// <summary>What's drawn, or <see langword="null"/> for nothing.</summary>
         [ObservableProperty]
@@ -202,9 +199,6 @@ namespace ChartPacker.ViewModels
         /// </summary>
         [ObservableProperty]
         public partial TimeSpan? ChartOffset { get; private set; }
-
-        /// <summary>How far ahead of the strike line the highway shows, in seconds.</summary>
-        public double LookAhead => BaseLookAhead / Math.Clamp(NoteSpeed, AppSettings.MinHighwayNoteSpeed, AppSettings.MaxHighwayNoteSpeed);
 
         public bool HasChart => _original is not null;
 
@@ -311,12 +305,12 @@ namespace ChartPacker.ViewModels
             RefreshState();
         }
 
-        /// <summary>Takes up the settings again, as after another highway sharing them changed them: whether it's shown, where, the speed and the difficulties.</summary>
+        /// <summary>Takes up the settings again, as after another highway sharing them changed them: whether it's shown, where, the look-ahead and the difficulties.</summary>
         public void ReloadSettings()
         {
             IsEnabled = _settings.Settings.ShowNoteHighway;
             Placement = _settings.Settings.HighwayPlacement;
-            NoteSpeed = _settings.Settings.HighwayNoteSpeed;
+            LookAhead = _settings.Settings.HighwayLookAhead;
             if (_original is { } chart)
             {
                 BuildRows(chart);
@@ -329,7 +323,8 @@ namespace ChartPacker.ViewModels
 
         partial void OnPlacementChanged(HighwayPlacement value) => _settings.Settings.HighwayPlacement = value;
 
-        partial void OnNoteSpeedChanged(double value) => _settings.Settings.HighwayNoteSpeed = value;
+        // Already snapped by whatever sets it: the slider, the settings window, and the constructor.
+        partial void OnLookAheadChanged(double value) => _settings.Settings.HighwayLookAhead = value;
 
         partial void OnCanEditOffsetsChanged(bool value)
         {

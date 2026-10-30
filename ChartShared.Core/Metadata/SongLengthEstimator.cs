@@ -18,12 +18,8 @@ public interface IVideoDurationProbe
 /// <param name="VideoEndMs">When the background video ends against the audio; <see langword="null"/> when it loops.</param>
 public sealed record SongLengthEstimate(long? ChartEndMs, long? AudioMs, long? VideoEndMs)
 {
-    /// <summary>How much longer than its longest part a song is made, so nothing is cut off at the end.</summary>
-    public const long BufferMs = 1000;
-
-    /// <summary>The longest part plus <see cref="BufferMs"/>, or <see langword="null"/> when no part is known.</summary>
-    public long? SongLengthMs =>
-        new[] { ChartEndMs, AudioMs, VideoEndMs }.Max() is { } longest ? longest + BufferMs : null;
+    /// <summary>The longest part, or <see langword="null"/> when no part is known.</summary>
+    public long? SongLengthMs => new[] { ChartEndMs, AudioMs, VideoEndMs }.Max();
 }
 
 /// <summary>

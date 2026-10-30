@@ -107,7 +107,7 @@ namespace ChartBuilder.Controls.Editing
             e.Pointer.Capture(this);
             _isPressed = true;
             _lastVocalPoint = point;
-            _boxFrom = _pressButton == MouseButton.Left && session.Tool == EditorTool.Select && !point.InPhrases && session.Tools.HitTest(point) is null ? position : null;
+            _boxFrom = _pressButton == MouseButton.Left && session.Tool == EditorTool.Select && !session.Tools.LoopActive && !point.InPhrases && session.Tools.HitTest(point) is null ? position : null;
             _boxTo = position;
             _boxFromSeconds = _boxFrom is not null && CurrentProjection() is { } anchorScreen
                 ? anchorScreen.SecondsAt(AlongOf(position))
@@ -148,6 +148,28 @@ namespace ChartBuilder.Controls.Editing
 
             SetCursor(wanted);
             ShowTip(tip);
+        }
+
+        /// <summary>
+        /// Shows the resize arrow over a tempo or time signature change the Tempo tool would drag in a vocal lane, or the
+        /// usual cursor over the one the song starts with. Whether it showed anything.
+        /// </summary>
+        private bool ShowVocalTempoCursor(Point position)
+        {
+            if (Session is not { } session || session.Tool != EditorTool.Tempo || (_keys & KeyModifiers.Shift) != 0
+                || session.Tools.IsSyncPress(ModifiersOf(_keys)))
+            {
+                return false;
+            }
+
+            if (VocalPointAt(position, clamp: false) is not { InPhrases: false } point
+                || session.Tools.TempoChangeAt(point.Tick, point.Tolerance) is not { } tick)
+            {
+                return false;
+            }
+
+            ShowTempoCursorFor(tick);
+            return true;
         }
 
         /// <summary>Draws <paramref name="layer"/> of a vocal part's lane, as <see cref="RenderLayer"/> does a highway's.</summary>
@@ -401,13 +423,17 @@ namespace ChartBuilder.Controls.Editing
         }
 
         /// <summary>
-        /// What's on the strike line, lit; the place tool's ghost; the octaves' names at the rows' left edge; the cursor; a
+        /// What's on the strike line, lit; the place tool's ghost; the octaves' names at the rows' left edge; where the Loop
+        /// tool would start drawing the loop region, and its X and what of it the pointer would take hold of; the cursor; a
         /// box being drawn; and the focus's edge.
         /// </summary>
         private void RenderVocalOverlay(DrawingContext context, EditorSession session, VocalTrack vocal, VocalLane vocals, LaneProjection screen, Size size)
         {
             DrawVocalSinging(context, session, vocal, vocals, screen, size);
             DrawVocalHover(context, session, vocal, vocals, screen);
+            DrawVocalTempoHover(context, session, screen);
+            DrawLoopLine(context, session, screen, screen.Slots);
+            DrawLoopHover(context, session, screen, screen.Slots);
             var pitches = vocals.Pitches;
             var brush = LabelBrush ?? DefaultLabelBrush;
             for (int i = 0; i < pitches.Count; i++)
@@ -444,6 +470,30 @@ namespace ChartBuilder.Controls.Editing
             using (context.PushClip(RowsOf(screen)))
             using (context.PushOpacity(0.45))
                 context.DrawRectangle(VocalNoteBrushes[color], VocalEdgePens[color], bar, thickness / 2, thickness / 2);
+        }
+
+        /// <summary>
+        /// Where a press of the Tempo tool would add a tempo marker in a vocal lane: a line across the pitch rows in the
+        /// tempo markers' amber, on the grid step the press would snap to. None over a change the press would drag, in the
+        /// phrase strip, or with Shift held or the Sync tool's press.
+        /// </summary>
+        private void DrawVocalTempoHover(DrawingContext context, EditorSession session, LaneProjection screen)
+        {
+            if (_hover is not { } hover || _isPressed || session.Tool != EditorTool.Tempo || (_keys & KeyModifiers.Shift) != 0
+                || session.Tools.IsSyncPress(ModifiersOf(_keys)))
+            {
+                return;
+            }
+
+            if (VocalPointAt(hover, clamp: false) is not { Pitch: not null, InPhrases: false } point
+                || session.Tools.TempoAddAt(point.Tick, point.Tolerance) is not { } tick)
+            {
+                return;
+            }
+
+            double along = screen.AlongOf(session.AudioAt(tick));
+            var rows = RowsOf(screen);
+            context.FillRectangle(TempoBrush, Box(along - 1, along + 1, rows.Top, rows.Bottom));
         }
 
         /// <summary>The name of a C's pitch, with its octave as MIDI numbers them from middle C, C4 (60).</summary>

@@ -1,5 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:help="using:ChartShared.Core.Help"
         xmlns:vm="using:ChartBuilder.ViewModels"
         xmlns:views="using:ChartBuilder.Views"
         xmlns:res="using:ChartBuilder.Resources"
@@ -7,6 +8,9 @@
         xmlns:uiviews="using:ChartShared.UI.Views"
         xmlns:bctl="using:ChartBuilder.Controls"
         xmlns:chrome="using:Avalonia.Controls.Chrome"
+        xmlns:kb="using:ChartShared.UI.Keybinds"
+        xmlns:svc="using:ChartBuilder.Services"
+        xmlns:shared="using:ChartShared.UI.Resources"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="1280" d:DesignHeight="800"
@@ -22,16 +26,6 @@
         WindowDecorationsTheme="{StaticResource TitleBarDecorations}"
         WindowStartupLocation="CenterScreen"
         bctl:PanelLayout.Store="{Binding PanelLayout}">
-
-    <Window.KeyBindings>
-        <KeyBinding Gesture="Ctrl+N" Command="{Binding NewChartCommand}" />
-        <KeyBinding Gesture="Ctrl+O" Command="{Binding OpenChartCommand}" />
-        <KeyBinding Gesture="Ctrl+OemComma" Command="{Binding OpenProgramSettingsCommand}" />
-        <KeyBinding Gesture="Ctrl+S" Command="{Binding SaveCommand}" />
-        <KeyBinding Gesture="Ctrl+Z" Command="{Binding UndoCommand}" />
-        <KeyBinding Gesture="Ctrl+Y" Command="{Binding RedoCommand}" />
-        <KeyBinding Gesture="Ctrl+Shift+Z" Command="{Binding RedoCommand}" />
-    </Window.KeyBindings>
 
     <Window.Styles>
         <!-- Centred messages standing in for content that isn't built yet. -->
@@ -68,6 +62,12 @@
             <Setter Property="TextDecorations" Value="Strikethrough" />
             <Setter Property="Opacity" Value="0.55" />
         </Style>
+        <!-- The transport bar's latency button, the one tool button as wide as its stopwatch and value, rather than a
+             bare 28. -->
+        <Style Selector="Button.tool.value">
+            <Setter Property="Width" Value="NaN" />
+            <Setter Property="Padding" Value="6,0" />
+        </Style>
     </Window.Styles>
 
     <Grid x:Name="RootGrid">
@@ -83,22 +83,22 @@
         <!-- The title bar and the toolbar. The code-behind refits the panels as they change height, the toolbar wrapping as
              the window narrows. -->
         <StackPanel x:Name="TopBand" Grid.Row="0">
-            <!-- The window draws its own title bar (TitleBar): the icon, the File and Edit menus, and the window's title and
+            <!-- The window draws its own title bar (TitleBar): the icon, the File, Edit and View menus, and the window's title and
                  the program version. Dragging anywhere but the menus, the title and the version moves the window. Layered
                  over the progress of a song being opened, see-through so it shows. -->
             <Panel x:Name="TitleBand">
                 <ctl:BusyBar Foreground="{DynamicResource AccentTintBrush}"
                              IsActive="{Binding IsLoading}"
                              AutomationProperties.Name="{Binding LoadingText}" />
-                <ctl:TitleBar Icon="/Assets/ChartBuilder.ico" AppName="{x:Static res:Strings.AppName}" Background="Transparent">
+                <ctl:TitleBar Icon="/Assets/ChartBuilder.ico" AppName="{x:Static res:Strings.AppName}" HelpPage="{x:Static help:HelpPages.ChartBuilder}" Background="Transparent">
                     <ctl:TitleBar.Menu>
                         <!-- Off while a song opens, as what's chosen would act on the Editor being left. -->
                         <Menu chrome:WindowDecorationProperties.ElementRole="User" IsEnabled="{Binding !IsOpening}">
                             <MenuItem Header="{x:Static res:Strings.MenuFile}">
-                                <MenuItem Header="{x:Static res:Strings.MenuNewChart}" Command="{Binding NewChartCommand}" InputGesture="Ctrl+N">
+                                <MenuItem Header="{x:Static res:Strings.MenuNewChart}" Command="{Binding NewChartCommand}" kb:Shortcut.Action="{x:Static svc:BuilderKeys.NewChart}">
                                     <MenuItem.Icon><ctl:LineIcon Data="{StaticResource NewChartStroke}" /></MenuItem.Icon>
                                 </MenuItem>
-                                <MenuItem Header="{x:Static res:Strings.MenuOpen}" Command="{Binding OpenChartCommand}" InputGesture="Ctrl+O">
+                                <MenuItem Header="{x:Static res:Strings.MenuOpen}" Command="{Binding OpenChartCommand}" kb:Shortcut.Action="{x:Static svc:BuilderKeys.OpenChart}">
                                     <MenuItem.Icon><ctl:LineIcon Data="{StaticResource InputFolderStroke}" /></MenuItem.Icon>
                                 </MenuItem>
                                 <!-- The songs opened lately, the latest first. Each opens with the menu's OpenRecentCommand, found up
@@ -122,12 +122,12 @@
                                     </MenuItem.ItemContainerTheme>
                                 </MenuItem>
                                 <Separator />
-                                <MenuItem Header="{x:Static res:Strings.MenuSave}" Command="{Binding SaveCommand}" InputGesture="Ctrl+S">
+                                <MenuItem Header="{x:Static res:Strings.MenuSave}" Command="{Binding SaveCommand}" kb:Shortcut.Action="{x:Static kb:SharedKeys.Save}">
                                     <MenuItem.Icon><ctl:LineIcon Data="{StaticResource SaveStroke}" /></MenuItem.Icon>
                                 </MenuItem>
-                                <MenuItem Header="{x:Static res:Strings.MenuSaveAndPack}"
-                                          Command="{Binding SaveAndPackCommand}"
-                                          ToolTip.Tip="{Binding SaveAndPackToolTip}"
+                                <MenuItem Header="{x:Static res:Strings.MenuPack}"
+                                          Command="{Binding PackCommand}"
+                                          ToolTip.Tip="{Binding PackToolTip}"
                                           ToolTip.ShowOnDisabled="True">
                                     <MenuItem.Icon><ctl:LineIcon Data="{StaticResource PackStroke}" /></MenuItem.Icon>
                                 </MenuItem>
@@ -139,19 +139,76 @@
                                 </MenuItem>
                                 <Separator />
                                 <!-- Settings is the program's, last under File as in Chart Packer; the chart's are a tab in the
-                                     left panel. Its Ctrl+, isn't shown, as Avalonia would print it as Ctrl+OemComma. -->
-                                <MenuItem Header="{x:Static res:Strings.MenuSettings}" Command="{Binding OpenProgramSettingsCommand}">
+                                     left panel. Its key is in the tooltip, as Avalonia would print Ctrl+, as Ctrl+OemComma. -->
+                                <MenuItem Header="{x:Static res:Strings.MenuSettings}"
+                                          Command="{Binding OpenProgramSettingsCommand}"
+                                          kb:Shortcut.Action="{x:Static kb:SharedKeys.Settings}"
+                                          kb:Shortcut.Tip="{x:Static res:Strings.HomeSettingsToolTip}">
                                     <MenuItem.Icon><ctl:LineIcon Data="{StaticResource SettingsStroke}" /></MenuItem.Icon>
                                 </MenuItem>
                             </MenuItem>
                             <MenuItem Header="{x:Static res:Strings.MenuEdit}">
-                                <MenuItem Header="{x:Static res:Strings.MenuUndo}" Command="{Binding UndoCommand}" InputGesture="Ctrl+Z">
+                                <MenuItem Header="{x:Static res:Strings.MenuUndo}" Command="{Binding UndoCommand}" kb:Shortcut.Action="{x:Static kb:SharedKeys.Undo}">
                                     <MenuItem.Icon><ctl:LineIcon Data="{StaticResource UndoStroke}" /></MenuItem.Icon>
                                 </MenuItem>
-                                <MenuItem Header="{x:Static res:Strings.MenuRedo}" Command="{Binding RedoCommand}" InputGesture="Ctrl+Y">
+                                <MenuItem Header="{x:Static res:Strings.MenuRedo}" Command="{Binding RedoCommand}" kb:Shortcut.Action="{x:Static kb:SharedKeys.Redo}">
                                     <MenuItem.Icon><ctl:LineIcon Data="{StaticResource UndoStroke}" RenderTransform="scaleX(-1)" /></MenuItem.Icon>
                                 </MenuItem>
+                                <Separator />
+                                <!-- These do what the canvas's keys do, on the focused lane and what's selected. Their keys are
+                                     shown only, as the window doesn't take them: the canvas does, while it has focus, and a window
+                                     key would take Ctrl+X, C, V and A from the panels' text boxes. So they're the keys of the lane
+                                     in focus; with focus in a panel, they're that panel's, and the items act on the lane last
+                                     focused. -->
+                                <MenuItem Header="{x:Static res:Strings.MenuCut}" Command="{Binding CutCommand}" kb:Shortcut.Action="{x:Static svc:BuilderKeys.Cut}">
+                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource CutStroke}" /></MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="{x:Static res:Strings.MenuCopy}" Command="{Binding CopyCommand}" kb:Shortcut.Action="{x:Static svc:BuilderKeys.Copy}">
+                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource CopyStroke}" /></MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="{x:Static res:Strings.MenuPaste}" Command="{Binding PasteCommand}" kb:Shortcut.Action="{x:Static svc:BuilderKeys.Paste}">
+                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource PasteStroke}" /></MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="{x:Static res:Strings.MenuPasteMerge}" Command="{Binding PasteMergeCommand}" kb:Shortcut.Action="{x:Static svc:BuilderKeys.PasteMerge}">
+                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource PasteMergeStroke}" /></MenuItem.Icon>
+                                </MenuItem>
+                                <Separator />
+                                <MenuItem Header="{x:Static res:Strings.MenuSelectAll}" Command="{Binding SelectAllCommand}" kb:Shortcut.Action="{x:Static svc:BuilderKeys.SelectAll}">
+                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource SelectStroke}" /></MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="{x:Static res:Strings.MenuDelete}" Command="{Binding DeleteCommand}" kb:Shortcut.Action="{x:Static svc:BuilderKeys.Delete}">
+                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource TrashStroke}" /></MenuItem.Icon>
+                                </MenuItem>
+                                <Separator />
+                                <MenuItem Header="{Binding QuantizeMenuHeader}" Command="{Binding QuantizeCommand}" kb:Shortcut.Action="{x:Static svc:BuilderKeys.Quantize}">
+                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource QuantizeStroke}" /></MenuItem.Icon>
+                                </MenuItem>
+                                <Separator />
+                                <!-- Navigation: the window takes these keys, so they work wherever focus is. -->
+                                <MenuItem Header="{x:Static res:Strings.MenuGoToMeasure}" Command="{Binding GoToMeasureCommand}" kb:Shortcut.Action="{x:Static svc:BuilderKeys.GoToMeasure}" />
+                                <MenuItem Header="{x:Static res:Strings.MenuFindMatches}" Command="{Binding FindMatchesCommand}" kb:Shortcut.Action="{x:Static svc:BuilderKeys.Find}" />
+                                <MenuItem Header="{x:Static res:Strings.MenuFindNext}" Command="{Binding FindNextCommand}" kb:Shortcut.Action="{x:Static svc:BuilderKeys.FindNext}" />
+                                <MenuItem Header="{x:Static res:Strings.MenuFindPrevious}" Command="{Binding FindPreviousCommand}" kb:Shortcut.Action="{x:Static svc:BuilderKeys.FindPrevious}" />
+                                <!-- The window where every keyboard shortcut is listed and changed. -->
+                                <Separator />
+                                <MenuItem Header="{x:Static shared:SharedStrings.MenuShortcuts}"
+                                          Command="{Binding OpenShortcutsCommand}"
+                                          ToolTip.Tip="{x:Static shared:SharedStrings.MenuShortcutsToolTip}">
+                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource SettingsStroke}" /></MenuItem.Icon>
+                                </MenuItem>
                             </MenuItem>
+                            <MenuItem Header="{x:Static res:Strings.MenuView}">
+                                <MenuItem Header="{x:Static res:Strings.MenuShowMessages}" Command="{Binding ShowMessagesCommand}">
+                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource InfoStroke}" /></MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="{x:Static res:Strings.MenuShowPreview}" Command="{Binding ShowPreviewCommand}">
+                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource PreviewStroke}" /></MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="{x:Static res:Strings.MenuShowDifficulty}" Command="{Binding ShowDifficultyCommand}">
+                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource SortAscendingStroke}" /></MenuItem.Icon>
+                                </MenuItem>
+                            </MenuItem>
+                            <ctl:AboutMenuItem />
                         </Menu>
                     </ctl:TitleBar.Menu>
                     <!-- Left-aligned, so the version follows the title, and the title is trimmed when they don't fit. The title
@@ -177,8 +234,8 @@
 
             <!-- The toolbar's groups wrap onto more rows as the window narrows, rather than scrolling. -->
             <Border Classes="toolbar">
-                <WrapPanel ItemSpacing="8" LineSpacing="6">
-                    <WrapPanel.Styles>
+                <bctl:CenteredWrapPanel ItemSpacing="8" LineSpacing="6">
+                    <bctl:CenteredWrapPanel.Styles>
                         <Style Selector="ToggleButton.labelled">
                             <Setter Property="Height" Value="28" />
                             <Setter Property="Padding" Value="10,0" />
@@ -197,7 +254,7 @@
                             <Setter Property="Margin" Value="4,5" />
                             <Setter Property="Background" Value="{DynamicResource SubtleBorderBrush}" />
                         </Style>
-                    </WrapPanel.Styles>
+                    </bctl:CenteredWrapPanel.Styles>
 
                     <!-- The editing tools (charter-spec §4.5: EditorTools), one picked at a time, as icons whose tips name
                          them. Beside the Phrase tool is the kind of phrase it adds, of those the part in focus can have
@@ -205,37 +262,41 @@
                          lane's part. -->
                     <Border Classes="toolbar-group">
                         <StackPanel Orientation="Horizontal" Spacing="2">
-                            <ToggleButton Classes="tool" IsChecked="{Binding Editor.IsSelectTool}" AutomationProperties.Name="{x:Static res:Strings.ToolSelect}">
+                            <ToggleButton Classes="tool" IsChecked="{Binding Editor.IsSelectTool}" AutomationProperties.Name="{x:Static res:Strings.ToolSelect}"
+                                          kb:Shortcut.Action="{x:Static svc:BuilderKeys.ToolSelect}">
                                 <ToolTip.Tip>
                                     <StackPanel MaxWidth="320" Spacing="4">
-                                        <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.ToolSelect}" />
+                                        <TextBlock FontWeight="SemiBold" kb:Shortcut.Action="{x:Static svc:BuilderKeys.ToolSelect}" kb:Shortcut.Text="{x:Static res:Strings.ToolSelect}" />
                                         <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.ToolSelectToolTip}" />
                                     </StackPanel>
                                 </ToolTip.Tip>
                                 <ctl:LineIcon Data="{StaticResource PointerStroke}" />
                             </ToggleButton>
-                            <ToggleButton Classes="tool" IsChecked="{Binding Editor.IsPlaceTool}" AutomationProperties.Name="{x:Static res:Strings.ToolPlace}">
+                            <ToggleButton Classes="tool" IsChecked="{Binding Editor.IsPlaceTool}" AutomationProperties.Name="{x:Static res:Strings.ToolPlace}"
+                                          kb:Shortcut.Action="{x:Static svc:BuilderKeys.ToolPlace}">
                                 <ToolTip.Tip>
                                     <StackPanel MaxWidth="320" Spacing="4">
-                                        <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.ToolPlace}" />
+                                        <TextBlock FontWeight="SemiBold" kb:Shortcut.Action="{x:Static svc:BuilderKeys.ToolPlace}" kb:Shortcut.Text="{x:Static res:Strings.ToolPlace}" />
                                         <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.ToolPlaceToolTip}" />
                                     </StackPanel>
                                 </ToolTip.Tip>
                                 <ctl:LineIcon Data="{StaticResource PencilStroke}" />
                             </ToggleButton>
-                            <ToggleButton Classes="tool" IsChecked="{Binding Editor.IsEraseTool}" AutomationProperties.Name="{x:Static res:Strings.ToolErase}">
+                            <ToggleButton Classes="tool" IsChecked="{Binding Editor.IsEraseTool}" AutomationProperties.Name="{x:Static res:Strings.ToolErase}"
+                                          kb:Shortcut.Action="{x:Static svc:BuilderKeys.ToolErase}">
                                 <ToolTip.Tip>
                                     <StackPanel MaxWidth="320" Spacing="4">
-                                        <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.ToolErase}" />
+                                        <TextBlock FontWeight="SemiBold" kb:Shortcut.Action="{x:Static svc:BuilderKeys.ToolErase}" kb:Shortcut.Text="{x:Static res:Strings.ToolErase}" />
                                         <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.ToolEraseToolTip}" />
                                     </StackPanel>
                                 </ToolTip.Tip>
                                 <ctl:LineIcon Data="{StaticResource EraserStroke}" />
                             </ToggleButton>
-                            <ToggleButton Classes="tool" IsChecked="{Binding Editor.IsPhraseTool}" AutomationProperties.Name="{x:Static res:Strings.ToolPhrase}">
+                            <ToggleButton Classes="tool" IsChecked="{Binding Editor.IsPhraseTool}" AutomationProperties.Name="{x:Static res:Strings.ToolPhrase}"
+                                          kb:Shortcut.Action="{x:Static svc:BuilderKeys.ToolPhrase}">
                                 <ToolTip.Tip>
                                     <StackPanel MaxWidth="320" Spacing="4">
-                                        <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.ToolPhrase}" />
+                                        <TextBlock FontWeight="SemiBold" kb:Shortcut.Action="{x:Static svc:BuilderKeys.ToolPhrase}" kb:Shortcut.Text="{x:Static res:Strings.ToolPhrase}" />
                                         <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.ToolPhraseToolTip}" />
                                     </StackPanel>
                                 </ToolTip.Tip>
@@ -249,23 +310,35 @@
                                       DisplayMemberBinding="{Binding Label, x:DataType=vm:PhraseKindChoice}"
                                       ToolTip.Tip="{x:Static res:Strings.ToolPhraseKindToolTip}"
                                       AutomationProperties.Name="{x:Static res:Strings.ToolPhraseKindName}" />
-                            <ToggleButton Classes="tool" IsChecked="{Binding Editor.IsTempoTool}" AutomationProperties.Name="{x:Static res:Strings.ToolTempo}">
+                            <ToggleButton Classes="tool" IsChecked="{Binding Editor.IsTempoTool}" AutomationProperties.Name="{x:Static res:Strings.ToolTempo}"
+                                          kb:Shortcut.Action="{x:Static svc:BuilderKeys.ToolTempo}">
                                 <ToolTip.Tip>
                                     <StackPanel MaxWidth="320" Spacing="4">
-                                        <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.ToolTempo}" />
+                                        <TextBlock FontWeight="SemiBold" kb:Shortcut.Action="{x:Static svc:BuilderKeys.ToolTempo}" kb:Shortcut.Text="{x:Static res:Strings.ToolTempo}" />
                                         <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.ToolTempoToolTip}" />
                                     </StackPanel>
                                 </ToolTip.Tip>
                                 <ctl:LineIcon Data="{StaticResource MetronomeStroke}" />
                             </ToggleButton>
-                            <ToggleButton Classes="tool" IsChecked="{Binding Editor.IsSyncTool}" AutomationProperties.Name="{x:Static res:Strings.ToolSync}">
+                            <ToggleButton Classes="tool" IsChecked="{Binding Editor.IsSyncTool}" AutomationProperties.Name="{x:Static res:Strings.ToolSync}"
+                                          kb:Shortcut.Action="{x:Static svc:BuilderKeys.ToolSync}">
                                 <ToolTip.Tip>
                                     <StackPanel MaxWidth="320" Spacing="4">
-                                        <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.ToolSync}" />
+                                        <TextBlock FontWeight="SemiBold" kb:Shortcut.Action="{x:Static svc:BuilderKeys.ToolSync}" kb:Shortcut.Text="{x:Static res:Strings.ToolSync}" />
                                         <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.ToolSyncToolTip}" />
                                     </StackPanel>
                                 </ToolTip.Tip>
                                 <ctl:LineIcon Data="{StaticResource LinkStroke}" />
+                            </ToggleButton>
+                            <ToggleButton Classes="tool" IsChecked="{Binding Editor.IsLoopTool}" AutomationProperties.Name="{x:Static res:Strings.ToolLoopName}"
+                                          kb:Shortcut.Action="{x:Static svc:BuilderKeys.LoopTool}">
+                                <ToolTip.Tip>
+                                    <StackPanel MaxWidth="320" Spacing="4">
+                                        <TextBlock FontWeight="SemiBold" kb:Shortcut.Action="{x:Static svc:BuilderKeys.LoopTool}" kb:Shortcut.Text="{x:Static res:Strings.ToolLoop}" />
+                                        <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.ToolLoopToolTip}" />
+                                    </StackPanel>
+                                </ToolTip.Tip>
+                                <ctl:LineIcon Data="{StaticResource LoopRegionStroke}" />
                             </ToggleButton>
                         </StackPanel>
                     </Border>
@@ -275,9 +348,9 @@
                     <Border Classes="toolbar-group" IsVisible="{Binding Editor.ShowsFretPlaceOptions}">
                         <StackPanel Orientation="Horizontal" Spacing="2">
                             <ToggleButton Classes="labelled" Content="{x:Static res:Strings.PlaceNatural}" IsChecked="{Binding Editor.IsNaturalPlace}" ToolTip.Tip="{x:Static res:Strings.PlaceNaturalToolTip}" />
-                            <ToggleButton Classes="labelled" Content="{x:Static res:Strings.PlaceHopo}" IsChecked="{Binding Editor.IsHopoPlace}" ToolTip.Tip="{x:Static res:Strings.PlaceHopoToolTip}" />
-                            <ToggleButton Classes="labelled" Content="{x:Static res:Strings.PlaceStrum}" IsChecked="{Binding Editor.IsStrumPlace}" ToolTip.Tip="{x:Static res:Strings.PlaceStrumToolTip}" />
-                            <ToggleButton Classes="labelled" Content="{x:Static res:Strings.PlaceTap}" IsChecked="{Binding Editor.IsTapPlace}" ToolTip.Tip="{x:Static res:Strings.PlaceTapToolTip}" />
+                            <ToggleButton Classes="labelled" Content="{x:Static res:Strings.PlaceHopo}" IsChecked="{Binding Editor.IsHopoPlace}" kb:Shortcut.Tip="{x:Static res:Strings.PlaceHopoToolTip}" kb:Shortcut.Action="{x:Static svc:BuilderKeys.NoteForceHopo}" />
+                            <ToggleButton Classes="labelled" Content="{x:Static res:Strings.PlaceStrum}" IsChecked="{Binding Editor.IsStrumPlace}" kb:Shortcut.Tip="{x:Static res:Strings.PlaceStrumToolTip}" kb:Shortcut.Action="{x:Static svc:BuilderKeys.NoteForceStrum}" />
+                            <ToggleButton Classes="labelled" Content="{x:Static res:Strings.PlaceTap}" IsChecked="{Binding Editor.IsTapPlace}" kb:Shortcut.Tip="{x:Static res:Strings.PlaceTapToolTip}" kb:Shortcut.Action="{x:Static svc:BuilderKeys.NoteTap}" />
                             <Border Classes="choice-divider" />
                             <ToggleButton Classes="labelled" Content="{x:Static res:Strings.PlaceOpen}" IsChecked="{Binding Editor.PlaceOpen}" ToolTip.Tip="{x:Static res:Strings.PlaceOpenToolTip}" />
                             <Border Classes="choice-divider" />
@@ -292,12 +365,12 @@
                         <StackPanel Orientation="Horizontal" Spacing="2">
                             <StackPanel Orientation="Horizontal" Spacing="2" IsVisible="{Binding Editor.ShowsTomChoice}">
                                 <ToggleButton Classes="labelled" Content="{x:Static res:Strings.PlaceCymbal}" IsChecked="{Binding Editor.IsCymbalPlace}" ToolTip.Tip="{x:Static res:Strings.PlaceCymbalToolTip}" />
-                                <ToggleButton Classes="labelled" Content="{x:Static res:Strings.PlaceTom}" IsChecked="{Binding Editor.IsTomPlace}" ToolTip.Tip="{x:Static res:Strings.PlaceTomToolTip}" />
+                                <ToggleButton Classes="labelled" Content="{x:Static res:Strings.PlaceTom}" IsChecked="{Binding Editor.IsTomPlace}" kb:Shortcut.Tip="{x:Static res:Strings.PlaceTomToolTip}" kb:Shortcut.Action="{x:Static svc:BuilderKeys.NoteCymbal}" />
                                 <Border Classes="choice-divider" />
                             </StackPanel>
                             <ToggleButton Classes="labelled" Content="{x:Static res:Strings.PlaceNormal}" IsChecked="{Binding Editor.IsNormalPlace}" ToolTip.Tip="{x:Static res:Strings.PlaceNormalToolTip}" />
-                            <ToggleButton Classes="labelled" Content="{x:Static res:Strings.PlaceAccent}" IsChecked="{Binding Editor.IsAccentPlace}" ToolTip.Tip="{x:Static res:Strings.PlaceAccentToolTip}" />
-                            <ToggleButton Classes="labelled" Content="{x:Static res:Strings.PlaceGhost}" IsChecked="{Binding Editor.IsGhostPlace}" ToolTip.Tip="{x:Static res:Strings.PlaceGhostToolTip}" />
+                            <ToggleButton Classes="labelled" Content="{x:Static res:Strings.PlaceAccent}" IsChecked="{Binding Editor.IsAccentPlace}" kb:Shortcut.Tip="{x:Static res:Strings.PlaceAccentToolTip}" kb:Shortcut.Action="{x:Static svc:BuilderKeys.NoteAccent}" />
+                            <ToggleButton Classes="labelled" Content="{x:Static res:Strings.PlaceGhost}" IsChecked="{Binding Editor.IsGhostPlace}" kb:Shortcut.Tip="{x:Static res:Strings.PlaceGhostToolTip}" kb:Shortcut.Action="{x:Static svc:BuilderKeys.NoteGhost}" />
                             <StackPanel Orientation="Horizontal" Spacing="2" IsVisible="{Binding Editor.ShowsDoubleKickChoice}">
                                 <Border Classes="choice-divider" />
                                 <ToggleButton Classes="labelled" Content="{x:Static res:Strings.PlaceDoubleKick}" IsChecked="{Binding Editor.PlaceDoubleKick}" ToolTip.Tip="{x:Static res:Strings.PlaceDoubleKickToolTip}" />
@@ -305,7 +378,7 @@
                         </StackPanel>
                     </Border>
 
-                    <!-- The grid notes snap to (charter-spec C4 item 4), on while the magnet is lit: [ and ] step through it. -->
+                    <!-- The grid notes snap to (charter-spec C4 item 4), on while the magnet is lit: the snap keys step through it. -->
                     <Border Classes="toolbar-group">
                         <StackPanel Orientation="Horizontal" Spacing="2" Height="28">
                             <ToggleButton Classes="tool" IsChecked="{Binding Editor.IsSnapOn}" AutomationProperties.Name="{x:Static res:Strings.SnapLabel}">
@@ -327,14 +400,13 @@
                         </StackPanel>
                     </Border>
 
-                    <!-- Audio assist (charter-spec C14): snap to onset (O), on while the phi is lit, and Nudge to onsets
-                         (Shift+O). A proposed tempo map and Find first downbeat are in the Tempo map tab. -->
+                    <!-- Audio assist (charter-spec C14): snap to onset, on while the phi is lit, and Nudge to onsets. A proposed tempo map and Find first downbeat are in the Tempo map tab. -->
                     <Border Classes="toolbar-group" IsVisible="{Binding Editor.AudioAssist.HasAudio}">
                         <StackPanel Orientation="Horizontal" Spacing="2" Height="28">
                             <ToggleButton Classes="tool" IsChecked="{Binding Editor.AudioAssist.IsSnapToOnset}" AutomationProperties.Name="{x:Static res:Strings.SnapToOnsetLabel}">
                                 <ToolTip.Tip>
                                     <StackPanel MaxWidth="320" Spacing="4">
-                                        <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.SnapToOnsetLabel}" />
+                                        <TextBlock FontWeight="SemiBold" kb:Shortcut.Action="{x:Static svc:BuilderKeys.SnapToOnset}" kb:Shortcut.Text="{x:Static res:Strings.SnapToOnsetLabel}" />
                                         <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.SnapToOnsetToolTip}" />
                                     </StackPanel>
                                 </ToolTip.Tip>
@@ -345,7 +417,7 @@
                                     BorderThickness="0"
                                     Content="{x:Static res:Strings.NudgeToOnsetsButton}"
                                     Command="{Binding Editor.AudioAssist.NudgeCommand}"
-                                    ToolTip.Tip="{x:Static res:Strings.NudgeToOnsetsToolTip}" />
+                                    kb:Shortcut.Tip="{x:Static res:Strings.NudgeToOnsetsToolTip}" kb:Shortcut.Action="{x:Static svc:BuilderKeys.NudgeToOnsets}" />
                         </StackPanel>
                     </Border>
 
@@ -353,20 +425,20 @@
                         <StackPanel Orientation="Horizontal" Spacing="2">
                             <Button Classes="tool"
                                     Command="{Binding UndoCommand}"
-                                    ToolTip.Tip="{x:Static res:Strings.UndoToolTip}"
+                                    kb:Shortcut.Tip="{x:Static res:Strings.UndoToolTip}" kb:Shortcut.Action="{x:Static kb:SharedKeys.Undo}"
                                     AutomationProperties.Name="{x:Static res:Strings.UndoButton}">
                                 <ctl:LineIcon Data="{StaticResource UndoStroke}" />
                             </Button>
                             <!-- Redo is Undo's arrow mirrored. -->
                             <Button Classes="tool"
                                     Command="{Binding RedoCommand}"
-                                    ToolTip.Tip="{x:Static res:Strings.RedoToolTip}"
+                                    kb:Shortcut.Tip="{x:Static res:Strings.RedoToolTip}" kb:Shortcut.Action="{x:Static kb:SharedKeys.Redo}"
                                     AutomationProperties.Name="{x:Static res:Strings.RedoButton}">
                                 <ctl:LineIcon Data="{StaticResource UndoStroke}" RenderTransform="scaleX(-1)" />
                             </Button>
                         </StackPanel>
                     </Border>
-                </WrapPanel>
+                </bctl:CenteredWrapPanel>
             </Border>
         </StackPanel>
 
@@ -412,43 +484,8 @@
                           Background="{DynamicResource SubtleBorderBrush}"
                           IsVisible="{Binding !IsLeftPanelAutoHide}" />
 
-            <!-- The chart: its lanes, each a part's highway or a vocal part, docked as the user arranges them. Over them,
-                 while Generate fills or Generate star power runs (charter-spec C6 item 5, C8 item 1), a bar to keep, drop,
-                 add or cancel its proposals. -->
+            <!-- The chart: its lanes, each a part's highway or a vocal part, docked as the user arranges them. -->
             <DockPanel Grid.Column="2">
-                <Border DockPanel.Dock="Top"
-                        IsVisible="{Binding Editor.IsProposalRunActive}"
-                        Background="{DynamicResource ToolbarBrush}"
-                        BorderBrush="{DynamicResource SubtleBorderBrush}"
-                        BorderThickness="0,0,0,1"
-                        Padding="12,4">
-                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
-                        <TextBlock Grid.Column="0" VerticalAlignment="Center" FontWeight="SemiBold" Text="{Binding Editor.ProposalRunText}" />
-                        <TextBlock Grid.Column="1"
-                                   Classes="muted"
-                                   FontSize="12"
-                                   VerticalAlignment="Center"
-                                   TextTrimming="CharacterEllipsis"
-                                   Text="{Binding Editor.ProposalRunHint}" />
-                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6">
-                            <Button Classes="labelled"
-                                    Content="{x:Static res:Strings.ProposalRunPrevious}"
-                                    Command="{Binding Editor.PreviousProposalCommand}"
-                                    ToolTip.Tip="{x:Static res:Strings.ProposalRunPreviousToolTip}" />
-                            <Button Classes="labelled"
-                                    Content="{x:Static res:Strings.ProposalRunNext}"
-                                    Command="{Binding Editor.NextProposalCommand}"
-                                    ToolTip.Tip="{x:Static res:Strings.ProposalRunNextToolTip}" />
-                            <Button Classes="labelled" Content="{x:Static res:Strings.FillRunKeepAll}" Command="{Binding Editor.KeepAllProposalsCommand}" />
-                            <Button Classes="labelled" Content="{x:Static res:Strings.FillRunDropAll}" Command="{Binding Editor.DropAllProposalsCommand}" />
-                            <Button Classes="labelled accent"
-                                    Content="{Binding Editor.ProposalRunAdd}"
-                                    Command="{Binding Editor.AddProposalsCommand}"
-                                    ToolTip.Tip="{Binding Editor.ProposalRunAddToolTip}" />
-                            <Button Classes="labelled" Content="{x:Static res:Strings.FillRunCancel}" Command="{Binding Editor.CancelProposalsCommand}" />
-                        </StackPanel>
-                    </Grid>
-                </Border>
                 <!-- While a proposed tempo map is reviewed (charter-spec C14 item 4): what it is, and to adjust, accept or
                      discard it. -->
                 <Border DockPanel.Dock="Top"
@@ -509,6 +546,16 @@
                                        GuideBorderBrush="{DynamicResource SubtleBorderBrush}"
                                        AccentBrush="{DynamicResource AccentTextBrush}"
                                        PreviewBrush="{DynamicResource AccentTintBrush}" />
+                    <!-- The 3, 2, 1 before record mode or a playtest starts the song. It's drawn over the lanes without taking
+                         their clicks, and the message bar says it too, for a screen reader. -->
+                    <TextBlock HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               FontSize="120"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource AccentHighlightBrush}"
+                               IsHitTestVisible="False"
+                               IsVisible="{Binding Editor.IsCountingDown}"
+                               Text="{Binding Editor.CountdownText}" />
                     <StackPanel Classes="placeholder" IsVisible="{Binding !Lanes.HasLanes}">
                         <TextBlock Classes="centered" FontWeight="SemiBold" Text="{x:Static res:Strings.NoLanesOpen}" />
                         <TextBlock Classes="muted centered" FontSize="12" Text="{x:Static res:Strings.NoLanesOpenHint}" />
@@ -657,7 +704,7 @@
                     <WrapPanel Grid.Column="0" ItemSpacing="8" VerticalAlignment="Center">
                         <Button Classes="tool"
                                 Command="{Binding Playback.PlayPauseCommand}"
-                                ToolTip.Tip="{Binding Playback.PlayPauseToolTip}"
+                                kb:Shortcut.Tip="{Binding Playback.PlayPauseToolTip}" kb:Shortcut.Action="{x:Static kb:SharedKeys.PlayPause}"
                                 AutomationProperties.Name="{x:Static res:Strings.PlayPauseButton}">
                             <Panel>
                                 <ctl:LineIcon Width="12" Height="12" Data="{StaticResource PlayStroke}" IsVisible="{Binding !Playback.IsPlaying}" />
@@ -667,7 +714,7 @@
                         <ToggleButton Classes="tool"
                                       IsChecked="{Binding Editor.IsRecordArmed, Mode=OneWay}"
                                       Command="{Binding Editor.ToggleRecordCommand}"
-                                      ToolTip.Tip="{Binding Editor.RecordToolTip}"
+                                      kb:Shortcut.Tip="{Binding Editor.RecordToolTip}" kb:Shortcut.Action="{x:Static svc:BuilderKeys.RecordToggle}"
                                       AutomationProperties.Name="{x:Static res:Strings.RecordButton}">
                             <Ellipse Width="10" Height="10" Fill="{DynamicResource DifficultyHardBrush}" />
                         </ToggleButton>
@@ -676,7 +723,7 @@
                         <ToggleButton Classes="tool"
                                       IsChecked="{Binding Editor.Playtest.IsArmed, Mode=OneWay}"
                                       Command="{Binding Editor.TogglePlaytestCommand}"
-                                      ToolTip.Tip="{Binding Editor.Playtest.ToolTip}"
+                                      kb:Shortcut.Tip="{Binding Editor.Playtest.ToolTip}" kb:Shortcut.Action="{x:Static svc:BuilderKeys.PlaytestToggle}"
                                       AutomationProperties.Name="{x:Static res:Strings.PlaytestButton}">
                             <PathIcon Width="16" Height="16" Data="{StaticResource PlaytestIconGeometry}" />
                         </ToggleButton>
@@ -721,7 +768,7 @@
                         <Button Classes="labelled"
                                 Content="{x:Static res:Strings.PlaytestProblemsButton}"
                                 IsVisible="{Binding Editor.Playtest.HasProblems}"
-                                ToolTip.Tip="{x:Static res:Strings.PlaytestProblemsToolTip}"
+                                kb:Shortcut.Tip="{x:Static res:Strings.PlaytestProblemsToolTip}" kb:Shortcut.Action="{x:Static svc:BuilderKeys.PlaytestNext}"
                                 AutomationProperties.Name="{x:Static res:Strings.PlaytestProblemsButton}">
                             <Button.Flyout>
                                 <Flyout Placement="TopEdgeAlignedLeft">
@@ -840,13 +887,14 @@
                             </Button.Flyout>
                             <ctl:LineIcon Data="{StaticResource VolumeStroke}" />
                         </Button>
-                        <Button Classes="labelled"
+                        <!-- The calibrated latency, clicked to calibrate: a stopwatch with the value beside it. -->
+                        <Button Classes="tool value"
                                 Command="{Binding Playback.OpenCalibrationCommand}"
                                 ToolTip.Tip="{x:Static res:Strings.LatencyToolTip}"
                                 AutomationProperties.Name="{x:Static res:Strings.LatencyToolTip}">
                             <StackPanel Orientation="Horizontal" Spacing="4">
-                                <TextBlock Classes="muted" VerticalAlignment="Center" Text="{x:Static res:Strings.LatencyLabel}" />
-                                <TextBlock VerticalAlignment="Center" Text="{Binding Playback.LatencyText}" />
+                                <ctl:LineIcon Width="14" Height="14" Data="{StaticResource OffsetStroke}" />
+                                <TextBlock FontSize="12" VerticalAlignment="Center" Text="{Binding Playback.LatencyText}" />
                             </StackPanel>
                         </Button>
                     </WrapPanel>
@@ -871,6 +919,8 @@
                                FindingMarks="{Binding Findings.Marks}"
                                VisibleStart="{Binding Editor.VisibleStart}"
                                VisibleEnd="{Binding Editor.VisibleEnd}"
+                               Loop="{Binding Playback.Loop}"
+                               LoopBrush="{DynamicResource LoopRegionLineBrush}"
                                SpanBrush="{DynamicResource AccentTintBrush}"
                                WaveformBrush="{DynamicResource WaveformBrush}"
                                BeatBrush="{DynamicResource SubtleBorderBrush}"

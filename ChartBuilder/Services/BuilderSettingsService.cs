@@ -10,7 +10,6 @@ using ChartShared.Core.Charting.Layout;
 using ChartShared.Core.Charting.Playtest;
 using ChartShared.Core.Launching;
 using ChartShared.Core.Settings;
-using ChartShared.UI.Services;
 using ChartShared.UI.ViewModels;
 using ChartShared.UI.Views;
 
@@ -36,6 +35,9 @@ namespace ChartBuilder.Services
 
         public BuilderSettings Settings { get; }
 
+        /// <summary>The schema version this build writes to <c>builder-settings.json</c>.</summary>
+        public const int SchemaVersion = 1;
+
         /// <summary>
         /// The default rules Reduce starts from (charter-spec C9 item 2, §10): <c>reduction-rules.json</c> beside the settings
         /// file, which Chart Packer reads and writes too.
@@ -45,7 +47,8 @@ namespace ChartBuilder.Services
         /// <summary>Loads settings from <paramref name="filePath"/>, falling back to defaults when it's missing or unreadable.</summary>
         public static BuilderSettingsService Load(string filePath)
         {
-            var file = new JsonSettingsFile<BuilderSettings>(filePath, BuilderSettingsJsonContext.Default.BuilderSettings);
+            // Each window's placement is merged on its own, so Chart Builders closing different windows keep both.
+            var file = new JsonSettingsFile<BuilderSettings>(filePath, BuilderSettingsJsonContext.Default.BuilderSettings, [nameof(BuilderSettings.Windows)], SchemaVersion);
             var settings = file.Load();
             Sanitize(settings);
             string rules = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(filePath)) ?? "", Path.GetFileName(UserConfigPaths.ReductionRulesFile));
@@ -102,23 +105,23 @@ namespace ChartBuilder.Services
                 : BuilderSettings.DefaultMasterVolume;
             settings.MetronomeVolume = Math.Clamp(settings.MetronomeVolume, 0, 100);
             settings.HitSoundVolume = Math.Clamp(settings.HitSoundVolume, 0, 100);
-            settings.PreviewLookAhead = double.IsFinite(settings.PreviewLookAhead) ? Math.Clamp(settings.PreviewLookAhead, 0.5, 4) : 1.4;
+            settings.PreviewLookAhead = HighwayLookAhead.Clamp(settings.PreviewLookAhead, BuilderSettings.DefaultPreviewLookAhead);
+            settings.GeneratePhrasesLookAhead = HighwayLookAhead.Clamp(settings.GeneratePhrasesLookAhead, BuilderSettings.DefaultGeneratePhrasesLookAhead);
             settings.ReducePreviewCategories &= ReductionChangeCategories.All;
-            settings.ReducePreviewLookAhead = BuilderSettings.SnapReducePreviewLookAhead(settings.ReducePreviewLookAhead);
+            settings.ReducePreviewLookAhead = HighwayLookAhead.Clamp(settings.ReducePreviewLookAhead, ReductionPreviewViewModel.DefaultLookAhead);
             settings.PlaytestEarlyMs = Math.Clamp(settings.PlaytestEarlyMs, (int)HitWindow.MinMs, (int)HitWindow.MaxMs);
             settings.PlaytestLateMs = Math.Clamp(settings.PlaytestLateMs, (int)HitWindow.MinMs, (int)HitWindow.MaxMs);
             if (!Enum.IsDefined(settings.GuitarRecordStyle))
                 settings.GuitarRecordStyle = GuitarRecordStyle.Strum;
+            if (!Enum.IsDefined(settings.PlaybackCountdown))
+                settings.PlaybackCountdown = PlaybackCountdownMode.Both;
+            settings.CountdownSeconds = BuilderSettings.ClampCountdownSeconds(settings.CountdownSeconds);
 
             settings.EditorLeftPanelWidth = Size(settings.EditorLeftPanelWidth, BuilderSettings.MinEditorPanelWidth, BuilderSettings.DefaultEditorLeftPanelWidth);
             settings.EditorRightPanelWidth = Size(settings.EditorRightPanelWidth, BuilderSettings.MinEditorPanelWidth, BuilderSettings.DefaultEditorRightPanelWidth);
             settings.EditorTimelineHeight = Size(settings.EditorTimelineHeight, BuilderSettings.MinEditorTimelineHeight, BuilderSettings.DefaultEditorTimelineHeight);
             SanitizePanelLayout(settings);
-
-            if (settings.EditorFullscreen)
-                settings.EditorMaximized = true;
-            SanitizeEditorBounds(settings);
-            SettingsWindowSize.Sanitize(settings);
+            WindowMemory.Sanitize(settings);
         }
 
         /// <summary>
@@ -158,16 +161,6 @@ namespace ChartBuilder.Services
                 return null;
             var kept = keys.Where(k => !string.IsNullOrWhiteSpace(k)).Distinct().Take(PanelLayoutStore.MaxKeys).ToList();
             return kept.Count > 0 ? kept : null;
-        }
-
-        /// <summary>The editor's saved normal bounds, as <see cref="WindowBounds.FromSaved"/> reads them: dropped whole when half-saved.</summary>
-        private static void SanitizeEditorBounds(BuilderSettings settings)
-        {
-            var bounds = WindowBounds.FromSaved(settings.EditorX, settings.EditorY, settings.EditorWidth, settings.EditorHeight);
-            settings.EditorX = bounds?.Position.X;
-            settings.EditorY = bounds?.Position.Y;
-            settings.EditorWidth = bounds?.Size.Width;
-            settings.EditorHeight = bounds?.Size.Height;
         }
     }
 }

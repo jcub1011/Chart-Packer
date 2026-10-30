@@ -27,7 +27,15 @@
         <!-- The accent for marks drawn on a dark surface, e.g. the lyric lane's notes. The accent itself here; a
              themed accent darkens for white text on it, but this one stays light, so the marks still stand out. -->
         <SolidColorBrush x:Key="AccentMarkBrush" Color="#8B5CF6" />
+        <!-- Star power's colour, as the highway and timeline draw it (HighwayPalette.StarPower). The star power
+             window's kept-region bar uses it, so a kept phrase reads as star power rather than as UI selection. -->
+        <SolidColorBrush x:Key="StarPowerBrush" Color="#7FE9FF" />
+        <!-- The amber a generated phrase is proposed in (HighwayPalette.Proposal). A fill's kept-region bar uses it. -->
+        <SolidColorBrush x:Key="ProposalBrush" Color="#FFB000" />
         <SolidColorBrush x:Key="WarningTextBrush" Color="#FBBF24" />
+        <!-- A warning's tint and border, e.g. the star power window's low-meter chip. -->
+        <SolidColorBrush x:Key="WarningTintBrush" Color="#1FFBBF24" />
+        <SolidColorBrush x:Key="WarningBorderBrush" Color="#66FBBF24" />
         <!-- Metadata that fails validation: an orange bar and tint on its row, and the message under it. -->
         <SolidColorBrush x:Key="InvalidBrush" Color="#FB923C" />
         <SolidColorBrush x:Key="InvalidTintBrush" Color="#1FFB923C" />
@@ -36,6 +44,8 @@
         <SolidColorBrush x:Key="ExcludeTextBrush" Color="#FDA4AF" />
         <!-- The part of the waveform still to be played; the part played is AccentTextBrush. -->
         <SolidColorBrush x:Key="WaveformBrush" Color="#5B5E78" />
+        <!-- The loop region's start and end on the timeline, in a blue apart from the playhead's and the span box's. -->
+        <SolidColorBrush x:Key="LoopRegionLineBrush" Color="#4C8DFF" />
         <!-- Behind the tip strip along the bottom of the details panel: 90% opaque, so the rows only faintly show past it. -->
         <SolidColorBrush x:Key="ToolTipStripBrush" Color="#E61D1E29" />
         <!-- The spectrum behind the details panel while a song plays: a shade for each bar, stepped from rose at

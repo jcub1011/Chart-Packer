@@ -1,5 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:help="using:ChartShared.Core.Help"
+        xmlns:ui="using:ChartShared.UI.Controls"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:res="using:ChartPacker.Resources"
@@ -11,18 +13,38 @@
         ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner"
         MinWidth="360"
-        MaxWidth="480">
-    <StackPanel Margin="20" Spacing="20">
-        <TextBlock x:Name="MessageText" TextWrapping="Wrap" />
-        <!-- OK is the only choice, so Enter and Escape both close it. -->
-        <Button HorizontalAlignment="Right"
-                MinWidth="80"
-                HorizontalContentAlignment="Center"
-                Classes="accent"
-                Content="{x:Static sres:SharedStrings.OkButton}"
-                IsDefault="True"
-                IsCancel="True"
-                Click="OnOk"
-                AutomationProperties.Name="{x:Static sres:SharedStrings.OkButton}" />
-    </StackPanel>
+        MaxWidth="480"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaTitleBarHeightHint="30"
+        WindowDecorationsTheme="{StaticResource TitleBarDecorations}">
+
+    <DockPanel>
+        <ui:TitleBar x:Name="WindowTitleBar"
+                     HelpPage="{x:Static help:HelpPages.MessageDialog}"
+                     DockPanel.Dock="Top"
+                     Height="31"
+                     BorderThickness="0,0,0,1"
+                     BorderBrush="{DynamicResource SubtleBorderBrush}">
+            <TextBlock x:Name="TitleText"
+                       Text="{Binding Title, RelativeSource={RelativeSource AncestorType=Window}}"
+                       Margin="8,0,12,0"
+                       FontSize="12"
+                       VerticalAlignment="Center"
+                       TextTrimming="CharacterEllipsis" />
+        </ui:TitleBar>
+
+        <StackPanel Margin="20" Spacing="20">
+            <TextBlock x:Name="MessageText" TextWrapping="Wrap" />
+            <!-- OK is the only choice, so Enter and Escape both close it. -->
+            <Button HorizontalAlignment="Right"
+                    MinWidth="80"
+                    HorizontalContentAlignment="Center"
+                    Classes="accent"
+                    Content="{x:Static sres:SharedStrings.OkButton}"
+                    IsDefault="True"
+                    IsCancel="True"
+                    Click="OnOk"
+                    AutomationProperties.Name="{x:Static sres:SharedStrings.OkButton}" />
+        </StackPanel>
+    </DockPanel>
 </Window>

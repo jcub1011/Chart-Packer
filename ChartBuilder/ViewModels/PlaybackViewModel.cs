@@ -15,6 +15,7 @@ using ChartShared.Audio.Playback;
 using ChartShared.Audio.Synthesis;
 using ChartShared.Audio.Waveforms;
 using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Scanning;
 using ChartShared.UI.Controls;
 using ChartShared.UI.Services;
@@ -35,7 +36,7 @@ namespace ChartBuilder.ViewModels
     /// drawn against the audio while it plays is drawn the calibrated latency earlier, times the speed (C10 item 5),
     /// for the device the audio is on (C11).
     /// </remarks>
-    public sealed partial class PlaybackViewModel : ViewModelBase, IDisposable, ITrackMixer, IReductionPreviewPlayback
+    public sealed partial class PlaybackViewModel : ViewModelBase, IDisposable, ITrackMixer, IReductionPreviewPlayback, ILoopSpan
     {
         /// <summary>How long the timeline is when there's no audio to say.</summary>
         private const double PlaceholderLengthSeconds = 180;
@@ -233,7 +234,7 @@ namespace ChartBuilder.ViewModels
             }
         }
 
-        /// <summary>Plays from <paramref name="start"/> to <paramref name="end"/>, in seconds of audio, then pauses (Shift+Space).</summary>
+        /// <summary>Plays from <paramref name="start"/> to <paramref name="end"/>, in seconds of audio, then pauses.</summary>
         public void PlayRegion(double start, double end)
         {
             if (_player is not { } player || end <= start)
@@ -244,16 +245,50 @@ namespace ChartBuilder.ViewModels
             SetPlaying(true);
         }
 
-        /// <summary>Sets the loop region, in seconds of audio, and turns looping on (L).</summary>
+        /// <summary>
+        /// Sets the loop region, in seconds of audio, without turning looping on: what's repeating is the Loop button's and
+        /// the L key's, not drawing a region's (charter-spec C10 item 2).
+        /// </summary>
         public void SetLoop(double start, double end)
         {
             if (end <= start)
                 return;
-            Loop = new LoopRegion(Math.Max(0, start), end);
+            DragLoop(start, end);
+            if (Loop is not { } loop)
+                return;
+
+            // Repeating it already, the song carries on from where the region now is.
             if (IsLooping && _player is { IsPlaying: true } player)
-                player.PlayRegion(TimeSpan.FromSeconds(Loop.Start), TimeSpan.FromSeconds(Loop.End), loops: true);
-            IsLooping = true;
+                player.PlayRegion(TimeSpan.FromSeconds(loop.Start), TimeSpan.FromSeconds(loop.End), loops: true);
         }
+
+        /// <summary>
+        /// Puts the loop region where a drag has it, in seconds of audio, without turning looping on or moving what's
+        /// playing: the Loop tool's preview of where the region lands.
+        /// </summary>
+        public void DragLoop(double start, double end)
+        {
+            if (!double.IsFinite(start) || !double.IsFinite(end) || end <= start)
+                return;
+            Loop = new LoopRegion(Math.Max(0, start), end);
+        }
+
+        /// <summary>Takes the loop region away, and stops looping: the region's X, or the Loop tool's middle button.</summary>
+        public void ClearLoop()
+        {
+            if (Loop is null && !IsLooping)
+                return;
+            Loop = null;
+            IsLooping = false;
+        }
+
+        (double Start, double End)? ILoopSpan.Span => Loop is { } loop ? (loop.Start, loop.End) : null;
+
+        void ILoopSpan.DragTo(double start, double end) => DragLoop(start, end);
+
+        void ILoopSpan.Define(double start, double end) => SetLoop(start, end);
+
+        void ILoopSpan.Clear() => ClearLoop();
 
         /// <summary>Takes the notes' hit sounds, in audio time, which play while <see cref="IsHitSoundsOn"/>.</summary>
         public void SetHits(IReadOnlyList<NoteHit> hits)
@@ -400,8 +435,9 @@ namespace ChartBuilder.ViewModels
                 return;
 
             SeekTo(Math.Min(position, LengthSeconds));
+            // Straight to playing, not the play button's path: carrying on after a reload isn't the user starting the song, so no countdown.
             if (wasPlaying)
-                PlayPauseCommand.Execute(null);
+                StartPlayback();
         }
 
         /// <inheritdoc/>
@@ -453,6 +489,22 @@ namespace ChartBuilder.ViewModels
                 SetPlaying(false);
                 return;
             }
+
+            if (DeferPlayStart?.Invoke(StartPlayback) == true)
+                return;
+            StartPlayback();
+        }
+
+        /// <summary>
+        /// Asked before the song starts from the play button or key, with what starts it. Returns true when it took the start
+        /// over, to call that later or never, as a countdown does; false to start the song now.
+        /// </summary>
+        public Func<Action, bool>? DeferPlayStart { get; set; }
+
+        private void StartPlayback()
+        {
+            if (_player is not { IsPlaying: false } player)
+                return;
 
             // The volumes may have changed in Settings since.
             RefreshMasterVolume();

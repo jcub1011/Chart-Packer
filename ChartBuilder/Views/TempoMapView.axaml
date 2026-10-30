@@ -2,6 +2,8 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:ChartBuilder.ViewModels"
              xmlns:res="using:ChartBuilder.Resources"
+             xmlns:svc="using:ChartBuilder.Services"
+             xmlns:kb="using:ChartShared.UI.Keybinds"
              xmlns:ctl="using:ChartShared.UI.Controls"
              xmlns:sres="using:ChartShared.UI.Resources"
              xmlns:bctl="using:ChartBuilder.Controls"
@@ -76,6 +78,7 @@
             <Setter Property="FontSize" Value="12" />
             <Setter Property="FontFeatures" Value="tnum" />
             <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
         </Style>
     </UserControl.Styles>
 
@@ -250,12 +253,22 @@
                         </WrapPanel>
                     </StackPanel>
 
-                    <TextBlock DockPanel.Dock="Bottom"
-                               Classes="muted"
-                               FontSize="11"
-                               Margin="12,4,12,8"
-                               TextWrapping="Wrap"
-                               Text="{x:Static res:Strings.TempoMapKeysHint}" />
+                    <StackPanel DockPanel.Dock="Bottom" Margin="12,4,12,8" Spacing="2">
+                        <TextBlock Classes="muted"
+                                   FontSize="11"
+                                   TextWrapping="Wrap"
+                                   kb:Shortcut.Action="{x:Static svc:BuilderKeys.TempoChangeNext}"
+                                   kb:Shortcut.Text="{x:Static res:Strings.TempoMapKeysHint}" />
+                        <TextBlock Classes="muted"
+                                   FontSize="11"
+                                   TextWrapping="Wrap"
+                                   kb:Shortcut.Action="{x:Static svc:BuilderKeys.TempoChangePrevious}"
+                                   kb:Shortcut.Text="{x:Static res:Strings.TempoMapPreviousKeysHint}" />
+                        <TextBlock Classes="muted"
+                                   FontSize="11"
+                                   TextWrapping="Wrap"
+                                   Text="{x:Static res:Strings.TempoMapToolHint}" />
+                    </StackPanel>
 
                     <!-- One virtualizing list, so only the rows on screen are made. Not a ListBox, whose keys would take the
                          fields' arrows. A row's right-click menu goes to it, moves it to the playhead or deletes it. -->
@@ -276,13 +289,22 @@
                                         </Border.ContextMenu>
                                         <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="6" RowSpacing="4">
                                             <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal" Spacing="4">
-                                                <TextBox Name="BpmBox"
-                                                         Classes="tempo-field"
-                                                         Width="64"
-                                                         Text="{Binding BpmText, UpdateSourceTrigger=LostFocus}"
-                                                         PlaceholderText="{Binding BpmInForce}"
-                                                         ToolTip.Tip="{x:Static res:Strings.TempoMapBpmToolTip}"
-                                                         AutomationProperties.Name="{x:Static res:Strings.PropertiesBpmLabel}" />
+                                                <NumericUpDown Name="BpmBox"
+                                                               Width="76"
+                                                               MinHeight="26"
+                                                               FontSize="12"
+                                                               VerticalAlignment="Center"
+                                                               ShowButtonSpinner="False"
+                                                               ctl:DragScrub.IsEnabled="True"
+                                                               ctl:DragScrub.Step="0.1"
+                                                               Increment="0.1"
+                                                               Minimum="{x:Static vm:TempoMapViewModel.MinBpm}"
+                                                               Maximum="60000000"
+                                                               FormatString="0.###"
+                                                               Value="{Binding Bpm}"
+                                                               PlaceholderText="{Binding BpmInForce}"
+                                                               ToolTip.Tip="{x:Static res:Strings.TempoMapBpmToolTip}"
+                                                               AutomationProperties.Name="{x:Static res:Strings.PropertiesBpmLabel}" />
                                                 <TextBlock Classes="muted" FontSize="11" VerticalAlignment="Center" Text="{x:Static res:Strings.TempoMapBpmLabel}" />
                                                 <!-- The time signature: a pill that opens its editor, the common ones a click away. -->
                                                 <Button Name="SignatureButton"
@@ -410,12 +432,22 @@
                                                        Text="{Binding Where}" />
                                             <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="4">
                                                 <TextBlock Classes="muted" FontSize="11" VerticalAlignment="Center" Text="{x:Static res:Strings.SectionsTickLabel}" />
-                                                <TextBox Classes="tempo-field"
-                                                         Width="76"
-                                                         IsEnabled="{Binding CanRemove}"
-                                                         Text="{Binding TickText, UpdateSourceTrigger=LostFocus}"
-                                                         ToolTip.Tip="{x:Static res:Strings.TempoMapTickToolTip}"
-                                                         AutomationProperties.Name="{x:Static res:Strings.SectionsTickLabel}" />
+                                                <NumericUpDown Name="TickBox"
+                                                               Width="76"
+                                                               MinHeight="26"
+                                                               FontSize="12"
+                                                               VerticalAlignment="Center"
+                                                               ShowButtonSpinner="False"
+                                                               ctl:DragScrub.IsEnabled="True"
+                                                               ctl:DragScrub.Step="1"
+                                                               Increment="1"
+                                                               Minimum="0"
+                                                               FormatString="0"
+                                                               ParsingNumberStyle="Integer"
+                                                               IsEnabled="{Binding CanRemove}"
+                                                               Value="{Binding TickValue}"
+                                                               ToolTip.Tip="{x:Static res:Strings.TempoMapTickToolTip}"
+                                                               AutomationProperties.Name="{x:Static res:Strings.SectionsTickLabel}" />
                                             </StackPanel>
                                         </Grid>
                                     </Border>

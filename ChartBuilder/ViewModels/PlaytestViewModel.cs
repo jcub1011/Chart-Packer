@@ -10,6 +10,8 @@ using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charting.Playtest;
 using ChartShared.Core.Charts;
 using ChartShared.Core.Input;
+using ChartShared.Core.Keybinds;
+using ChartShared.UI.Keybinds;
 using ChartShared.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -172,12 +174,13 @@ namespace ChartBuilder.ViewModels
 
         /// <summary>
         /// Plays <paramref name="key"/> while a lane is playtested: a key bound to the lane's instrument plays, and is taken
-        /// from the editor. Space, Esc, P and N, and keys with Ctrl or Alt, are always the editor's.
+        /// from the editor. The keys the editor reserves for itself during a playtest (Space, Esc, P and N unless they've been
+        /// rebound; <see cref="KeyAction.ReservedDuringPlaytest"/>), and keys with Ctrl or Alt, are always the editor's.
         /// </summary>
         /// <returns>Whether the key is taken.</returns>
         public bool HandleKey(PhysicalKey key, KeyModifiers modifiers, bool down)
         {
-            if (!IsActive || _devices() is not { } player || key is PhysicalKey.Space or PhysicalKey.Escape or PhysicalKey.P or PhysicalKey.N)
+            if (!IsActive || _devices() is not { } player || AppKeys.Map.IsReservedDuringPlaytest(new KeyChord(key.ToString(), KeyMods.None)))
                 return false;
             if (down && (modifiers & (KeyModifiers.Control | KeyModifiers.Alt | KeyModifiers.Meta)) != 0)
                 return false;

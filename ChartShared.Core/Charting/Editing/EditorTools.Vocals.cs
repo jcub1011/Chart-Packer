@@ -35,6 +35,16 @@ public sealed partial class EditorTools
     {
         Cancel();
         _modifiers = modifiers;
+
+        // The Loop tool's press, or L held: the loop region covers the whole song, so it's drawn and taken hold of here
+        // too, rather than the part's notes being edited. As in a highway's lane, only inside the rows: the phrase strip
+        // and the margins beyond the highest and lowest pitch aren't its business.
+        if (LoopActive)
+        {
+            _gesture = point.InPhrases || point.Pitch is null ? null : PressLoop(point.Tick, point.Tolerance);
+            return;
+        }
+
         if (VocalContentOrSay(point.Track) is not { } content)
             return;
         bool shift = modifiers.HasFlag(EditorModifiers.Shift);
@@ -58,13 +68,15 @@ public sealed partial class EditorTools
     /// <summary>
     /// Starts erasing at <paramref name="point"/> in a vocal part's lane, as the middle button does: each note the pointer
     /// passes over goes, with its lyrics, and in the phrase strip each phrase, as one step. With the Tempo tool, it removes
-    /// the tempo marker there instead.
+    /// the tempo marker there instead, and with the Loop tool active, it takes the loop region away.
     /// </summary>
     public void PressErase(VocalPoint point)
     {
         Cancel();
         _modifiers = EditorModifiers.None;
-        if (_session.Tool == EditorTool.Tempo)
+        if (LoopActive)
+            _session.ClearLoop();
+        else if (_session.Tool == EditorTool.Tempo)
             RemoveTempoNear(point.Tick, point.Tolerance);
         else if (VocalContentOrSay(point.Track) is { } content)
             _gesture = new VocalEraseGesture(this, point, content);

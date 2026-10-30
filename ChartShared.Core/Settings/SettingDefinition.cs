@@ -1,4 +1,5 @@
 using System.Globalization;
+using ChartShared.Core.Charting;
 
 namespace ChartShared.Core.Settings;
 
@@ -109,6 +110,15 @@ public sealed class RangeSetting : SettingDefinition<double>
 
     public string FormatValue(double value) =>
         Format is { } format ? format(value) : value.ToString(CultureInfo.CurrentCulture);
+}
+
+/// <summary>
+/// How far ahead of its strike line a highway shows, in seconds (<see cref="HighwayLookAhead"/>), edited with the slider every
+/// highway's look-ahead is set with: the same range, grain and scale wherever it's shown.
+/// </summary>
+public sealed class LookAheadSetting : SettingDefinition<double>
+{
+    public override double Coerce(double value) => HighwayLookAhead.Clamp(value, DefaultValue);
 }
 
 /// <summary>One of a fixed list of values.</summary>

@@ -22,8 +22,8 @@ namespace ChartBuilder.ViewModels
     public sealed class TempoChangeItem : ObservableObject
     {
         private readonly TempoMapViewModel _owner;
-        private string _bpmText = "";
-        private string _tickText = "";
+        private decimal? _bpm;
+        private decimal? _tickValue;
         private string _where;
         private bool _isCurrent;
         private decimal? _editNumerator;
@@ -52,6 +52,19 @@ namespace ChartBuilder.ViewModels
         /// <summary>Whether its fields are filled again at the next refresh whatever's typed in them, after an edit of its own.</summary>
         internal bool IsStale { get; set; }
 
+        /// <summary>Whether a BPM typed or scrubbed in it is still to be applied, so a refresh leaves it alone.</summary>
+        internal bool IsBpmPending { get; set; }
+
+        /// <summary>Whether its tick scrubbed or typed is still to be applied, so a refresh leaves it alone.</summary>
+        internal bool IsTickPending { get; set; }
+
+        /// <summary>Shows the tick the chart has again, taking back one scrubbed or typed but not applied.</summary>
+        internal void RestoreTick()
+        {
+            _tickValue = Row.Tick;
+            OnPropertyChanged(nameof(TickValue));
+        }
+
         public long Tick => Row.Tick;
 
         public bool HasTempo => Row.HasTempo;
@@ -70,15 +83,15 @@ namespace ChartBuilder.ViewModels
         /// <summary>Whether ✕ asks which of the tempo and the time signature to remove.</summary>
         public bool RemovesEither => CanRemove && Row.HasTempo && Row.HasSignature;
 
-        /// <summary>The tempo marker's BPM, typed to change it; empty when there's none here.</summary>
-        public string BpmText
+        /// <summary>The tempo marker's BPM, edited to change it; null when there's none here.</summary>
+        public decimal? Bpm
         {
-            get => _bpmText;
+            get => _bpm;
             set
             {
-                if (value == _bpmText)
+                if (value == _bpm)
                     return;
-                _bpmText = value;
+                _bpm = value;
                 OnPropertyChanged();
                 _owner.SetBpm(this, value);
             }
@@ -122,17 +135,17 @@ namespace ChartBuilder.ViewModels
         /// <summary>The note values a beat can be, the one in force among them.</summary>
         public IReadOnlyList<int> Denominators { get; private set; } = [];
 
-        /// <summary>Its tick, which is typed to move it.</summary>
-        public string TickText
+        /// <summary>Its tick, which is scrubbed or typed to move it.</summary>
+        public decimal? TickValue
         {
-            get => _tickText;
+            get => _tickValue;
             set
             {
-                if (value == _tickText)
+                if (value == _tickValue)
                     return;
-                _tickText = value;
+                _tickValue = value;
                 OnPropertyChanged();
-                _owner.Move(this, value);
+                _owner.SetTick(this, value);
             }
         }
 
@@ -224,9 +237,9 @@ namespace ChartBuilder.ViewModels
             OnPropertyChanged(nameof(BpmInForce));
             OnPropertyChanged(nameof(SignatureText));
 
-            string bpm = row.Tempo is { } tempo ? TempoMapViewModel.BpmText(tempo.MicrosecondsPerQuarter) : "";
-            if (force || bpm != _bpmText)
-                SetField(ref _bpmText, bpm, nameof(BpmText));
+            decimal? bpm = row.Tempo is { } tempo ? TempoMapViewModel.BpmValueOf(tempo.MicrosecondsPerQuarter) : null;
+            if (!IsBpmPending && (force || bpm != _bpm))
+                SetField(ref _bpm, bpm, nameof(Bpm));
 
             // The time signature editor's note values, with the one here among them.
             int denominator = row.Signature?.Denominator ?? row.SignatureInForce.Denominator;
@@ -236,9 +249,9 @@ namespace ChartBuilder.ViewModels
                 OnPropertyChanged(nameof(Denominators));
             }
 
-            string tick = row.Tick.ToString(CultureInfo.CurrentCulture);
-            if (force || tick != _tickText)
-                SetField(ref _tickText, tick, nameof(TickText));
+            decimal tickValue = row.Tick;
+            if (!IsTickPending && (force || tickValue != _tickValue))
+                SetField(ref _tickValue, tickValue, nameof(TickValue));
         }
 
         // Sets a field and says so, without the edit its setter makes.
@@ -275,6 +288,9 @@ namespace ChartBuilder.ViewModels
         /// <summary>The time signatures Add time signature offers, before Custom….</summary>
         private static readonly (int Numerator, int Denominator)[] CommonSignatures = [(2, 4), (3, 4), (4, 4), (5, 4), (6, 8), (7, 8), (12, 8)];
 
+        // How long a field typed or scrubbed is left alone before it's applied, so a drag is one undoable step.
+        private static readonly TimeSpan FieldTypingDelay = TimeSpan.FromMilliseconds(600);
+
         /// <summary>The common time signatures as they're written, e.g. "6/8", which a row's time signature editor offers.</summary>
         internal static readonly IReadOnlyList<string> SignaturePresets =
             [.. CommonSignatures.Select(s => string.Format(CultureInfo.InvariantCulture, "{0}/{1}", s.Numerator, s.Denominator))];
@@ -285,6 +301,16 @@ namespace ChartBuilder.ViewModels
         private TempoChangeItem? _current;
         private bool _scheduled;
         private bool _disposed;
+
+        // A BPM scrubbed or typed, shown on the chart at once, and applied once it's been left alone.
+        private readonly DispatcherTimer _bpmApply;
+        private (TempoChangeItem Item, decimal? Bpm)? _pendingBpm;
+        private bool _bpmPreviewing;
+
+        // A tick scrubbed or typed, shown on the chart at once, and applied once it's been left alone.
+        private readonly DispatcherTimer _tickApply;
+        private (TempoChangeItem Item, decimal? Tick)? _pendingTick;
+        private bool _tickPreviewing;
 
         // A change added to be typed into, whose field is edited once it's listed.
         private (long Tick, TempoField Field)? _editNext;
@@ -300,6 +326,10 @@ namespace ChartBuilder.ViewModels
         {
             _editor = editor;
             ChartSettings = chartSettings;
+            _bpmApply = new DispatcherTimer(FieldTypingDelay, DispatcherPriority.Background, (_, _) => ApplyBpm());
+            _bpmApply.Stop();
+            _tickApply = new DispatcherTimer(FieldTypingDelay, DispatcherPriority.Background, (_, _) => ApplyTick());
+            _tickApply.Stop();
             AddSignatureMenu =
             [
                 .. CommonSignatures.Select(s => LaneMenuItem.Choice(
@@ -339,9 +369,28 @@ namespace ChartBuilder.ViewModels
         internal static string BpmText(long microsecondsPerQuarter) =>
             EditableTempoMap.BpmOf(microsecondsPerQuarter).ToString("0.###", CultureInfo.CurrentCulture);
 
+        /// <summary>
+        /// A tempo in beats per minute for the BPM box, to three decimals as it's shown, e.g. 120 or 96.5.
+        /// </summary>
+        internal static decimal BpmValueOf(long microsecondsPerQuarter) =>
+            Math.Round((decimal)EditableTempoMap.BpmOf(microsecondsPerQuarter), 3, MidpointRounding.AwayFromZero);
+
+        /// <summary>
+        /// The slowest tempo the BPM box offers, in beats per minute: a beat as long as MIDI can hold, rounded up to the
+        /// three decimals it shows, so that what it holds can always be applied.
+        /// </summary>
+        public static decimal MinBpm =>
+            Math.Ceiling((decimal)(60_000_000.0 / EditableTempoMap.MaxMicrosecondsPerQuarter * 1000)) / 1000;
+
         public void Dispose()
         {
+            ClearBpmPreview();
+            ClearTickPreview();
             _disposed = true;
+            _bpmApply.Stop();
+            _pendingBpm = null;
+            _tickApply.Stop();
+            _pendingTick = null;
             Session.ChartChanged -= OnChartChanged;
             Session.SongSettingsChanged -= OnSongSettingsChanged;
             Session.Viewport.Changed -= OnCursorChanged;
@@ -381,6 +430,7 @@ namespace ChartBuilder.ViewModels
         /// <summary>Moves the cursor to <paramref name="item"/>'s change, and selects its tempo marker when it has one.</summary>
         internal void GoTo(TempoChangeItem item)
         {
+            FlushPending();
             Session.MoveCursorTo(item.Tick);
             if (item.HasTempo)
                 Session.Selection.SelectTempos([item.Tick]);
@@ -388,6 +438,7 @@ namespace ChartBuilder.ViewModels
 
         internal void Remove(TempoChangeItem item)
         {
+            FlushPending();
             if (item.HasTempo)
                 RemoveTempo(item);
             else if (item.HasSignature)
@@ -396,47 +447,159 @@ namespace ChartBuilder.ViewModels
 
         internal void RemoveTempo(TempoChangeItem item)
         {
+            FlushPending();
             long tick = item.Tick;
             Edit(item, blocked => TempoMapEdits.RemoveMarker(Session.Chart, tick, Session.Delay, Session.KeepTimes, blocked));
         }
 
         internal void RemoveBoth(TempoChangeItem item)
         {
+            FlushPending();
             long tick = item.Tick;
             Edit(item, blocked => TempoMapEdits.RemoveChange(Session.Chart, tick, Session.Delay, Session.KeepTimes, blocked));
         }
 
-        internal void RemoveSignature(TempoChangeItem item) => Execute(item, TempoMapEdits.RemoveSignature(Session.Chart, item.Tick));
+        internal void RemoveSignature(TempoChangeItem item)
+        {
+            FlushPending();
+            Execute(item, TempoMapEdits.RemoveSignature(Session.Chart, item.Tick));
+        }
 
-        internal void ToggleAnchor(TempoChangeItem item) =>
+        internal void ToggleAnchor(TempoChangeItem item)
+        {
+            FlushPending();
             Execute(item, TempoMapEdits.SetAnchored(Session.Chart, item.Tick, !item.IsAnchored, Session.Delay));
+        }
 
         /// <summary>
-        /// Sets the tempo from <paramref name="item"/>'s tick to the BPM typed, adding a tempo marker there when there's
-        /// none; an empty field removes the marker. Anything else typed is put back.
+        /// Takes back the BPM typed at <paramref name="item"/> but not yet applied, showing the tempo the chart has.
         /// </summary>
-        internal void SetBpm(TempoChangeItem item, string text)
+        internal void RevertBpm(TempoChangeItem item) => CancelPendingBpm(item);
+
+        // Forgets a BPM scrubbed or typed in this row, showing the tempo the chart has again. Another row's is left alone.
+        private void CancelPendingBpm(TempoChangeItem item)
         {
-            long tick = item.Tick;
-            if (string.IsNullOrWhiteSpace(text))
+            if (_pendingBpm is { } pending && ReferenceEquals(pending.Item, item))
             {
-                if (item.HasTempo)
+                _pendingBpm = null;
+                _bpmApply.Stop();
+                item.IsBpmPending = false;
+                ClearBpmPreview();
+            }
+
+            item.IsStale = true;
+            Schedule();
+        }
+
+        /// <summary>
+        /// Takes up the BPM scrubbed or typed at <paramref name="item"/>'s row: the chart shows it at once, and it's put on
+        /// the undo stack once it's been left alone, so a drag or a burst of typing is one undoable tempo edit. A row
+        /// changed before it's applied takes its own BPM.
+        /// </summary>
+        internal void SetBpm(TempoChangeItem item, decimal? bpm)
+        {
+            if (_pendingTick is not null)
+                ApplyTick();
+            if (_pendingBpm is { } pending && !ReferenceEquals(pending.Item, item))
+                ApplyBpm();
+
+            _pendingBpm = (item, bpm);
+            item.IsBpmPending = true;
+            PreviewBpm(item, bpm);
+            _bpmApply.Stop();
+            _bpmApply.Start();
+        }
+
+        // Shows the tempo the BPM makes on the chart, without putting it on the undo stack, so a drag is seen as it's made.
+        private void PreviewBpm(TempoChangeItem item, decimal? bpm)
+        {
+            ClearBpmPreview();
+            TempoEdit edit;
+            long tick = item.Tick;
+            if (bpm is not { } value)
+            {
+                if (Session.Chart.TempoMap.Tempos.At(tick).IsEmpty)
+                    return;
+                edit = TempoMapEdits.RemoveMarker(Session.Chart, tick, Session.Delay, Session.KeepTimes);
+            }
+            else
+            {
+                long tempo;
+                try
+                {
+                    tempo = EditableTempoMap.MicrosecondsPerQuarterOf((double)Math.Round(value, 3));
+                }
+                catch (ArgumentOutOfRangeException)
+                {
+                    Session.Status = Strings.PropertiesBadBpm;
+                    return;
+                }
+
+                if (!Session.Chart.TempoMap.Tempos.At(tick).IsEmpty && TempoMapEdits.TempoAt(Session.Chart.TempoMap, tick) == tempo)
+                    return;
+                edit = TempoMapEdits.PlaceBpm(Session.Chart, tick, tempo, Session.Delay, Session.KeepTimes);
+            }
+
+            if (edit.IsRefused)
+            {
+                // An anchor it can't keep is offered a way out once the value settles; anything else says why now.
+                if (edit.Blocking is null)
+                    Session.Status = edit.Refusal;
+                return;
+            }
+
+            if (Session.Preview(edit.Command))
+                _bpmPreviewing = true;
+        }
+
+        // Takes the shown BPM off the chart again, leaving the tempo it had.
+        private void ClearBpmPreview()
+        {
+            if (!_bpmPreviewing)
+                return;
+            _bpmPreviewing = false;
+            Session.Preview(null);
+        }
+
+        // Applies the BPM last typed or scrubbed: adding a marker when there's none, changing it when there is, and
+        // removing it when the field is emptied.
+        private void ApplyBpm()
+        {
+            _bpmApply.Stop();
+            if (_pendingBpm is not { } pending)
+                return;
+            _pendingBpm = null;
+            if (_disposed)
+                return;
+
+            var item = pending.Item;
+            item.IsBpmPending = false;
+
+            // The value shown is the one settled on: put it on the undo stack as one step.
+            if (_bpmPreviewing)
+            {
+                _bpmPreviewing = false;
+                if (Session.CommitPreview() is not null)
+                {
+                    Edited(item);
+                    return;
+                }
+            }
+
+            long tick = item.Tick;
+            if (pending.Bpm is not { } bpm)
+            {
+                if (!Session.Chart.TempoMap.Tempos.At(tick).IsEmpty)
                     RemoveTempo(item);
                 else
                     Edited(item);
                 return;
             }
 
-            if (!double.TryParse(text, NumberStyles.Float, CultureInfo.CurrentCulture, out double bpm))
-            {
-                Edited(item);
-                return;
-            }
-
             long tempo;
             try
             {
-                tempo = EditableTempoMap.MicrosecondsPerQuarterOf(Math.Round(bpm, 3));
+                tempo = EditableTempoMap.MicrosecondsPerQuarterOf((double)Math.Round(bpm, 3));
             }
             catch (ArgumentOutOfRangeException)
             {
@@ -445,7 +608,7 @@ namespace ChartBuilder.ViewModels
                 return;
             }
 
-            if (item.Row.Tempo is { } placed && placed.MicrosecondsPerQuarter == tempo)
+            if (!Session.Chart.TempoMap.Tempos.At(tick).IsEmpty && TempoMapEdits.TempoAt(Session.Chart.TempoMap, tick) == tempo)
             {
                 Edited(item);
                 return;
@@ -456,6 +619,7 @@ namespace ChartBuilder.ViewModels
 
         private void PlaceSignature(TempoChangeItem item, int numerator, int denominator)
         {
+            FlushPending();
             var signature = item.Row.Signature;
             if (signature is { } placed && placed.Numerator == numerator && placed.Denominator == denominator)
             {
@@ -494,22 +658,132 @@ namespace ChartBuilder.ViewModels
         /// </summary>
         internal void MoveToPlayhead(TempoChangeItem item)
         {
+            FlushPending();
             long to = Session.CursorTick;
             if (!item.CanRemove || to == item.Tick)
                 return;
             _ = MoveAsync(item, to);
         }
 
-        /// <summary>Moves <paramref name="item"/>'s tempo marker and time signature to the tick typed; anything else typed is put back.</summary>
-        internal void Move(TempoChangeItem item, string text)
+        /// <summary>
+        /// Takes up the tick scrubbed or typed at <paramref name="item"/>'s row, to apply once it's been left alone, so a
+        /// drag is one undoable step. A row changed before it's applied takes its own tick.
+        /// </summary>
+        internal void SetTick(TempoChangeItem item, decimal? tick)
         {
-            if (!long.TryParse(text, NumberStyles.Integer, CultureInfo.CurrentCulture, out long to) || to == item.Tick)
+            if (_pendingBpm is not null)
+                ApplyBpm();
+            if (_pendingTick is { } pending && !ReferenceEquals(pending.Item, item))
+                ApplyTick();
+
+            _pendingTick = (item, tick);
+            item.IsTickPending = true;
+            PreviewTick(item, tick);
+            _tickApply.Stop();
+            _tickApply.Start();
+        }
+
+        // Shows the change at the tick scrubbed or typed on the chart, without putting it on the undo stack.
+        private void PreviewTick(TempoChangeItem item, decimal? tick)
+        {
+            ClearTickPreview();
+            if (tick is not { } value || value < 0 || value > long.MaxValue || value != Math.Floor(value))
+                return;
+
+            long to = (long)value;
+            if (to == item.Tick || !item.CanRemove)
+                return;
+
+            var edit = TempoMapEdits.MoveChange(Session.Chart, item.Tick, to, Session.Delay, Session.KeepTimes);
+            if (edit.IsRefused)
             {
+                // An anchor it can't keep is offered a way out once the value settles; anything else says why now.
+                if (edit.Blocking is null)
+                    Session.Status = edit.Refusal;
+                return;
+            }
+
+            if (Session.Preview(edit.Command))
+                _tickPreviewing = true;
+        }
+
+        // Takes the shown tick off the chart again, leaving the change where it was.
+        private void ClearTickPreview()
+        {
+            if (!_tickPreviewing)
+                return;
+            _tickPreviewing = false;
+            Session.Preview(null);
+        }
+
+        // Moves the marker and time signature to the tick scrubbed or typed: anything else is put back.
+        private void ApplyTick()
+        {
+            _tickApply.Stop();
+            if (_pendingTick is not { } pending)
+                return;
+            _pendingTick = null;
+            if (_disposed)
+                return;
+
+            var item = pending.Item;
+            item.IsTickPending = false;
+            if (pending.Tick is not { } value || value < 0 || value > long.MaxValue || value != Math.Floor(value))
+            {
+                ClearTickPreview();
                 Edited(item);
                 return;
             }
 
+            long to = (long)value;
+            if (to == item.Tick || !item.CanRemove)
+            {
+                ClearTickPreview();
+                Edited(item);
+                return;
+            }
+
+            // The tick shown is the one settled on: put it on the undo stack as one step.
+            if (_tickPreviewing)
+            {
+                _tickPreviewing = false;
+                if (Session.CommitPreview() is not null)
+                {
+                    item.Rekey(to);
+                    Edited(item);
+                    return;
+                }
+            }
+
             _ = MoveAsync(item, to);
+        }
+
+        /// <summary>Takes back a tick scrubbed or typed but not yet applied, showing the tick the chart has.</summary>
+        internal void RevertTick(TempoChangeItem item) => CancelPendingTick(item);
+
+        // Forgets a tick scrubbed or typed in this row, so a button pressed next doesn't apply it afterwards. The list is
+        // refreshed as it then is, as a refresh asked for while the tick was pending was left to this.
+        private void CancelPendingTick(TempoChangeItem item)
+        {
+            if (_pendingTick is not { } pending || !ReferenceEquals(pending.Item, item))
+                return;
+            _pendingTick = null;
+            _tickApply.Stop();
+            item.IsTickPending = false;
+            ClearTickPreview();
+            item.RestoreTick();
+            Schedule();
+        }
+
+        // Applies a BPM or tick scrubbed or typed but not yet settled, as one undo step, before another change is made:
+        // the change shown is put on the undo stack over the chart as it is then, so a commit can't take back what's
+        // been done meanwhile.
+        private void FlushPending()
+        {
+            if (_pendingTick is not null)
+                ApplyTick();
+            if (_pendingBpm is not null)
+                ApplyBpm();
         }
 
         private async Task MoveAsync(TempoChangeItem item, long to)
@@ -549,6 +823,10 @@ namespace ChartBuilder.ViewModels
 
         private void OnChartChanged(object? sender, EditorChartChangedEventArgs e)
         {
+            // A tick being scrubbed moves the row, which is put back in order once it settles; a refresh asked for
+            // meanwhile is made then, or when the tick is taken back.
+            if (_pendingTick is not null)
+                return;
             if (e.Affected.TempoMapChanged)
                 Schedule();
         }
@@ -570,7 +848,8 @@ namespace ChartBuilder.ViewModels
         private void Refresh()
         {
             _scheduled = false;
-            if (_disposed)
+            // A tick being scrubbed is put back in order once it settles, or when it's taken back, which asks again.
+            if (_disposed || _pendingTick is not null)
                 return;
 
             var map = Session.TempoMap;

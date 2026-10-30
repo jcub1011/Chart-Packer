@@ -10,6 +10,11 @@ namespace ChartShared.Core.Charts;
 /// </remarks>
 internal static class SustainCutoff
 {
+    /// <summary>
+    /// The shortest hold Chart Builder treats as a sustain: shorter is a plain note, in the editor and in what it saves.
+    /// </summary>
+    public const long MinimumSustain = 10;
+
     /// <summary>The shortest a sustain is written: longer than a cutoff of 2, which a one-tick note is shorter than.</summary>
     public const long ShortestSustain = 3;
 
@@ -26,6 +31,15 @@ internal static class SustainCutoff
     /// </summary>
     public static long? For(int resolution, long? shortest) =>
         shortest is { } ticks && ticks <= resolution / 3 ? Math.Max(ShortestSustain - 1, ticks - 1) : null;
+
+    /// <summary>
+    /// The cutoff Chart Builder saves for a chart of <paramref name="resolution"/> whose shortest sustain is
+    /// <paramref name="shortest"/>: a third of a beat when every sustain is longer than one, otherwise a tick under
+    /// the shortest, which YARG (<c>length &lt; cutoff</c>) and Clone Hero (<c>length &lt;= cutoff</c>) both keep.
+    /// Null when the chart has no sustains.
+    /// </summary>
+    public static long? ForChartBuilder(int resolution, long? shortest) =>
+        shortest is { } ticks ? Math.Max(ShortestSustain - 1, Math.Min(resolution / 3, ticks - 1)) : null;
 
     /// <summary>The pitches of a fret track's gems, every difficulty's; its open notes only with <c>ENHANCED_OPENS</c>.</summary>
     public static HashSet<int> GemPitches(ChartInstrumentKind kind, bool enhancedOpens)

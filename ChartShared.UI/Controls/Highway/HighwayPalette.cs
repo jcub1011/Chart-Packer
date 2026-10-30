@@ -11,6 +11,9 @@ namespace ChartShared.UI.Controls.Highway
     public static class HighwayPalette
     {
         public static readonly Color StarPower = Color.FromRgb(0x7F, 0xE9, 0xFF);
+
+        /// <summary>The amber a generated phrase is proposed in, which no phrase of the chart is drawn in.</summary>
+        public static readonly Color Proposal = Color.FromRgb(0xFF, 0xB0, 0x00);
         public static readonly Color Open = Color.FromRgb(0xB0, 0x4C, 0xE0);
         public static readonly Color Kick = Color.FromRgb(0xFB, 0x8C, 0x00);
         public static readonly Color WhiteFret = Color.FromRgb(0xF2, 0xF2, 0xF4);

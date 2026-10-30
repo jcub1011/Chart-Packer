@@ -243,6 +243,22 @@ public sealed class SectionEditingTests
     }
 
     [TestMethod]
+    public void APreviewMovesASectionLiveWithoutAnUndoStep()
+    {
+        var session = Of(WithSections());
+        var section = TextEvent.Of(960, "[section Intro]");
+
+        Assert.IsTrue(session.Tools.PreviewMoveEvent(null, section, 2400));
+        Assert.IsNotNull(session.Chart.Events.FirstOrDefault(e => e.Tick == 2400 && e.Text == section.Text));
+        Assert.AreEqual(0, session.UndoStack.UndoCount);
+
+        session.Preview(null);
+
+        Assert.IsNotNull(session.Chart.Events.FirstOrDefault(e => e.Tick == 960 && e.Text == section.Text));
+        Assert.AreEqual(0, session.UndoStack.UndoCount);
+    }
+
+    [TestMethod]
     [DataRow("[end]")]
     [DataRow("[music_start]")]
     [DataRow(" [music_end] ")]

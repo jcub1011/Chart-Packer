@@ -9,9 +9,9 @@ namespace ChartPacker.Views
 {
     /// <summary>
     /// The Generate lower difficulties window (<see cref="LowerDifficultiesViewModel"/>). It closes once Close is pressed,
-    /// and not while songs are saved. While the preview is shown it takes the width the songs leave, and Space plays or
-    /// pauses and N goes to the next change (Shift+N the one before) (<see cref="ReductionPreviewKeys"/>); hidden, the
-    /// songs take it.
+    /// and not while songs are saved. While the preview is shown it takes the width the songs leave, and the keys for
+    /// play/pause and the next and previous change (Space, N and Shift+N unless rebound) are its
+    /// (<see cref="ReductionPreviewKeys"/>); hidden, the songs take it.
     /// </summary>
     public partial class LowerDifficultiesWindow : Window
     {
@@ -24,6 +24,7 @@ namespace ChartPacker.Views
         {
             InitializeComponent();
             WindowChrome.ShowIcon(this, WindowTitleBar);
+            WindowMemory.Remember(this);
             Opened += (_, _) => WindowChrome.UseDarkTitleBar(this);
             Closed += (_, _) => Watch(null);
             ReductionPreviewKeys.Attach(this, () => _viewModel?.Preview);

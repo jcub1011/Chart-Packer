@@ -206,6 +206,39 @@ public sealed class AudioLatencyFileTests
         Assert.IsTrue(Open().DetectEnabled);
     }
 
+    [TestMethod]
+    public void AWriteStampsTheSchemaVersion()
+    {
+        Assert.IsTrue(Open().Save("Speakers", "{speakers}", 25));
+
+        Assert.AreEqual(AudioLatencyFile.SchemaVersion, (int)Read()["SchemaVersion"]!);
+        Assert.AreEqual(AudioLatencyFile.SchemaVersion, Open().StoredSchemaVersion);
+    }
+
+    [TestMethod]
+    public void ALegacyFileReadsAsVersionZeroAndIsStampedByTheNextWrite()
+    {
+        File.WriteAllText(_path, """{ "byId": { "{a}": 10 } }""");
+        Assert.AreEqual(0, Open().StoredSchemaVersion);
+
+        Assert.IsTrue(Open().SetDetect(false));
+
+        Assert.AreEqual(AudioLatencyFile.SchemaVersion, (int)Read()["SchemaVersion"]!);
+    }
+
+    [TestMethod]
+    public void AFileFromANewerBuildIsLeftUntouched()
+    {
+        const string newer = """{ "byId": { "{a}": 10 }, "SchemaVersion": 7 }""";
+        File.WriteAllText(_path, newer);
+
+        Assert.IsFalse(Open().Save("A", "{a}", 20));
+        Assert.IsFalse(Open().SetDetect(false));
+        Assert.IsFalse(Open().Save("B", null, 5));
+
+        Assert.AreEqual(newer, File.ReadAllText(_path));
+    }
+
     private AudioLatencyFile Open() => new(_path);
 
     private JsonObject Read() => (JsonObject)JsonNode.Parse(File.ReadAllText(_path))!;

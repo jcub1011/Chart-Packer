@@ -1,0 +1,163 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:help="using:ChartShared.Core.Help"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:res="using:ChartShared.UI.Resources"
+        xmlns:ui="using:ChartShared.UI.Controls"
+        mc:Ignorable="d"
+        x:Class="ChartShared.UI.Views.CrashDialog"
+        Background="{DynamicResource AppBackgroundBrush}"
+        Width="580"
+        SizeToContent="Height"
+        CanResize="False"
+        CanMinimize="False"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaTitleBarHeightHint="30"
+        WindowDecorationsTheme="{StaticResource TitleBarDecorations}">
+
+    <Window.Styles>
+        <!-- The exception's type, in code's monospace, on the rose that marks something gone wrong. -->
+        <Style Selector="Border.exception-type">
+            <Setter Property="Background" Value="{DynamicResource ExcludeTintBrush}" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Padding" Value="6,2" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+        </Style>
+        <Style Selector="Border.exception-type SelectableTextBlock">
+            <Setter Property="FontFamily" Value="Consolas, Menlo, monospace" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource ExcludeTextBrush}" />
+        </Style>
+
+        <!-- Show details: a quiet toggle, not a button. Its chevron points right while closed and turns down to open. -->
+        <Style Selector="ToggleButton.disclosure">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="4,3" />
+            <Setter Property="Margin" Value="-4,0,0,0" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+        <Style Selector="ToggleButton.disclosure:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+        </Style>
+        <Style Selector="ToggleButton.disclosure:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ToolPressedBrush}" />
+        </Style>
+        <Style Selector="ToggleButton.disclosure:checked /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+        </Style>
+        <Style Selector="ToggleButton.disclosure:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+        </Style>
+        <Style Selector="ToggleButton.disclosure ui|LineIcon">
+            <Setter Property="Width" Value="12" />
+            <Setter Property="Height" Value="12" />
+            <Setter Property="RenderTransform" Value="rotate(-90deg)" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.12" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="ToggleButton.disclosure:checked ui|LineIcon">
+            <Setter Property="RenderTransform" Value="rotate(0deg)" />
+        </Style>
+    </Window.Styles>
+
+    <!-- The title bar, as the main windows' is; what happened, and the error with what can be done with it; then the two
+         choices in the footer. -->
+    <DockPanel>
+        <ui:TitleBar x:Name="WindowTitleBar"
+                     HelpPage="{x:Static help:HelpPages.CrashDialog}"
+                     DockPanel.Dock="Top"
+                     Height="31"
+                     BorderThickness="0,0,0,1"
+                     BorderBrush="{DynamicResource SubtleBorderBrush}">
+            <TextBlock x:Name="TitleText"
+                       Margin="8,0,12,0"
+                       FontSize="12"
+                       VerticalAlignment="Center"
+                       TextTrimming="CharacterEllipsis" />
+        </ui:TitleBar>
+
+        <Border DockPanel.Dock="Bottom" Classes="toolbar" BorderThickness="0,1,0,0">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+                <Button x:Name="QuitButton" Classes="labelled" Click="OnQuit" />
+                <!-- Keeping working is the default, so Enter and Escape both choose it, as closing the dialog does. -->
+                <Button x:Name="KeepWorkingButton"
+                        Classes="labelled accent"
+                        IsDefault="True"
+                        IsCancel="True"
+                        Click="OnKeepWorking" />
+            </StackPanel>
+        </Border>
+
+        <StackPanel Margin="20,18,20,20" Spacing="16">
+            <StackPanel Spacing="6">
+                <TextBlock Text="{x:Static res:SharedStrings.CrashDialogHeading}"
+                           FontSize="16"
+                           FontWeight="SemiBold"
+                           TextWrapping="Wrap" />
+                <TextBlock Text="{x:Static res:SharedStrings.CrashDialogBody}"
+                           Opacity="0.85"
+                           LineHeight="20"
+                           TextWrapping="Wrap" />
+            </StackPanel>
+
+            <!-- The error: its type, its message, what can be done with it, and its stack behind Show details. The
+                 helpers wrap rather than overlap when their labels are long. -->
+            <Border Classes="severity error"
+                    Background="{DynamicResource SurfaceBrush}"
+                    CornerRadius="0,6,6,0"
+                    Padding="14,12,14,10">
+                <StackPanel Spacing="8">
+                    <Border Classes="exception-type">
+                        <SelectableTextBlock x:Name="TypeText" />
+                    </Border>
+                    <SelectableTextBlock x:Name="MessageText" TextWrapping="Wrap" />
+                    <WrapPanel ItemSpacing="8" LineSpacing="8" Margin="0,4,0,0">
+                        <Button x:Name="CopyButton" Classes="labelled" Click="OnCopy" />
+                        <Button x:Name="LogFolderButton" Classes="labelled" Click="OnOpenLogFolder" />
+                        <Button x:Name="ReportButton" Classes="labelled" Click="OnReport" />
+                    </WrapPanel>
+                    <ToggleButton x:Name="DetailsToggle"
+                                  Classes="disclosure"
+                                  IsCheckedChanged="OnDetailsToggled">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ui:LineIcon Data="{DynamicResource ChevronDownStroke}" />
+                            <TextBlock x:Name="DetailsToggleText" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </ToggleButton>
+                    <Border x:Name="DetailsPanel"
+                            IsVisible="False"
+                            Background="{DynamicResource AppBackgroundBrush}"
+                            BorderBrush="{DynamicResource SubtleBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="4">
+                        <ScrollViewer MaxHeight="240"
+                                      HorizontalScrollBarVisibility="Auto"
+                                      VerticalScrollBarVisibility="Auto">
+                            <SelectableTextBlock x:Name="DetailsText"
+                                                 Margin="10,8"
+                                                 FontFamily="Consolas, Menlo, monospace"
+                                                 FontSize="11"
+                                                 LineHeight="16" />
+                        </ScrollViewer>
+                    </Border>
+                </StackPanel>
+            </Border>
+
+            <TextBlock x:Name="MoreErrorsText"
+                       IsVisible="False"
+                       Foreground="{DynamicResource WarningTextBrush}"
+                       FontSize="12"
+                       TextWrapping="Wrap" />
+        </StackPanel>
+    </DockPanel>
+</Window>

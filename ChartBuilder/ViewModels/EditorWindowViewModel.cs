@@ -10,6 +10,7 @@ using ChartBuilder.Resources;
 using ChartBuilder.Services;
 using ChartShared.Core.Charting;
 using ChartShared.Core.Charting.Commands;
+using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charting.Layout;
 using ChartShared.Core.Charting.Saving;
 using ChartShared.Core.Charts;
@@ -66,7 +67,7 @@ namespace ChartBuilder.ViewModels
             _undo = new ChartUndoStack(song.Chart, startsSaved);
             _undo.Changed += OnChartChanged;
             ChartSettings = new ChartSettingsViewModel(settings, services.Confirmations, song, ApplyChartSettings, () => Editor?.AudioAssist, () => Editor?.Session.ReadOptions);
-            Metadata = new ChartMetadataViewModel(song, ApplyChartSettings);
+            Metadata = new ChartMetadataViewModel(song, ApplyChartSettings, () => Playback.Clock());
             Tracks = new EditorTracksViewModel(song, Playback, services.FilePicker, ApplyChartSettings);
             Art = new ArtViewModel(song, services.ImagePicker, services.FilePicker, ApplyChartSettings, Playback.Clock);
             _tracksTimer = new DispatcherTimer(TracksDelay, DispatcherPriority.Normal, (_, _) => _ = ReloadAudioAsync());
@@ -100,6 +101,14 @@ namespace ChartBuilder.ViewModels
             Song.TracksChanged += OnTracksChanged;
             _ = MeasureAudioAsync();
             StartAutosave();
+
+            // Last, so a constructor that throws leaves nothing in the static clipboard pointing at this one.
+            RefreshEditMenu();
+            Editor.Session.Selection.Changed += OnEditMenuStateChanged;
+            Editor.Session.StateChanged += OnEditMenuStateChanged;
+            Editor.Session.Find.Changed += OnEditMenuStateChanged;
+            ChartClipboard.Shared.Changed += OnEditMenuStateChanged;
+            Editor.PropertyChanged += OnEditorPropertyChanged;
         }
 
         /// <summary>A song opened from a folder or <c>.sng</c> (charter-spec C2).</summary>
@@ -285,11 +294,18 @@ namespace ChartBuilder.ViewModels
                 autosave.Interval = TimeSpan.FromMinutes(_settings.Settings.AutosaveMinutes);
         }
 
+        /// <summary>The Edit menu's Shortcuts: the window where the keyboard shortcuts are changed.</summary>
+        [RelayCommand]
+        private Task OpenShortcutsAsync() => _services.Keybinds.ShowAsync();
+
         /// <summary>
         /// A change from Chart settings or the Art tab (charter-spec C1), as one undoable step. Playback goes on, so the
         /// tempo can be found by ear; the beats follow the change.
         /// </summary>
-        private void ApplyChartSettings(IChartCommand command)
+        private void ApplyChartSettings(IChartCommand command) => TryApplyChartSettings(command);
+
+        /// <summary>As <see cref="ApplyChartSettings"/>; false when the change was refused, so the caller can stop.</summary>
+        private bool TryApplyChartSettings(IChartCommand command)
         {
             try
             {
@@ -300,11 +316,12 @@ namespace ChartBuilder.ViewModels
                 // Refused before anything changed, as every command checks first, so Chart settings shows the chart again.
                 Messages.Error(string.Format(CultureInfo.CurrentCulture, Strings.ChartSettingsNotAppliedFormat, ex.Message));
                 ChartSettings.Reload();
-                return;
+                return false;
             }
 
             if (DrumConversionText.ConversionIn(command) is { Report: { } report } conversion)
                 ReportConversion(conversion, report);
+            return true;
         }
 
         /// <summary>
@@ -337,6 +354,125 @@ namespace ChartBuilder.ViewModels
 
         private static bool IsSongEdit(IChartCommand? command) => command is SongValueCommand or MediaCommand;
 
+        // The Edit menu's items do what the canvas's keys do, on the focused lane and what's selected.
+        private EditorSelection Selection => Editor.Session.Selection;
+
+        private bool CanCopy() => EditMenuState.CanCopy(Selection);
+
+        private bool CanDelete() => EditMenuState.CanDelete(Selection);
+
+        private bool CanQuantize() => EditMenuState.CanQuantize(Selection);
+
+        private bool CanSelectAll() => EditMenuState.CanSelectAll(Editor.Session);
+
+        private bool CanPaste() => EditMenuState.CanPaste(Editor.Session, ChartClipboard.Shared);
+
+        [RelayCommand(CanExecute = nameof(CanCopy))]
+        private void Cut() => Editor.Cut();
+
+        [RelayCommand(CanExecute = nameof(CanCopy))]
+        private void Copy() => Editor.Copy();
+
+        [RelayCommand(CanExecute = nameof(CanPaste))]
+        private Task Paste() => PasteAsMode(PasteMode.Overwrite);
+
+        [RelayCommand(CanExecute = nameof(CanPaste))]
+        private Task PasteMerge() => PasteAsMode(PasteMode.Merge);
+
+        private Task PasteAsMode(PasteMode mode) =>
+            ChartClipboard.Shared.Current is { } clip
+                ? Editor.PasteAsync(mode, EditMenuState.PasteTarget(Editor.Session, clip, null))
+                : Task.CompletedTask;
+
+        [RelayCommand(CanExecute = nameof(CanSelectAll))]
+        private void SelectAll()
+        {
+            var tools = Editor.Session.Tools;
+            if (EditMenuState.SelectAllVocalTarget(Editor.Session) is { } vocal)
+                tools.SelectAllVocals(vocal);
+            else
+                tools.SelectAll();
+        }
+
+        [RelayCommand(CanExecute = nameof(CanDelete))]
+        private void Delete() => Editor.Session.Tools.DeleteSelection();
+
+        [RelayCommand(CanExecute = nameof(CanQuantize))]
+        private void Quantize() => Editor.QuantizeSelection();
+
+        private bool CanStepFind() => EditMenuState.CanStepFind(Editor.Session);
+
+        // Always on, so Ctrl+F with no notes selected says what it needs instead of doing nothing.
+        [RelayCommand]
+        private void FindMatches() => Editor.Navigation.OpenFind();
+
+        [RelayCommand(CanExecute = nameof(CanStepFind))]
+        private void FindNext() => Editor.Navigation.StepFind(1);
+
+        [RelayCommand(CanExecute = nameof(CanStepFind))]
+        private void FindPrevious() => Editor.Navigation.StepFind(-1);
+
+        [RelayCommand]
+        private void GoToMeasure() => Editor.Navigation.OpenGoTo();
+
+        /// <summary>The Edit menu's Quantize, naming the grid it puts the selected notes on.</summary>
+        public string QuantizeMenuHeader => string.Format(CultureInfo.CurrentCulture, Strings.MenuQuantizeFormat, BuilderSettingsCatalog.SnapLabel(Editor.QuantizeGrid.Division));
+
+        [RelayCommand]
+        private void ShowPreview() => Editor.ShowPreviewWindow(Editor.Preview);
+
+        [RelayCommand]
+        private void ShowDifficulty() => Editor.ShowDifficultyWindow(Editor.Difficulty);
+
+        // What the Edit menu's items were last enabled for, so a command is told only when its answer changes: a drag or a
+        // record pass raises the selection's and the session's changes many times a second.
+        private (bool Copy, bool Paste, bool SelectAll, bool Delete, bool Quantize, bool StepFind) _editMenu;
+
+        // What the Edit menu's items are enabled for follows the selection, the lane focused and the clipboard.
+        private void RefreshEditMenu()
+        {
+            var before = _editMenu;
+            _editMenu = (CanCopy(), CanPaste(), CanSelectAll(), CanDelete(), CanQuantize(), CanStepFind());
+            if (_editMenu.Copy != before.Copy)
+            {
+                CutCommand.NotifyCanExecuteChanged();
+                CopyCommand.NotifyCanExecuteChanged();
+            }
+
+            if (_editMenu.Paste != before.Paste)
+            {
+                PasteCommand.NotifyCanExecuteChanged();
+                PasteMergeCommand.NotifyCanExecuteChanged();
+            }
+
+            if (_editMenu.SelectAll != before.SelectAll)
+                SelectAllCommand.NotifyCanExecuteChanged();
+            if (_editMenu.Delete != before.Delete)
+                DeleteCommand.NotifyCanExecuteChanged();
+            if (_editMenu.Quantize != before.Quantize)
+                QuantizeCommand.NotifyCanExecuteChanged();
+            if (_editMenu.StepFind != before.StepFind)
+            {
+                FindNextCommand.NotifyCanExecuteChanged();
+                FindPreviousCommand.NotifyCanExecuteChanged();
+            }
+        }
+
+        // The commands' controls are the UI thread's, which a change raised from another thread is taken to.
+        private void OnEditMenuStateChanged(object? sender, EventArgs e)
+        {
+            if (Dispatcher.UIThread.CheckAccess())
+                RefreshEditMenu();
+            else
+                Dispatcher.UIThread.Post(RefreshEditMenu);
+        }
+
+        private void OnEditorPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(ChartEditorViewModel.SelectedQuantize))
+                OnPropertyChanged(nameof(QuantizeMenuHeader));
+        }
+
         /// <summary>Saves the panels' sizes, whether they auto-hide and how they're arranged, and the lanes, for the next Editor.</summary>
         public void SaveLayout()
         {
@@ -363,6 +499,11 @@ namespace ChartBuilder.ViewModels
             _undo.Changed -= OnChartChanged;
             Song.Changed -= OnSongChanged;
             Song.TracksChanged -= OnTracksChanged;
+            Editor.Session.Selection.Changed -= OnEditMenuStateChanged;
+            Editor.Session.StateChanged -= OnEditMenuStateChanged;
+            Editor.Session.Find.Changed -= OnEditMenuStateChanged;
+            ChartClipboard.Shared.Changed -= OnEditMenuStateChanged;
+            Editor.PropertyChanged -= OnEditorPropertyChanged;
             _tracksTimer.Stop();
             Findings.Dispose();
             Sections.Dispose();

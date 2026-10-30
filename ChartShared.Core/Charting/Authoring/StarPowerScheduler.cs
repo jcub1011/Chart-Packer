@@ -44,7 +44,7 @@ internal sealed class StarPowerScheduler
         _fixed = [];
         foreach (var phrase in context.Part.Phrases.AsSpan())
         {
-            if (phrase.Kind != PhraseKind.StarPower)
+            if (phrase.Kind != PhraseKind.StarPower || context.Replaces(phrase))
                 continue;
             var covered = context.Source.Notes.Between(phrase.Tick, phrase.CoverEnd - 1);
             double? complete = covered.IsEmpty ? null : timeline.MeasureAt(covered[^1].Tick);

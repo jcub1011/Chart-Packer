@@ -360,6 +360,14 @@ Behaviour:
      - Edited rows show `*`, added rows `+`, and removed rows are struck through. Each has a
        revert button.
      - The library list marks items that have drafts.
+   - **Undo and Redo.** Each item's draft has an undo history of its own (Edit menu; Ctrl+Z,
+     Ctrl+Y or Ctrl+Shift+Z, as set in the Shortcuts window). Every change to a draft, whatever made it, is a step.
+     - A batch edit is a step in each selected item's history, so undoing it for one item leaves
+       the others as they are. They apply to the one item selected, and are disabled while
+       several are.
+     - Changes a drag makes to offsets are one step. Histories survive a change of selection.
+     - Saving an item, or Chart Builder changing it, starts its history over: undo covers
+       unsaved changes only. A text box being edited keeps its own Ctrl+Z.
    - **Saving writes only the edited keys.** A draft records changes per key, and Save re-reads
      each file and applies them to what's on disk.
    - **Saving a song folder edits its `song.ini` in place.**
@@ -538,7 +546,7 @@ Acceptance criteria:
 
 Behaviour:
 
-1. **Search.** A search box above the list (Ctrl+F; Escape clears it) shows only songs where every
+1. **Search.** A search box above the list (Ctrl+F, or the key set in the Shortcuts window; Escape clears it) shows only songs where every
    word typed appears in the file or folder name, the title or the artist. Matching ignores case
    and accents.
 2. **Sort.** A flyout from the filter button sorts by scan order (the default), title, artist,
@@ -744,6 +752,8 @@ Settings are stored as JSON (source-generated serialization) in the per-user con
 | Batch parallelism | Half the logical cores, at least 1 |
 | Theme | Follow OS |
 | Library sort ([F8](#f8-library-search-sort-and-filter)) | Scan order, first to last |
+| Scan on launch | On. The songs folder from last time is scanned as the app starts. When off, the empty list shows a Scan button instead. |
+| Scan on folder change | On. Choosing a songs folder, with Browse or by dropping it on the window, scans it straight away. When off, the folder is set but not scanned until you use Scan. |
 
 ## 9. Non-functional requirements
 

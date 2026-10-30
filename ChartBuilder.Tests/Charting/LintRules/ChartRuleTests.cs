@@ -39,7 +39,6 @@ public sealed class ChartRuleTests
         [ChrRules.Chr004, 1],
         [ChrRules.Chr005, 1],
         [ChrRules.Chr020, 1],
-        [ChrRules.Chr021, 1],
         [ChrRules.Chr022, 1],
         [ChrRules.Chr023, 1],
         [ChrRules.Chr024, 1],
@@ -224,22 +223,36 @@ public sealed class ChartRuleTests
     }
 
     [TestMethod]
-    public void APartWithoutStarPowerIsNotedOnlyWhereStarPowerCanBeGenerated()
+    public void APartWithoutStarPowerIsNotedOnlyWhereAPhraseFits()
     {
-        // Drums and GHL have none and aren't noted; neither is a 5-fret part with too few chords for a phrase, nor keys whose
-        // six chords all come too near its end for a phrase's star power to be used.
-        var (chart, input) = Clean([KeyValuePair.Create("diff_bass", "2"), KeyValuePair.Create("diff_keys", "2"), KeyValuePair.Create("diff_guitarghl", "2")], drums: true);
+        // Neither a 5-fret part with too few chords for a phrase, nor keys whose six chords all come too near its end for a
+        // phrase's star power to be used.
+        var (chart, input) = Clean([KeyValuePair.Create("diff_bass", "2"), KeyValuePair.Create("diff_keys", "2")]);
         new AddPart(ChartInstrument.Bass).Apply(chart);
         new AddNotes(ChartInstrument.Bass, Expert, [new EditableNote(0, 1, 0), new EditableNote(Beat, 1, 1), new EditableNote(2 * Beat, 1, 2)]).Apply(chart);
         new AddPart(ChartInstrument.Keys).Apply(chart);
         new AddNotes(ChartInstrument.Keys, Expert, [.. Enumerable.Range(0, 6).Select(i => new EditableNote((long)i * Beat, 1, i % 5))]).Apply(chart);
         Assert.IsFalse(StarPowerGenerator.HasSpot(chart, chart.PartOf(ChartInstrument.Keys)!));
-        new AddPart(ChartInstrument.GhlGuitar).Apply(chart);
-        new AddNotes(ChartInstrument.GhlGuitar, Expert, [.. Enumerable.Range(0, Notes).Select(i => new EditableNote((long)i * Beat, 1, 0))]).Apply(chart);
 
         var findings = new ChartLinter().LintAll(Snapshot(chart, input)).FindingsOf(ChrRules.Chr066);
 
         Assert.IsEmpty(findings, string.Join("; ", findings.Select(Describe)));
+    }
+
+    [TestMethod]
+    public void DrumsAndGhlWithoutStarPowerAreNoted()
+    {
+        var (chart, input) = Clean([], drums: true);
+        new RemovePhrase(Drums, CleanStarPower).Apply(chart);
+        new AddPart(ChartInstrument.GhlGuitar).Apply(chart);
+        foreach (var difficulty in Enum.GetValues<ChartDifficulty>())
+            new AddNotes(ChartInstrument.GhlGuitar, difficulty, [.. Enumerable.Range(0, 64).Select(i => new EditableNote((long)i * Beat, 1, 1))]).Apply(chart);
+
+        var findings = new ChartLinter().LintAll(Snapshot(chart, input)).FindingsOf(ChrRules.Chr066);
+
+        Assert.AreSequenceEqual([Drums, ChartInstrument.GhlGuitar], [.. findings.Select(f => f.Location!.Part).Order()]);
+        foreach (var finding in findings)
+            Assert.IsNotEmpty(StarPowerGenerator.Propose(chart, finding.Location!.Part, StarPowerOptions.Default, input.Options).Proposals);
     }
 
     [TestMethod]
@@ -337,18 +350,33 @@ public sealed class ChartRuleTests
     }
 
     [TestMethod]
-    public void Chr021TakesOnlyLengthsMeantAsSustains()
+    public void Chr021IsRetiredBecauseTheChartDerivesItsSustainCutoff()
     {
-        // A sixteenth is a plain note as written; a length from a sixteenth up to the cutoff (160 at 480) is flagged.
         var (chart, input) = Clean();
         var expert = chart.PartOf(Guitar)![Expert];
-        new SetSustain(Guitar, Expert, [expert.Notes[0]], 119).Apply(chart);
-        new SetSustain(Guitar, Expert, [expert.Notes[1]], 120).Apply(chart);
-        new SetSustain(Guitar, Expert, [expert.Notes[2]], 160).Apply(chart);
+        new SetSustain(Guitar, Expert, [expert.Notes[0]], 120).Apply(chart);
 
-        var findings = new ChartLinter().LintAll(Snapshot(chart, input)).FindingsOf(ChrRules.Chr021);
+        var findings = new ChartLinter().LintAll(Snapshot(chart, input)).Findings;
 
-        Assert.AreSequenceEqual(new long[] { Beat }, [.. findings.Select(f => f.Location!.Tick)]);
+        Assert.DoesNotContain(f => f.RuleId == ChrRules.Chr021, findings);
+        Assert.IsTrue(ChrRules.All.Contains(ChrRules.Chr021), "The ID is kept.");
+        Assert.IsFalse(ChartLintRules.All.Any(r => r.RuleId == ChrRules.Chr021), "The rule no longer runs.");
+    }
+
+    [TestMethod]
+    public void Chr020sTrimUnderTheFloorLeavesAPlainNote()
+    {
+        // Cut at a note five ticks in, the sustain would be under the 10-tick floor, so the fix makes it plain.
+        var (chart, input) = Clean();
+        var expert = chart.PartOf(Guitar)![Expert];
+        new SetSustain(Guitar, Expert, [expert.Notes.First(n => n.Tick == 0 && n.Lane == 0)], 3000).Apply(chart);
+        new AddNotes(Guitar, Expert, [new EditableNote(5, EditableNote.PlainLength, 0)]).Apply(chart);
+
+        var finding = new ChartLinter().LintAll(Snapshot(chart, input)).FindingsOf(ChrRules.Chr020).Single();
+        var option = QuickFixRegistry.ProposeChartFixes(finding, chart, input.Options).Single();
+        new ChartUndoStack(chart).Execute(QuickFixRegistry.ProposeChartFix(finding, chart, input.Options, option.Id)!);
+
+        Assert.AreEqual(EditableNote.PlainLength, expert.Notes.First(n => n.Tick == 0 && n.Lane == 0).Length);
     }
 
     [TestMethod]
@@ -389,6 +417,8 @@ public sealed class ChartRuleTests
         }
 
         new AddPhrase(Guitar, CleanStarPower).Apply(chart);
+        if (drums)
+            new AddPhrase(Drums, CleanStarPower).Apply(chart);
         new AddTextEvent(null, TextEvent.Of(0, "[section Intro]")).Apply(chart);
         new AddTextEvent(null, TextEvent.Of(SongEventPlacement.Place(chart, null, TimeSpan.Zero).End, SongEvents.EndText)).Apply(chart);
         return (chart, Snapshot(chart, IniWith(extraIni, drums), audio ?? AudioLength));
@@ -439,9 +469,6 @@ public sealed class ChartRuleTests
                 break;
             case ChrRules.Chr020:
                 new SetSustain(Guitar, Expert, [expert.Notes[0]], 3000).Apply(chart);
-                break;
-            case ChrRules.Chr021:
-                new SetSustain(Guitar, Expert, [expert.Notes[1]], 130).Apply(chart);
                 break;
             case ChrRules.Chr022:
                 new AddNotes(Guitar, Expert, [new EditableNote(0, 1, ChartNote.OpenLane)]).Apply(chart);

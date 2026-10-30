@@ -250,7 +250,7 @@
             </ItemsControl.ItemTemplate>
         </ItemsControl>
 
-        <!-- One entry per stem; a stem the song has already is replaced, in whatever format it was. -->
+        <!-- One entry per stem, labelled with its name; picking one the song already has replaces that track, in whatever format it was, as the row's Replace does. -->
         <Button x:Name="AddButton"
                 Classes="icon"
                 Margin="10,4,0,0"

@@ -24,6 +24,7 @@ namespace ChartBuilder.ViewModels
     {
         private readonly EditorSong _song;
         private readonly Action<IChartCommand> _execute;
+        private readonly Func<TimeSpan?>? _playhead;
         private IReadOnlyList<MetadataItem> _items = [];
         private bool _refreshQueued;
         private bool _isSaving;
@@ -31,12 +32,14 @@ namespace ChartBuilder.ViewModels
 
         /// <param name="song">The song open.</param>
         /// <param name="execute">Makes an edit, as one undo step.</param>
-        public ChartMetadataViewModel(EditorSong song, Action<IChartCommand> execute)
+        /// <param name="playhead">Where the playhead is, for setting a time to it; none for no playhead.</param>
+        public ChartMetadataViewModel(EditorSong song, Action<IChartCommand> execute, Func<TimeSpan?>? playhead = null)
         {
             ArgumentNullException.ThrowIfNull(song);
             ArgumentNullException.ThrowIfNull(execute);
             _song = song;
             _execute = execute;
+            _playhead = playhead;
             MetadataEditor = new MetadataEditorViewModel(this, showDifficulties: false);
             _song.Changed += OnSongChanged;
             Refresh();
@@ -75,6 +78,8 @@ namespace ChartBuilder.ViewModels
 
         // song_length follows the audio on its own (charter-spec C17 item 2).
         IRelayCommand? IMetadataEditorHost.AutoSetSongLengthCommand => null;
+
+        TimeSpan? IMetadataEditorHost.PlayheadPosition => _playhead?.Invoke();
 
         bool IMetadataEditorHost.CanEditKey(string key) => _song.CanEdit(key);
 

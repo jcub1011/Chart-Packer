@@ -492,11 +492,17 @@
                 </ListBox.ItemTemplate>
             </ListBox>
 
-            <TextBlock Classes="muted centered"
-                       VerticalAlignment="Center"
-                       Margin="16"
-                       Text="{x:Static res:Strings.LibraryPrompt}"
-                       IsVisible="{Binding ShowPrompt}" />
+            <StackPanel VerticalAlignment="Center"
+                        HorizontalAlignment="Center"
+                        Margin="16"
+                        Spacing="10"
+                        IsVisible="{Binding ShowPrompt}">
+                <TextBlock Classes="muted centered" Text="{x:Static res:Strings.LibraryPrompt}" TextWrapping="Wrap" />
+                <Button Classes="accent"
+                        HorizontalAlignment="Center"
+                        Content="{x:Static res:Strings.ChooseSongsFolderButton}"
+                        Command="{Binding BrowseCommand}" />
+            </StackPanel>
 
             <StackPanel VerticalAlignment="Center"
                         HorizontalAlignment="Center"
@@ -509,11 +515,17 @@
                 <TextBlock Classes="muted centered" Text="{x:Static res:Strings.Scanning}" />
             </StackPanel>
 
-            <TextBlock Classes="muted centered"
-                       VerticalAlignment="Center"
-                       Margin="16"
-                       Text="{x:Static res:Strings.NotScannedHint}"
-                       IsVisible="{Binding ShowNotScanned}" />
+            <StackPanel VerticalAlignment="Center"
+                        HorizontalAlignment="Center"
+                        Margin="16"
+                        Spacing="10"
+                        IsVisible="{Binding ShowNotScanned}">
+                <TextBlock Classes="muted centered" Text="{x:Static res:Strings.NotScannedHint}" TextWrapping="Wrap" />
+                <Button Classes="accent"
+                        HorizontalAlignment="Center"
+                        Content="{x:Static res:Strings.ScanButton}"
+                        Command="{Binding RescanCommand}" />
+            </StackPanel>
 
             <TextBlock Classes="muted centered"
                        VerticalAlignment="Center"

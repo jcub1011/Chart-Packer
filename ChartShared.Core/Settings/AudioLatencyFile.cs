@@ -29,7 +29,7 @@ public readonly record struct LatencyLookup(int Calibration, LatencySource Sourc
 /// <remarks>
 /// <para>
 /// It holds two maps, from device ID and from device name to milliseconds, a fallback, and whether to
-/// add the latency detected from a device: <c>{ "byId": { … }, "byName": { … }, "fallback": 0, "detect": true }</c>.
+/// add the latency detected from a device: <c>{ "SchemaVersion": 1, "byId": { … }, "byName": { … }, "fallback": 0, "detect": true }</c>.
 /// A device is looked up by its ID, then its name, then the fallback. A device's ID, where the
 /// platform gives one, outlives its name.
 /// </para>
@@ -44,11 +44,19 @@ public readonly record struct LatencyLookup(int Calibration, LatencySource Sourc
 /// place, holding <c>{file}.lock</c> from its read to the rename, as <see cref="JsonSettingsFile{T}"/> does.
 /// The path is always passed in; tests pass a temp file.
 /// </para>
+/// <para>
+/// It records a schema version (<c>SchemaVersion</c>, an integer) so a later build can migrate a drastically changed
+/// shape (<see cref="SettingsSchema"/>). A write stamps <see cref="SchemaVersion"/> into a file that has an older one or
+/// none; a file from a newer build isn't written. Reading never writes, so an older file is stamped by the next write.
+/// </para>
 /// </remarks>
 public sealed class AudioLatencyFile
 {
     /// <summary>The most a latency can be either way, in milliseconds.</summary>
     public const int MaxMilliseconds = 500;
+
+    /// <summary>The schema version this build writes to the file.</summary>
+    public const int SchemaVersion = 1;
 
     private const string ById = "byId";
     private const string ByName = "byName";
@@ -65,6 +73,9 @@ public sealed class AudioLatencyFile
 
     /// <summary>Whether the latency detected from a device is added to the value stored for it.</summary>
     public bool DetectEnabled => DetectIn(JsonFiles.ReadObject(_path, warn: true));
+
+    /// <summary>The schema version the file records; 0 when it has none. Reading it never writes.</summary>
+    public int StoredSchemaVersion => SettingsSchema.Read(JsonFiles.ReadObject(_path, warn: false));
 
     /// <summary>
     /// The latency stored for the device with <paramref name="name"/> and <paramref name="id"/>, or the fallback, with
@@ -94,7 +105,7 @@ public sealed class AudioLatencyFile
     }
 
     /// <summary>Turns <see cref="DetectEnabled"/> on or off, keeping everything else. Gives false when it couldn't be written.</summary>
-    public bool SetDetect(bool on) => JsonFiles.Update(_path, file =>
+    public bool SetDetect(bool on) => JsonFiles.Update(_path, SchemaVersion, file =>
     {
         file ??= [];
         file[Detect] = on;
@@ -111,7 +122,7 @@ public sealed class AudioLatencyFile
             return false;
 
         milliseconds = Math.Clamp(milliseconds, -MaxMilliseconds, MaxMilliseconds);
-        return JsonFiles.Update(_path, file =>
+        return JsonFiles.Update(_path, SchemaVersion, file =>
         {
             file ??= [];
             if (!string.IsNullOrEmpty(name))
@@ -136,7 +147,7 @@ public sealed class AudioLatencyFile
         if (ValueIn(found, ById, id) is not null || ValueIn(found, ByName, name) is null)
             return;
 
-        JsonFiles.Update(_path, file =>
+        JsonFiles.Update(_path, SchemaVersion, file =>
         {
             if (ValueIn(file, ById, id) is not null || ValueIn(file, ByName, name) is not { } byName)
                 return null;

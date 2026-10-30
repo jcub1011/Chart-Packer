@@ -48,6 +48,33 @@ public readonly record struct MeasureBeat(long Measure, double Beat)
     }
 
     /// <summary>
+    /// The tick the measure numbered <paramref name="measure"/> starts at, counted as <see cref="At"/> counts them; the
+    /// first measure's for one below 1. A measure past the last time signature's carries on at its length.
+    /// </summary>
+    public static long TickOf(TempoMap map, long measure)
+    {
+        ArgumentNullException.ThrowIfNull(map);
+        var signatures = map.TimeSignatures;
+        if (signatures.Count == 0)
+            return 0;
+        long remaining = Math.Max(1, measure) - 1;
+        for (int i = 0; i < signatures.Count; i++)
+        {
+            var signature = signatures[i];
+            long length = Math.Max(1, map.Resolution * 4L / signature.Denominator) * Math.Max(1, signature.Numerator);
+            long end = i + 1 < signatures.Count ? signatures[i + 1].Tick : long.MaxValue;
+            if (end <= signature.Tick)
+                continue;
+            long inSignature = end == long.MaxValue ? long.MaxValue : ((end - 1 - signature.Tick) / length) + 1;
+            if (remaining < inSignature)
+                return signature.Tick + (remaining * length);
+            remaining -= inSignature;
+        }
+
+        return signatures[^1].Tick;
+    }
+
+    /// <summary>
     /// The tick of the measure line at or before <paramref name="tick"/>: the start of the measure it's in, counted from
     /// the time signature in force, as <see cref="TempoMap.BeatLines"/> draws the lines.
     /// </summary>

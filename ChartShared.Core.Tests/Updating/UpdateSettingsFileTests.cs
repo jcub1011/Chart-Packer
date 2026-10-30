@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using ChartShared.Core.Updating;
 
 namespace ChartShared.Core.Tests.Updating;
@@ -84,4 +85,42 @@ public sealed class UpdateSettingsFileTests
         File.WriteAllText(_path, """{ "checkFrequency": "fortnightly" }""");
         Assert.AreEqual(UpdateCheckFrequency.Daily, new UpdateSettingsFile(_path).Read().CheckFrequency);
     }
+
+    [TestMethod]
+    public void AWriteStampsTheSchemaVersion()
+    {
+        Assert.IsTrue(new UpdateSettingsFile(_path).SetCheckForUpdates(false));
+
+        Assert.AreEqual(UpdateSettingsFile.SchemaVersion, (int)Read()["SchemaVersion"]!);
+        Assert.AreEqual(UpdateSettingsFile.SchemaVersion, new UpdateSettingsFile(_path).StoredSchemaVersion);
+    }
+
+    [TestMethod]
+    public void ALegacyFileReadsAsVersionZeroAndIsStampedByTheNextWrite()
+    {
+        File.WriteAllText(_path, """{ "checkForUpdates": false }""");
+        Assert.AreEqual(0, new UpdateSettingsFile(_path).StoredSchemaVersion);
+
+        Assert.IsTrue(new UpdateSettingsFile(_path).SetCheckFrequency(UpdateCheckFrequency.Daily));
+
+        Assert.AreEqual(UpdateSettingsFile.SchemaVersion, (int)Read()["SchemaVersion"]!);
+    }
+
+    [TestMethod]
+    public void AFileFromANewerBuildIsLeftUntouched()
+    {
+        const string newer = """{ "checkForUpdates": false, "SchemaVersion": 7 }""";
+        File.WriteAllText(_path, newer);
+        var file = new UpdateSettingsFile(_path);
+
+        Assert.IsFalse(file.SetCheckForUpdates(true));
+        Assert.IsFalse(file.SetCheckFrequency(UpdateCheckFrequency.Hourly));
+        Assert.IsFalse(file.SetIncludePrereleases(true));
+        Assert.IsFalse(file.SetCached(DateTimeOffset.UtcNow, "v1.2.0", false, false));
+
+        Assert.AreEqual(newer, File.ReadAllText(_path));
+        Assert.AreEqual(7, file.StoredSchemaVersion);
+    }
+
+    private JsonObject Read() => (JsonObject)JsonNode.Parse(File.ReadAllText(_path))!;
 }

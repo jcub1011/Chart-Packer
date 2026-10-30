@@ -1,5 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:help="using:ChartShared.Core.Help"
         xmlns:vm="using:ChartBuilder.ViewModels"
         xmlns:res="using:ChartBuilder.Resources"
         xmlns:ui="using:ChartShared.UI.Controls"
@@ -201,6 +202,7 @@
     <Grid RowDefinitions="Auto,*,Auto">
         <!-- The title bar, as the main window's is: the icon (the owner's, set in code) and the title. -->
         <ui:TitleBar x:Name="WindowTitleBar"
+                     HelpPage="{x:Static help:HelpPages.InputDevices}"
                      Grid.Row="0"
                      Height="31"
                      BorderThickness="0,0,0,1"

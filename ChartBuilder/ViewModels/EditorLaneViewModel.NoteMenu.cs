@@ -24,7 +24,13 @@ namespace ChartBuilder.ViewModels
             var session = editor.Session;
             var selection = session.Selection;
             if (Vocal is { } vocal)
-                return selection.Vocal == vocal && selection.HasVocalNotes ? VocalNoteMenu(session, vocal) : [];
+            {
+                if (selection.Vocal != vocal || !selection.HasVocalNotes)
+                    return [];
+                var sung = VocalNoteMenu(session, vocal);
+                return sung.Count == 0 ? EditItems(editor, vocal) : [.. EditItems(editor, vocal), LaneMenuItem.Separator, .. sung];
+            }
+
             if (Track is not { } track || selection.Track != track || selection.Notes.Count == 0 || session.TrackOf(track) is not { } edited)
                 return [];
             var items = edited.Kind == ChartInstrumentKind.Drums ? DrumNoteMenu(session, track) : FretNoteMenu(session.Tools);
@@ -32,8 +38,38 @@ namespace ChartBuilder.ViewModels
                 string.Format(CultureInfo.CurrentCulture, Strings.NoteMenuQuantizeFormat, BuilderSettingsCatalog.SnapLabel(editor.QuantizeGrid.Division)),
                 isEnabled: true,
                 editor.QuantizeSelection,
-                "QuantizeStroke");
-            return items.Count == 0 ? [quantize] : [quantize, LaneMenuItem.Separator, .. items];
+                "QuantizeStroke",
+                BuilderKeys.Quantize);
+            List<LaneMenuItem> edit = [quantize, LaneMenuItem.Separator, .. EditItems(editor, null)];
+            return items.Count == 0 ? edit : [.. edit, LaneMenuItem.Separator, .. items];
+        }
+
+        /// <summary>
+        /// Cut, Copy, Paste, Paste and merge and Delete, as the lane's Edit menu has them: on what's selected, and a paste at the
+        /// cursor. A vocal lane's paste goes into its <paramref name="vocal"/> part. The menu is made as it opens, so Paste is
+        /// dimmed when the clipboard's clip would be refused here, as the Edit menu's is.
+        /// </summary>
+        private static List<LaneMenuItem> EditItems(ChartEditorViewModel editor, VocalTrack? vocal)
+        {
+            bool canPaste = EditMenuState.CanPaste(editor.Session, ChartClipboard.Shared, vocal);
+            return
+            [
+                LaneMenuItem.Action(Strings.LaneCut, true, editor.Cut, "CutStroke", BuilderKeys.Cut),
+                LaneMenuItem.Action(Strings.LaneCopy, true, editor.Copy, "CopyStroke", BuilderKeys.Copy),
+                LaneMenuItem.Action(Strings.LanePaste, canPaste, () => PasteFromClipboard(editor, PasteMode.Overwrite, vocal), "PasteStroke", BuilderKeys.Paste),
+                LaneMenuItem.Action(Strings.LanePasteMerge, canPaste, () => PasteFromClipboard(editor, PasteMode.Merge, vocal), "PasteMergeStroke", BuilderKeys.PasteMerge),
+                LaneMenuItem.Action(Strings.LaneDelete, true, editor.Session.Tools.DeleteSelection, "TrashStroke", BuilderKeys.Delete),
+            ];
+        }
+
+        /// <summary>
+        /// Pastes the clipboard at the cursor from a lane's menu, into the part the Edit menu's Paste would: the lane's own
+        /// <paramref name="vocal"/> part, else the one a clip of vocal notes goes to (<see cref="EditMenuState.PasteTarget"/>).
+        /// </summary>
+        private static void PasteFromClipboard(ChartEditorViewModel editor, PasteMode mode, VocalTrack? vocal)
+        {
+            var into = ChartClipboard.Shared.Current is { } clip ? EditMenuState.PasteTarget(editor.Session, clip, vocal) : vocal;
+            _ = editor.PasteAsync(mode, into);
         }
 
         private static List<LaneMenuItem> FretNoteMenu(EditorTools tools)

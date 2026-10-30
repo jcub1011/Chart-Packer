@@ -73,18 +73,13 @@ namespace ChartShared.UI.ViewModels
             string.Format(CultureInfo.CurrentCulture, SharedStrings.PickTrackTitleFormat, CultureInfo.CurrentCulture.TextInfo.ToTitleCase(stem));
 
         /// <summary>
-        /// The Add track menu's entries: every stem, labelled to replace it where <paramref name="present"/> has it, each
-        /// running <paramref name="commandFor"/>'s command.
+        /// The Add track menu's entries: every stem, labelled with just its name, each running
+        /// <paramref name="commandFor"/>'s command.
         /// </summary>
-        public static IReadOnlyList<StemOption> OptionsFor(IEnumerable<string> present, Func<string, System.Windows.Input.ICommand> commandFor)
+        public static IReadOnlyList<StemOption> OptionsFor(Func<string, System.Windows.Input.ICommand> commandFor)
         {
-            ArgumentNullException.ThrowIfNull(present);
             ArgumentNullException.ThrowIfNull(commandFor);
-            var stems = present.ToHashSet(StringComparer.Ordinal);
-            return [.. AudioStems.Stems.Select(stem => new StemOption(
-                stem,
-                stems.Contains(stem) ? string.Format(CultureInfo.CurrentCulture, SharedStrings.ReplaceTrackFormat, stem) : stem,
-                commandFor(stem)))];
+            return [.. AudioStems.Stems.Select(stem => new StemOption(stem, stem, commandFor(stem)))];
         }
     }
 }

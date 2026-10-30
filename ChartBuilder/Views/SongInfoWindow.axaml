@@ -1,0 +1,66 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:help="using:ChartShared.Core.Help"
+        xmlns:ui="using:ChartShared.UI.Controls"
+        xmlns:vm="using:ChartBuilder.ViewModels"
+        xmlns:res="using:ChartBuilder.Resources"
+        xmlns:sres="using:ChartShared.UI.Resources"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="460" d:DesignHeight="260"
+        x:Class="ChartBuilder.Views.SongInfoWindow"
+        x:DataType="vm:SongInfoViewModel"
+        Icon="/Assets/ChartBuilder.ico"
+        Title="{x:Static res:Strings.SongInfoTitle}"
+        Background="{DynamicResource AppBackgroundBrush}"
+        WindowStartupLocation="CenterOwner"
+        SizeToContent="Height"
+        CanResize="False"
+        ShowInTaskbar="False"
+        Width="460"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaTitleBarHeightHint="30"
+        WindowDecorationsTheme="{StaticResource TitleBarDecorations}">
+
+    <DockPanel>
+        <ui:TitleBar x:Name="WindowTitleBar"
+                     HelpPage="{x:Static help:HelpPages.FirstSave}"
+                     DockPanel.Dock="Top"
+                     Height="31"
+                     BorderThickness="0,0,0,1"
+                     BorderBrush="{DynamicResource SubtleBorderBrush}">
+            <TextBlock Margin="8,0,12,0"
+                       FontSize="12"
+                       VerticalAlignment="Center"
+                       TextTrimming="CharacterEllipsis"
+                       Text="{x:Static res:Strings.SongInfoTitle}" />
+        </ui:TitleBar>
+
+        <!-- A new chart's first save (charter-spec C1) needs its name and artist, which the folder name starts from. -->
+        <StackPanel Margin="20" Spacing="14">
+            <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap" Text="{x:Static res:Strings.SongInfoIntro}" />
+
+            <StackPanel Spacing="6">
+                <TextBlock Classes="caption" Text="{x:Static res:Strings.SongInfoNameLabel}" />
+                <TextBox x:Name="NameBox" Text="{Binding Name}" AutomationProperties.Name="{x:Static res:Strings.SongInfoNameLabel}" />
+            </StackPanel>
+
+            <StackPanel Spacing="6">
+                <TextBlock Classes="caption" Text="{x:Static res:Strings.SongInfoArtistLabel}" />
+                <TextBox x:Name="ArtistBox" Text="{Binding Artist}" AutomationProperties.Name="{x:Static res:Strings.SongInfoArtistLabel}" />
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+                <Button Classes="accent"
+                        Content="{x:Static res:Strings.SaveButton}"
+                        Command="{Binding SaveCommand}"
+                        IsDefault="True"
+                        AutomationProperties.Name="{x:Static res:Strings.SaveButton}" />
+                <Button Content="{x:Static sres:SharedStrings.CancelButton}"
+                        IsCancel="True"
+                        Click="OnCancel"
+                        AutomationProperties.Name="{x:Static sres:SharedStrings.CancelButton}" />
+            </StackPanel>
+        </StackPanel>
+    </DockPanel>
+</Window>

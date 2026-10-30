@@ -18,8 +18,11 @@ namespace ChartShared.Core.Charting.Authoring;
 /// </remarks>
 internal static class StarPowerSpikes
 {
-    /// <summary>The hard passages, most prominent first, from <paramref name="notes"/>, the source as the difficulty model reads it.</summary>
-    public static List<StarPowerSpike> Find(StarPowerContext c, IReadOnlyList<DifficultyNote> notes)
+    /// <summary>
+    /// The hard passages, most prominent first, from <paramref name="notes"/>, the source as the difficulty model reads it,
+    /// rated as <paramref name="difficulty"/> says.
+    /// </summary>
+    public static List<StarPowerSpike> Find(StarPowerContext c, IReadOnlyList<DifficultyNote> notes, DifficultyParameters difficulty)
     {
         var p = c.Parameters;
         var timeline = c.Timeline;
@@ -41,7 +44,7 @@ internal static class StarPowerSpikes
             for (int i = lo; i < hi; i++)
                 stretch[i - lo] = notes[i];
             measures.Add(m);
-            scores.Add(DifficultyAnalyzer.Analyze(stretch, new DifficultySpan(from, to)).ChartScore);
+            scores.Add(DifficultyAnalyzer.Analyze(stretch, new DifficultySpan(from, to), difficulty).ChartScore);
         }
 
         int n = scores.Count;

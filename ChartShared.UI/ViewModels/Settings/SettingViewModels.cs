@@ -4,9 +4,7 @@ using System.ComponentModel;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
-using Avalonia.Media;
 using ChartShared.Core.Settings;
-using ChartShared.UI.Controls;
 using ChartShared.UI.Resources;
 using ChartShared.UI.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -30,6 +28,9 @@ namespace ChartShared.UI.ViewModels.Settings
         }
 
         public string Label => _edit.Definition.Label;
+
+        /// <summary>Whether the row has an editor, rather than only its <see cref="Actions"/>.</summary>
+        public virtual bool HasEditor => true;
 
         /// <summary>The setting's buttons, shown beside its editor (<see cref="SettingDefinition.Actions"/>).</summary>
         public IReadOnlyList<SettingActionViewModel> Actions { get; }
@@ -91,10 +92,10 @@ namespace ChartShared.UI.ViewModels.Settings
         /// <summary>The button's text, or with an <see cref="Icon"/>, its tooltip.</summary>
         public string Label => action.Label;
 
-        /// <summary>The line icon shown instead of the text, or <see langword="null"/> for a text button.</summary>
-        public Geometry? Icon { get; } = LineIcon.Find(action.IconKey);
+        /// <summary>The key of the line icon shown instead of the text, or <see langword="null"/> for a text button.</summary>
+        public string? IconKey => action.IconKey;
 
-        public bool HasIcon => Icon is not null;
+        public bool HasIcon => IconKey is not null;
 
         [RelayCommand]
         private void Run() => action.Run();
@@ -108,6 +109,7 @@ namespace ChartShared.UI.ViewModels.Settings
             ToggleSetting => new ToggleSettingViewModel((SettingEdit<bool>)edit),
             IntegerSetting integer => new IntegerSettingViewModel((SettingEdit<int>)edit, integer),
             RangeSetting range => new RangeSettingViewModel((SettingEdit<double>)edit, range),
+            LookAheadSetting => new LookAheadSettingViewModel((SettingEdit<double>)edit),
             FolderSetting folder => new FolderSettingViewModel((SettingEdit<string?>)edit, folder, folderPicker),
             TextSetting text => new TextSettingViewModel((SettingEdit<string>)edit, text),
             ActionSetting => new ActionSettingViewModel(edit),
@@ -119,6 +121,8 @@ namespace ChartShared.UI.ViewModels.Settings
     /// <summary>A row with only its buttons (<see cref="ActionSetting"/>), and no editor.</summary>
     public sealed class ActionSettingViewModel(SettingEdit edit) : SettingViewModel(edit)
     {
+        public override bool HasEditor => false;
+
         protected override void OnValueChanged()
         {
         }
@@ -176,6 +180,24 @@ namespace ChartShared.UI.ViewModels.Settings
         }
 
         public string ValueText => definition.FormatValue(edit.Value);
+
+        protected override void OnValueChanged()
+        {
+            OnPropertyChanged(nameof(Value));
+            OnPropertyChanged(nameof(ValueText));
+        }
+    }
+
+    /// <summary>A highway's look-ahead in seconds, shown as the look-ahead slider and its readout.</summary>
+    public sealed class LookAheadSettingViewModel(SettingEdit<double> edit) : SettingViewModel(edit)
+    {
+        public double Value
+        {
+            get => edit.Value;
+            set => edit.Value = value;
+        }
+
+        public string ValueText => string.Format(CultureInfo.CurrentCulture, SharedStrings.LookAheadFormat, edit.Value);
 
         protected override void OnValueChanged()
         {

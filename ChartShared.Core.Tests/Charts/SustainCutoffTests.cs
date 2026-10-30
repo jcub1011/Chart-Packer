@@ -29,6 +29,17 @@ public sealed class SustainCutoffTests
     }
 
     [TestMethod]
+    [DataRow(480, null, null)]
+    [DataRow(480, 480L, 160L)]
+    [DataRow(480, 161L, 160L)]
+    [DataRow(480, 160L, 159L)]
+    [DataRow(480, 10L, 9L)]
+    [DataRow(480, 9L, 8L)]
+    [DataRow(24, 10L, 8L)]
+    public void ChartBuilderCutoffKeepsTheShortestSustainAndCapsAtAThird(int resolution, long? shortest, long? expected) =>
+        Assert.AreEqual(expected, SustainCutoff.ForChartBuilder(resolution, shortest));
+
+    [TestMethod]
     public void ASustainIsntCutShortByANoteOnTheSameTickOnAnotherChannel()
     {
         List<MidiMessage> messages = [On(0, 96), On(0, 96, channel: 1), Off(50, 96), Off(50, 96, channel: 1)];

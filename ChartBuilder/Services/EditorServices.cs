@@ -9,12 +9,12 @@ namespace ChartBuilder.Services
     /// <param name="Settings">Chart Builder's settings, and where the layout and the recent songs are saved.</param>
     /// <param name="SettingsWindow">Opens Program settings.</param>
     /// <param name="Confirmations">Asks before a change that loses something, and Save, Discard or Cancel on closing.</param>
-    /// <param name="FolderPicker">Picks the folder Save and pack writes to, the folder Export copy writes to, and a new chart's parent folder.</param>
+    /// <param name="FolderPicker">Picks the folder Pack writes to, the folder Export copy writes to, and a new chart's parent folder.</param>
     /// <param name="ImagePicker">Picks the album art the Art tab puts in place of the song's.</param>
     /// <param name="FilePicker">Picks the tracks and backgrounds Chart settings and the Art tab add.</param>
     /// <param name="FirstSave">Asks where a new chart's first save makes its folder.</param>
     /// <param name="ExportSng">Shows the Export to <c>.sng</c> dialog: preview, location and if-exists choice.</param>
-    /// <param name="ExportProgress">Shows the export progress dialog while Save and pack works; <see langword="null"/> runs headless.</param>
+    /// <param name="ExportProgress">Shows the export progress dialog while Pack works; <see langword="null"/> runs headless.</param>
     /// <param name="MessagesDialog">Shows what the Editor has said this session, from its message bar.</param>
     /// <param name="OpenOutput">Opens the audio output, for playback.</param>
     /// <param name="Latency">The audio/visual latency, which what's drawn against the audio allows for.</param>
@@ -26,6 +26,8 @@ namespace ChartBuilder.Services
     /// <param name="Input">The instrument devices and their bindings, for playtest and record mode (charter-spec C19).</param>
     /// <param name="OpenInputDevices">Opens the Input devices window, where the bindings are set.</param>
     /// <param name="Reveal">Shows the song's folder or <c>.sng</c> in the file manager, from the title bar.</param>
+    /// <param name="JumpList">The recent songs in the taskbar button's right-click menu, listed again as the Recent list changes.</param>
+    /// <param name="Keybinds">Shows the Shortcuts window, where the keyboard shortcuts are changed.</param>
     public sealed record EditorServices(
         BuilderSettingsService Settings,
         ISettingsWindowService SettingsWindow,
@@ -46,5 +48,7 @@ namespace ChartBuilder.Services
         IEditorWindowService Editors,
         InputService Input,
         Action OpenInputDevices,
-        IFileRevealService Reveal);
+        IFileRevealService Reveal,
+        IJumpListService JumpList,
+        IKeybindsWindowService Keybinds);
 }

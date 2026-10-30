@@ -27,12 +27,26 @@ namespace ChartShared.UI.Controls.Highway
         Flagged = 2,
     }
 
+    /// <summary>The kind of band drawn behind a highway's notes: star power, or a proposed phrase of a generator's window.</summary>
+    public enum HighwayBandKind
+    {
+        /// <summary>A star power phrase.</summary>
+        StarPower,
+
+        /// <summary>A proposed fill of Generate fills, in the proposal amber.</summary>
+        Proposal,
+    }
+
+    /// <summary>A phrase drawn behind a highway's notes, in song seconds.</summary>
+    public readonly record struct HighwayBand(double Start, double End, HighwayBandKind Kind = HighwayBandKind.StarPower);
+
     /// <summary>One highway: an instrument difficulty's notes with their song times worked out.</summary>
     public sealed class HighwayLane
     {
         /// <param name="delay">How much later than its ticks say the chart plays against the audio.</param>
         /// <param name="marks">How each of <paramref name="notes"/> is marked out, in their order, or null for none.</param>
-        public HighwayLane(ChartInstrumentKind kind, int laneCount, string label, IReadOnlyList<ChartNote> notes, TempoMap tempo, TimeSpan delay, IReadOnlyList<HighwayNoteMark>? marks = null)
+        /// <param name="bands">The phrases to draw behind the notes, in song time, earliest first.</param>
+        public HighwayLane(ChartInstrumentKind kind, int laneCount, string label, IReadOnlyList<ChartNote> notes, TempoMap tempo, TimeSpan delay, IReadOnlyList<HighwayNoteMark>? marks = null, IReadOnlyList<HighwayBand>? bands = null)
         {
             if (marks is not null && marks.Count != notes.Count)
                 throw new ArgumentException("There must be a mark for each note.", nameof(marks));
@@ -42,6 +56,7 @@ namespace ChartShared.UI.Controls.Highway
             Label = label;
             Notes = [.. notes];
             Marks = marks is null ? null : [.. marks];
+            Bands = bands is null ? [] : [.. bands];
             Starts = new double[Notes.Length];
             Ends = new double[Notes.Length];
             for (int i = 0; i < Notes.Length; i++)
@@ -78,6 +93,9 @@ namespace ChartShared.UI.Controls.Highway
 
         /// <summary>How each note is marked out, in the order of <see cref="Notes"/>; null when none is.</summary>
         public HighwayNoteMark[]? Marks { get; }
+
+        /// <summary>The phrases drawn behind the notes, in song seconds, earliest first.</summary>
+        public HighwayBand[] Bands { get; }
 
         /// <summary>Each note's song time, in seconds.</summary>
         public double[] Starts { get; }
@@ -157,6 +175,9 @@ namespace ChartShared.UI.Controls.Highway
         public static readonly StyledProperty<double> FineScrubFactorProperty =
             AvaloniaProperty.Register<NoteHighwayView, double>(nameof(FineScrubFactor), LaneScrub.DefaultFineFactor);
 
+        public static readonly StyledProperty<int?> SelectedPhraseProperty =
+            AvaloniaProperty.Register<NoteHighwayView, int?>(nameof(SelectedPhrase));
+
         // Where the strike line sits, as a fraction of the height from the top; the instrument's name sits below it.
         private const double StrikeFraction = 0.87;
 
@@ -186,6 +207,13 @@ namespace ChartShared.UI.Controls.Highway
         private static readonly IBrush StrikeBandBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xC0, 0x00, 0x00, 0x00));
         private static readonly IPen StrikeEdgePen = new ImmutablePen(Color.FromArgb(0x8C, 0xFF, 0xFF, 0xFF).ToUInt32(), 1);
         private static readonly IBrush LabelBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xD0, 0xFF, 0xFF, 0xFF));
+
+        // Bands behind the notes, the selected one outlined: star power in its cyan, a proposed fill in the proposal amber.
+        private static readonly IBrush StarPowerBandBrush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(HighwayPalette.StarPower, 0x22));
+        private static readonly IPen StarPowerBandPen = new ImmutablePen(HighwayPalette.WithAlpha(HighwayPalette.StarPower, 0xA0).ToUInt32(), 1);
+        private static readonly IBrush ProposalBandBrush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(HighwayPalette.Proposal, 0x22));
+        private static readonly IPen ProposalBandPen = new ImmutablePen(HighwayPalette.WithAlpha(HighwayPalette.Proposal, 0xA0).ToUInt32(), 1);
+        private static readonly IPen BandSelectedPen = new ImmutablePen(Colors.White.ToUInt32(), 2);
 
         // How opaque a faded note is (HighwayNoteMark.Faded), on the highway and in its whole chart.
         private const double FadedOpacity = 0.28;
@@ -221,7 +249,7 @@ namespace ChartShared.UI.Controls.Highway
 
         static NoteHighwayView()
         {
-            AffectsRender<NoteHighwayView>(SceneProperty, LookAheadProperty, WaveformsProperty, AreNotesOutlinedProperty, LengthSecondsProperty);
+            AffectsRender<NoteHighwayView>(SceneProperty, LookAheadProperty, WaveformsProperty, AreNotesOutlinedProperty, LengthSecondsProperty, SelectedPhraseProperty);
         }
 
         /// <summary>Raised when a highway is pressed, before the first <see cref="Scrubbed"/>.</summary>
@@ -289,6 +317,13 @@ namespace ChartShared.UI.Controls.Highway
         {
             get => GetValue(FineScrubFactorProperty);
             set => SetValue(FineScrubFactorProperty, value);
+        }
+
+        /// <summary>The band drawn selected, or null for none.</summary>
+        public int? SelectedPhrase
+        {
+            get => GetValue(SelectedPhraseProperty);
+            set => SetValue(SelectedPhraseProperty, value);
         }
 
         public NoteHighwayView()
@@ -379,7 +414,7 @@ namespace ChartShared.UI.Controls.Highway
                 {
                     var waveform = waveforms is not null && i < waveforms.Count ? waveforms[i] : null;
                     using (context.PushOpacity(1 - overview))
-                        DrawHighway(context, scene, scene.Lanes[i], waveform, bounds, strike, gem, now, from, to, Y);
+                        DrawHighway(context, scene, scene.Lanes[i], waveform, bounds, strike, gem, now, from, to, Y, i == 0 ? SelectedPhrase : null);
                 }
 
                 if (overview > 0)
@@ -575,6 +610,23 @@ namespace ChartShared.UI.Controls.Highway
         }
 
         /// <summary>
+        /// The wheel scrolls the highway through the song, a quarter of its look-ahead a notch, so the preview can be moved
+        /// without leaving it. The window hears <see cref="Scrubbed"/> and seeks.
+        /// </summary>
+        protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
+        {
+            base.OnPointerWheelChanged(e);
+            if (Scene is not { } scene)
+                return;
+
+            double now = (Clock?.Invoke() ?? TimeSpan.Zero).TotalSeconds;
+            double step = Math.Clamp(Math.Max(0.1, LookAhead) * 0.25, 0.1, 2);
+            double target = Math.Clamp(now + (e.Delta.Y * step), 0, TimelineOf(scene));
+            Scrubbed?.Invoke(this, new ScrubEventArgs(target));
+            e.Handled = true;
+        }
+
+        /// <summary>
         /// Where a drag to <paramref name="point"/> moves the audio: with the whole chart shown, the time there up it; otherwise
         /// on from where the audio is by how far down the pointer has gone since it last moved, as far as the notes falling
         /// move for it, or while it's fine, <see cref="FineScrubFactor"/> times less far; either way holding the pointer still.
@@ -677,7 +729,7 @@ namespace ChartShared.UI.Controls.Highway
             InvalidateVisual();
         }
 
-        private void DrawHighway(DrawingContext context, HighwayScene scene, HighwayLane lane, Waveform? waveform, Rect bounds, double strike, double gem, double now, double from, double to, Func<double, double> y)
+        private void DrawHighway(DrawingContext context, HighwayScene scene, HighwayLane lane, Waveform? waveform, Rect bounds, double strike, double gem, double now, double from, double to, Func<double, double> y, int? selectedBand)
         {
             double laneWidth = bounds.Width / lane.LaneCount;
             var hits = HitsAt(lane, now);
@@ -686,6 +738,20 @@ namespace ChartShared.UI.Controls.Highway
             using (context.PushOpacityMask(FadeMask, bounds))
             {
                 context.FillRectangle(HighwayBrush, bounds);
+
+                // Star power phrases and proposed fills, behind the notes they charge.
+                for (int i = 0; i < lane.Bands.Length; i++)
+                {
+                    var band = lane.Bands[i];
+                    double top = y(band.End), bottom = y(band.Start);
+                    var rect = new Rect(bounds.X, Math.Min(top, bottom), bounds.Width, Math.Max(1, Math.Abs(bottom - top)));
+                    var (brush, pen) = band.Kind == HighwayBandKind.Proposal ? (ProposalBandBrush, ProposalBandPen) : (StarPowerBandBrush, StarPowerBandPen);
+                    context.FillRectangle(brush, rect);
+                    context.DrawLine(pen, new Point(bounds.X, rect.Top), new Point(bounds.Right, rect.Top));
+                    context.DrawLine(pen, new Point(bounds.X, rect.Bottom), new Point(bounds.Right, rect.Bottom));
+                    if (i == selectedBand)
+                        context.DrawRectangle(null, BandSelectedPen, rect.Deflate(1));
+                }
 
                 // The track as it's heard, inside the rails, so a note can be lined up with the sound it's played to. Scaled
                 // so its loudest peak fills the highway, so a quiet track's beats show as clearly as a loud one's.
@@ -855,7 +921,7 @@ namespace ChartShared.UI.Controls.Highway
                 // An open note or a kick: a flat bar across the highway.
                 double barHeight = Math.Max(4, gem * 0.45);
                 var bar = new Rect(bounds.X + 4, at - (barHeight / 2), bounds.Width - 8, barHeight);
-                _gems.DrawBar(context, note, color, bar, outlined);
+                _gems.DrawBar(context, lane.Kind, note, color, bar, outlined);
                 return bar;
             }
 

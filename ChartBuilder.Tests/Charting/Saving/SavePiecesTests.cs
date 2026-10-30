@@ -70,21 +70,81 @@ public sealed class SavePiecesTests
     }
 
     [TestMethod]
-    public void AnImportsSongValuesAndItsSustainCutoffArePendingWhereSongIniHasNone()
+    public void AnImportsSongValuesArePendingAndTheChartDerivesItsSustainCutoff()
     {
         var chart = NewChart(Guitar);
-        var import = Import(null, new ChartReadOptions(SustainCutoff: 0), [KeyValuePair.Create("name", "Name"), KeyValuePair.Create("artist", "Artist")]);
+        new AddNotes(Guitar, Expert, [new EditableNote(0, 480, 0)]).Apply(chart);
+        var import = Import(null, new ChartReadOptions(), [KeyValuePair.Create("name", "Name"), KeyValuePair.Create("artist", "Artist")]);
 
         var changes = PendingSongIniChanges.Of(chart, new PendingSongIniInputs(JustGuitar, [KeyValuePair.Create("artist", "Kept")]) { Import = import });
 
         Assert.AreSequenceEqual(
             [
                 new PendingSongIniChange("name", "Name", PendingChangeReason.ImportedValue),
-                new PendingSongIniChange("sustain_cutoff_threshold", "0", PendingChangeReason.ImportSettings),
+                new PendingSongIniChange("sustain_cutoff_threshold", "160", PendingChangeReason.SustainCutoff),
             ],
             changes.ToList());
         Assert.IsTrue(changes[0].CanRevert);
         Assert.IsFalse(changes[1].CanRevert, "The chart is read by it.");
+    }
+
+    [TestMethod]
+    public void TheSustainCutoffComesFromTheShortestSustain()
+    {
+        var chart = NewChart(Guitar);
+        new AddNotes(Guitar, Expert, [new EditableNote(0, 10, 0), new EditableNote(240, 20, 1)]).Apply(chart);
+
+        var changes = PendingSongIniChanges.Of(chart, new PendingSongIniInputs(JustGuitar, []));
+
+        var cutoff = changes.Single(c => c.Key == "sustain_cutoff_threshold");
+        Assert.AreEqual("9", cutoff.Value);
+        Assert.AreEqual(PendingChangeReason.SustainCutoff, cutoff.Reason);
+        Assert.IsFalse(cutoff.CanRevert);
+    }
+
+    [TestMethod]
+    public void AChartWithoutSustainsLeavesTheCutoffAlone()
+    {
+        var chart = NewChart(Guitar);
+        new AddNotes(Guitar, Expert, [new EditableNote(0, EditableNote.PlainLength, 0)]).Apply(chart);
+
+        var changes = PendingSongIniChanges.Of(chart, new PendingSongIniInputs(JustGuitar, []));
+
+        Assert.DoesNotContain(c => c.Key == "sustain_cutoff_threshold", changes);
+    }
+
+    [TestMethod]
+    public void TheCutoffFollowsTheSustainsTheSaveWrites()
+    {
+        var chart = NewChart(Guitar);
+        // The sustain runs into the note 100 ticks in, where the save cuts it short: the cutoff follows the 100.
+        new AddNotes(Guitar, Expert, [new EditableNote(0, 480, 0), new EditableNote(100, EditableNote.PlainLength, 0)]).Apply(chart);
+
+        var changes = PendingSongIniChanges.Of(chart, new PendingSongIniInputs(JustGuitar, []));
+
+        Assert.AreEqual("99", changes.Single(c => c.Key == "sustain_cutoff_threshold").Value);
+    }
+
+    [TestMethod]
+    public void TheCutoffIsTheChartsToDecideOnlyWhileItHasASustain()
+    {
+        var sustainless = NewChart(Guitar);
+        new AddNotes(Guitar, Expert, [new EditableNote(0, EditableNote.PlainLength, 0)]).Apply(sustainless);
+        var edited = PendingSongIniChanges.Of(
+            sustainless,
+            new PendingSongIniInputs(JustGuitar, []) { Edits = [new KeyValuePair<string, string?>("sustain_cutoff_threshold", "50")] });
+
+        var change = edited.Single(c => c.Key == "sustain_cutoff_threshold");
+        Assert.AreEqual("50", change.Value);
+        Assert.AreEqual(PendingChangeReason.UserEdit, change.Reason, "The chart has no sustain to decide it.");
+
+        var sustained = NewChart(Guitar);
+        new AddNotes(Guitar, Expert, [new EditableNote(0, 20, 0)]).Apply(sustained);
+        var ignored = PendingSongIniChanges.Of(
+            sustained,
+            new PendingSongIniInputs(JustGuitar, []) { Edits = [new KeyValuePair<string, string?>("sustain_cutoff_threshold", "50")] });
+
+        Assert.AreEqual("19", ignored.Single(c => c.Key == "sustain_cutoff_threshold").Value, "The chart derives it.");
     }
 
     [TestMethod]

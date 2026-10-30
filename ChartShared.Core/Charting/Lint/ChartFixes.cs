@@ -19,8 +19,6 @@ public static class ChartFixes
     private const string SnapNearest = "nearest";
     private const string SnapFarther = "farther";
     private const string DeleteChord = "delete";
-    private const string MakePlain = "plain";
-    private const string LengthenToCutoff = "cutoff";
     private const string RemoveOpen = "remove-open";
     private const string KeepOpen = "keep-open";
     private const string DeleteLater = "delete-later";
@@ -35,7 +33,6 @@ public static class ChartFixes
         new Fixes(ChrRules.Chr004, SnapToGrid),
         new Fix(ChrRules.Chr005, KeepTheLaterMarker),
         new Fix(ChrRules.Chr020, TrimSustain),
-        new Fixes(ChrRules.Chr021, PlainOrCutoff),
         new Fixes(ChrRules.Chr022, OpenOrFrets),
         new Fix(ChrRules.Chr023, RemoveRedundantForce),
         new Fix(ChrRules.Chr024, RemoveForceHopo),
@@ -99,32 +96,18 @@ public static class ChartFixes
         };
     }
 
-    // CHR020: each sustain at the tick that runs into the next note on its lane, held to that note.
+    // CHR020: each sustain at the tick that runs into the next note on its lane, held to that note, or made plain when
+    // that leaves it under the shortest hold Chart Builder keeps as a sustain.
     private static IChartCommand? TrimSustain(Finding finding, EditableChart chart, ChartReadOptions options)
     {
         if (TrackAt(finding, chart) is not var (part, track, location))
             return null;
-        long cutoff = SustainCutoff.Of(chart.Resolution, options.SustainCutoff);
         var lengths = track.Notes.At(location.Tick).ToArray()
-            .Select(n => (Note: n, Next: SustainIntoNextNoteRule.RunsInto(track, n, cutoff)))
+            .Select(n => (Note: n, Next: SustainIntoNextNoteRule.RunsInto(track, n)))
             .Where(p => p.Next is { } next && next.Tick == location.EndTick)
-            .Select(p => (p.Note, p.Next!.Value.Tick - p.Note.Tick))
+            .Select(p => (p.Note, EditableNote.SustainOrPlain(p.Next!.Value.Tick - p.Note.Tick)))
             .ToList();
         return lengths.Count > 0 ? new SetSustain(part.Instrument, track.Difficulty, lengths) : null;
-    }
-
-    // CHR021: the chord's sustains that the games read as plain notes made plain notes, or held to the cutoff, so they're
-    // read as sustains.
-    private static IEnumerable<ChartFixOption> PlainOrCutoff(Finding finding, EditableChart chart, ChartReadOptions options)
-    {
-        if (TrackAt(finding, chart) is not var (part, track, location))
-            yield break;
-        long cutoff = SustainCutoff.Of(chart.Resolution, options.SustainCutoff);
-        var notes = track.Notes.At(location.Tick).ToArray().Where(n => SustainUnderCutoffRule.IsUnderCutoff(n, chart.Resolution, cutoff)).ToList();
-        if (notes.Count == 0)
-            yield break;
-        yield return new ChartFixOption(MakePlain, FindingMessages.FixMakePlain, new SetSustain(part.Instrument, track.Difficulty, notes, EditableNote.PlainLength));
-        yield return new ChartFixOption(LengthenToCutoff, FindingMessages.FixLengthenToCutoff, new SetSustain(part.Instrument, track.Difficulty, notes, cutoff));
     }
 
     // CHR022: the open note taken out of the chord, leaving its frets; or the frets, leaving the open note.

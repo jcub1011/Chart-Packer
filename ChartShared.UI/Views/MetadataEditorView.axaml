@@ -302,6 +302,12 @@
                                         <MenuItem.Icon><ui:LineIcon Data="{StaticResource TrashStroke}" /></MenuItem.Icon>
                                     </MenuItem>
                                     <Separator IsVisible="{Binding HasUndoOrRemove}" />
+                                    <MenuItem Header="{x:Static res:SharedStrings.UsePlayheadButton}"
+                                              Command="{Binding UsePlayheadCommand}"
+                                              IsVisible="{Binding ShowUsePlayhead}"
+                                              ToolTip.Tip="{x:Static res:SharedStrings.UsePlayheadToolTip}">
+                                        <MenuItem.Icon><ui:LineIcon Data="{StaticResource PlayheadStroke}" /></MenuItem.Icon>
+                                    </MenuItem>
                                     <MenuItem Header="{Binding QuickFixHeader}" Command="{Binding QuickFixCommand}">
                                         <MenuItem.Icon><ui:LineIcon Data="{StaticResource QuickFixStroke}" /></MenuItem.Icon>
                                     </MenuItem>
@@ -372,6 +378,14 @@
                                             <KeyBinding Gesture="Escape" Command="{Binding CancelCommand}" />
                                         </TextBox.KeyBindings>
                                     </TextBox>
+                                    <!-- A time's edit box also takes the playhead position, committing it at once. -->
+                                    <Button Classes="inlineAction"
+                                            Command="{Binding UsePlayheadCommand}"
+                                            IsVisible="{Binding ShowUsePlayhead}"
+                                            ToolTip.Tip="{x:Static res:SharedStrings.UsePlayheadToolTip}"
+                                            AutomationProperties.Name="{x:Static res:SharedStrings.UsePlayheadButton}">
+                                        <TextBlock Text="{x:Static res:SharedStrings.UsePlayheadButton}" />
+                                    </Button>
                                     <TextBlock Classes="error" Text="{Binding Error}" IsVisible="{Binding HasError}" />
                                 </StackPanel>
 
@@ -475,13 +489,21 @@
                         <TextBox x:Name="NewValueBox"
                                  Classes="inline"
                                  Text="{Binding NewValue}"
-                                 PlaceholderText="{x:Static res:SharedStrings.NewValueWatermark}"
+                                 PlaceholderText="{Binding NewValuePlaceholder}"
                                  AutomationProperties.Name="{x:Static res:SharedStrings.NewValueWatermark}">
                             <TextBox.KeyBindings>
                                 <KeyBinding Gesture="Enter" Command="{Binding CommitAddCommand}" />
                                 <KeyBinding Gesture="Escape" Command="{Binding CancelAddCommand}" />
                             </TextBox.KeyBindings>
                         </TextBox>
+                        <!-- A time being added also takes the playhead position. -->
+                        <Button Classes="inlineAction"
+                                Command="{Binding UsePlayheadForNewCommand}"
+                                IsVisible="{Binding ShowUsePlayheadForNew}"
+                                ToolTip.Tip="{x:Static res:SharedStrings.UsePlayheadToolTip}"
+                                AutomationProperties.Name="{x:Static res:SharedStrings.UsePlayheadButton}">
+                            <TextBlock Text="{x:Static res:SharedStrings.UsePlayheadButton}" />
+                        </Button>
                         <TextBlock Classes="error" Text="{Binding NewRowError}" IsVisible="{Binding HasNewRowError}" />
                         <TextBlock Classes="hint"
                                    Margin="0,2,0,2"

@@ -1,10 +1,12 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:help="using:ChartShared.Core.Help"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:svm="using:ChartShared.UI.ViewModels.Settings"
         xmlns:res="using:ChartShared.UI.Resources"
         xmlns:ctl="using:ChartShared.UI.Controls"
+        xmlns:conv="using:ChartShared.UI.Converters"
         xmlns:chrome="using:Avalonia.Controls.Chrome"
         mc:Ignorable="d" d:DesignWidth="820" d:DesignHeight="560"
         x:Class="ChartShared.UI.Views.SettingsWindow"
@@ -25,46 +27,18 @@
          would have nothing to restore it from, leaving its owner disabled. -->
 
     <Window.Styles>
-        <Style Selector="TextBlock.settings-heading">
-            <Setter Property="FontSize" Value="13" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
-        </Style>
-        <!-- One setting. Outlined in the accent while it has a change that OK or Apply hasn't written yet. -->
-        <Style Selector="Border.setting-row">
-            <Setter Property="Background" Value="{DynamicResource ToolbarGroupBrush}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="6" />
-            <Setter Property="Padding" Value="12,8,6,8" />
-        </Style>
-        <Style Selector="Border.setting-row.modified">
-            <Setter Property="BorderBrush" Value="#998B5CF6" />
-        </Style>
-        <Style Selector="TextBlock.setting-description">
-            <Setter Property="FontSize" Value="12" />
-            <Setter Property="Opacity" Value="0.6" />
-            <Setter Property="TextWrapping" Value="Wrap" />
-        </Style>
-        <!-- Locked while the toggle it depends on is off: dimmed, with a note saying which toggle that is. -->
-        <Style Selector="Border.setting-row.locked StackPanel.setting-text">
-            <Setter Property="Opacity" Value="0.55" />
-        </Style>
-        <Style Selector="TextBlock.setting-locked">
-            <Setter Property="FontSize" Value="12" />
-            <Setter Property="FontStyle" Value="Italic" />
-            <Setter Property="TextWrapping" Value="Wrap" />
-        </Style>
-        <Style Selector="TreeViewItem" x:DataType="svm:SettingsCategoryViewModel">
-            <Setter Property="IsExpanded" Value="{Binding IsExpanded}" />
-        </Style>
+        <!-- The rail, page header, flat rows and footer, shared with the Shortcuts window. -->
+        <StyleInclude Source="avares://ChartShared.UI/Styles/Dialogs.axaml" />
     </Window.Styles>
 
     <!-- Editors, one per kind of setting; SettingEditorFactory picks the view model. Each is shown inside a
          settings row (the row template below), which adds the label, description and reset button. -->
     <Window.DataTemplates>
         <DataTemplate DataType="svm:ToggleSettingViewModel">
-            <CheckBox IsChecked="{Binding Value}" AutomationProperties.Name="{Binding Label}" />
+            <ToggleSwitch IsChecked="{Binding Value}"
+                          OnContent=""
+                          OffContent=""
+                          AutomationProperties.Name="{Binding Label}" />
         </DataTemplate>
         <DataTemplate DataType="svm:IntegerSettingViewModel">
             <NumericUpDown Value="{Binding Value}"
@@ -84,6 +58,15 @@
                         Maximum="{Binding Maximum}"
                         SmallChange="{Binding SmallChange}"
                         LargeChange="{Binding SmallChange}"
+                        Width="180"
+                        VerticalAlignment="Center"
+                        AutomationProperties.Name="{Binding Label}" />
+                <TextBlock Text="{Binding ValueText}" MinWidth="40" TextAlignment="Right" VerticalAlignment="Center" />
+            </StackPanel>
+        </DataTemplate>
+        <DataTemplate DataType="svm:LookAheadSettingViewModel">
+            <StackPanel Orientation="Horizontal" Spacing="10">
+                <ctl:LookAheadSlider LookAhead="{Binding Value}"
                         Width="180"
                         VerticalAlignment="Center"
                         AutomationProperties.Name="{Binding Label}" />
@@ -125,6 +108,7 @@
         <!-- The title bar, as the main windows' are: the icon (the owner's, set in code), the title and the search box.
              Dragging anywhere but the search box moves the window. -->
         <ctl:TitleBar x:Name="WindowTitleBar"
+                      HelpPage="{x:Static help:HelpPages.Settings}"
                       Grid.Row="0"
                       Height="31"
                       BorderThickness="0,0,0,1"
@@ -149,59 +133,86 @@
             </StackPanel>
         </ctl:TitleBar>
 
-        <Grid Grid.Row="1" ColumnDefinitions="220,*">
+        <Grid Grid.Row="1" ColumnDefinitions="200,*">
+            <!-- The categories: an icon, a name, and how many of its settings have a change not yet written (or, while
+                 searching, how many match). "All Settings" at the top shows every category. -->
             <Border Grid.Column="0"
                     Background="{DynamicResource SurfaceBrush}"
                     BorderBrush="{DynamicResource SubtleBorderBrush}"
                     BorderThickness="0,0,1,0">
-                <TreeView ItemsSource="{Binding Categories}"
-                          SelectedItem="{Binding SelectedCategory}"
-                          Margin="4,8"
-                          AutomationProperties.Name="{x:Static res:SharedStrings.SettingsCategoriesName}">
-                    <TreeView.ItemTemplate>
-                        <TreeDataTemplate DataType="svm:SettingsCategoryViewModel" ItemsSource="{Binding Children}">
-                            <TextBlock Text="{Binding Label}" />
-                        </TreeDataTemplate>
-                    </TreeView.ItemTemplate>
-                </TreeView>
+                <ListBox Classes="rail"
+                         ItemsSource="{Binding Categories}"
+                         SelectedItem="{Binding SelectedCategory}"
+                         AutomationProperties.Name="{x:Static res:SharedStrings.SettingsCategoriesName}">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate DataType="svm:SettingsCategoryViewModel">
+                            <Grid ColumnDefinitions="16,*,Auto" ColumnSpacing="10">
+                                <ctl:LineIcon Grid.Column="0"
+                                              Data="{Binding IconKey, Converter={x:Static conv:LineIconConverter.Instance}}"
+                                              IsVisible="{Binding HasIcon}"
+                                              VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding Label}"
+                                           TextTrimming="CharacterEllipsis"
+                                           VerticalAlignment="Center" />
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                    <TextBlock Classes="rail-matches"
+                                               Text="{Binding MatchCount}"
+                                               IsVisible="{Binding HasMatchCount}" />
+                                    <Border Classes="rail-count" IsVisible="{Binding HasModified}">
+                                        <TextBlock Text="{Binding ModifiedCount}" />
+                                    </Border>
+                                </StackPanel>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
             </Border>
 
-            <Panel Grid.Column="1">
-                <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-                    <ItemsControl ItemsSource="{Binding Groups}" Margin="20,14,20,20">
+            <Grid Grid.Column="1" RowDefinitions="Auto,*">
+                <!-- The page header: the selected category's name, and the sections it holds. -->
+                <StackPanel Grid.Row="0" Spacing="2" Margin="24,18,24,8">
+                    <TextBlock Classes="page-title" Text="{Binding PageTitle}" />
+                    <TextBlock Classes="page-subtitle"
+                               Text="{Binding PageSubtitle}"
+                               IsVisible="{Binding HasPageSubtitle}" />
+                </StackPanel>
+
+                <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled">
+                    <ItemsControl ItemsSource="{Binding Groups}" Margin="24,6,24,20">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
-                                <StackPanel Spacing="20" />
+                                <StackPanel Spacing="22" />
                             </ItemsPanelTemplate>
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate DataType="svm:SettingsGroupViewModel">
-                                <StackPanel Spacing="8">
-                                    <TextBlock Classes="settings-heading" Text="{Binding Title}" />
+                                <StackPanel>
+                                    <Border Classes="section" IsVisible="{Binding HasTitle}">
+                                        <TextBlock Text="{Binding Title}" />
+                                    </Border>
                                     <ItemsControl ItemsSource="{Binding Items}">
-                                        <ItemsControl.ItemsPanel>
-                                            <ItemsPanelTemplate>
-                                                <StackPanel Spacing="6" />
-                                            </ItemsPanelTemplate>
-                                        </ItemsControl.ItemsPanel>
                                         <!-- The row. Its editor comes from Window.DataTemplates, by the setting's kind. -->
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate DataType="svm:SettingViewModel">
-                                                <Border Classes="setting-row" Classes.modified="{Binding IsModified}" Classes.locked="{Binding !IsEnabled}">
-                                                    <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="12">
-                                                        <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
-                                                            <StackPanel Classes="setting-text" Spacing="2">
+                                                <Border Classes="row" Classes.locked="{Binding !IsEnabled}">
+                                                    <Grid ColumnDefinitions="Auto,*,Auto,Auto,32" ColumnSpacing="12">
+                                                        <Border Grid.Column="0" Classes="row-bar" Classes.modified="{Binding IsModified}" />
+                                                        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                                            <StackPanel Classes="row-dim" Spacing="2">
                                                                 <TextBlock Text="{Binding Label}" TextWrapping="Wrap" />
-                                                                <TextBlock Classes="setting-description"
+                                                                <TextBlock Classes="row-description"
                                                                            Text="{Binding Description}"
                                                                            IsVisible="{Binding HasDescription}" />
                                                             </StackPanel>
-                                                            <TextBlock Classes="setting-locked"
+                                                            <TextBlock Classes="row-note"
                                                                        Text="{Binding LockedNote}"
                                                                        IsVisible="{Binding !IsEnabled}" />
                                                         </StackPanel>
                                                         <!-- The setting's own buttons. They act at once, so they stay enabled while the setting is locked. -->
-                                                        <ItemsControl Grid.Column="1"
+                                                        <ItemsControl Grid.Column="2"
+                                                                      Classes="row-actions"
+                                                                      Classes.alone="{Binding !HasEditor}"
                                                                       ItemsSource="{Binding Actions}"
                                                                       IsVisible="{Binding HasActions}"
                                                                       VerticalAlignment="Center">
@@ -219,7 +230,7 @@
                                                                                 IsVisible="{Binding HasIcon}"
                                                                                 ToolTip.Tip="{Binding Label}"
                                                                                 AutomationProperties.Name="{Binding Label}">
-                                                                            <ctl:LineIcon Data="{Binding Icon}" />
+                                                                            <ctl:LineIcon Data="{Binding IconKey, Converter={x:Static conv:LineIconConverter.Instance}}" />
                                                                         </Button>
                                                                         <Button Content="{Binding Label}"
                                                                                 Command="{Binding RunCommand}"
@@ -229,9 +240,17 @@
                                                                 </DataTemplate>
                                                             </ItemsControl.ItemTemplate>
                                                         </ItemsControl>
-                                                        <ContentControl Grid.Column="2" Content="{Binding}" VerticalAlignment="Center" IsEnabled="{Binding IsEnabled}" />
+                                                        <!-- The editors share a track at the row's right, so their right edges line up down the page. -->
+                                                        <ContentControl Grid.Column="3"
+                                                                        Content="{Binding}"
+                                                                        MinWidth="180"
+                                                                        HorizontalAlignment="Right"
+                                                                        HorizontalContentAlignment="Right"
+                                                                        VerticalAlignment="Center"
+                                                                        IsVisible="{Binding HasEditor}"
+                                                                        IsEnabled="{Binding IsEnabled}" />
                                                         <!-- Fixed width, so the editor doesn't shift when the button appears. -->
-                                                        <Panel Grid.Column="3" Width="32" VerticalAlignment="Center">
+                                                        <Panel Grid.Column="4" VerticalAlignment="Center">
                                                             <Button Classes="tool"
                                                                     Command="{Binding ResetCommand}"
                                                                     IsVisible="{Binding !IsDefault}"
@@ -251,35 +270,43 @@
                     </ItemsControl>
                 </ScrollViewer>
 
-                <TextBlock Classes="muted centered"
+                <TextBlock Grid.Row="1"
+                           Classes="muted centered"
                            Margin="20"
                            VerticalAlignment="Center"
                            IsVisible="{Binding HasNoMatches}"
                            Text="{Binding NoMatchesText}" />
-            </Panel>
+            </Grid>
         </Grid>
 
         <!-- No default button: Enter in the search or number boxes shouldn't close the window. -->
         <Border Grid.Row="2" Classes="toolbar" BorderThickness="0,1,0,0">
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
-                <Button Classes="accent"
-                        MinWidth="80"
-                        HorizontalContentAlignment="Center"
-                        Content="{x:Static res:SharedStrings.OkButton}"
-                        Click="OnOk"
-                        AutomationProperties.Name="{x:Static res:SharedStrings.OkButton}" />
-                <Button MinWidth="80"
-                        HorizontalContentAlignment="Center"
-                        Content="{x:Static res:SharedStrings.CancelButton}"
-                        IsCancel="True"
-                        Click="OnCancel"
-                        AutomationProperties.Name="{x:Static res:SharedStrings.CancelButton}" />
-                <Button MinWidth="80"
-                        HorizontalContentAlignment="Center"
-                        Content="{x:Static res:SharedStrings.ApplyButton}"
-                        Command="{Binding ApplyCommand}"
-                        AutomationProperties.Name="{x:Static res:SharedStrings.ApplyButton}" />
-            </StackPanel>
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                <TextBlock Grid.Column="0"
+                           Classes="footer-status"
+                           Margin="4,0,0,0"
+                           Text="{Binding UnsavedText}"
+                           IsVisible="{Binding HasUnsaved}" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                    <Button MinWidth="80"
+                            HorizontalContentAlignment="Center"
+                            Content="{x:Static res:SharedStrings.ApplyButton}"
+                            Command="{Binding ApplyCommand}"
+                            AutomationProperties.Name="{x:Static res:SharedStrings.ApplyButton}" />
+                    <Button MinWidth="80"
+                            HorizontalContentAlignment="Center"
+                            Content="{x:Static res:SharedStrings.CancelButton}"
+                            IsCancel="True"
+                            Click="OnCancel"
+                            AutomationProperties.Name="{x:Static res:SharedStrings.CancelButton}" />
+                    <Button Classes="accent"
+                            MinWidth="80"
+                            HorizontalContentAlignment="Center"
+                            Content="{x:Static res:SharedStrings.OkButton}"
+                            Click="OnOk"
+                            AutomationProperties.Name="{x:Static res:SharedStrings.OkButton}" />
+                </StackPanel>
+            </Grid>
         </Border>
     </Grid>
 </Window>

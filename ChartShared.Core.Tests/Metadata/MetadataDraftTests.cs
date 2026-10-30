@@ -521,6 +521,98 @@ public sealed class MetadataDraftTests
         Assert.IsTrue(draft.IsEmpty);
     }
 
+    [TestMethod]
+    public void CopyFromReplacesEveryChangeAndKeepsTheObject()
+    {
+        var track = new ChartTrackKey(ChartInstrument.Drums, ChartDifficulty.Expert);
+        var source = new MetadataDraft();
+        source.Set("name", "A");
+        source.Remove("artist");
+        source.SetAlbumArt("cover.png");
+        source.SetBackground(BackgroundKind.Video, "clip.webm");
+        source.AddFile(new AddedFile("guitar.opus", "g.opus", 1), ["guitar.ogg"], [new MetadataChange("delay", "5")]);
+        source.SetChartOffset(track, 40);
+        source.SetVocalsOffset(-20);
+
+        var target = new MetadataDraft();
+        target.Set("album", "Old");
+        target.SetBackground(BackgroundKind.Image, "bg.png");
+        target.RemoveFile("video.mp4");
+
+        target.CopyFrom(source);
+
+        Assert.IsTrue(target.SameAs(source));
+        Assert.AreSequenceEqual(["name", "artist", "delay"], [.. target.Keys]);
+        Assert.IsNull(target.BackgroundImage);
+        Assert.AreSequenceEqual(["guitar.ogg"], [.. target.RemovedFiles]);
+
+        // Its own copy: reverting the add here brings back the file it replaced, and the source keeps its add.
+        target.RevertFile("guitar.opus");
+        Assert.IsTrue(source.IsFileAdded("guitar.opus"));
+        Assert.IsTrue(source.IsFileRemoved("guitar.ogg"));
+        Assert.IsFalse(target.IsFileRemoved("guitar.ogg"));
+    }
+
+    [TestMethod]
+    public void SameAsComparesEveryPartOfTheDraft()
+    {
+        var track = new ChartTrackKey(ChartInstrument.Drums, ChartDifficulty.Expert);
+        Assert.IsTrue(new MetadataDraft().SameAs(new MetadataDraft()));
+
+        var draft = new MetadataDraft();
+        draft.Set("name", "A");
+        Assert.IsTrue(draft.SameAs(draft.Clone()));
+
+        foreach (var change in new Action<MetadataDraft>[]
+        {
+            d => d.Set("name", "B"),
+            d => d.Set("artist", "X"),
+            d => d.SetAlbumArt("a.png"),
+            d => d.RemoveBackground(BackgroundKind.Image),
+            d => d.RemoveFile("a.ogg"),
+            d => d.AddFile(new AddedFile("a.ogg", "x", 1)),
+            d => d.SetChartOffset(track, 3),
+            d => d.SetVocalsOffset(3),
+            d => d.RemoveVocals(),
+        })
+        {
+            var changed = draft.Clone();
+            change(changed);
+            Assert.IsFalse(draft.SameAs(changed));
+            Assert.IsFalse(changed.SameAs(draft));
+        }
+    }
+
+    [TestMethod]
+    public void SameAsSeesTheOrderKeysWereChanged()
+    {
+        var one = new MetadataDraft();
+        one.Set("a", "1");
+        one.Set("b", "2");
+        var other = new MetadataDraft();
+        other.Set("b", "2");
+        other.Set("a", "1");
+
+        Assert.IsFalse(one.SameAs(other));
+        Assert.IsTrue(one.SameApartFromKeys(other));
+    }
+
+    [TestMethod]
+    public void SameApartFromKeysSeesEverythingButTheKeys()
+    {
+        var draft = new MetadataDraft();
+        draft.Set("name", "A");
+
+        var keys = draft.Clone();
+        keys.Set("name", "B");
+        keys.Remove("artist");
+        var art = draft.Clone();
+        art.SetAlbumArt("a.png");
+
+        Assert.IsTrue(draft.SameApartFromKeys(keys));
+        Assert.IsFalse(draft.SameApartFromKeys(art));
+    }
+
     private static KeyValuePair<string, string> P(string key, string value) => KeyValuePair.Create(key, value);
 
     private static VocalsSource Source(string path)

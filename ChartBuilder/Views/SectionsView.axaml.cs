@@ -1,6 +1,9 @@
 using System;
 using System.Linq;
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using ChartBuilder.ViewModels;
@@ -19,6 +22,7 @@ namespace ChartBuilder.Views
         {
             InitializeComponent();
             AddHandler(KeyDownEvent, FieldKeys.OnKeyDown);
+            AddHandler(KeyDownEvent, OnTickEscape, RoutingStrategies.Tunnel);
         }
 
         protected override void OnDataContextChanged(EventArgs e)
@@ -29,6 +33,20 @@ namespace ChartBuilder.Views
             _viewModel = DataContext as SectionsViewModel;
             if (_viewModel is not null)
                 _viewModel.EditRequested += OnEditRequested;
+        }
+
+        // Escape in the tick box takes back what's typed, as a field's Escape does. Its text is the box's own, so the row is
+        // filled again from the chart rather than a binding put back.
+        private void OnTickEscape(object? sender, KeyEventArgs e)
+        {
+            if (e.Key != Key.Escape || e.Source is not Visual source
+                || source.FindAncestorOfType<NumericUpDown>(includeSelf: true) is not { Name: "TickBox", DataContext: EventItem item })
+            {
+                return;
+            }
+
+            _viewModel?.RevertTick(item);
+            e.Handled = true;
         }
 
         // A row inserted to be renamed: brought into view, as the list only makes the rows on screen, and once it's laid out,

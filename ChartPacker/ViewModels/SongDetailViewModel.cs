@@ -78,6 +78,10 @@ namespace ChartPacker.ViewModels
     {
         private const int BulkLoadParallelism = 4;
 
+        // The changes a drag makes to the chart's offsets, and to the audio and video offset keys, are one step to undo each.
+        private const string OffsetsMergeKey = "offsets";
+        private const string TimingMergeKey = "timing";
+
         // A square tile at its 512px largest, at 2x scaling.
         private const int ArtDecodeWidth = 1024;
 
@@ -172,6 +176,7 @@ namespace ChartPacker.ViewModels
 
         // One command per stem for the Add track menu, whose labels change with the song's tracks.
         private readonly Dictionary<string, IAsyncRelayCommand> _addTrackCommands = [];
+        private readonly IReadOnlyList<StemOption> _addTrackOptions;
 
         /// <param name="downloads">Saves copies of the song's files from their right-click menus; none for a panel that only previews.</param>
         /// <param name="reveal">Shows the selected songs in the file manager; none for a panel that only previews.</param>
@@ -261,6 +266,7 @@ namespace ChartPacker.ViewModels
             };
             foreach (string stem in AudioStems.Stems)
                 _addTrackCommands[stem] = new AsyncRelayCommand(() => AddTrackAsync(stem), CanChangeFiles);
+            _addTrackOptions = TrackStaging.OptionsFor(stem => _addTrackCommands[stem]);
             _job.PropertyChanged += OnJobPropertyChanged;
         }
 
@@ -321,7 +327,7 @@ namespace ChartPacker.ViewModels
         /// <summary>How far the one selected song's draft moves its background video, as its <c>video_start_time</c>; in the background's caption.</summary>
         public TimingOffsetViewModel VideoOffset { get; } = new(TimingOffsets.VideoKey);
 
-        /// <summary>The Add track menu: every stem, labelled to replace the ones the song already has.</summary>
+        /// <summary>The Add track menu: every stem, labelled with its name.</summary>
         [ObservableProperty]
         public partial IReadOnlyList<StemOption> AddTrackOptions { get; set; } = [];
 
@@ -544,6 +550,8 @@ namespace ChartPacker.ViewModels
         string? IMetadataEditorHost.LoadNote => _loadNote;
 
         IRelayCommand? IMetadataEditorHost.AutoSetSongLengthCommand => AutoSetSongLengthCommand;
+
+        TimeSpan? IMetadataEditorHost.PlayheadPosition => IsBulk || _songs.Count != 1 ? null : Player.DrawnPosition;
 
         bool IMetadataEditorHost.CanEditKey(string key) => true;
 
@@ -1404,7 +1412,11 @@ namespace ChartPacker.ViewModels
                 var bySong = dirty.ToDictionary(s => s.Entry.FullPath, StringComparer.Ordinal);
                 failures = await _saver.SaveAsync(
                     [.. dirty.Select(s => new SaveTarget(s.Entry, s.SongIniPath, s.Item.Draft))],
-                    entry => NotifyDrafts([bySong[entry.FullPath]]));
+                    entry =>
+                    {
+                        // What's saved is the state undo can't go back past.
+                        NotifyDrafts([bySong[entry.FullPath]], change: DraftChange.Saved);
+                    });
             }
             finally
             {
@@ -1456,6 +1468,37 @@ namespace ChartPacker.ViewModels
         }
 
         /// <summary>
+        /// The song undo and redo apply to: the one shown, as there's no telling which of several is meant, and what
+        /// one song's undo would do to the rest of a selection would be anyone's guess.
+        /// </summary>
+        private string? UndoPath => CanEdit && !IsBulk && !IsAutoSettingLength && _songs.Count == 1 && !MetadataEditor.IsEditingAny
+            ? _songs[0].Entry.FullPath
+            : null;
+
+        private bool CanUndo() => UndoPath is { } path && _drafts.CanUndo(path);
+
+        private bool CanRedo() => UndoPath is { } path && _drafts.CanRedo(path);
+
+        /// <summary>
+        /// Undoes the last change to the one song shown, whatever made it, a batch edit included: each song keeps its own
+        /// changes, so a batch edit is undone for this song only. The store tells the panel, which shows the draft again.
+        /// </summary>
+        [RelayCommand(CanExecute = nameof(CanUndo))]
+        private void Undo()
+        {
+            if (UndoPath is { } path)
+                _drafts.Undo(path);
+        }
+
+        /// <summary>Applies again the last change undone to the one song shown.</summary>
+        [RelayCommand(CanExecute = nameof(CanRedo))]
+        private void Redo()
+        {
+            if (UndoPath is { } path)
+                _drafts.Redo(path);
+        }
+
+        /// <summary>
         /// Lets go of every file of the shown songs this panel holds open, which would stop them being replaced or
         /// deleted: playback's, and the background video's. They're opened again when the songs are next shown.
         /// </summary>
@@ -1493,13 +1536,14 @@ namespace ChartPacker.ViewModels
         }
 
         /// <summary>Tells the draft store that <paramref name="songs"/>' drafts changed, without this panel hearing it back.</summary>
-        private void NotifyDrafts(IEnumerable<EditableSong> songs)
+        /// <param name="mergeKey">Names a run of changes that make one step to undo, as a drag's; see <see cref="MetadataDraftStore.NotifyChanged"/>.</param>
+        private void NotifyDrafts(IEnumerable<EditableSong> songs, string? mergeKey = null, DraftChange change = DraftChange.Edited)
         {
             _notifyingDrafts = true;
             try
             {
                 foreach (var song in songs)
-                    _drafts.NotifyChanged(song.Entry.FullPath);
+                    _drafts.NotifyChanged(song.Entry.FullPath, change, mergeKey);
             }
             finally
             {
@@ -1649,7 +1693,7 @@ namespace ChartPacker.ViewModels
         /// </summary>
         private void OnOffsetsChanged()
         {
-            NotifyDrafts(_songs);
+            NotifyDrafts(_songs, OffsetsMergeKey);
             OnPropertyChanged(nameof(IsChartChanged));
             RefreshState();
 
@@ -1663,7 +1707,7 @@ namespace ChartPacker.ViewModels
         /// </summary>
         private void OnTimingChanged()
         {
-            NotifyDrafts(_songs);
+            NotifyDrafts(_songs, TimingMergeKey);
             RebuildRows();
             RefreshPlayback();
 
@@ -2195,7 +2239,7 @@ namespace ChartPacker.ViewModels
 
         /// <summary>
         /// Gives the player the one selected song's tracks once its draft is applied, each with its
-        /// size; lists the tracks the draft removes without replacing; and labels the Add track menu to match.
+        /// size; lists the tracks the draft removes without replacing; and shows the Add track menu.
         /// </summary>
         private void RefreshTracks()
         {
@@ -2240,7 +2284,7 @@ namespace ChartPacker.ViewModels
 
             OnPropertyChanged(nameof(HasRemovedTracks));
 
-            AddTrackOptions = TrackStaging.OptionsFor(tracks.Select(t => t.Stem), stem => _addTrackCommands[stem]);
+            AddTrackOptions = _addTrackOptions;
         }
 
         /// <summary><paramref name="track"/>'s file size, formatted: the file to be added, or the one stored.</summary>
@@ -2544,6 +2588,8 @@ namespace ChartPacker.ViewModels
         {
             SaveCommand.NotifyCanExecuteChanged();
             DiscardCommand.NotifyCanExecuteChanged();
+            UndoCommand.NotifyCanExecuteChanged();
+            RedoCommand.NotifyCanExecuteChanged();
             AutoSetSongLengthCommand.NotifyCanExecuteChanged();
             ReplaceArtCommand.NotifyCanExecuteChanged();
             RemoveArtCommand.NotifyCanExecuteChanged();

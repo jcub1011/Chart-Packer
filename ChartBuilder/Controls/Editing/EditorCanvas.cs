@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq;
 using Avalonia;
@@ -79,7 +80,11 @@ namespace ChartBuilder.Controls.Editing
         private static readonly IPen TempoPen = new ImmutablePen(Color.FromArgb(0xB0, 0xFF, 0xB0, 0x40).ToUInt32(), 1.5);
         private static readonly IBrush TempoBrush = new ImmutableSolidColorBrush(Color.FromRgb(0xFF, 0xB0, 0x40));
         private static readonly IBrush SpanBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x26, 0x6E, 0x9C, 0xFF));
-        private static readonly IBrush LoopBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x18, 0x3C, 0xD2, 0x78));
+        // The loop region (charter-spec C10 item 2): a light green box across the lanes, whose ends a drag resizes and whose
+        // body a drag moves with the Loop tool; and where a press of the tool would start drawing one.
+        private static readonly IBrush LoopBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x22, 0x3C, 0xD2, 0x78));
+        private static readonly IPen LoopPen = new ImmutablePen(Color.FromArgb(0xD0, 0x3C, 0xD2, 0x78).ToUInt32(), 1.5);
+        private static readonly IBrush LoopLineBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xD0, 0x3C, 0xD2, 0x78));
         private static readonly IBrush BoxBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x30, 0x6E, 0x9C, 0xFF));
         private static readonly IPen BoxPen = new ImmutablePen(Color.FromArgb(0xC0, 0x6E, 0x9C, 0xFF).ToUInt32(), 1);
 
@@ -87,6 +92,20 @@ namespace ChartBuilder.Controls.Editing
         private static readonly IBrush SyncedBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x38, 0xFF, 0x7A, 0x1A));
         private static readonly IBrush SyncRegionBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x20, 0xFF, 0x7A, 0x1A));
         private static readonly IPen SyncRegionPen = new ImmutablePen(Color.FromArgb(0xD0, 0xFF, 0x7A, 0x1A).ToUInt32(), 1.5);
+
+        // Where a press of the Sync tool would start drawing a region, on the cursor: the solid orange of its outline.
+        private static readonly IBrush SyncLineBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xD0, 0xFF, 0x7A, 0x1A));
+
+        // A region nothing matched, hashed in yellow instead, and the small X at its top right that clears it.
+        private static readonly IBrush SyncUnmatchedBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x14, 0xE6, 0xC8, 0x00));
+        private static readonly IPen SyncUnmatchedPen = new ImmutablePen(Color.FromArgb(0xD0, 0xE6, 0xC8, 0x00).ToUInt32(), 1.5);
+        private static readonly IPen SyncHashPen = new ImmutablePen(Color.FromArgb(0x8C, 0xE6, 0xC8, 0x00).ToUInt32(), 1.5);
+        private static readonly IBrush SyncCloseBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xE0, 0x20, 0x22, 0x2E));
+        private static readonly IPen SyncClosePen = new ImmutablePen(Color.FromRgb(0xF8, 0x71, 0x71).ToUInt32(), 1.5);
+
+        // How far apart a region nothing matched's hash lines are drawn, in pixels, and how long a side of its X is.
+        private const double SyncHashGap = 7;
+        private const double CloseSize = 13;
         private static readonly IBrush WaveformPeakBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x24, 0xC8, 0xD2, 0xFF));
         private static readonly IBrush WaveformLoudBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x48, 0xC8, 0xD2, 0xFF));
         private static readonly IBrush FullWaveformPeakBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x70, 0xC8, 0xD2, 0xFF));
@@ -131,25 +150,17 @@ namespace ChartBuilder.Controls.Editing
         private static readonly IBrush DefaultAccentBrush = new ImmutableSolidColorBrush(Color.FromRgb(0x7C, 0xB4, 0xFF));
         private static readonly IBrush StrikeBandBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x90, 0x00, 0x00, 0x00));
         private static readonly IPen StrikeEdgePen = new ImmutablePen(Color.FromArgb(0x8C, 0xFF, 0xFF, 0xFF).ToUInt32(), 1);
-        private static readonly IBrush PhraseRowBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x12, 0xFF, 0xFF, 0xFF));
         private static readonly Color SoloColor = PhraseColors.Solo;
-        private static readonly IBrush StarPowerTintBrush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(HighwayPalette.StarPower, 0x16));
-        private static readonly IBrush SoloTintBrush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(SoloColor, 0x1A));
         private static readonly IBrush SoloLabelBrush = new ImmutableSolidColorBrush(SoloColor);
-        private static readonly Color DiscoFlipColor = PhraseColors.DiscoFlip;
 
-        // Generate fills' and Generate star power's proposals (charter-spec C6 item 5, C8 item 1), in amber whatever their
-        // kind, so they stand out from the phrases there: a kept one's ghost is a lit bar taller than its row, with a bold
-        // dashed edge over a dark one so it reads on any bar, and a band across the lanes edged by dashed lines; a dropped
-        // one's only a faint dashed outline, struck through, and a fainter band.
-        private const double GhostRise = 2.5;
-        private static readonly IPen KeptGhostPen = new ImmutablePen(PhraseColors.Proposal.ToUInt32(), 2, new ImmutableDashStyle([4, 2], 0));
-        private static readonly IPen GhostShadowPen = new ImmutablePen(Color.FromArgb(0xC0, 0x00, 0x00, 0x00).ToUInt32(), 3);
-        private static readonly IPen DroppedGhostPen = new ImmutablePen(HighwayPalette.WithAlpha(PhraseColors.Proposal, 0x70).ToUInt32(), 1, new ImmutableDashStyle([3, 2], 0));
-        private static readonly IBrush KeptGhostBrush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(PhraseColors.Proposal, 0x80));
-        private static readonly IBrush KeptBandBrush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(PhraseColors.Proposal, 0x26));
-        private static readonly IPen KeptBandEdgePen = new ImmutablePen(HighwayPalette.WithAlpha(PhraseColors.Proposal, 0xC0).ToUInt32(), 1, new ImmutableDashStyle([4, 3], 0));
-        private static readonly IBrush DroppedBandBrush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(PhraseColors.Proposal, 0x0A));
+        // How opaque the range indicator over every phrase and disco flip is, and the lines marking where each begins
+        // and ends.
+        private const byte PhraseRangeAlpha = 0x16;
+
+        // A solo's tint is a shade stronger than the other kinds', as it was before they were tinted too.
+        private const byte SoloTintAlpha = 0x1A;
+        private const byte PhraseRangeEdgeAlpha = 0xA0;
+        private static readonly Color DiscoFlipColor = PhraseColors.DiscoFlip;
         private static readonly Color SectionColor = Color.FromRgb(0x5E, 0xEA, 0xD4);
         private static readonly IPen SectionPen = new ImmutablePen(HighwayPalette.WithAlpha(SectionColor, 0x70).ToUInt32(), 1.5);
         private static readonly IBrush SectionBrush = new ImmutableSolidColorBrush(SectionColor);
@@ -518,9 +529,11 @@ namespace ChartBuilder.Controls.Editing
             context.FillRectangle(LanesBrush, LanesOf(projection, slots));
             DrawLaneDividers(context, projection, slots);
             DrawBackdrop(context, size, projection, rows.Count);
+
+            // The rail's rows are tinted under whatever is marked across them, such as a timeline's section lines.
+            DrawPhraseRailBackground(context, rows, projection);
             FindPhrasesShown(part, fromTick, toTick);
-            DrawPhraseTints(context, session, projection);
-            DrawProposalBands(context, session, key, projection, fromTick, toTick);
+            DrawPhraseRanges(context, session, key, projection, fromTick, toTick);
             DrawSpans(context, session, projection);
             DrawSyncBands(context, session, key, projection);
             DrawBeats(context, session, session.TempoMap, projection, fromTick, toTick, size);
@@ -532,7 +545,6 @@ namespace ChartBuilder.Controls.Editing
             // The phrase rail is beside the lanes, clear of the strike line's band, which is drawn over this.
             DrawPhraseRail(context, session, part, rows, projection);
             DrawDiscoFlips(context, session, key, rows, projection, fromTick, toTick);
-            DrawProposalGhosts(context, session, key, rows, projection, fromTick, toTick);
         }
 
         /// <summary>
@@ -589,15 +601,27 @@ namespace ChartBuilder.Controls.Editing
 
         /// <summary>
         /// What follows the pointer and the focus: the place tool's ghost, what the erase tool would take away, where the
-        /// Phrase tool would start drawing, the cursor, a box being drawn, and the focus's edge.
+        /// Phrase tool would start drawing, where the Tempo tool would add a marker, where the Loop tool would start
+        /// drawing a region, where the Sync tool would start drawing one, the synchronized region's notes, its X and what
+        /// of it the pointer would take hold of, the loop region's X and what of it the pointer would take hold of, the
+        /// cursor, a box being drawn, and the focus's edge.
         /// </summary>
         private void RenderOverlay(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, EditablePart part, IReadOnlyList<RailKind> rows, LaneSlots slots, LaneProjection screen)
         {
             var lanes = LanesOf(screen, slots);
             using (context.PushClip(lanes))
+            {
                 DrawHover(context, session, key, track, screen, slots);
+                DrawSyncNotes(context, session, key, track, screen, slots);
+            }
+
             DrawEraseHover(context, session, key, track, part, rows, screen, slots);
             DrawPhraseHover(context, session, key, part, rows, screen, slots);
+            DrawTempoHover(context, session, screen, slots);
+            DrawLoopLine(context, session, screen, slots);
+            DrawSyncLine(context, session, screen, slots);
+            DrawSyncHover(context, session, key, screen, slots);
+            DrawLoopHover(context, session, screen, slots);
 
             DrawCursor(context, session, screen, lanes);
             DrawBox(context, screen);
@@ -689,15 +713,20 @@ namespace ChartBuilder.Controls.Editing
         }
 
         /// <summary>
-        /// Whether the place tool's ghost, the erase tool's red or the Phrase tool's line is shown under the pointer, which
-        /// follow the song as it moves under it.
+        /// Whether the place tool's ghost, the erase tool's red, the Phrase tool's line or the Tempo tool's marker preview
+        /// is shown under the pointer, which follow the song as it moves under it; or a Select tool's rail hover, whose
+        /// placement line does too; or, with a synchronized region or the loop region drawn, its X and hover, which do too.
         /// </summary>
-        private bool IsHoverShown => _hover is not null && !_isPressed && Session?.Tool is EditorTool.Place or EditorTool.Erase or EditorTool.Phrase;
+        private bool IsHoverShown => _hover is { } hover && !_isPressed
+            && (Session?.Tool is EditorTool.Place or EditorTool.Erase or EditorTool.Phrase or EditorTool.Tempo
+                || Session?.Sync.IsActive == true
+                || Session?.Loop?.Span is not null
+                || (Session?.Tool == EditorTool.Select && PointAt(hover) is { Rail: not null }));
 
         /// <summary>
         /// Follows the cursor: the song and the notes are moved, as far as their page reaches, and drawn again around the
         /// screen past it, rather than the whole lane drawn again every frame the song plays. The glow is drawn again while
-        /// the song plays, and the place tool's ghost, which snaps to the song under a still pointer.
+        /// the song plays, and the tools' hover marks, which snap to the song under a still pointer.
         /// </summary>
         private void OnViewportChanged(object? sender, EventArgs e)
         {
@@ -853,8 +882,17 @@ namespace ChartBuilder.Controls.Editing
         protected override void OnGotFocus(FocusChangedEventArgs e)
         {
             base.OnGotFocus(e);
-            if (Session is { } session && _lane?.Track is { } key)
-                session.Focused = key;
+            if (Session is { } session)
+            {
+                if (_lane?.Vocal is { } vocal)
+                    session.FocusedVocal = vocal;
+                else if (_lane?.Track is { } key)
+                {
+                    session.Focused = key;
+                    session.FocusedVocal = null;
+                }
+            }
+
             _overlay.Redraw();
         }
 
@@ -896,9 +934,29 @@ namespace ChartBuilder.Controls.Editing
             _pressDragged = false;
             ShowTip(null);
 
+            // The small X at the loop region's top right clears it, whatever the tool, in a vocal part's lane too.
+            if (button == MouseButton.Left && LoopCloseAt(current.Position))
+            {
+                session.ClearLoop();
+                Focus();
+                e.Handled = true;
+                _overlay.Redraw();
+                return;
+            }
+
             if (_lane is { Vocal: not null })
             {
                 PressVocals(session, current.Position, e);
+                return;
+            }
+
+            // The small X at the synchronized region's top right clears it, whatever the tool.
+            if (button == MouseButton.Left && SyncCloseAt(current.Position))
+            {
+                session.Sync.Clear();
+                Focus();
+                e.Handled = true;
+                _overlay.Redraw();
                 return;
             }
 
@@ -920,8 +978,9 @@ namespace ChartBuilder.Controls.Editing
             _lastPoint = point;
 
             // A box is drawn from a press in the lanes that's on no note, with the select tool or Shift, which lends any tool
-            // the select tool's press.
-            bool selecting = session.Tool == EditorTool.Select || (e.KeyModifiers & KeyModifiers.Shift) != 0;
+            // the select tool's press. The Sync and Loop tools' presses draw no box.
+            bool sync = session.Tools.IsSyncPress(ModifiersOf(e.KeyModifiers));
+            bool selecting = !sync && !session.Tools.LoopActive && (session.Tool == EditorTool.Select || (e.KeyModifiers & KeyModifiers.Shift) != 0);
             _boxFrom = button == MouseButton.Left && selecting && point.Rail is null && session.TrackOf(point.Track) is not null && session.Tools.HitTest(point) is null
                 ? current.Position
                 : null;
@@ -981,9 +1040,14 @@ namespace ChartBuilder.Controls.Editing
             else if (!_isPressed)
             {
                 if (_lane is { Vocal: not null })
-                    ShowVocalCursor(position);
-                else
+                {
+                    if (!ShowLoopCursor(position) && !ShowVocalTempoCursor(position))
+                        ShowVocalCursor(position);
+                }
+                else if (!ShowLoopCursor(position) && !ShowSyncCursor(position) && !ShowTempoCursor(position))
+                {
                     ShowRailCursor(position);
+                }
             }
 
             _overlay.Redraw();
@@ -1089,22 +1153,26 @@ namespace ChartBuilder.Controls.Editing
             e.Handled = true;
         }
 
+        // The canvas's keys are the window's key dispatcher's, which finds the canvas with focus and runs the key's action on it
+        // (EditorKeys); here, only the modifiers held are taken in.
         protected override void OnKeyDown(KeyEventArgs e)
         {
             base.OnKeyDown(e);
             TakeKeys(e.KeyModifiers);
-            if (e.Handled || _editor is not { } editor || _lane is not { } lane || Session is not { })
-                return;
-            e.Handled = EditorKeys.Handle(e.PhysicalKey, e.KeyModifiers, editor, lane, this);
         }
 
         protected override void OnKeyUp(KeyEventArgs e)
         {
             base.OnKeyUp(e);
             TakeKeys(e.KeyModifiers);
-            if (e.Handled || _editor is not { } editor || _lane is not { } lane || Session is not { })
-                return;
-            e.Handled = EditorKeys.HandleUp(e.PhysicalKey, editor, lane);
+        }
+
+        /// <summary>The editor and the lane this canvas shows, for a key that acts on them; false while it shows none.</summary>
+        internal bool TryGetKeyContext([NotNullWhen(true)] out ChartEditorViewModel? editor, [NotNullWhen(true)] out EditorLaneViewModel? lane)
+        {
+            editor = _editor;
+            lane = _lane;
+            return editor is not null && lane is not null && Session is not null;
         }
 
         /// <summary>
@@ -1197,8 +1265,118 @@ namespace ChartBuilder.Controls.Editing
         }
 
         /// <summary>
-        /// Shows a resize arrow over a phrase or disco flip bar's end in the rail, and a hand over its body, or over a
-        /// proposed fill's ghost, which is clicked to keep or drop it; and over a bar, a tip saying what it is.
+        /// Shows what the pointer would take hold of on the loop region: a hand over its X, which clears it whatever the
+        /// tool; and with the Loop tool picked, or L held, a resize arrow over an end and a hand over its body to move it;
+        /// each with a tip saying what it does. Whether it showed anything.
+        /// </summary>
+        private bool ShowLoopCursor(Point position)
+        {
+            if (Loop is not { } loop || CurrentProjection() is not { } projection)
+                return false;
+            var band = LoopBandOf(projection, loop);
+            if (CloseRectOf(band, LanesOf(projection, projection.Slots)).Inflate(ClickSlop).Contains(position))
+            {
+                SetCursor(StandardCursorType.Hand);
+                ShowTip(Strings.LoopClearToolTip);
+                return true;
+            }
+
+            if (Session is not { Tools.LoopActive: true } session || !band.Contains(position))
+                return false;
+            if (BandTickAt(projection, position) is not { } at || session.Tools.LoopGripAt(at.Tick, at.Tolerance) is not { } grip)
+                return false;
+            SetCursor(grip == LoopGrip.Body
+                ? StandardCursorType.Hand
+                : View == LaneView.Highway ? StandardCursorType.SizeNorthSouth : StandardCursorType.SizeWestEast);
+            ShowTip(grip == LoopGrip.Body ? Strings.LoopMoveToolTip : Strings.LoopResizeToolTip);
+            return true;
+        }
+
+        /// <summary>
+        /// Shows what the pointer would take hold of on the synchronized region: a hand over its X, which clears it whatever
+        /// the tool; and with the Sync tool picked, or Ctrl + Shift held, a resize arrow over an end, a hand over its body
+        /// to move it, and over a passage synced with it to make it the source; each with a tip saying what it does.
+        /// Whether it showed anything.
+        /// </summary>
+        private bool ShowSyncCursor(Point position)
+        {
+            if (Session is not { } session || _lane?.Track is not { } key || session.Sync is not { IsActive: true } sync || sync.Track != key)
+                return false;
+            if (CurrentProjection() is not { } projection || sync.Span is not var (from, to))
+                return false;
+            var close = CloseRectOf(SyncBandOf(session, projection, from, to), LanesOf(projection, projection.Slots));
+            if (close.Inflate(ClickSlop).Contains(position))
+            {
+                SetCursor(StandardCursorType.Hand);
+                ShowTip(Strings.SyncClearToolTip);
+                return true;
+            }
+
+            if (!session.Tools.IsSyncPress(ModifiersOf(_keys)))
+                return false;
+            if (PointAt(position) is not { Rail: null } point)
+                return false;
+
+            long length = to - from;
+            foreach (long start in sync.Matches)
+            {
+                if (point.Tick >= start && point.Tick < start + length)
+                {
+                    SetCursor(StandardCursorType.Hand);
+                    ShowTip(Strings.SyncSourceToolTip);
+                    return true;
+                }
+            }
+
+            if (Math.Abs(point.Tick - from) <= point.Tolerance || Math.Abs(point.Tick - to) <= point.Tolerance)
+            {
+                SetCursor(View == LaneView.Highway ? StandardCursorType.SizeNorthSouth : StandardCursorType.SizeWestEast);
+                ShowTip(Strings.SyncResizeToolTip);
+                return true;
+            }
+
+            if (point.Tick > from && point.Tick < to)
+            {
+                SetCursor(StandardCursorType.Hand);
+                ShowTip(Strings.SyncMoveToolTip);
+                return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Shows a resize arrow over a tempo or time signature change the Tempo tool would drag: up and down a highway's
+        /// lane, left and right along a timeline's. The change the song starts with can't be moved, so shows the usual
+        /// cursor. Whether it showed anything.
+        /// </summary>
+        private bool ShowTempoCursor(Point position)
+        {
+            if (Session is not { } session || session.Tool != EditorTool.Tempo || (_keys & KeyModifiers.Shift) != 0
+                || session.Tools.IsSyncPress(ModifiersOf(_keys)))
+            {
+                return false;
+            }
+
+            if (PointAt(position) is not { Rail: null } point || session.Tools.TempoChangeAt(point) is not { } tick)
+                return false;
+            ShowTempoCursorFor(tick);
+            return true;
+        }
+
+        /// <summary>Shows the cursor a tempo or time signature change can be dragged by, or the usual one at the song's start.</summary>
+        private void ShowTempoCursorFor(long tick)
+        {
+            SetCursor(EditorTools.TempoChangeMoves(tick)
+                ? View == LaneView.Highway ? StandardCursorType.SizeNorthSouth : StandardCursorType.SizeWestEast
+                : null);
+            ShowTip(null);
+        }
+
+        /// <summary>
+        /// Shows a tooltip naming the phrase rail's row or bar under the pointer; a resize arrow over a phrase or disco flip
+        /// bar's end and a move arrow over its body; and a cross over an empty row where a drag would draw a phrase of its
+        /// kind.
         /// </summary>
         private void ShowRailCursor(Point position)
         {
@@ -1206,27 +1384,25 @@ namespace ChartBuilder.Controls.Editing
             string? tip = null;
             if (PointAt(position) is { Rail: not null } point && Session is { } session)
             {
+                tip = ChartEditorViewModel.PhraseKindName(point.Rail.Value);
                 PhraseGrip? grip = null;
-                if (session.Proposals is { } run && run.HitTest(point) is not null)
-                {
-                    wanted = StandardCursorType.Hand;
-                    tip = string.Format(CultureInfo.CurrentCulture, Strings.ProposalGhostToolTipFormat, ChartEditorViewModel.PhraseKindName(run.Kind).ToLower(CultureInfo.CurrentCulture));
-                }
-                else if (session.Chart.PartOf(point.Track.Instrument) is { } part && PhraseRail.HitTest(part, point) is { } phrase)
-                {
-                    (grip, tip) = (phrase.Grip, ChartEditorViewModel.PhraseKindName(phrase.Phrase.Kind));
-                }
+                if (session.Chart.PartOf(point.Track.Instrument) is { } part && PhraseRail.HitTest(part, point) is { } phrase)
+                    grip = phrase.Grip;
                 else if (PhraseRail.HitTestDiscoFlip(point.Track.Difficulty, session.DiscoFlipRangesOf(point.Track), point) is { } flip)
-                {
-                    (grip, tip) = (flip.Grip, ChartEditorViewModel.PhraseKindName(RailKind.DiscoFlip));
-                }
+                    grip = flip.Grip;
 
                 // The erase tool erases a bar rather than grabbing it, as its red shows.
                 if (grip is { } grabbed && (session.Tool != EditorTool.Erase || (_keys & KeyModifiers.Shift) != 0))
                 {
-                    wanted = grabbed == PhraseGrip.Body ? StandardCursorType.Hand
+                    wanted = grabbed == PhraseGrip.Body ? StandardCursorType.SizeAll
                         : View == LaneView.Highway ? StandardCursorType.SizeNorthSouth
                         : StandardCursorType.SizeWestEast;
+                }
+                else if (grip is null && (_keys & KeyModifiers.Shift) == 0
+                    && session.Tools.PhraseDrawAt(point) is { } draw
+                    && session.Tools.DrawsIn(point.Track, draw.Kind))
+                {
+                    wanted = StandardCursorType.Cross;
                 }
             }
 
@@ -1377,9 +1553,13 @@ namespace ChartBuilder.Controls.Editing
                     RequestFrame();
                     break;
                 case nameof(PlaybackViewModel.Waveform):
+                    _song.Redraw();
+                    break;
                 case nameof(PlaybackViewModel.Loop):
                 case nameof(PlaybackViewModel.IsLooping):
+                    // The region's box, its X and what the pointer would take hold of.
                     _song.Redraw();
+                    _overlay.Redraw();
                     break;
             }
         }
@@ -1682,51 +1862,168 @@ namespace ChartBuilder.Controls.Editing
             _redrawTimer.Start();
         }
 
-        /// <summary>The selected span, and the loop region.</summary>
+        /// <summary>
+        /// The loop region, boxed in light green across the lanes: drawn wherever a region is, whether or not the song is
+        /// repeating it just now (charter-spec C10 item 2). And the selected span.
+        /// </summary>
         private void DrawSpans(DrawingContext context, EditorSession session, LaneProjection projection)
         {
-            double across1 = projection.LaneFrom, across2 = projection.LaneFrom + (projection.LaneSize * projection.Slots.Slots.Count);
-            if (_editor?.Playback is { Loop: { } loop, IsLooping: true })
-                context.FillRectangle(LoopBrush, Box(projection.AlongOf(loop.Start), projection.AlongOf(loop.End), across1, across2));
+            if (Loop is { } loop)
+                context.DrawRectangle(LoopBrush, LoopPen, LoopBandOf(projection, loop));
             if (session.Selection.Range is { } range && range.To > range.From)
+            {
+                double across1 = projection.LaneFrom, across2 = projection.LaneFrom + (projection.LaneSize * projection.Slots.Slots.Count);
                 context.FillRectangle(SpanBrush, Box(projection.AlongOf(session.AudioAt(range.From)), projection.AlongOf(session.AudioAt(range.To)), across1, across2));
+            }
+        }
+
+        /// <summary>The loop region playback holds, in seconds of audio; null with none.</summary>
+        private LoopRegion? Loop => _editor?.Playback.Loop;
+
+        /// <summary>The band the loop region covers, from its start up to its end, across the lanes.</summary>
+        private Rect LoopBandOf(LaneProjection projection, LoopRegion loop)
+        {
+            double across1 = projection.LaneFrom, across2 = projection.LaneFrom + (projection.LaneSize * projection.Slots.Slots.Count);
+            return Box(projection.AlongOf(loop.Start), projection.AlongOf(loop.End), across1, across2);
         }
 
         /// <summary>
         /// On the synchronized region's lane, the region outlined and each passage synced with it as an orange band, behind
-        /// the notes; and the region being dragged out with the Sync tool.
+        /// the notes; a region nothing matched is hashed in yellow instead. And the region being dragged out with the Sync
+        /// tool.
         /// </summary>
         private void DrawSyncBands(DrawingContext context, EditorSession session, ChartTrackKey key, LaneProjection projection)
         {
             var sync = session.Sync;
-            double across1 = projection.LaneFrom, across2 = projection.LaneFrom + (projection.LaneSize * projection.Slots.Slots.Count);
-            Rect BandOf(long from, long to) => Box(projection.AlongOf(session.AudioAt(from)), projection.AlongOf(session.AudioAt(to)), across1, across2);
-
             if (sync.Track == key && sync.Span is var (regionFrom, regionTo))
             {
+                long length = regionTo - regionFrom;
                 foreach (long start in sync.Matches)
-                    context.FillRectangle(SyncedBrush, BandOf(start, start + regionTo - regionFrom));
-                context.DrawRectangle(SyncRegionBrush, SyncRegionPen, BandOf(regionFrom, regionTo));
+                    context.FillRectangle(SyncedBrush, SyncBandOf(session, projection, start, start + length));
+                var band = SyncBandOf(session, projection, regionFrom, regionTo);
+                if (sync.IsUnmatched)
+                    DrawSyncHash(context, band);
+                else
+                    context.DrawRectangle(SyncRegionBrush, SyncRegionPen, band);
             }
 
             if (sync.Draft is var (track, draftFrom, draftTo) && track == key)
-                context.DrawRectangle(SyncRegionBrush, SyncRegionPen, BandOf(draftFrom, draftTo));
+                context.DrawRectangle(SyncRegionBrush, SyncRegionPen, SyncBandOf(session, projection, draftFrom, draftTo));
         }
 
-        /// <summary>A faint tint across the lanes, behind the notes, over each star power phrase and solo (charter-spec C8).</summary>
-        private void DrawPhraseTints(DrawingContext context, EditorSession session, LaneProjection projection)
+        /// <summary>The band the synchronized region, or a passage synced with it, covers from its start up to its end.</summary>
+        private Rect SyncBandOf(EditorSession session, LaneProjection projection, long from, long to)
         {
             double across1 = projection.LaneFrom, across2 = projection.LaneFrom + (projection.LaneSize * projection.Slots.Slots.Count);
+            return Box(projection.AlongOf(session.AudioAt(from)), projection.AlongOf(session.AudioAt(to)), across1, across2);
+        }
+
+        /// <summary>A synchronized region nothing matched: hashed in yellow over its wash, inside its outline.</summary>
+        private void DrawSyncHash(DrawingContext context, Rect band)
+        {
+            context.DrawRectangle(SyncUnmatchedBrush, SyncUnmatchedPen, band);
+            using (context.PushClip(band))
+            {
+                for (double x = band.Left - band.Height; x < band.Right; x += SyncHashGap)
+                    context.DrawLine(SyncHashPen, new Point(x, band.Bottom), new Point(x + band.Height, band.Top));
+            }
+        }
+
+        /// <summary>
+        /// Where the small X that clears the synchronized region or the loop region goes: at the top right of the band it
+        /// covers, kept within the lanes so it can always be reached.
+        /// </summary>
+        private static Rect CloseRectOf(Rect band, Rect lanes)
+        {
+            double left = Math.Clamp(Math.Min(band.Right, lanes.Right) - CloseSize, lanes.Left, Math.Max(lanes.Left, lanes.Right - CloseSize));
+            return new(left, Math.Max(band.Top, lanes.Top), CloseSize, CloseSize);
+        }
+
+        /// <summary>Whether the pointer at <paramref name="position"/> is on the X that clears the synchronized region.</summary>
+        private bool SyncCloseAt(Point position)
+        {
+            if (Session is not { } session || _lane?.Track is not { } key || session.Sync is not { IsActive: true } sync || sync.Track != key)
+                return false;
+            if (CurrentProjection() is not { } projection || sync.Span is not var (from, to))
+                return false;
+            var close = CloseRectOf(SyncBandOf(session, projection, from, to), LanesOf(projection, projection.Slots));
+            return close.Inflate(ClickSlop).Contains(position);
+        }
+
+        /// <summary>
+        /// A range's tint, where it starts and ends along the time axis, and whether it has an end to mark: at least two
+        /// pixels long, so one with no length shows.
+        /// </summary>
+        private readonly record struct PhraseRange(double Start, double End, Color Color, byte Alpha, bool HasEnd = true);
+
+        /// <summary>
+        /// A faint tint across the lanes, behind the notes, over every phrase and the difficulty's disco flip ranges
+        /// (charter-spec C8), each in its kind's colour, with its start, and its end where it has one, marked by a
+        /// stronger line of that colour. Overlapping tints show through each other.
+        /// </summary>
+        private void DrawPhraseRanges(DrawingContext context, EditorSession session, ChartTrackKey key, LaneProjection projection, double fromTick, double toTick)
+        {
+            var ranges = new List<PhraseRange>(_phrasesShown.Count);
             foreach (var phrase in _phrasesShown)
             {
-                var tint = phrase.Kind switch
-                {
-                    PhraseKind.StarPower => StarPowerTintBrush,
-                    PhraseKind.Solo => SoloTintBrush,
-                    _ => null,
-                };
-                if (tint is not null)
-                    context.FillRectangle(tint, BoxOf(projection, session, phrase, across1, across2));
+                double start = projection.AlongOf(session.AudioAt(phrase.Tick));
+                double end = projection.AlongOf(session.AudioAt(phrase.CoverEnd));
+                ranges.Add(RangeOf(start, end, PhraseColors.Of(phrase.Kind), PhraseTintAlpha(phrase.Kind), projection.View));
+            }
+
+            double farEnd = projection.AlongOf(projection.End);
+            foreach (var range in session.DiscoFlipRangesOf(key))
+            {
+                if (range.Tick > toTick || range.EndTick < fromTick)
+                    continue;
+                double start = projection.AlongOf(session.AudioAt(range.Tick));
+                double end = range.EndTick is { } endTick ? projection.AlongOf(session.AudioAt(endTick)) : farEnd;
+                ranges.Add(RangeOf(start, end, PhraseColors.DiscoFlip, PhraseRangeAlpha, projection.View, hasEnd: range.EndTick is not null));
+            }
+
+            if (ranges.Count == 0)
+                return;
+
+            double across1 = projection.LaneFrom, across2 = projection.LaneFrom + (projection.LaneSize * projection.Slots.Slots.Count);
+            foreach (var range in ranges)
+            {
+                var tint = HighwayPalette.WithAlpha(range.Color, range.Alpha);
+                context.FillRectangle(_gems.Brush(tint), Box(Math.Min(range.Start, range.End), Math.Max(range.Start, range.End), across1, across2));
+            }
+
+            // The edges go over every tint, so none of them is hidden where ranges overlap. Like the tints, they're cut
+            // to the page, so a range reaching far past it doesn't make its picture bigger than the page.
+            foreach (var range in ranges)
+            {
+                var pen = _gems.Pen(HighwayPalette.WithAlpha(range.Color, PhraseRangeEdgeAlpha), 1);
+                context.DrawLine(pen, At(Limited(range.Start), across1), At(Limited(range.Start), across2));
+                if (range.HasEnd)
+                    context.DrawLine(pen, At(Limited(range.End), across1), At(Limited(range.End), across2));
+            }
+        }
+
+        /// <summary>How opaque a phrase of <paramref name="kind"/> is tinted.</summary>
+        private static byte PhraseTintAlpha(PhraseKind kind) => kind == PhraseKind.Solo ? SoloTintAlpha : PhraseRangeAlpha;
+
+        /// <summary>A range's start and end along the time axis, in the order it runs: at least two pixels long, so one with no length shows.</summary>
+        private static PhraseRange RangeOf(double start, double end, Color color, byte alpha, LaneView view, bool hasEnd = true)
+        {
+            if (Math.Abs(end - start) < 2)
+                end = start + (view == LaneView.Highway ? -2 : 2);
+            return new PhraseRange(start, end, color, alpha, hasEnd);
+        }
+
+        /// <summary>
+        /// The phrase rail's rows, each a dark shade of its kind's colour (charter-spec C8). Drawn under the rest of the
+        /// song so the marks across the rail, as a timeline's section lines, still show in it.
+        /// </summary>
+        private void DrawPhraseRailBackground(DrawingContext context, IReadOnlyList<RailKind> rows, LaneProjection projection)
+        {
+            double along1 = projection.TimeFrom, along2 = projection.TimeFrom + projection.TimeLength;
+            for (int i = 0; i < rows.Count; i++)
+            {
+                var (from, to) = PhraseRowOf(projection, rows.Count, i);
+                context.FillRectangle(_gems.Brush(PhraseColors.RailBackground(rows[i])), Box(along1, along2, from, to));
             }
         }
 
@@ -1736,13 +2033,6 @@ namespace ChartBuilder.Controls.Editing
         /// </summary>
         private void DrawPhraseRail(DrawingContext context, EditorSession session, EditablePart part, IReadOnlyList<RailKind> rows, LaneProjection projection)
         {
-            double along1 = projection.TimeFrom, along2 = projection.TimeFrom + projection.TimeLength;
-            for (int i = 0; i < rows.Count; i++)
-            {
-                var (from, to) = PhraseRowOf(projection, rows.Count, i);
-                context.FillRectangle(PhraseRowBrush, Box(along1, along2, from, to));
-            }
-
             var selection = session.Selection;
             var accent = ((AccentBrush ?? DefaultAccentBrush) as ISolidColorBrush)?.Color ?? Color.FromRgb(0x7C, 0xB4, 0xFF);
             foreach (var phrase in _phrasesShown)
@@ -1789,67 +2079,6 @@ namespace ChartBuilder.Controls.Editing
         }
 
         /// <summary>
-        /// The ghosts of Generate fills' or Generate star power's proposals (charter-spec C6 item 5, C8 item 1) in their row
-        /// beside a lane of the part, drawn over the bars there, as a click on one keeps or drops it before it reaches a bar.
-        /// </summary>
-        private void DrawProposalGhosts(DrawingContext context, EditorSession session, ChartTrackKey key, IReadOnlyList<RailKind> rows, LaneProjection projection, double fromTick, double toTick)
-        {
-            if (session.Proposals is not { } run || key.Instrument != run.ProposedPart)
-                return;
-            int row = IndexOf(rows, run.Kind);
-            if (row < 0)
-                return;
-            var (across1, across2) = PhraseRowOf(projection, rows.Count, row);
-            for (int i = 0; i < run.Phrases.Count; i++)
-            {
-                var phrase = run.Phrases[i];
-                if (phrase.Tick > toTick || phrase.CoverEnd < fromTick)
-                    continue;
-                if (run.IsKept(i))
-                {
-                    // Taller than its row, so it rises over the bars beside it.
-                    var bar = BoxOf(projection, session, phrase, across1 - GhostRise, across2 + GhostRise).Inflate(0.5);
-                    context.DrawRectangle(null, GhostShadowPen, bar, 2, 2);
-                    context.DrawRectangle(KeptGhostBrush, KeptGhostPen, bar, 2, 2);
-                }
-                else
-                {
-                    var bar = BoxOf(projection, session, phrase, across1, across2).Inflate(0.5);
-                    context.DrawRectangle(null, DroppedGhostPen, bar, 2, 2);
-                    context.DrawLine(DroppedGhostPen, bar.TopLeft, bar.BottomRight);
-                }
-            }
-        }
-
-        /// <summary>
-        /// A band across the lanes, behind the notes, over each of the proposals of the run going on, on a lane of its part: a
-        /// kept one's edged at its start and end by dashed lines across the lanes.
-        /// </summary>
-        private void DrawProposalBands(DrawingContext context, EditorSession session, ChartTrackKey key, LaneProjection projection, double fromTick, double toTick)
-        {
-            if (session.Proposals is not { } run || key.Instrument != run.ProposedPart)
-                return;
-            double across1 = projection.LaneFrom, across2 = projection.LaneFrom + (projection.LaneSize * projection.Slots.Slots.Count);
-            for (int i = 0; i < run.Phrases.Count; i++)
-            {
-                var phrase = run.Phrases[i];
-                if (phrase.Tick > toTick || phrase.CoverEnd < fromTick)
-                    continue;
-                var band = BoxOf(projection, session, phrase, across1, across2);
-                if (!run.IsKept(i))
-                {
-                    context.FillRectangle(DroppedBandBrush, band);
-                    continue;
-                }
-
-                context.FillRectangle(KeptBandBrush, band);
-                bool alongIsDown = projection.View == LaneView.Highway;
-                context.DrawLine(KeptBandEdgePen, band.TopLeft, alongIsDown ? band.TopRight : band.BottomLeft);
-                context.DrawLine(KeptBandEdgePen, alongIsDown ? band.BottomLeft : band.TopRight, band.BottomRight);
-            }
-        }
-
-        /// <summary>
         /// A solo's note count on the difficulty shown, at its start (charter-spec C8 item 2): only for the solos that start
         /// on screen, as the others' counts aren't seen.
         /// </summary>
@@ -1887,7 +2116,7 @@ namespace ChartBuilder.Controls.Editing
         private Rect BoxOf(LaneProjection projection, EditorSession session, Phrase phrase, double across1, double across2)
         {
             double start = projection.AlongOf(session.AudioAt(phrase.Tick));
-            double end = projection.AlongOf(session.AudioAt(phrase.Tick + phrase.Length));
+            double end = projection.AlongOf(session.AudioAt(phrase.CoverEnd));
             if (Math.Abs(end - start) < 2)
                 end = start + (projection.View == LaneView.Highway ? -2 : 2);
             return Box(start, end, across1, across2);
@@ -1975,6 +2204,7 @@ namespace ChartBuilder.Controls.Editing
                 if (!tempoMap.Tempos.At(signature.Tick).IsEmpty)
                     continue;
                 double along = projection.AlongOf(session.AudioAt(signature.Tick));
+                context.DrawLine(TempoPen, At(along, across1), At(along, across2));
                 var text = Label(SignatureText(signature), 10, TempoBrush);
                 text.Draw(context, View == LaneView.Highway ? new Point(labels.X + 2, along + 1) : new Point(along + 3, labels.Y + 1));
             }
@@ -2130,7 +2360,7 @@ namespace ChartBuilder.Controls.Editing
                 {
                     double thickness = Math.Max(4, size * 0.45);
                     rect = Box(along - (thickness / 2), along + (thickness / 2), across1 + 4, across2 - 4);
-                    _gems.DrawBar(context, shown, color, rect, outlined: isGhost);
+                    _gems.DrawBar(context, kind, shown, color, rect, outlined: isGhost);
                 }
                 else
                 {
@@ -2140,7 +2370,7 @@ namespace ChartBuilder.Controls.Editing
                     rect = GemRect(projection, column, along, size);
                     if (column == slots.Slots.Count - 1 && slots.Across is null && note.Lane == EditorTools.ApartLane(slots))
                     {
-                        _gems.DrawBar(context, shown, color, rect, outlined: isGhost);
+                        _gems.DrawBar(context, kind, shown, color, rect, outlined: isGhost);
                     }
                     else
                     {
@@ -2225,7 +2455,7 @@ namespace ChartBuilder.Controls.Editing
                     ? Box(along - (thickness / 2), along + (thickness / 2), projection.LaneFrom + 4, projection.LaneFrom + (projection.LaneSize * slots.Slots.Count) - 4)
                     : GemRect(projection, column, along, size);
                 using (context.PushOpacity(0.45))
-                    _gems.DrawBar(context, placed, color, bar, outlined: true);
+                    _gems.DrawBar(context, track.Kind, placed, color, bar, outlined: true);
                 return;
             }
 
@@ -2240,21 +2470,19 @@ namespace ChartBuilder.Controls.Editing
 
         /// <summary>
         /// What a click of the erase tool would take away where the pointer is, in red over it: a note with its sustain, or
-        /// in the phrase rail a phrase's bar or a disco flip section's. None over a proposed phrase's ghost, which a click
-        /// keeps or drops, or with Shift held, which lends the erase tool the select tool's press.
+        /// in the phrase rail a phrase's bar or a disco flip section's. None with Shift held, which lends the erase tool the
+        /// select tool's press.
         /// </summary>
         private void DrawEraseHover(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, EditablePart part, IReadOnlyList<RailKind> rows, LaneProjection projection, LaneSlots slots)
         {
             if (_hover is not { } hover || _isPressed || session.Tool != EditorTool.Erase || (_keys & KeyModifiers.Shift) != 0 || PointAt(hover) is not { } point)
-                return;
-            if (point.Rail is not null && session.Proposals?.HitTest(point) is not null)
                 return;
 
             switch (session.Tools.EraseTargetAt(point))
             {
                 case { Note: { } note }:
                     using (context.PushClip(LanesOf(projection, slots)))
-                        DrawErasedNote(context, session, key, track, note, projection, slots);
+                        DrawNoteMark(context, session, key, track, note, projection, slots, EraseBrush, ErasePen);
                     break;
                 case { Phrase: { } phrase } when IndexOf(rows, PhraseRail.RowOf(part.Kind, phrase.Kind)) is var row and >= 0:
                 {
@@ -2275,8 +2503,8 @@ namespace ChartBuilder.Controls.Editing
             }
         }
 
-        /// <summary>A note the erase tool would take away, in red over its gem or bar and its sustain's tail, where DrawNotes draws them.</summary>
-        private void DrawErasedNote(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, EditableNote note, LaneProjection projection, LaneSlots slots)
+        /// <summary>A note marked over, where DrawNotes draws its gem or bar and its sustain's tail: what the erase tool takes away in red, or the notes a synchronized region syncs in orange.</summary>
+        private void DrawNoteMark(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, EditableNote note, LaneProjection projection, LaneSlots slots, IBrush? brush, IPen pen)
         {
             bool across = slots.Across == note.Lane;
             int column = slots.IndexOf(session.ShownLane(key, note));
@@ -2290,36 +2518,217 @@ namespace ChartBuilder.Controls.Editing
                 double end = projection.AlongOf(session.AudioAt(note.Tick + note.Length));
                 double width = Math.Max(3, projection.LaneSize * 0.2);
                 var tail = across ? Box(along, end, across1, across2) : Box(along, end, projection.AcrossOf(column) - (width / 2), projection.AcrossOf(column) + (width / 2));
-                context.DrawRectangle(EraseBrush, ErasePen, tail);
+                context.DrawRectangle(brush, pen, tail);
             }
 
             double thickness = Math.Max(4, size * 0.45);
             var gem = across ? Box(along - (thickness / 2), along + (thickness / 2), across1, across2) : GemRect(projection, column, along, size);
-            context.DrawRectangle(EraseBrush, ErasePen, gem.Inflate(1), 3, 3);
+            context.DrawRectangle(brush, pen, gem.Inflate(1), 3, 3);
         }
 
         /// <summary>
-        /// Where a press of the Phrase tool would start drawing, on the grid: a line across the lanes in the colour of the
-        /// kind picked, and a mark in its row of the rail. None where a press does something else, such as on a phrase's
-        /// bar, or in the lanes with Shift held, which lends the Phrase tool the select tool's press; nor where a press is
-        /// refused, as a disco flip section is off Pro drums.
+        /// Where a press would start drawing, on the grid: a line across the lanes in the colour of the kind drawn, and a
+        /// mark in its row of the rail. The Phrase tool draws where a press does in the lanes; the Select, Place and Phrase
+        /// tools draw in an empty part of the rail, where the row's kind is drawn whatever's picked. None where a press does
+        /// something else, such as on a phrase's bar or a proposed phrase's ghost, with Shift held, which lends the select
+        /// tool's press; nor where a press is refused, as a disco flip section is off Pro drums.
         /// </summary>
         private void DrawPhraseHover(DrawingContext context, EditorSession session, ChartTrackKey key, EditablePart part, IReadOnlyList<RailKind> rows, LaneProjection projection, LaneSlots slots)
         {
-            if (_hover is not { } hover || _isPressed || session.Tool != EditorTool.Phrase || !session.Tools.DrawsIn(key) || PointAt(hover) is not { } point)
+            if (_hover is not { } hover || _isPressed || (_keys & KeyModifiers.Shift) != 0 || PointAt(hover) is not { } point)
                 return;
-            if ((point.Rail is null && (_keys & KeyModifiers.Shift) != 0) || session.Tools.PhraseDrawStart(point) is not { } tick)
+            if (point.Rail is null && session.Tool != EditorTool.Phrase)
+                return;
+            if (session.Tools.PhraseDrawAt(point) is not { } draw || !session.Tools.DrawsIn(key, draw.Kind))
                 return;
 
-            var kind = session.PhraseKind;
-            var brush = _gems.Brush(kind.Phrase is { } phrase ? PhraseColor(phrase) : DiscoFlipColor);
-            double along = projection.AlongOf(session.AudioAt(tick));
+            var brush = _gems.Brush(draw.Kind.Phrase is { } phrase ? PhraseColor(phrase) : DiscoFlipColor);
+            double along = projection.AlongOf(session.AudioAt(draw.Tick));
             context.FillRectangle(brush, Box(along - 1, along + 1, projection.LaneFrom, projection.LaneFrom + (projection.LaneSize * slots.Slots.Count)));
-            int row = IndexOf(rows, kind.Phrase is { } drawn ? PhraseRail.RowOf(part.Kind, drawn) : RailKind.DiscoFlip);
+            int row = IndexOf(rows, draw.Kind.Phrase is { } drawn ? PhraseRail.RowOf(part.Kind, drawn) : RailKind.DiscoFlip);
             if (row < 0)
                 return;
             var (across1, across2) = PhraseRowOf(projection, rows.Count, row);
             context.FillRectangle(brush, Box(along - 1.5, along + 1.5, across1 - 1, across2 + 1));
+        }
+
+        /// <summary>
+        /// Where a press of the Tempo tool would add a tempo marker: a line across the lanes in the tempo markers' amber,
+        /// on the grid step the press would snap to, as the Phrase tool's hover line is drawn. None over a change the press
+        /// would drag instead, in the phrase rail, or with Shift held or the Sync tool's press.
+        /// </summary>
+        private void DrawTempoHover(DrawingContext context, EditorSession session, LaneProjection projection, LaneSlots slots)
+        {
+            if (_hover is not { } hover || _isPressed || session.Tool != EditorTool.Tempo || (_keys & KeyModifiers.Shift) != 0
+                || session.Tools.IsSyncPress(ModifiersOf(_keys)))
+            {
+                return;
+            }
+
+            if (PointAt(hover) is not { Rail: null } point || point.Lane is null || session.Tools.TempoAddAt(point) is not { } tick)
+                return;
+
+            double along = projection.AlongOf(session.AudioAt(tick));
+            context.FillRectangle(TempoBrush, Box(along - 1, along + 1, projection.LaneFrom, projection.LaneFrom + (projection.LaneSize * slots.Slots.Count)));
+        }
+
+        /// <summary>
+        /// Where a press of the Sync tool would start drawing a synchronized region: a line across the lanes in the
+        /// region's orange, on the grid step the press would snap to, as the Phrase tool's hover line is drawn. None
+        /// where a press does something else: on the region or a passage synced with it, on its X, or one that isn't the
+        /// Sync tool's press.
+        /// </summary>
+        private void DrawSyncLine(DrawingContext context, EditorSession session, LaneProjection projection, LaneSlots slots)
+        {
+            if (_hover is not { } hover || _isPressed || !session.Tools.IsSyncPress(ModifiersOf(_keys)) || SyncCloseAt(hover))
+                return;
+            if (PointAt(hover) is not { Rail: null } point || session.Tools.SyncDrawStart(point, ModifiersOf(_keys)) is not { } tick)
+                return;
+            double along = projection.AlongOf(session.AudioAt(tick));
+            context.FillRectangle(SyncLineBrush, Box(along - 1, along + 1, projection.LaneFrom, projection.LaneFrom + (projection.LaneSize * slots.Slots.Count)));
+        }
+
+        /// <summary>
+        /// The notes the synchronized region holds, and each passage synced with it holds, marked over in orange while the
+        /// Sync tool is active: just which notes are synced.
+        /// </summary>
+        private void DrawSyncNotes(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, LaneProjection projection, LaneSlots slots)
+        {
+            if (session.Sync is not { IsActive: true } sync || sync.Track != key || sync.Span is not var (from, to))
+                return;
+            if (!session.Tools.IsSyncPress(ModifiersOf(_keys)))
+                return;
+            long length = to - from;
+            foreach (long start in sync.Matches.Prepend(from))
+            {
+                foreach (var note in track.Notes.Between(start, start + length - 1))
+                    DrawNoteMark(context, session, key, track, note, projection, slots, SyncedBrush, SyncRegionPen);
+            }
+        }
+
+        /// <summary>
+        /// The small X at the synchronized region's top right, which clears it with a click whatever the tool, shown while
+        /// the pointer is over the region; and with the Sync tool picked, or Ctrl + Shift held, what the pointer would take
+        /// hold of: an end to resize, the region's body to move it, or a passage synced with it to make the source.
+        /// </summary>
+        private void DrawSyncHover(DrawingContext context, EditorSession session, ChartTrackKey key, LaneProjection projection, LaneSlots slots)
+        {
+            if (_hover is not { } hover || _isPressed || session.Sync is not { IsActive: true } sync || sync.Track != key)
+                return;
+            if (sync.Span is not var (from, to))
+                return;
+            var lanes = LanesOf(projection, slots);
+            var band = SyncBandOf(session, projection, from, to);
+            var close = CloseRectOf(band, lanes);
+            if (!band.Inflate(2).Contains(hover) && !close.Inflate(ClickSlop).Contains(hover))
+                return;
+            DrawSyncClose(context, close);
+            if (!session.Tools.IsSyncPress(ModifiersOf(_keys)))
+                return;
+            if (PointAt(hover) is not { Rail: null } point)
+                return;
+
+            long length = to - from;
+            foreach (long start in sync.Matches)
+            {
+                if (point.Tick >= start && point.Tick < start + length)
+                {
+                    context.DrawRectangle(null, SyncRegionPen, SyncBandOf(session, projection, start, start + length).Inflate(1), 2, 2);
+                    return;
+                }
+            }
+
+            double across1 = projection.LaneFrom, across2 = projection.LaneFrom + (projection.LaneSize * slots.Slots.Count);
+            if (Math.Abs(point.Tick - from) <= point.Tolerance || Math.Abs(point.Tick - to) <= point.Tolerance)
+            {
+                double at = projection.AlongOf(session.AudioAt(Math.Abs(point.Tick - from) <= point.Tolerance ? from : to));
+                context.FillRectangle(SyncRegionBrush, Box(at - 1.5, at + 1.5, across1, across2));
+            }
+            else if (point.Tick > from && point.Tick < to)
+            {
+                context.DrawRectangle(null, SyncRegionPen, band.Inflate(1), 2, 2);
+            }
+        }
+
+        /// <summary>Draws the small X at <paramref name="close"/> that clears the synchronized region, or the loop region.</summary>
+        private void DrawSyncClose(DrawingContext context, Rect close)
+        {
+            context.DrawRectangle(SyncCloseBrush, null, close, 3, 3);
+            var inner = close.Deflate(close.Width * 0.28);
+            context.DrawLine(SyncClosePen, inner.TopLeft, inner.BottomRight);
+            context.DrawLine(SyncClosePen, inner.TopRight, inner.BottomLeft);
+        }
+
+        /// <summary>
+        /// Where a press of the Loop tool would start drawing the loop region: a line across the lanes in the region's
+        /// green, on the grid step the press would snap to, as the Phrase tool's hover line is drawn. None where a press
+        /// does something else: on the region, on its X, or one that isn't the Loop tool's press.
+        /// </summary>
+        private void DrawLoopLine(DrawingContext context, EditorSession session, LaneProjection projection, LaneSlots slots)
+        {
+            if (_hover is not { } hover || _isPressed || !session.Tools.LoopActive || LoopCloseAt(hover))
+                return;
+            if (!LanesOf(projection, slots).Contains(hover) || BandTickAt(projection, hover) is not { } at)
+                return;
+            if (session.Tools.LoopDrawStart(at.Tick, at.Tolerance) is not { } tick)
+                return;
+            double along = projection.AlongOf(session.AudioAt(tick));
+            context.FillRectangle(LoopLineBrush, Box(along - 1, along + 1, projection.LaneFrom, projection.LaneFrom + (projection.LaneSize * slots.Slots.Count)));
+        }
+
+        /// <summary>
+        /// The small X at the loop region's top right, which clears it with a click whatever the tool, shown while the
+        /// pointer is over the region in this lane; and with the Loop tool picked, or L held, what the pointer would take
+        /// hold of: an end to resize, or the region's body to move it.
+        /// </summary>
+        private void DrawLoopHover(DrawingContext context, EditorSession session, LaneProjection projection, LaneSlots slots)
+        {
+            if (_hover is not { } hover || _isPressed || Loop is not { } loop)
+                return;
+            var lanes = LanesOf(projection, slots);
+            var band = LoopBandOf(projection, loop);
+            var close = CloseRectOf(band, lanes);
+            if (!band.Inflate(2).Contains(hover) && !close.Inflate(ClickSlop).Contains(hover))
+                return;
+            DrawSyncClose(context, close);
+            if (!session.Tools.LoopActive || BandTickAt(projection, hover) is not { } at || session.Tools.LoopGripAt(at.Tick, at.Tolerance) is not { } grip)
+                return;
+
+            switch (grip)
+            {
+                case LoopGrip.Start or LoopGrip.End:
+                {
+                    double edge = projection.AlongOf(grip == LoopGrip.Start ? loop.Start : loop.End);
+                    double across1 = projection.LaneFrom, across2 = projection.LaneFrom + (projection.LaneSize * slots.Slots.Count);
+                    context.FillRectangle(LoopBrush, Box(edge - 1.5, edge + 1.5, across1, across2));
+                    break;
+                }
+
+                case LoopGrip.Body:
+                    context.DrawRectangle(null, LoopPen, band.Inflate(1), 2, 2);
+                    break;
+            }
+        }
+
+        /// <summary>Whether the pointer at <paramref name="position"/> is on the X that clears the loop region.</summary>
+        private bool LoopCloseAt(Point position)
+        {
+            if (Loop is not { } loop || CurrentProjection() is not { } projection)
+                return false;
+            var close = CloseRectOf(LoopBandOf(projection, loop), LanesOf(projection, projection.Slots));
+            return close.Inflate(ClickSlop).Contains(position);
+        }
+
+        /// <summary>
+        /// The tick under <paramref name="position"/>, and how many ticks either way it reaches, in a highway's, a
+        /// timeline's or a vocal part's lane alike: what the Loop tool takes hold of there is where it is in the song.
+        /// </summary>
+        private (double Tick, double Tolerance)? BandTickAt(LaneProjection projection, Point position)
+        {
+            if (Session is not { } session)
+                return null;
+            double tick = session.TickAt(projection.SecondsAt(AlongOf(position)));
+            return (tick, Math.Max(1, projection.TicksOf(HitPixels, Math.Max(0, tick), session.TempoMap)));
         }
 
         /// <summary>The strike line's band, on the cursor, behind the notes: dark across the lanes, as in the games.</summary>

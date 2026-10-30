@@ -138,7 +138,7 @@ engine. Its design decisions are recorded in the spec, as *Settled in CM2* and *
   [C10](charter-spec-v1.md#c10-playback) the transport bar, regions, the loop and following. The
   highway's drawing moved to `ChartShared.UI`.
 - **Saving** ([C17](charter-spec-v1.md#c17-save-and-export)): Save, a new chart's first save,
-  **New chart in this song**, Save and pack, Export copy, and the pending changes with Revert and
+  **New chart in this song**, Pack, Export copy, and the pending changes with Revert and
   Restore. [C15](charter-spec-v1.md#c15-editing-ergonomics) autosave and recovery.
 - **Lint.** The timing, 5-fret and song rules ([§6](charter-spec-v1.md#lint-rules)) with their
   fixes, the Findings tab and the marks on the bottom timeline. The chart's load issues are listed

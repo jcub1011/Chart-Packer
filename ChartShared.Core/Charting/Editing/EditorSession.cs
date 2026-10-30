@@ -17,6 +17,9 @@ public enum EditorTool
 
     /// <summary>Drags out a synchronized region (<see cref="SyncRegion"/>).</summary>
     Sync,
+
+    /// <summary>Draws out the loop region, and moves or resizes it (<see cref="ILoopSpan"/>).</summary>
+    Loop,
 }
 
 /// <summary>The modifier keys held with a click or a key.</summary>
@@ -96,11 +99,10 @@ public sealed class EditorSession
         Viewport = new EditorViewport();
         Selection = new EditorSelection(Chart, VocalContentOf);
         Tools = new EditorTools(this);
-        Fills = new FillProposals(this);
-        StarPower = new StarPowerProposals(this);
         TempoProposal = new TempoProposals(this);
         Reduce = new ReduceProposals(this);
         Sync = new SyncRegion(this);
+        Find = new EditorFind(this);
         SongEventMarks = SongEventsWith(null);
         undo.Changed += OnUndoChanged;
     }
@@ -108,7 +110,7 @@ public sealed class EditorSession
     /// <summary>Raised after the chart changes: a command done, undone or redone, or a preview applied or taken back.</summary>
     public event EventHandler<EditorChartChangedEventArgs>? ChartChanged;
 
-    /// <summary>Raised when the snap, the tool, the focused lane, the status or the proposed fills change.</summary>
+    /// <summary>Raised when the snap, the tool, the focused lane or the status changes.</summary>
     public event EventHandler? StateChanged;
 
     /// <summary>Raised each time a status is said, even one the same as the last, so a refusal repeated is said again.</summary>
@@ -146,8 +148,6 @@ public sealed class EditorSession
         _readOptions = null;
         _game.Clear();
         ForgetDiscoFlips();
-        Fills.OnChanged();
-        StarPower.OnChanged();
         SongSettingsChanged?.Invoke(this, EventArgs.Empty);
         PlaceSongEvents();
         RaiseState();
@@ -215,15 +215,6 @@ public sealed class EditorSession
     /// <summary>The tools, which turn clicks, drags and keys into commands.</summary>
     public EditorTools Tools { get; }
 
-    /// <summary>The run of Generate fills going on, if there's one (charter-spec C6 item 5).</summary>
-    public FillProposals Fills { get; }
-
-    /// <summary>The run of Generate star power going on, if there's one (charter-spec C8 item 1).</summary>
-    public StarPowerProposals StarPower { get; }
-
-    /// <summary>The run of proposed phrases going on, Generate fills' or Generate star power's; null for none.</summary>
-    public PhraseProposals? Proposals => Fills.IsActive ? Fills : StarPower.IsActive ? StarPower : null;
-
     /// <summary>The proposed tempo map being looked at, if there's one (charter-spec C14 item 4).</summary>
     public TempoProposals TempoProposal { get; }
 
@@ -232,6 +223,35 @@ public sealed class EditorSession
 
     /// <summary>The synchronized region, if one is drawn: edits in it are made again in the passages that matched it.</summary>
     public SyncRegion Sync { get; }
+
+    /// <summary>The passages found matching the selected notes (Ctrl+F), to jump between.</summary>
+    public EditorFind Find { get; }
+
+    /// <summary>
+    /// The loop region the Loop tool draws, moves and resizes (charter-spec C10 item 2): playback's, in seconds of audio,
+    /// or null without playback to hold one.
+    /// </summary>
+    public ILoopSpan? Loop { get; set; }
+
+    /// <summary>
+    /// Whether the Loop tool has drawn, moved or resized the region, or cleared it, since L was last pressed: a press of L
+    /// that hasn't touches nothing, so letting it go turns what repeating it does on or off instead.
+    /// </summary>
+    public bool LoopTouched { get; private set; }
+
+    /// <summary>Sets the loop region as a gesture ends, noting that the Loop tool has touched it.</summary>
+    public void DefineLoop(double start, double end)
+    {
+        LoopTouched = true;
+        Loop?.Define(start, end);
+    }
+
+    /// <summary>Takes the loop region away, noting that the Loop tool's X or middle button has touched it.</summary>
+    public void ClearLoop()
+    {
+        LoopTouched = true;
+        Loop?.Clear();
+    }
 
     /// <summary>
     /// The notes drawn faintly over <paramref name="key"/>'s lane as a draft not yet added: a recording pass's, a Reduce
@@ -293,6 +313,8 @@ public sealed class EditorSession
             Tools.Cancel();
             if (value == EditorTool.Sync)
                 ToolBeforeSync = field;
+            if (value == EditorTool.Loop)
+                ToolBeforeLoop = field;
             field = value;
             RaiseState();
         }
@@ -300,6 +322,28 @@ public sealed class EditorSession
 
     /// <summary>The tool picked before the Sync tool, which a region drawn goes back to.</summary>
     internal EditorTool ToolBeforeSync { get; private set; }
+
+    /// <summary>The tool picked before the Loop tool, which a loop region drawn goes back to.</summary>
+    internal EditorTool ToolBeforeLoop { get; private set; }
+
+    /// <summary>
+    /// Whether the Loop tool is held on with L, for as long as the key is down: the toolbar's button is lit and a press
+    /// draws, moves or resizes the loop region, whatever tool is picked.
+    /// </summary>
+    public bool LoopToolHeld
+    {
+        get;
+        set
+        {
+            if (field == value)
+                return;
+            field = value;
+
+            // Held, or let go, it's a fresh press: what a press of L toggles depends on whether the region is touched after.
+            LoopTouched = false;
+            RaiseState();
+        }
+    }
 
     /// <summary>
     /// The kind of phrase the Phrase tool draws, of those offered for the focused part (<see cref="ToolKindsOf"/>), or disco
@@ -371,6 +415,22 @@ public sealed class EditorSession
         }
     }
 
+    /// <summary>
+    /// The vocal part's lane the keys act on, when the lane last clicked or chosen was one; null when it was a highway's
+    /// (<see cref="Focused"/>). The Edit menu's Select all and Paste follow it, as the lane's own keys do.
+    /// </summary>
+    public VocalTrack? FocusedVocal
+    {
+        get;
+        set
+        {
+            if (field == value)
+                return;
+            field = value;
+            RaiseState();
+        }
+    }
+
     /// <summary>What the editor has to say: why an edit was refused, or what a key did. Null for nothing.</summary>
     public string? Status
     {
@@ -387,8 +447,14 @@ public sealed class EditorSession
         }
     }
 
-    /// <summary>The song.ini settings the chart is read with once saved, which the game view is worked out with.</summary>
-    public ChartReadOptions ReadOptions => _readOptions ??= MidiChartWriter.SettingsAfterSave(Chart, ChartReadOptions.From(_songIni));
+    /// <summary>
+    /// The settings the editor's game view is read with: the song's once saved, with sustains at Chart Builder's 10-tick
+    /// floor rather than the song's cutoff.
+    /// </summary>
+    public ChartReadOptions ReadOptions => _readOptions ??= MidiChartWriter.SettingsAfterSave(Chart, ChartReadOptions.From(_songIni)) with
+    {
+        SustainCutoff = EditableNote.MinimumSustainLength,
+    };
 
     /// <summary>Whether the drums are drawn with five pads.</summary>
     public bool IsFiveLaneDrums => Chart.DrumsVariant is { } variant ? variant == DrumsVariant.FiveLane : GameView.IsFiveLaneDrums(Chart, ReadOptions);
@@ -486,6 +552,26 @@ public sealed class EditorSession
 
     /// <summary>Moves the cursor to <paramref name="tick"/>.</summary>
     public void MoveCursorTo(long tick) => Viewport.MoveCursor(AudioAt(Math.Max(0, tick)));
+
+    /// <summary>Where the chart's last note, in any part, lets go; 0 for a chart with none.</summary>
+    public long ChartEndTick
+    {
+        get
+        {
+            long end = VocalSpan()?.End ?? 0;
+            foreach (var part in Chart.Parts)
+            {
+                foreach (var track in part.Tracks)
+                {
+                    // Notes are in start order, but a long sustain may let go after a later note's start.
+                    foreach (var note in track.Notes)
+                        end = Math.Max(end, note.Tick + note.Length);
+                }
+            }
+
+            return end;
+        }
+    }
 
     /// <summary>The columns or rows of <paramref name="instrument"/>'s lane in <paramref name="view"/>.</summary>
     public LaneSlots SlotsOf(ChartInstrument instrument, LaneView view) => LaneSlots.Of(ChartInstruments.KindOf(instrument), view, IsFiveLaneDrums);
@@ -726,8 +812,6 @@ public sealed class EditorSession
         {
             Selection.Reconcile();
             KeepPhraseKindOffered();
-            Fills.OnChanged();
-            StarPower.OnChanged();
             Reduce.OnChanged();
             Sync.OnChanged();
             PlaceSongEvents();

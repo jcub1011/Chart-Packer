@@ -12,6 +12,7 @@ using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charting.Layout;
 using ChartShared.Core.Charts;
 using ChartShared.Core.Input;
+using ChartShared.UI.Keybinds;
 using ChartShared.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -38,7 +39,9 @@ namespace ChartBuilder.ViewModels
 
         // Generate fills' and Generate star power's options, as last picked.
         private FillOptions _fillOptions = FillOptions.Default;
+        private GenerationMode _fillMode = GenerationMode.Add;
         private StarPowerOptions _starPowerOptions = StarPowerOptions.Default;
+        private GenerationMode _starPowerMode = GenerationMode.Replace;
 
         /// <summary>The ways record mode can put a pass in: merged with what's there, or over it.</summary>
         public IReadOnlyList<RecordModeChoice> RecordModeChoices { get; } =
@@ -128,6 +131,7 @@ namespace ChartBuilder.ViewModels
         [RelayCommand]
         public void ToggleRecord()
         {
+            CancelCountdown(announce: false);
             if (IsRecordArmed)
             {
                 IsRecordArmed = false;
@@ -162,6 +166,7 @@ namespace ChartBuilder.ViewModels
         [RelayCommand]
         public void TogglePlaytest()
         {
+            CancelCountdown(announce: false);
             if (Playtest.IsArmed)
             {
                 Playtest.Disarm();
@@ -178,10 +183,13 @@ namespace ChartBuilder.ViewModels
             Playtest.IsArmed = true;
             if (Playback.IsPlaying)
                 Playtest.Begin();
+            AnnouncePlaytestOn();
+        }
+
+        private void AnnouncePlaytestOn() =>
             Messages.Info(Session.Focused is { } key
                 ? string.Format(CultureInfo.CurrentCulture, Strings.PlaytestOnFormat, ChartLabels.InstrumentName(key.Instrument), ChartLabels.DifficultyName(key.Difficulty))
                 : Strings.PlaytestOnNoLane, RecordMessageKey);
-        }
 
         /// <summary>
         /// Lends the song's playback to a dialog over the Editor, as the Reduce dialog's preview has it: until it's given back,
@@ -192,6 +200,7 @@ namespace ChartBuilder.ViewModels
         {
             if (_playbackBorrows++ == 0)
             {
+                CancelCountdown(announce: false);
                 Playback.Pause();
                 _loopedBeforeBorrow = Playback.IsLooping;
                 Playback.IsLooping = false;
@@ -260,7 +269,10 @@ namespace ChartBuilder.ViewModels
                 CultureInfo.CurrentCulture,
                 mode == RecordMode.Overwrite ? Strings.RecordingOverwriteFormat : Strings.RecordingMergeFormat,
                 ChartLabels.InstrumentName(key.Instrument),
-                ChartLabels.DifficultyName(key.Difficulty)),
+                ChartLabels.DifficultyName(key.Difficulty),
+                AppKeys.Map.Display(SharedKeys.PlayPause),
+                AppKeys.Map.Display(BuilderKeys.Cancel),
+                AppKeys.Map.Display(BuilderKeys.RecordToggle)),
                 RecordMessageKey);
         }
 
@@ -368,9 +380,9 @@ namespace ChartBuilder.ViewModels
         }
 
         /// <summary>
-        /// Opens Generate fills' options (charter-spec C6 item 5), from the Edit menu of a lane of the drums
-        /// <paramref name="part"/>, and proposes fills with the options picked, over the span of a selection of the part or
-        /// the whole part. The options are kept while the editor is open, so the next run starts from the last one's.
+        /// Opens Generate fills' window (charter-spec C6 item 5), from the Edit menu of a lane of the drums, to review the
+        /// fills it proposes over the span of a selection of the part or the whole part, then apply the kept fills or
+        /// cancel. The options and mode are kept while the editor is open, so the next run starts from the last one's.
         /// </summary>
         public async Task GenerateFillsAsync(ChartInstrument part)
         {
@@ -378,18 +390,18 @@ namespace ChartBuilder.ViewModels
                 return;
             Session.Tools.Cancel();
             var span = Session.Selection.SpanIn(part);
-            var options = new GenerateFillsViewModel(_fillOptions, overSelection: span is not null);
-            if (!await _dialogs.AskGenerateFillsAsync(options))
-                return;
-            _fillOptions = options.Options;
-            Session.Fills.Start(_fillOptions, span);
+            var viewModel = new GenerateFillsViewModel(this, part, _fillOptions, overSelection: span is not null, _fillMode);
+            // The options and mode are kept as the window left them, whether the fills were applied or not.
+            await _dialogs.ShowPhraseGeneratorAsync(viewModel);
+            _fillOptions = viewModel.Options;
+            _fillMode = viewModel.Mode;
         }
 
         /// <summary>
-        /// Opens Generate star power's options (charter-spec C8 item 1), from the Edit menu of a lane of
-        /// <paramref name="part"/>, and proposes star power for it with the options picked, over the span of a selection of
-        /// the part or the whole part. The options are kept while the editor is open, so the next run starts from the last
-        /// one's.
+        /// Opens Generate star power's window (charter-spec C8 item 1), from the Edit menu of a lane of
+        /// <paramref name="part"/>, to review the layout it proposes over the span of a selection of the part or the whole
+        /// part, then apply the kept regions or cancel. The options and mode are kept while the editor is open, so the next
+        /// run starts from the last one's.
         /// </summary>
         public async Task GenerateStarPowerAsync(ChartInstrument part)
         {
@@ -397,11 +409,11 @@ namespace ChartBuilder.ViewModels
                 return;
             Session.Tools.Cancel();
             var span = Session.Selection.SpanIn(part);
-            var options = new GenerateStarPowerViewModel(part, _starPowerOptions, overSelection: span is not null);
-            if (!await _dialogs.AskGenerateStarPowerAsync(options))
+            var viewModel = new GenerateStarPowerViewModel(this, part, _starPowerOptions, overSelection: span is not null, _starPowerMode);
+            if (!await _dialogs.ShowPhraseGeneratorAsync(viewModel))
                 return;
-            _starPowerOptions = options.Options;
-            Session.StarPower.Start(part, _starPowerOptions, span);
+            _starPowerOptions = viewModel.Options;
+            _starPowerMode = viewModel.Mode;
         }
 
         /// <summary>Opens the highway preview in a window of its own (charter-spec C18).</summary>

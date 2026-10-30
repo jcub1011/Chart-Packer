@@ -11,7 +11,7 @@ using ChartShared.UI.Services;
 namespace ChartPacker.Services
 {
     /// <summary>User settings persisted to <c>settings.json</c>. See spec §8.</summary>
-    public sealed class AppSettings : ISettingsWindowSize
+    public sealed class AppSettings : IRememberedWindows
     {
         public const double DefaultLibraryPaneWidth = 320;
         public const double MinLibraryPaneWidth = 200;
@@ -20,13 +20,15 @@ namespace ChartPacker.Services
         // Reading a song is mostly parsing its chart, so a reader per processor keeps every core busy.
         public static readonly int DefaultScanParallelism = Environment.ProcessorCount;
         public const int MinScanParallelism = 1;
+        public const bool DefaultScanOnLaunch = true;
+        public const bool DefaultScanOnFolderChange = true;
         public const double DefaultMasterVolume = 1;
         public const bool DefaultPitchCorrection = true;
         public const OverwritePolicy DefaultOverwritePolicy = OverwritePolicy.Skip;
         public const DedupKindPreference DefaultDedupKeepPreference = DedupKindPreference.PreferSng;
-        public const double DefaultHighwayNoteSpeed = 1;
-        public const double MinHighwayNoteSpeed = 0.5;
-        public const double MaxHighwayNoteSpeed = 3;
+        // Qualified: this class's own HighwayLookAhead property would otherwise be what the name means.
+        public const double DefaultHighwayLookAhead = ChartShared.Core.Charting.HighwayLookAhead.Default;
+        public const double DefaultGenerateDifficultiesLookAhead = ChartShared.UI.ViewModels.ReductionPreviewViewModel.DefaultLookAhead;
         public const HighwayPlacement DefaultHighwayPlacement = HighwayPlacement.Background;
         public const WaveformFidelity DefaultWaveformFidelity = WaveformFidelity.High;
         public const ScrubStep DefaultScrubStep = ScrubStep.Quarter;
@@ -46,25 +48,8 @@ namespace ChartPacker.Services
         /// <summary>Width of the library (left) panel, in device-independent pixels.</summary>
         public double LibraryPaneWidth { get; set; } = DefaultLibraryPaneWidth;
 
-        /// <summary>Whether the main window was maximized when it last closed, so it opens that way.</summary>
-        public bool MainWindowMaximized { get; set; }
-
-        /// <summary>The main window's normal bounds when it last closed, in screen pixels (position) and device-independent pixels (size). Null for none yet.</summary>
-        public int? MainWindowX { get; set; }
-
-        public int? MainWindowY { get; set; }
-
-        public double? MainWindowWidth { get; set; }
-
-        public double? MainWindowHeight { get; set; }
-
-        /// <summary>The Settings window's normal size when it last closed, in device-independent pixels. Null for none yet.</summary>
-        public double? SettingsWindowWidth { get; set; }
-
-        public double? SettingsWindowHeight { get; set; }
-
-        /// <summary>Whether the merge songs editor was maximized when it was last closed.</summary>
-        public bool MergeWindowMaximized { get; set; }
+        /// <summary>How each window was shown when it last closed, by its type's name (<see cref="ChartShared.UI.Views.WindowMemory"/>). Null for none yet.</summary>
+        public Dictionary<string, SavedWindow>? Windows { get; set; }
 
         /// <summary>Share of the merge songs editor's width given to the preview (right) panel, from 0 to 1.</summary>
         public double MergePreviewFraction { get; set; } = DefaultMergePreviewFraction;
@@ -78,7 +63,13 @@ namespace ChartPacker.Services
         /// <summary>How many folders the library scan searches, and how many songs it reads, at once.</summary>
         public int ScanParallelism { get; set; } = DefaultScanParallelism;
 
-        /// <summary>The last folder picked in the library panel. It is restored at launch but not scanned.</summary>
+        /// <summary>Whether the app scans <see cref="LastFolder"/> as it starts. When off, the folder is restored but not scanned.</summary>
+        public bool ScanOnLaunch { get; set; } = DefaultScanOnLaunch;
+
+        /// <summary>Whether choosing a songs folder, with Browse or by dropping it on the window, scans it straight away. When off, the folder is set but not scanned.</summary>
+        public bool ScanOnFolderChange { get; set; } = DefaultScanOnFolderChange;
+
+        /// <summary>The last folder picked in the library panel. It is restored at launch, and scanned then when <see cref="ScanOnLaunch"/> is on.</summary>
         public string? LastFolder { get; set; }
 
         /// <summary>Where Pack and Unpack write. <see langword="null"/> means the scanned folder.</summary>
@@ -140,8 +131,18 @@ namespace ChartPacker.Services
         [JsonConverter(typeof(JsonStringEnumConverter<HighwayPlacement>))]
         public HighwayPlacement HighwayPlacement { get; set; } = DefaultHighwayPlacement;
 
-        /// <summary>How fast the highway's notes fall, as a multiple of the normal speed.</summary>
-        public double HighwayNoteSpeed { get; set; } = DefaultHighwayNoteSpeed;
+        /// <summary>How many seconds ahead of the strike line the highway shows, from <see cref="HighwayLookAhead"/>'s range.</summary>
+        public double HighwayLookAhead { get; set; } = DefaultHighwayLookAhead;
+
+        /// <summary>
+        /// How fast the highway's notes fell, as a multiple of the normal speed, before the highway was set by its
+        /// look-ahead. Only read, to carry a file an older Chart Packer saved over to <see cref="HighwayLookAhead"/>
+        /// (<see cref="SettingsService"/>); null once it has.
+        /// </summary>
+        public double? HighwayNoteSpeed { get; set; }
+
+        /// <summary>How many seconds ahead the Generate lower difficulties window's preview shows, as its slider last left it.</summary>
+        public double GenerateDifficultiesLookAhead { get; set; } = DefaultGenerateDifficultiesLookAhead;
 
         /// <summary>How far Ctrl and the wheel move the audio over the seek bar or a lane: a note of this length on the chart's grid.</summary>
         [JsonConverter(typeof(JsonStringEnumConverter<ScrubStep>))]

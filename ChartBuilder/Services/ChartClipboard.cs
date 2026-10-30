@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charts;
@@ -16,8 +17,19 @@ namespace ChartBuilder.Services
         /// <summary>The app's clipboard.</summary>
         public static ChartClipboard Shared { get; } = new();
 
+        /// <summary>Raised when what the clipboard holds changes, which the Edit menu's Paste follows.</summary>
+        public event EventHandler? Changed;
+
         /// <summary>What was last cut or copied; null for nothing.</summary>
-        public ChartClip? Current { get; set; }
+        public ChartClip? Current
+        {
+            get;
+            set
+            {
+                field = value;
+                Changed?.Invoke(this, EventArgs.Empty);
+            }
+        }
 
         /// <summary>The mapping last confirmed from <paramref name="from"/> to <paramref name="to"/>, or the default one.</summary>
         public LaneMapping MappingFor(ChartInstrumentKind from, ChartInstrumentKind to) =>

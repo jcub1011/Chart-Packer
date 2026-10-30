@@ -1,10 +1,86 @@
 <?xml version="1.0" encoding="utf-8"?>
 <root>
+  <!-- 
+    Microsoft ResX Schema 
+    
+    Version 2.0
+    
+    The primary goals of this format is to allow a simple XML format 
+    that is mostly human readable. The generation and parsing of the 
+    various data types are done through the TypeConverter classes 
+    associated with the data types.
+    
+    Example:
+    
+    ... ado.net/XML headers & schema ...
+    <resheader name="resmimetype">text/microsoft-resx</resheader>
+    <resheader name="version">2.0</resheader>
+    <resheader name="reader">System.Resources.ResXResourceReader, System.Windows.Forms, ...</resheader>
+    <resheader name="writer">System.Resources.ResXResourceWriter, System.Windows.Forms, ...</resheader>
+    <data name="Name1"><value>this is my long string</value><comment>this is a comment</comment></data>
+    <data name="Color1" type="System.Drawing.Color, System.Drawing">Blue</data>
+    <data name="Bitmap1" mimetype="application/x-microsoft.net.object.binary.base64">
+        <value>[base64 mime encoded serialized .NET Framework object]</value>
+    </data>
+    <data name="Icon1" type="System.Drawing.Icon, System.Drawing" mimetype="application/x-microsoft.net.object.bytearray.base64">
+        <value>[base64 mime encoded string representing a byte array form of the .NET Framework object]</value>
+        <comment>This is a comment</comment>
+    </data>
+                
+    There are any number of "resheader" rows that contain simple 
+    name/value pairs.
+    
+    Each data row contains a name, and value. The row also contains a 
+    type or mimetype. Type corresponds to a .NET class that support 
+    text/value conversion through the TypeConverter architecture. 
+    Classes that don't support this are serialized and stored with the 
+    mimetype set.
+    
+    The mimetype is used for serialized objects, and tells the 
+    ResXResourceReader how to depersist the object. This is currently not 
+    extensible. For a given mimetype the value must be set accordingly:
+    
+    Note - application/x-microsoft.net.object.binary.base64 is the format 
+    that the ResXResourceWriter will generate, however the reader can 
+    read any of the formats listed below.
+    
+    mimetype: application/x-microsoft.net.object.binary.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Binary.BinaryFormatter
+            : and then encoded with base64 encoding.
+    
+    mimetype: application/x-microsoft.net.object.soap.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Soap.SoapFormatter
+            : and then encoded with base64 encoding.
+
+    mimetype: application/x-microsoft.net.object.bytearray.base64
+    value   : The object must be serialized into a byte array 
+            : using a System.ComponentModel.TypeConverter
+            : and then encoded with base64 encoding.
+    -->
   <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
     <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
     <xsd:element name="root" msdata:IsDataSet="true">
       <xsd:complexType>
         <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
           <xsd:element name="data">
             <xsd:complexType>
               <xsd:sequence>
@@ -117,14 +193,22 @@
     <value>Settings</value>
   </data>
   <data name="SettingsSearchWatermark" xml:space="preserve">
-    <value>Search settings (Ctrl+E)</value>
+    <value>Search Settings (Ctrl+E)</value>
   </data>
   <data name="SettingsAllCategories" xml:space="preserve">
-    <value>All settings</value>
+    <value>All Settings</value>
     <comment>First entry in the Settings category tree; shows every category.</comment>
   </data>
+  <data name="SettingsUnsavedOne" xml:space="preserve">
+    <value>1 Unsaved Change</value>
+    <comment>Left of the Settings window's buttons while one setting has a change that OK or Apply hasn't written yet.</comment>
+  </data>
+  <data name="SettingsUnsavedFormat" xml:space="preserve">
+    <value>{0} Unsaved Changes</value>
+    <comment>Left of the Settings window's buttons while several settings have changes that OK or Apply hasn't written yet. {0} is how many.</comment>
+  </data>
   <data name="SettingsCategoriesName" xml:space="preserve">
-    <value>Setting categories</value>
+    <value>Setting Categories</value>
     <comment>Accessible name of the Settings category tree.</comment>
   </data>
   <data name="SettingsNoMatchesFormat" xml:space="preserve">
@@ -132,7 +216,7 @@
     <comment>{0} is the search text.</comment>
   </data>
   <data name="SettingsResetToolTip" xml:space="preserve">
-    <value>Reset to default</value>
+    <value>Reset to Default</value>
   </data>
   <data name="SettingsBrowseButton" xml:space="preserve">
     <value>Browse…</value>
@@ -314,7 +398,7 @@
     <value>Auto-set song length</value>
   </data>
   <data name="AutoSetLengthToolTip" xml:space="preserve">
-    <value>Set each song's length to its longest part (last chart note, longest audio track, or background video) plus 1 second</value>
+    <value>Set each song's length to its longest part (last chart note, longest audio track, or background video)</value>
   </data>
   <data name="DifficultyDistinctBadge" xml:space="preserve">
     <value>*</value>
@@ -679,10 +763,6 @@
   <data name="RemovedTracksListName" xml:space="preserve">
     <value>Removed tracks</value>
   </data>
-  <data name="ReplaceTrackFormat" xml:space="preserve">
-    <value>Replace {0}</value>
-    <comment>{0} is the stem, e.g. "guitar".</comment>
-  </data>
   <data name="TrackNotAudioFormat" xml:space="preserve">
     <value>{0} isn't an ogg, opus, mp3 or wav file.</value>
     <comment>{0} is the file name.</comment>
@@ -800,7 +880,7 @@
     <comment>Under the latency when it can't be read from the device, or detection is off in Settings.</comment>
   </data>
   <data name="CalibrationDetectedToolTip" xml:space="preserve">
-    <value>Device-buffer latency reported by the system is added to the latency set here while Detect output latency is on. Excludes Bluetooth and display delay: set those here.</value>
+    <value>Device-buffer latency reported by the system is added to the latency set here while Detect output latency is on.</value>
   </data>
   <data name="CalibrationSave" xml:space="preserve">
     <value>Save</value>
@@ -892,7 +972,7 @@
     <value>The offset couldn't be saved.</value>
   </data>
   <data name="CalibrationDeviceHowText" xml:space="preserve">
-    <value>No sound: hit along with what you see. Any button, fret, strum, key, or pad counts; releases don't. The result accounts for device lag, screen lag, and your timing bias; playtests subtract it from every input from the device.</value>
+    <value>No sound: hit along with what you see. Any button, fret, strum, key, or pad counts.</value>
   </data>
   <data name="CalibrationAudioUnavailableFormat" xml:space="preserve">
     <value>The audio can't be played: {0}</value>
@@ -931,10 +1011,10 @@
     <value>There weren't enough taps near the clicks to measure. Try again.</value>
   </data>
   <data name="CalibrationTapHowText" xml:space="preserve">
-    <value>Notes are hidden while you tap, so follow the sound alone. Any key or highway click counts; releases don't. The result goes into the latency above; check it against the notes before saving.</value>
+    <value>Any key or highway click counts.</value>
   </data>
   <data name="CalibrationTapDevicesNote" xml:space="preserve">
-    <value>Instrument devices count too. A device calibrated under Input devices has its offset subtracted, improving accuracy.</value>
+    <value>Instrument devices count too. A device calibrated under Input devices has its offset subtracted.</value>
   </data>
   <data name="ReductionRulesHeading" xml:space="preserve">
     <value>Rules</value>
@@ -1049,17 +1129,16 @@
     <value>Not easier than the difficulty above: {0}.</value>
     <comment>{0} lists the difficulties, e.g. "Hard, Easy".</comment>
   </data>
-  <data name="ReductionPreviewPlayToolTip" xml:space="preserve">
-    <value>Play or pause (Space)</value>
-  </data>
   <data name="ReductionPreviewPlayPauseButton" xml:space="preserve">
     <value>Play or pause</value>
   </data>
   <data name="ReductionPreviewPreviousToolTip" xml:space="preserve">
-    <value>Previous change (Shift+N)</value>
+    <value>Previous change</value>
+    <comment>The key is added after it, as it's bound (Shortcut.Tip).</comment>
   </data>
   <data name="ReductionPreviewNextToolTip" xml:space="preserve">
-    <value>Next change (N)</value>
+    <value>Next change</value>
+    <comment>The key is added after it, as it's bound (Shortcut.Tip).</comment>
   </data>
   <data name="ReductionPreviewSpeedToolTip" xml:space="preserve">
     <value>How fast the song plays</value>
@@ -1082,8 +1161,9 @@
   <data name="ReductionPreviewFilterCountFormat" xml:space="preserve">
     <value>{0} ({1})</value>
   </data>
-  <data name="ReductionPreviewLookAheadFormat" xml:space="preserve">
+  <data name="LookAheadFormat" xml:space="preserve">
     <value>{0:0.0} s</value>
+    <comment>A highway's look-ahead, as its slider's readout shows it: how many seconds it shows beyond the strike line, e.g. "1.5 s".</comment>
   </data>
   <data name="ReductionPreviewWorking" xml:space="preserve">
     <value>Comparing the draft with what it's reduced from…</value>
@@ -1162,5 +1242,373 @@
   </data>
   <data name="ReductionPreviewToolTip" xml:space="preserve">
     <value>Show the draft against its source, with the song, marking where it changed</value>
+  </data>
+  <data name="TimecodeWatermark" xml:space="preserve">
+    <value>HH:MM:SS:mmm or milliseconds</value>
+    <comment>Watermark of a time's edit box, e.g. preview_start_time. Accepts a timecode or a bare millisecond count.</comment>
+  </data>
+  <data name="UsePlayheadButton" xml:space="preserve">
+    <value>Use playhead</value>
+    <comment>Button setting a time to the current playhead position.</comment>
+  </data>
+  <data name="UsePlayheadToolTip" xml:space="preserve">
+    <value>Set to the current playhead position</value>
+  </data>
+  <data name="InvalidTimecode" xml:space="preserve">
+    <value>Enter milliseconds or a timecode like 00:03:45:123.</value>
+    <comment>Error for a time's edit box when its text is neither.</comment>
+  </data>
+  <data name="CrashDialogTitleFormat" xml:space="preserve">
+    <value>{0} Hit an Error</value>
+    <comment>Title of the crash dialog. {0} is the app's name.</comment>
+  </data>
+  <data name="CrashDialogHeading" xml:space="preserve">
+    <value>What you were doing didn't finish</value>
+  </data>
+  <data name="CrashDialogBody" xml:space="preserve">
+    <value>You can keep working, but save soon: the app may not behave as expected until it restarts. Quitting asks about unsaved changes first.</value>
+  </data>
+  <data name="CrashShowDetails" xml:space="preserve">
+    <value>Show details</value>
+    <comment>Toggle in the crash dialog that shows the error's stack trace.</comment>
+  </data>
+  <data name="CrashHideDetails" xml:space="preserve">
+    <value>Hide details</value>
+  </data>
+  <data name="CrashOneMoreError" xml:space="preserve">
+    <value>1 more error came in after this one.</value>
+  </data>
+  <data name="CrashMoreErrorsFormat" xml:space="preserve">
+    <value>{0} more errors came in after this one.</value>
+    <comment>{0} is a count above 1.</comment>
+  </data>
+  <data name="CrashCopyDetailsButton" xml:space="preserve">
+    <value>Copy details</value>
+    <comment>Copies the error, its stack trace, the app's version and the OS to the clipboard.</comment>
+  </data>
+  <data name="CrashCopiedButton" xml:space="preserve">
+    <value>Copied</value>
+    <comment>Shown on the Copy details button for a moment once the details are copied.</comment>
+  </data>
+  <data name="CrashReportButton" xml:space="preserve">
+    <value>Report on GitHub</value>
+    <comment>Copies the details, then opens a new issue on the project's GitHub page.</comment>
+  </data>
+  <data name="CrashQuitButton" xml:space="preserve">
+    <value>Quit</value>
+    <comment>Closes the app as its windows' close buttons would, asking about unsaved changes.</comment>
+  </data>
+  <data name="CrashKeepWorkingButton" xml:space="preserve">
+    <value>Keep working</value>
+    <comment>Closes the crash dialog and carries on.</comment>
+  </data>
+  <data name="KeyCategoryFile" xml:space="preserve">
+    <value>File</value>
+    <comment>Heading in the keyboard shortcuts list over the shortcuts for saving, opening and settings.</comment>
+  </data>
+  <data name="KeyCategoryEdit" xml:space="preserve">
+    <value>Edit</value>
+    <comment>Heading in the keyboard shortcuts list over the shortcuts for undo, redo and the clipboard.</comment>
+  </data>
+  <data name="KeyCategoryPlayback" xml:space="preserve">
+    <value>Playback</value>
+    <comment>Heading in the keyboard shortcuts list over the shortcuts for playing, pausing and moving through a song.</comment>
+  </data>
+  <data name="KeyActionSave" xml:space="preserve">
+    <value>Save</value>
+    <comment>Name of the Save shortcut in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionUndo" xml:space="preserve">
+    <value>Undo</value>
+    <comment>Name of the Undo shortcut in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionRedo" xml:space="preserve">
+    <value>Redo</value>
+    <comment>Name of the Redo shortcut in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionSettings" xml:space="preserve">
+    <value>Open Settings</value>
+    <comment>Name of the shortcut that opens the program settings, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionPlayPause" xml:space="preserve">
+    <value>Play/Pause</value>
+    <comment>Name of the shortcut that plays or pauses the song, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionNextChange" xml:space="preserve">
+    <value>Next Change</value>
+    <comment>Name of the shortcut that goes to the next change in a reduction's preview, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionPreviousChange" xml:space="preserve">
+    <value>Previous Change</value>
+    <comment>Name of the shortcut that goes to the change before in a reduction's preview, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyCategorySettings" xml:space="preserve">
+    <value>Settings</value>
+    <comment>Heading in the keyboard shortcuts list over the shortcuts of the Settings window.</comment>
+  </data>
+  <data name="KeyActionFocusSearch" xml:space="preserve">
+    <value>Search Settings</value>
+    <comment>Name of the shortcut that moves to the search box of the Settings window, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="MenuShortcuts" xml:space="preserve">
+    <value>_Shortcuts…</value>
+    <comment>Bottom item of the Edit menu; opens the window where keyboard shortcuts are changed. The underscore marks its access key.</comment>
+  </data>
+  <data name="MenuShortcutsToolTip" xml:space="preserve">
+    <value>See and change the keyboard shortcuts</value>
+  </data>
+  <data name="MenuAbout" xml:space="preserve">
+    <value>_About</value>
+    <comment>Top-level menu, after the others, with the documentation links. The underscore marks its access key, which must be unique among the top-level menus.</comment>
+  </data>
+  <data name="MenuGettingStarted" xml:space="preserve">
+    <value>_Getting Started</value>
+    <comment>Item of the About menu; opens the Getting Started guide in the browser. The underscore marks its access key.</comment>
+  </data>
+  <data name="MenuGettingStartedToolTip" xml:space="preserve">
+    <value>Open the Getting Started guide in your browser</value>
+  </data>
+  <data name="MenuThirdPartyNotices" xml:space="preserve">
+    <value>_Third Party Notices</value>
+    <comment>Item of the About menu; opens the file crediting the libraries, icons and references the program uses, in the browser. The underscore marks its access key.</comment>
+  </data>
+  <data name="MenuThirdPartyNoticesToolTip" xml:space="preserve">
+    <value>Open the third-party notices and licences in your browser</value>
+  </data>
+  <data name="HelpOpenFailedTitle" xml:space="preserve">
+    <value>Couldn't Open the Page</value>
+    <comment>Title of the alert shown when a link of the About menu couldn't be opened in the browser.</comment>
+  </data>
+  <data name="HelpOpenFailed" xml:space="preserve">
+    <value>The page couldn't be opened in your browser. Check that a default browser is set, then try again.</value>
+    <comment>Body of the alert shown when a link of the About menu couldn't be opened in the browser.</comment>
+  </data>
+  <data name="KeybindsWindowTitle" xml:space="preserve">
+    <value>Keyboard Shortcuts</value>
+  </data>
+  <data name="KeybindsAllCategories" xml:space="preserve">
+    <value>All Shortcuts</value>
+    <comment>Top entry of the category tree in the keyboard shortcuts window; shows every shortcut.</comment>
+  </data>
+  <data name="KeybindsViewName" xml:space="preserve">
+    <value>Shortcuts View</value>
+    <comment>Accessible name of the toggle between the list of shortcuts and the keyboard.</comment>
+  </data>
+  <data name="KeybindsListView" xml:space="preserve">
+    <value>List</value>
+    <comment>Button in the Shortcuts window that shows the shortcuts as a list.</comment>
+  </data>
+  <data name="KeybindsKeyboardView" xml:space="preserve">
+    <value>Keyboard</value>
+    <comment>Button in the Shortcuts window that shows the shortcuts on the keys of a keyboard.</comment>
+  </data>
+  <data name="KeybindsMapTitle" xml:space="preserve">
+    <value>Keyboard Map</value>
+    <comment>Heading of the Shortcuts window while it shows the keyboard.</comment>
+  </data>
+  <data name="KeybindsMapSubtitle" xml:space="preserve">
+    <value>Choose which modifier keys are held, then pick a key to see what it does.</value>
+    <comment>Under the keyboard map heading.</comment>
+  </data>
+  <data name="KeybindsMapOtherKeys" xml:space="preserve">
+    <value>Other Keys</value>
+    <comment>Heading over the keys of shortcuts that are not on the keyboard drawn, such as number pad keys.</comment>
+  </data>
+  <data name="KeybindsMapLegendBound" xml:space="preserve">
+    <value>Bound</value>
+    <comment>Legend of the keyboard map: a key that has a shortcut.</comment>
+  </data>
+  <data name="KeybindsMapLegendShared" xml:space="preserve">
+    <value>Shared</value>
+    <comment>Legend of the keyboard map: a key that shortcuts which can be live together share.</comment>
+  </data>
+  <data name="KeybindsMapLegendFixed" xml:space="preserve">
+    <value>Fixed</value>
+    <comment>Legend of the keyboard map: a key that only has shortcuts that cannot be changed.</comment>
+  </data>
+  <data name="KeybindsMapLegendElsewhere" xml:space="preserve">
+    <value>Other layer</value>
+    <comment>Legend of the keyboard map: a key with no shortcut in the modifiers shown that has one with other modifiers.</comment>
+  </data>
+  <data name="KeybindsMapElsewhereFormat" xml:space="preserve">
+    <value>Also in other layers: {0}</value>
+    <comment>Under the picked key, and in a key's tooltip, for shortcuts the key has with other modifiers. {0} is the list of them, each as its key with modifiers and the shortcut's name.</comment>
+  </data>
+  <data name="KeybindsMapAssignFailed" xml:space="preserve">
+    <value>Couldn't bind the shortcut to that key.</value>
+    <comment>Line under the keyboard map when binding a shortcut to the picked key failed unexpectedly.</comment>
+  </data>
+  <data name="KeybindsMapPickKey" xml:space="preserve">
+    <value>Pick a key to see what it does.</value>
+    <comment>Under the keyboard map until a key is picked.</comment>
+  </data>
+  <data name="KeybindsMapUnboundFormat" xml:space="preserve">
+    <value>Nothing is bound to {0}.</value>
+    <comment>Under the keyboard map for a picked key with no shortcut. {0} is the key, with its modifiers.</comment>
+  </data>
+  <data name="KeybindsMapAssignFormat" xml:space="preserve">
+    <value>Bind {0} to…</value>
+    <comment>Placeholder of the list that binds a shortcut to the picked key. {0} is the key, with its modifiers.</comment>
+  </data>
+  <data name="KeybindsMapAssignSearch" xml:space="preserve">
+    <value>Search Shortcuts</value>
+    <comment>Placeholder of the box that narrows the list of shortcuts to bind to the picked key.</comment>
+  </data>
+  <data name="KeybindsMapAssignNoMatches" xml:space="preserve">
+    <value>No shortcuts match.</value>
+    <comment>Under the box that narrows the list of shortcuts to bind to the picked key, when none does.</comment>
+  </data>
+  <data name="KeybindsMapShowInList" xml:space="preserve">
+    <value>Show in List</value>
+    <comment>Tooltip of the button that finds a shortcut in the list of shortcuts.</comment>
+  </data>
+  <data name="KeybindsMapRemoveFromKey" xml:space="preserve">
+    <value>Remove from Key</value>
+    <comment>Tooltip of the button that takes the picked key off a shortcut.</comment>
+  </data>
+  <data name="KeybindsCategoriesName" xml:space="preserve">
+    <value>Shortcut Categories</value>
+    <comment>Name of the category tree, which screen readers give it.</comment>
+  </data>
+  <data name="KeybindsSearchWatermark" xml:space="preserve">
+    <value>Search Shortcuts</value>
+  </data>
+  <data name="KeybindsNoMatchesFormat" xml:space="preserve">
+    <value>No shortcuts match "{0}".</value>
+    <comment>{0} is what the user typed in the search box.</comment>
+  </data>
+  <data name="KeybindsUnbound" xml:space="preserve">
+    <value>Not Set</value>
+    <comment>Shown for a shortcut that has no key.</comment>
+  </data>
+  <data name="KeybindsFixed" xml:space="preserve">
+    <value>Fixed</value>
+    <comment>Label on a shortcut that can't be changed, such as Copy and Paste.</comment>
+  </data>
+  <data name="KeybindsFixedToolTip" xml:space="preserve">
+    <value>This Shortcut Can't Be Changed</value>
+  </data>
+  <data name="KeybindsPressKey" xml:space="preserve">
+    <value>Press New Shortcut… (Esc to Cancel)</value>
+    <comment>Shown in place of a key while the window waits for the user to press the key they want.</comment>
+  </data>
+  <data name="KeybindsChangeToolTip" xml:space="preserve">
+    <value>Change or Delete Shortcut</value>
+  </data>
+  <data name="KeybindsChangeBinding" xml:space="preserve">
+    <value>Change Binding</value>
+    <comment>Menu item on a key in the keyboard shortcuts window: waits for the key to put in its place.</comment>
+  </data>
+  <data name="KeybindsDeleteBinding" xml:space="preserve">
+    <value>Delete Binding</value>
+    <comment>Menu item on a key in the keyboard shortcuts window: removes the key from its shortcut.</comment>
+  </data>
+  <data name="KeybindsAddToolTip" xml:space="preserve">
+    <value>Add Alternate Shortcut</value>
+  </data>
+  <data name="KeybindsResetToolTip" xml:space="preserve">
+    <value>Restore Defaults</value>
+  </data>
+  <data name="KeybindsResetAllButton" xml:space="preserve">
+    <value>Reset All</value>
+  </data>
+  <data name="KeybindsImportToolTip" xml:space="preserve">
+    <value>Import</value>
+  </data>
+  <data name="KeybindsExportToolTip" xml:space="preserve">
+    <value>Export</value>
+  </data>
+  <data name="KeybindsAlsoUsedFormat" xml:space="preserve">
+    <value>Also used by {0}</value>
+    <comment>Under a shortcut whose key another shortcut has too. {0} is the other shortcut's name, or names separated by commas.</comment>
+  </data>
+  <data name="KeybindsConflictTitle" xml:space="preserve">
+    <value>Shortcut Already in Use</value>
+  </data>
+  <data name="KeybindsConflictFormat" xml:space="preserve">
+    <value>{0} is already used by {1}. Move it to {2}, or keep it on both?</value>
+    <comment>{0} is the key, {1} the shortcut that has it now, {2} the shortcut being changed.</comment>
+  </data>
+  <data name="KeybindsMoveButton" xml:space="preserve">
+    <value>Move It</value>
+    <comment>Takes the key from the other shortcut and gives it to this one.</comment>
+  </data>
+  <data name="KeybindsKeepBothButton" xml:space="preserve">
+    <value>Keep Both</value>
+    <comment>Leaves the key on both shortcuts. Fine where they are never live together.</comment>
+  </data>
+  <data name="KeybindsLockedConflictFormat" xml:space="preserve">
+    <value>{0} is used by {1}, which can't be changed. Press another key.</value>
+  </data>
+  <data name="KeybindsOsReservedFormat" xml:space="preserve">
+    <value>{0} is taken by the operating system. Press another key.</value>
+  </data>
+  <data name="KeybindsNeedsModifierFormat" xml:space="preserve">
+    <value>{0} on its own would be typed into text boxes. Hold Ctrl, Shift or Alt too.</value>
+  </data>
+  <data name="KeybindsDuplicateFormat" xml:space="preserve">
+    <value>{0} is already one of this shortcut's keys. Press another key.</value>
+  </data>
+  <data name="KeybindsAltGrFormat" xml:space="preserve">
+    <value>{0} may be typed as a character on some keyboard layouts, where Alt Gr counts as Ctrl and Alt.</value>
+  </data>
+  <data name="KeybindsResetAllTitle" xml:space="preserve">
+    <value>Reset All Shortcuts</value>
+  </data>
+  <data name="KeybindsResetAllMessage" xml:space="preserve">
+    <value>Put every shortcut back to its default? The shortcuts that can't be changed are as they were.</value>
+  </data>
+  <data name="KeybindsImportTitle" xml:space="preserve">
+    <value>Import Shortcuts</value>
+  </data>
+  <data name="KeybindsImportChoice" xml:space="preserve">
+    <value>Merge the file's shortcuts into yours, or replace yours with them? Shortcuts the file doesn't have go back to their defaults when replacing.</value>
+  </data>
+  <data name="KeybindsMergeButton" xml:space="preserve">
+    <value>Merge</value>
+  </data>
+  <data name="KeybindsReplaceButton" xml:space="preserve">
+    <value>Replace</value>
+  </data>
+  <data name="KeybindsImportedFormat" xml:space="preserve">
+    <value>Imported {0} shortcuts; {1} ignored. They apply when you choose OK.</value>
+    <comment>{0} is how many shortcuts were taken from the file, {1} how many entries couldn't be used.</comment>
+  </data>
+  <data name="KeybindsImportUnreadable" xml:space="preserve">
+    <value>The file couldn't be read.</value>
+  </data>
+  <data name="KeybindsImportTooLarge" xml:space="preserve">
+    <value>The file is too large to be a shortcuts file.</value>
+  </data>
+  <data name="KeybindsImportNotKeybinds" xml:space="preserve">
+    <value>The file isn't a shortcuts file.</value>
+  </data>
+  <data name="KeybindsExportTitle" xml:space="preserve">
+    <value>Export Shortcuts</value>
+  </data>
+  <data name="KeybindsExportFailed" xml:space="preserve">
+    <value>The shortcuts couldn't be written there.</value>
+  </data>
+  <data name="KeybindsSaveFailedTitle" xml:space="preserve">
+    <value>Shortcuts Not Saved</value>
+  </data>
+  <data name="KeybindsSaveFailed" xml:space="preserve">
+    <value>The shortcuts couldn't be saved to keybinds.json, so they will be lost when the app closes. Check that the file isn't read-only or open elsewhere.</value>
+  </data>
+  <data name="KeybindsFileTypeName" xml:space="preserve">
+    <value>Shortcuts File</value>
+    <comment>Name of the file type in the Import and Export pickers (a .json file).</comment>
+  </data>
+  <data name="HelpButtonToolTip" xml:space="preserve">
+    <value>Help for this window</value>
+    <comment>Tooltip and screen-reader name of the ? button in a window's title bar; opens the window's help page in the browser.</comment>
+  </data>
+  <data name="KeyCategoryHelp" xml:space="preserve">
+    <value>Help</value>
+    <comment>Heading in the keyboard shortcuts list over the shortcut that opens a window's help page.</comment>
+  </data>
+  <data name="KeyActionHelp" xml:space="preserve">
+    <value>Open Help</value>
+    <comment>Name of the shortcut that opens the current window's help page, in the keyboard shortcuts list.</comment>
   </data>
 </root>

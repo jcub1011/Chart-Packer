@@ -20,10 +20,27 @@ using ChartShared.UI.Controls.Highway;
 
 namespace ChartBuilder.Controls
 {
+    /// <summary>A point of the star power meter over the song, as the meter ribbon draws it.</summary>
+    public readonly record struct StarPowerMeterPoint(double Seconds, double Meter, bool Active);
+
+    /// <summary>A hard passage and whether the kept star power can be activated going into it.</summary>
+    public readonly record struct StarPowerSpikeMark(double Seconds, bool Charged);
+
     /// <summary>
-    /// The editor's timeline: second marks, the whole mix's waveform, the chart's beat and measure lines, and a playhead
-    /// that clicking or dragging moves (scrubbing), and the wheel moves a bar at a time. It's also the overview strip (charter-spec C3 item 2): the sections,
-    /// the notes, faded, star power and solos of the lane in focus, and a box round the span the lanes show.
+    /// What the generation window's timeline adds to the editor's: for star power, the meter ribbon and the hard passages;
+    /// and which proposed region is selected.
+    /// </summary>
+    public sealed record StarPowerTimelineExtras(
+        IReadOnlyList<StarPowerMeterPoint> Meter,
+        IReadOnlyList<StarPowerSpikeMark> Spikes,
+        int? SelectedProposal,
+        double ActivationThreshold = 0.5);
+
+    /// <summary>
+    /// The editor's timeline: second marks, the whole mix's waveform, the chart's beat and measure lines, its tempo and
+    /// time signature changes, and a playhead that clicking or dragging moves (scrubbing), and the wheel moves a bar at a
+    /// time. It's also the overview strip (charter-spec C3 item 2): the sections, the notes, faded, star power and solos
+    /// of the lane in focus, and a box round the span the lanes show.
     /// </summary>
     /// <remarks>
     /// <para>The playhead is drawn by a layer of its own over the rest, so it moves without the ruler, waveform and beat
@@ -72,18 +89,39 @@ namespace ChartBuilder.Controls
         private static readonly Dictionary<(uint Color, double Opacity), IBrush> NoteBrushes = [];
         private static readonly IPen SectionPen = new ImmutablePen(Color.FromArgb(0x90, 0xFF, 0xFF, 0xFF).ToUInt32(), 1);
 
+        // The chart's tempo and time signature changes, in the tempo markers' amber, down the timeline.
+        private static readonly IPen TempoPen = new ImmutablePen(Color.FromArgb(0xC0, 0xFF, 0xB0, 0x40).ToUInt32(), 1);
+
+        // The loop region's start and end, as lines down the timeline, in the brush it's given.
+        private const double LoopLineThickness = 2;
+
         // The synchronized region, outlined, and the passages synced with it, filled, behind the other marks.
         private static readonly IBrush SyncedBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x60, 0xFF, 0x7A, 0x1A));
         private static readonly IBrush SyncRegionBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x30, 0xFF, 0x7A, 0x1A));
         private static readonly IPen SyncRegionPen = new ImmutablePen(Color.FromArgb(0xE0, 0xFF, 0x7A, 0x1A).ToUInt32(), 1);
 
-        // The ghosts of a run of Generate fills or Generate star power, over everything else, so they're easy to find: a kept
-        // one's a faint amber column the height of the overview, capped solid; a dropped one's only a faint outline.
+        // The passages Find found, as the synced passages are but in light blue, the one the cursor is at outlined like the region.
+        private static readonly IBrush FoundBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x60, 0x7F, 0xD0, 0xFF));
+        private static readonly IBrush FoundCurrentBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x30, 0x7F, 0xD0, 0xFF));
+        private static readonly IPen FoundCurrentPen = new ImmutablePen(Color.FromArgb(0xE0, 0x7F, 0xD0, 0xFF).ToUInt32(), 1);
+        // A synchronized region nothing matched, hashed in yellow instead.
+        private static readonly IBrush SyncUnmatchedBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x22, 0xE6, 0xC8, 0x00));
+        private static readonly IPen SyncUnmatchedPen = new ImmutablePen(Color.FromArgb(0xE0, 0xE6, 0xC8, 0x00).ToUInt32(), 1);
+        private static readonly IPen SyncHashPen = new ImmutablePen(Color.FromArgb(0x90, 0xE6, 0xC8, 0x00).ToUInt32(), 1);
+
+        // How far apart a region nothing matched's hash lines are drawn, in pixels.
+        private const double SyncHashGap = 5;
+
+        // The ghosts of a generator's proposals, over everything else, so they're easy to find: a kept one's a faint amber
+        // column the height of the overview, capped solid; a dropped one's only a faint outline.
         private const double ProposalCap = 4;
         private const double ProposalMinWidth = 2;
         private static readonly IBrush KeptProposalBrush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(PhraseColors.Proposal, 0x40));
         private static readonly IBrush ProposalCapBrush = new ImmutableSolidColorBrush(PhraseColors.Proposal);
         private static readonly IPen DroppedProposalPen = new ImmutablePen(HighwayPalette.WithAlpha(PhraseColors.Proposal, 0x60).ToUInt32(), 1);
+
+        // Star power the window is replacing, drawn muted.
+        private static readonly IBrush ReplacedBandBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x40, 0x9E, 0x9E, 0x9E));
 
         // The lint marks: a short tick up from the ruler's foot, coloured by severity, errors drawn last so they show.
         private const double MarkHeight = 6;
@@ -91,11 +129,24 @@ namespace ChartBuilder.Controls
         private static readonly IBrush WarningMarkBrush = new ImmutableSolidColorBrush(Color.FromRgb(0xFB, 0xBF, 0x24));
         private static readonly IBrush InfoMarkBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xC0, 0x93, 0xC5, 0xFD));
 
+        // The generation window's extras, for star power: the meter ribbon along the bottom, and the hard passages as
+        // triangles at the top. A fills window has neither, and uses them only to outline the selected proposal.
+        private const double MeterHeight = 20;
+        private static readonly IBrush MeterBackgroundBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xB0, 0x08, 0x08, 0x10));
+        private static readonly IBrush MeterFillBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x80, 0x7F, 0xE9, 0xFF));
+        private static readonly IPen MeterPen = new ImmutablePen(Color.FromArgb(0xE0, 0x7F, 0xE9, 0xFF).ToUInt32(), 1);
+        private static readonly IPen MeterThresholdPen = new ImmutablePen(Color.FromArgb(0x80, 0xFF, 0xFF, 0xFF).ToUInt32(), 1, new ImmutableDashStyle([3, 3], 0));
+        private static readonly IBrush SpikeChargedBrush = new ImmutableSolidColorBrush(Color.FromRgb(0xFF, 0xB0, 0x40));
+        private static readonly IBrush SpikeUnchargedBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x20, 0xFF, 0xB0, 0x40));
+        private static readonly IPen SpikePen = new ImmutablePen(Color.FromRgb(0xFF, 0xB0, 0x40).ToUInt32(), 1);
+        private static readonly IPen SelectedProposalPen = new ImmutablePen(Colors.White.ToUInt32(), 2);
+
         private readonly PlayheadLayer _playhead;
         private Pen? _tickPen;
         private Pen? _beatPen;
         private Pen? _measurePen;
         private Pen? _waveformPen;
+        private Pen? _loopPen;
         private bool _frameRequested;
 
         // The wheel turn not yet taken as a notch.
@@ -111,6 +162,10 @@ namespace ChartBuilder.Controls
         private bool _ownTipOpen;
         private bool _settingTip;
         private DispatcherTimer? _tipTimer;
+
+        // Where the pointer is over the timeline, in its own coordinates; null while it's elsewhere. A tip opens above the
+        // timeline at this x, so it never covers the waveform and playhead being scrubbed.
+        private Point? _pointer;
 
         // The picture of everything but the playhead, the size and scaling it was drawn at, and whether what it shows has
         // changed since.
@@ -170,11 +225,20 @@ namespace ChartBuilder.Controls
         public static readonly StyledProperty<IReadOnlyList<FindingMark>?> FindingMarksProperty =
             AvaloniaProperty.Register<TimelineView, IReadOnlyList<FindingMark>?>(nameof(FindingMarks));
 
-        // What the picture of the ruler, waveform, overview and beat lines shows: when one changes, it's drawn again.
+        public static readonly StyledProperty<LoopRegion?> LoopProperty =
+            AvaloniaProperty.Register<TimelineView, LoopRegion?>(nameof(Loop));
+
+        public static readonly StyledProperty<IBrush?> LoopBrushProperty =
+            AvaloniaProperty.Register<TimelineView, IBrush?>(nameof(LoopBrush));
+
+        public static readonly StyledProperty<StarPowerTimelineExtras?> StarPowerExtrasProperty =
+            AvaloniaProperty.Register<TimelineView, StarPowerTimelineExtras?>(nameof(StarPowerExtras));
+
+        // What the picture of the ruler, waveform, overview, beat lines and loop lines shows: when one changes, it's drawn again.
         private static readonly AvaloniaProperty[] ContentProperties =
         [
             LengthProperty, WaveformProperty, BeatsProperty, WaveformBrushProperty, TickBrushProperty, BeatBrushProperty, MeasureBrushProperty,
-            OverviewProperty, FindingMarksProperty,
+            OverviewProperty, FindingMarksProperty, LoopProperty, LoopBrushProperty, StarPowerExtrasProperty,
         ];
 
         static TimelineView()
@@ -187,6 +251,8 @@ namespace ChartBuilder.Controls
         {
             _playhead = new PlayheadLayer(this);
             VisualChildren.Add(_playhead);
+            ToolTip.SetPlacement(this, PlacementMode.Custom);
+            ToolTip.SetCustomPopupPlacementCallback(this, placement => TipPlacement.PlaceAbove(placement, this, _pointer));
         }
 
         /// <summary>The playhead while stopped, and where scrubbing puts it, in seconds of audio.</summary>
@@ -297,6 +363,27 @@ namespace ChartBuilder.Controls
             set => SetValue(SpanBrushProperty, value);
         }
 
+        /// <summary>The loop region, marked with blue lines at its start and end (charter-spec C10 item 2); null for none.</summary>
+        public LoopRegion? Loop
+        {
+            get => GetValue(LoopProperty);
+            set => SetValue(LoopProperty, value);
+        }
+
+        /// <summary>The line drawn at each end of the loop region.</summary>
+        public IBrush? LoopBrush
+        {
+            get => GetValue(LoopBrushProperty);
+            set => SetValue(LoopBrushProperty, value);
+        }
+
+        /// <summary>The meter ribbon, hard passages and selected proposal the star power window adds, or null for none.</summary>
+        public StarPowerTimelineExtras? StarPowerExtras
+        {
+            get => GetValue(StarPowerExtrasProperty);
+            set => SetValue(StarPowerExtrasProperty, value);
+        }
+
         protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
         {
             base.OnPropertyChanged(change);
@@ -309,6 +396,8 @@ namespace ChartBuilder.Controls
                 _measurePen = null;
             else if (change.Property == WaveformBrushProperty)
                 _waveformPen = null;
+            else if (change.Property == LoopBrushProperty)
+                _loopPen = null;
 
             // A tip given while a section's name is showing is the one to show again off it; the name stays for now.
             if (change.Property == ToolTip.TipProperty && _tipSection is not null && !_settingTip)
@@ -385,7 +474,9 @@ namespace ChartBuilder.Controls
             {
                 DrawWaveform(context, bounds);
                 DrawOverview(context, bounds);
+                DrawStarPowerExtras(context, bounds);
                 DrawBeats(context, bounds);
+                DrawLoop(context, bounds);
                 DrawRuler(context, bounds);
                 DrawFindingMarks(context, bounds);
             }
@@ -426,9 +517,9 @@ namespace ChartBuilder.Controls
         }
 
         /// <summary>
-        /// The lane in focus over the whole song: its notes, a band of its phrases for each row of its phrase rail, and the
-        /// song's sections; the synchronized region and the passages synced with it; and over them all, the ghosts of a run
-        /// of Generate fills or Generate star power.
+        /// The lane in focus over the whole song: its notes, a band of its phrases for each row of its phrase rail, the
+        /// chart's tempo and time signature changes, and the song's sections; the synchronized region and the passages
+        /// synced with it; and over them all, the ghosts of a generation window's proposals.
         /// </summary>
         private void DrawOverview(DrawingContext context, Rect bounds)
         {
@@ -437,13 +528,23 @@ namespace ChartBuilder.Controls
 
             double width = bounds.Width;
             double top = BodyTop;
-            foreach (var (start, end, isRegion) in overview.Synced)
+            foreach (var (start, end, isRegion, unmatched) in overview.Synced)
             {
                 var band = new Rect(XOf(start, width), top, Math.Max(1, XOf(end, width) - XOf(start, width)), bounds.Bottom - top);
-                if (isRegion)
-                    context.DrawRectangle(SyncRegionBrush, SyncRegionPen, band.Deflate(0.5));
-                else
+                if (!isRegion)
                     context.FillRectangle(SyncedBrush, band);
+                else if (unmatched)
+                    DrawSyncHash(context, band);
+                else
+                    context.DrawRectangle(SyncRegionBrush, SyncRegionPen, band.Deflate(0.5));
+            }
+
+            foreach (var (start, end, current) in overview.Found)
+            {
+                var band = new Rect(XOf(start, width), top, Math.Max(1, XOf(end, width) - XOf(start, width)), bounds.Bottom - top);
+                context.FillRectangle(FoundBrush, band);
+                if (current)
+                    context.DrawRectangle(FoundCurrentBrush, FoundCurrentPen, band.Deflate(0.5));
             }
 
             DrawNotes(context, overview, width, top + (overview.Rows.Count * (BandHeight + BandGap)), bounds.Bottom);
@@ -454,8 +555,10 @@ namespace ChartBuilder.Controls
                 if (row < 0)
                     continue;
                 double y = top + (row * (BandHeight + BandGap));
-                context.FillRectangle(BandBrush(phrase.Row), new Rect(XOf(phrase.Start, width), y, Math.Max(1, XOf(phrase.End, width) - XOf(phrase.Start, width)), BandHeight));
+                context.FillRectangle(phrase.Replaced ? ReplacedBandBrush : BandBrush(phrase.Row), new Rect(XOf(phrase.Start, width), y, Math.Max(1, XOf(phrase.End, width) - XOf(phrase.Start, width)), BandHeight));
             }
+
+            DrawTempoChanges(context, overview, width, bounds);
 
             // Each section's line, from the row under the ruler down through the rest, and its name in that row, cut short
             // with an ellipsis before the next section's line; its whole name is the tip over its stretch of the row.
@@ -500,6 +603,116 @@ namespace ChartBuilder.Controls
                         context.DrawRectangle(null, DroppedProposalPen, column.Deflate(0.5));
                     }
                 }
+            }
+        }
+
+        /// <summary>
+        /// The generation window's extras: for star power, the meter ribbon along the bottom with its activation threshold
+        /// and the hard passages as triangles along the top of the overview; and the selected proposal outlined.
+        /// </summary>
+        private void DrawStarPowerExtras(DrawingContext context, Rect bounds)
+        {
+            if (StarPowerExtras is not { } extras)
+                return;
+
+            double width = bounds.Width;
+
+            // The meter ribbon, filled under its curve.
+            if (extras.Meter.Count > 1)
+            {
+                double top = bounds.Bottom - MeterHeight;
+
+                // The ribbon is drawn over the meter's samples, so they can be fewer than a pixel apart.
+                context.FillRectangle(MeterBackgroundBrush, new Rect(0, top, width, MeterHeight));
+                var area = new StreamGeometry();
+                using (var geometry = area.Open())
+                {
+                    geometry.BeginFigure(new Point(XOf(extras.Meter[0].Seconds, width), bounds.Bottom), true);
+                    foreach (var sample in extras.Meter)
+                        geometry.LineTo(new Point(XOf(sample.Seconds, width), top + (MeterHeight * (1 - sample.Meter))));
+                    geometry.LineTo(new Point(XOf(extras.Meter[^1].Seconds, width), bounds.Bottom));
+                    geometry.EndFigure(true);
+                }
+
+                context.DrawGeometry(MeterFillBrush, null, area);
+                for (int i = 1; i < extras.Meter.Count; i++)
+                {
+                    var previous = extras.Meter[i - 1];
+                    var sample = extras.Meter[i];
+                    context.DrawLine(MeterPen,
+                        new Point(XOf(previous.Seconds, width), top + (MeterHeight * (1 - previous.Meter))),
+                        new Point(XOf(sample.Seconds, width), top + (MeterHeight * (1 - sample.Meter))));
+                }
+
+                double threshold = top + (MeterHeight * (1 - extras.ActivationThreshold));
+                context.DrawLine(MeterThresholdPen, new Point(0, threshold), new Point(width, threshold));
+            }
+
+            // Hard passages: filled when charged, hollow when the kept star power falls short.
+            foreach (var spike in extras.Spikes)
+            {
+                double x = Math.Round(XOf(spike.Seconds, width));
+                var triangle = new StreamGeometry();
+                using (var geometry = triangle.Open())
+                {
+                    geometry.BeginFigure(new Point(x, BodyTop + 7), true);
+                    geometry.LineTo(new Point(x - 4, BodyTop));
+                    geometry.LineTo(new Point(x + 4, BodyTop));
+                    geometry.EndFigure(true);
+                }
+
+                context.DrawGeometry(spike.Charged ? SpikeChargedBrush : SpikeUnchargedBrush, SpikePen, triangle);
+            }
+
+            // The selected proposal, outlined so it's found in the whole song.
+            if (extras.SelectedProposal is { } selected && Overview is { } overview && selected >= 0 && selected < overview.Proposals.Count)
+            {
+                var proposal = overview.Proposals[selected];
+                double x = XOf(proposal.Start, width);
+                double w = Math.Max(ProposalMinWidth, XOf(proposal.End, width) - x);
+                context.DrawRectangle(null, SelectedProposalPen, new Rect(x, BodyTop, w, bounds.Bottom - BodyTop).Deflate(0.5));
+            }
+        }
+
+        /// <summary>
+        /// The loop region's start and end, as blue lines from the ruler down through the timeline (charter-spec C10 item
+        /// 2), so the stretch the song repeats is found at a glance.
+        /// </summary>
+        private void DrawLoop(DrawingContext context, Rect bounds)
+        {
+            if (Loop is not { } loop || LoopBrush is not { } brush)
+                return;
+            var pen = _loopPen ??= new Pen(brush, LoopLineThickness);
+            foreach (double seconds in (ReadOnlySpan<double>)[loop.Start, loop.End])
+            {
+                if (seconds < 0 || seconds > Length)
+                    continue;
+                double x = Math.Round(XOf(seconds, bounds.Width)) + 0.5;
+                context.DrawLine(pen, new Point(x, RulerHeight), new Point(x, bounds.Bottom));
+            }
+        }
+
+        /// <summary>
+        /// The chart's tempo and time signature changes, as lines in the tempo markers' amber from the ruler down through
+        /// the overview, so the whole song's timing can be found at a glance.
+        /// </summary>
+        private void DrawTempoChanges(DrawingContext context, OverviewData overview, double width, Rect bounds)
+        {
+            foreach (double seconds in overview.TempoChanges)
+            {
+                double x = Math.Round(XOf(seconds, width)) + 0.5;
+                context.DrawLine(TempoPen, new Point(x, RulerHeight), new Point(x, bounds.Bottom));
+            }
+        }
+
+        /// <summary>A synchronized region nothing matched, hashed in yellow.</summary>
+        private static void DrawSyncHash(DrawingContext context, Rect band)
+        {
+            context.DrawRectangle(SyncUnmatchedBrush, SyncUnmatchedPen, band.Deflate(0.5));
+            using (context.PushClip(band))
+            {
+                for (double x = band.Left - band.Height; x < band.Right; x += SyncHashGap)
+                    context.DrawLine(SyncHashPen, new Point(x, band.Bottom), new Point(x + band.Height, band.Top));
             }
         }
 
@@ -746,9 +959,16 @@ namespace ChartBuilder.Controls
             e.Handled = true;
         }
 
+        protected override void OnPointerEntered(PointerEventArgs e)
+        {
+            base.OnPointerEntered(e);
+            _pointer = e.GetPosition(this);
+        }
+
         protected override void OnPointerMoved(PointerEventArgs e)
         {
             base.OnPointerMoved(e);
+            _pointer = e.GetPosition(this);
             if (ReferenceEquals(e.Pointer.Captured, this))
                 Scrub(e);
             else
@@ -758,6 +978,7 @@ namespace ChartBuilder.Controls
         protected override void OnPointerExited(PointerEventArgs e)
         {
             base.OnPointerExited(e);
+            _pointer = null;
             ShowSectionTip(null);
         }
 

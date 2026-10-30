@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 using ChartShared.Audio.Waveforms;
@@ -31,6 +32,22 @@ namespace ChartBuilder.Services
 
         /// <summary>The wheel turned down is later.</summary>
         DownIsLater,
+    }
+
+    /// <summary>Which starts of playback count 3, 2, 1 before the song starts, so there's time to get ready.</summary>
+    public enum PlaybackCountdownMode
+    {
+        /// <summary>None: the song starts at once.</summary>
+        Off,
+
+        /// <summary>Starting a pass of record mode.</summary>
+        Record,
+
+        /// <summary>Starting a playtest, an instrument playing the chart.</summary>
+        Play,
+
+        /// <summary>Both of them.</summary>
+        Both,
     }
 
     /// <summary>What Chart Builder opens with when it starts with nothing on its command line.</summary>
@@ -67,7 +84,7 @@ namespace ChartBuilder.Services
 
     /// <summary>Chart Builder's settings, persisted to <c>builder-settings.json</c> (charter-spec §10).</summary>
     /// <remarks>Chart Packer's are in its own file, so neither app overwrites the other's.</remarks>
-    public sealed class BuilderSettings : ISettingsWindowSize
+    public sealed class BuilderSettings : IRememberedWindows
     {
         public const double DefaultEditorLeftPanelWidth = 300;
         public const double DefaultEditorRightPanelWidth = 280;
@@ -192,26 +209,8 @@ namespace ChartBuilder.Services
         /// <summary>The editor's lanes, where each is docked and how big. Null for the default layout.</summary>
         public LaneDockState? EditorLanes { get; set; }
 
-        /// <summary>Whether the editor was maximized or fullscreen when it last closed, so the next one opens that way.</summary>
-        /// <remarks>Kept for files saved before fullscreen was told apart from maximized; use with <see cref="EditorFullscreen"/>.</remarks>
-        public bool EditorMaximized { get; set; }
-
-        /// <summary>Whether the editor was fullscreen when it last closed, so the next one opens fullscreen.</summary>
-        public bool EditorFullscreen { get; set; }
-
-        /// <summary>The editor's normal bounds when it last closed, in screen pixels (position) and device-independent pixels (size). Null for none yet.</summary>
-        public int? EditorX { get; set; }
-
-        public int? EditorY { get; set; }
-
-        public double? EditorWidth { get; set; }
-
-        public double? EditorHeight { get; set; }
-
-        /// <summary>The Settings window's normal size when it last closed, in device-independent pixels. Null for none yet.</summary>
-        public double? SettingsWindowWidth { get; set; }
-
-        public double? SettingsWindowHeight { get; set; }
+        /// <summary>How each window was shown when it last closed, by its type's name (<see cref="ChartShared.UI.Views.WindowMemory"/>). Null for none yet.</summary>
+        public Dictionary<string, SavedWindow>? Windows { get; set; }
 
         /// <summary>What Chart Builder opens with when it starts with nothing on its command line.</summary>
         public StartupAction StartupAction { get; set; } = StartupAction.BlankChart;
@@ -231,7 +230,7 @@ namespace ChartBuilder.Services
         /// <summary>The parent folder a new chart's first save last made its song folder in (charter-spec C1, §10). Null for none yet.</summary>
         public string? LastNewChartFolder { get; set; }
 
-        /// <summary>Where Save and pack writes the .sng. Null for asking every time, starting at the song's parent folder.</summary>
+        /// <summary>Where Pack writes the .sng. Null for asking every time, starting at the song's parent folder.</summary>
         public string? DefaultPackFolder { get; set; }
 
         /// <summary>The export dialog's location the last time it was confirmed. Null for none yet.</summary>
@@ -262,8 +261,17 @@ namespace ChartBuilder.Services
         /// </summary>
         public ReductionDefaults? ReductionRules { get; set; }
 
+        /// <summary>The look-ahead the highway preview starts with, in seconds.</summary>
+        public const double DefaultPreviewLookAhead = HighwayLookAhead.Default;
+
         /// <summary>How many seconds ahead the highway preview shows (charter-spec C18), as its slider last left it.</summary>
-        public double PreviewLookAhead { get; set; } = 1.4;
+        public double PreviewLookAhead { get; set; } = DefaultPreviewLookAhead;
+
+        /// <summary>The look-ahead the Generate fills and star power dialog starts with, in seconds.</summary>
+        public const double DefaultGeneratePhrasesLookAhead = 4;
+
+        /// <summary>How many seconds ahead the Generate fills and star power dialog's highway shows, as its slider last left it.</summary>
+        public double GeneratePhrasesLookAhead { get; set; } = DefaultGeneratePhrasesLookAhead;
 
         /// <summary>Whether the Reduce dialog shows its preview, as it was last left.</summary>
         public bool ReducePreviewShown { get; set; }
@@ -272,17 +280,7 @@ namespace ChartBuilder.Services
         /// How many seconds ahead the Reduce dialog's preview shows, as its slider last left it: its own, as it goes further
         /// than the highway preview's, to see a stretch of changes at once.
         /// </summary>
-        public double ReducePreviewLookAhead { get; set; } = 1.5;
-
-        /// <summary>The shortest and longest look-ahead the Reduce dialog's preview gives, and the steps its slider takes.</summary>
-        public const double MinReducePreviewLookAhead = ReductionPreviewViewModel.MinLookAhead;
-
-        public const double MaxReducePreviewLookAhead = ReductionPreviewViewModel.MaxLookAhead;
-
-        public const double ReducePreviewLookAheadStep = ReductionPreviewViewModel.LookAheadStep;
-
-        /// <summary><paramref name="seconds"/> as the Reduce dialog's preview takes a look-ahead: on its steps, in its range.</summary>
-        public static double SnapReducePreviewLookAhead(double seconds) => ReductionPreviewViewModel.SnapLookAhead(seconds);
+        public double ReducePreviewLookAhead { get; set; } = ReductionPreviewViewModel.DefaultLookAhead;
 
         /// <summary>
         /// Which kinds of change the Reduce dialog's preview marks and stops at, as its filters were last left: all but the
@@ -310,6 +308,24 @@ namespace ChartBuilder.Services
 
         /// <summary>How a guitar controller records (charter-spec C19 item 7).</summary>
         public GuitarRecordStyle GuitarRecordStyle { get; set; } = GuitarRecordStyle.Strum;
+
+        /// <summary>Which starts of playback, of record mode and playtest, count 3, 2, 1 first.</summary>
+        public PlaybackCountdownMode PlaybackCountdown { get; set; } = PlaybackCountdownMode.Both;
+
+        /// <summary>The fewest seconds the countdown before the song starts counts.</summary>
+        public const int MinCountdownSeconds = 1;
+
+        /// <summary>The most seconds the countdown before the song starts counts.</summary>
+        public const int MaxCountdownSeconds = 10;
+
+        /// <summary>3, the seconds counted before the song starts, before it's set.</summary>
+        public const int DefaultCountdownSeconds = 3;
+
+        /// <summary>Keeps <paramref name="seconds"/> within the fewest and most the countdown counts.</summary>
+        public static int ClampCountdownSeconds(int seconds) => Math.Clamp(seconds, MinCountdownSeconds, MaxCountdownSeconds);
+
+        /// <summary>How many seconds <see cref="PlaybackCountdown"/> counts down from, to start the song.</summary>
+        public int CountdownSeconds { get; set; } = DefaultCountdownSeconds;
 
         /// <summary>Whether a MIDI kit's hard hits record as accents and its soft ones as ghosts.</summary>
         public bool RecordDynamicsFromVelocity { get; set; }

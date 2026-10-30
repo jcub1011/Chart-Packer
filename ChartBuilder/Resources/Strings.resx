@@ -1,10 +1,86 @@
 <?xml version="1.0" encoding="utf-8"?>
 <root>
+  <!-- 
+    Microsoft ResX Schema 
+    
+    Version 2.0
+    
+    The primary goals of this format is to allow a simple XML format 
+    that is mostly human readable. The generation and parsing of the 
+    various data types are done through the TypeConverter classes 
+    associated with the data types.
+    
+    Example:
+    
+    ... ado.net/XML headers & schema ...
+    <resheader name="resmimetype">text/microsoft-resx</resheader>
+    <resheader name="version">2.0</resheader>
+    <resheader name="reader">System.Resources.ResXResourceReader, System.Windows.Forms, ...</resheader>
+    <resheader name="writer">System.Resources.ResXResourceWriter, System.Windows.Forms, ...</resheader>
+    <data name="Name1"><value>this is my long string</value><comment>this is a comment</comment></data>
+    <data name="Color1" type="System.Drawing.Color, System.Drawing">Blue</data>
+    <data name="Bitmap1" mimetype="application/x-microsoft.net.object.binary.base64">
+        <value>[base64 mime encoded serialized .NET Framework object]</value>
+    </data>
+    <data name="Icon1" type="System.Drawing.Icon, System.Drawing" mimetype="application/x-microsoft.net.object.bytearray.base64">
+        <value>[base64 mime encoded string representing a byte array form of the .NET Framework object]</value>
+        <comment>This is a comment</comment>
+    </data>
+                
+    There are any number of "resheader" rows that contain simple 
+    name/value pairs.
+    
+    Each data row contains a name, and value. The row also contains a 
+    type or mimetype. Type corresponds to a .NET class that support 
+    text/value conversion through the TypeConverter architecture. 
+    Classes that don't support this are serialized and stored with the 
+    mimetype set.
+    
+    The mimetype is used for serialized objects, and tells the 
+    ResXResourceReader how to depersist the object. This is currently not 
+    extensible. For a given mimetype the value must be set accordingly:
+    
+    Note - application/x-microsoft.net.object.binary.base64 is the format 
+    that the ResXResourceWriter will generate, however the reader can 
+    read any of the formats listed below.
+    
+    mimetype: application/x-microsoft.net.object.binary.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Binary.BinaryFormatter
+            : and then encoded with base64 encoding.
+    
+    mimetype: application/x-microsoft.net.object.soap.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Soap.SoapFormatter
+            : and then encoded with base64 encoding.
+
+    mimetype: application/x-microsoft.net.object.bytearray.base64
+    value   : The object must be serialized into a byte array 
+            : using a System.ComponentModel.TypeConverter
+            : and then encoded with base64 encoding.
+    -->
   <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
     <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
     <xsd:element name="root" msdata:IsDataSet="true">
       <xsd:complexType>
         <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
           <xsd:element name="data">
             <xsd:complexType>
               <xsd:sequence>
@@ -48,7 +124,7 @@
     <value>New Charts</value>
   </data>
   <data name="DefaultCharterNameLabel" xml:space="preserve">
-    <value>Default charter name</value>
+    <value>Default Charter Name</value>
   </data>
   <data name="DefaultCharterNameDescription" xml:space="preserve">
     <value>Filled in as the charter of a new chart.</value>
@@ -57,10 +133,10 @@
     <value>charter author name new chart</value>
   </data>
   <data name="DefaultCharterNamePlaceholder" xml:space="preserve">
-    <value>Your name</value>
+    <value>Your Name</value>
   </data>
   <data name="DefaultChartResolutionLabel" xml:space="preserve">
-    <value>Default resolution</value>
+    <value>Default Resolution</value>
   </data>
   <data name="DefaultChartResolutionDescription" xml:space="preserve">
     <value>The resolution a new chart starts with, in ticks per beat. At 192, 480 and 960 every common snap lands on a whole tick.</value>
@@ -89,7 +165,7 @@
     <value>Settings</value>
   </data>
   <data name="HomeSettingsToolTip" xml:space="preserve">
-    <value>Chart Builder's settings (Ctrl+,).</value>
+    <value>Chart Builder's settings</value>
   </data>
   <data name="HomeHint" xml:space="preserve">
     <value>Drop audio files here to start a new chart, or a song folder or .sng to open it.</value>
@@ -186,6 +262,14 @@
     <value>Sync</value>
     <comment>An editing tool: a synchronized region, whose edits are copied to the passages matching it.</comment>
   </data>
+  <data name="ToolLoop" xml:space="preserve">
+    <value>Loop</value>
+    <comment>An editing tool: the loop region, a stretch of the song the Loop button repeats.</comment>
+  </data>
+  <data name="ToolLoopName" xml:space="preserve">
+    <value>Loop tool</value>
+    <comment>The Loop tool's button for a screen reader, said apart from the transport bar's Loop button, which repeats the region.</comment>
+  </data>
   <data name="MenuFile" xml:space="preserve">
     <value>_File</value>
     <comment>The editor title bar's File menu. The underscore marks its access key (Alt+F).</comment>
@@ -206,9 +290,9 @@
     <value>_Save</value>
     <comment>File menu: saves the chart and its song.ini changes (Ctrl+S).</comment>
   </data>
-  <data name="MenuSaveAndPack" xml:space="preserve">
-    <value>Save and _pack…</value>
-    <comment>File menu: saves, then reviews and exports the song to a .sng.</comment>
+  <data name="MenuPack" xml:space="preserve">
+    <value>_Pack…</value>
+    <comment>File menu: reviews and packs the song, with its unsaved changes, to a .sng.</comment>
   </data>
   <data name="MenuExportCopy" xml:space="preserve">
     <value>_Export copy…</value>
@@ -226,6 +310,102 @@
     <value>_Redo</value>
     <comment>Edit menu (Ctrl+Y).</comment>
   </data>
+  <data name="MenuCut" xml:space="preserve">
+    <value>Cu_t</value>
+    <comment>Edit menu (Ctrl+X): copies the selected notes to the clipboard and deletes them. The underscore marks its access key.</comment>
+  </data>
+  <data name="MenuCopy" xml:space="preserve">
+    <value>_Copy</value>
+    <comment>Edit menu (Ctrl+C): copies the selected notes to the clipboard.</comment>
+  </data>
+  <data name="MenuPaste" xml:space="preserve">
+    <value>_Paste</value>
+    <comment>Edit menu (Ctrl+V): pastes the clipboard at the cursor, taking out what's in its span.</comment>
+  </data>
+  <data name="MenuPasteMerge" xml:space="preserve">
+    <value>Paste and _merge</value>
+    <comment>Edit menu (Ctrl+Shift+V): pastes the clipboard at the cursor, keeping what's already in its span.</comment>
+  </data>
+  <data name="MenuSelectAll" xml:space="preserve">
+    <value>Select _all</value>
+    <comment>Edit menu (Ctrl+A): selects every note of the focused lane.</comment>
+  </data>
+  <data name="MenuDelete" xml:space="preserve">
+    <value>_Delete</value>
+    <comment>Edit menu (Delete): deletes what's selected.</comment>
+  </data>
+  <data name="MenuQuantizeFormat" xml:space="preserve">
+    <value>_Quantize to {0}</value>
+    <comment>Edit menu (Q): puts the selected notes, and their sustains' ends, on the quantize grid. {0} is the grid, e.g. 1/16.</comment>
+  </data>
+  <data name="MenuGoToMeasure" xml:space="preserve">
+    <value>_Go to measure…</value>
+    <comment>Edit menu (Ctrl+G): asks for a measure and takes the cursor to it.</comment>
+  </data>
+  <data name="MenuFindMatches" xml:space="preserve">
+    <value>_Find matching passages</value>
+    <comment>Edit menu (Ctrl+F): finds the passages of the lane that match the selected notes, as Sync does, and goes to the next.</comment>
+  </data>
+  <data name="MenuFindNext" xml:space="preserve">
+    <value>Next _match</value>
+    <comment>Edit menu (F3): goes to the next passage found by Find.</comment>
+  </data>
+  <data name="MenuFindPrevious" xml:space="preserve">
+    <value>Pre_vious match</value>
+    <comment>Edit menu (Shift+F3): goes to the previous passage found by Find.</comment>
+  </data>
+  <data name="NavMeasureLabel" xml:space="preserve">
+    <value>Go to Measure</value>
+    <comment>The navigation flyout (Ctrl+G, Ctrl+F): the box for the measure to go to.</comment>
+  </data>
+  <data name="NavMeasureToolTipFormat" xml:space="preserve">
+    <value>Measure Number, 1 to {0}</value>
+    <comment>The navigation flyout's measure box tooltip. {0} is the last measure the chart has notes in.</comment>
+  </data>
+  <data name="NavGoButton" xml:space="preserve">
+    <value>Go</value>
+    <comment>The navigation flyout: goes to the measure typed.</comment>
+  </data>
+  <data name="NavFindButton" xml:space="preserve">
+    <value>Find Matches</value>
+    <comment>The navigation flyout: finds the passages matching the selected notes.</comment>
+  </data>
+  <data name="NavNextToolTip" xml:space="preserve">
+    <value>Next match</value>
+    <comment>The navigation flyout's next match button tooltip.</comment>
+  </data>
+  <data name="NavPreviousToolTip" xml:space="preserve">
+    <value>Previous match</value>
+    <comment>The navigation flyout's previous match button tooltip.</comment>
+  </data>
+  <data name="NavCloseToolTip" xml:space="preserve">
+    <value>Close (Esc)</value>
+    <comment>The navigation flyout's close button tooltip.</comment>
+  </data>
+  <data name="NavMatchCountFormat" xml:space="preserve">
+    <value>{0} of {1}</value>
+    <comment>The navigation flyout: which match the cursor is at, and how many were found.</comment>
+  </data>
+  <data name="NavNoMatches" xml:space="preserve">
+    <value>No Matches</value>
+    <comment>The navigation flyout: no passage has been found matching the selected notes.</comment>
+  </data>
+  <data name="MenuView" xml:space="preserve">
+    <value>_View</value>
+    <comment>The editor title bar's View menu. The underscore marks its access key (Alt+V).</comment>
+  </data>
+  <data name="MenuShowMessages" xml:space="preserve">
+    <value>_Messages</value>
+    <comment>View menu: shows every message said this session.</comment>
+  </data>
+  <data name="MenuShowPreview" xml:space="preserve">
+    <value>_Preview window</value>
+    <comment>View menu: opens the highway preview in a window of its own.</comment>
+  </data>
+  <data name="MenuShowDifficulty" xml:space="preserve">
+    <value>_Difficulty window</value>
+    <comment>View menu: opens the difficulty analysis in a window of its own.</comment>
+  </data>
   <data name="MenuSettings" xml:space="preserve">
     <value>_Settings…</value>
     <comment>Edit menu: the program settings (Ctrl+,). The chart's settings are a tab in the left panel.</comment>
@@ -234,13 +414,13 @@
     <value>Undo</value>
   </data>
   <data name="UndoToolTip" xml:space="preserve">
-    <value>Undo (Ctrl+Z)</value>
+    <value>Undo</value>
   </data>
   <data name="RedoButton" xml:space="preserve">
     <value>Redo</value>
   </data>
   <data name="RedoToolTip" xml:space="preserve">
-    <value>Redo (Ctrl+Y)</value>
+    <value>Redo</value>
   </data>
   <data name="PropertiesTab" xml:space="preserve">
     <value>Properties</value>
@@ -399,7 +579,7 @@
     <value>Metadata</value>
   </data>
   <data name="HomeOpenChartToolTip" xml:space="preserve">
-    <value>Open a song folder or .sng in the editor (Ctrl+O).</value>
+    <value>Open a song folder or .sng in the editor</value>
   </data>
   <data name="OpenSongPickerTitle" xml:space="preserve">
     <value>Open a Song</value>
@@ -412,12 +592,16 @@
     <value>yesterday</value>
     <comment>When a recent song was last opened.</comment>
   </data>
+  <data name="JumpListRecentCategory" xml:space="preserve">
+    <value>Recent</value>
+    <comment>The title of the recent songs in the taskbar button's right-click menu.</comment>
+  </data>
   <data name="RecentOpenToolTipFormat" xml:space="preserve">
     <value>Open {0}</value>
     <comment>{0} is the song's path.</comment>
   </data>
   <data name="StartupActionLabel" xml:space="preserve">
-    <value>What opens on startup</value>
+    <value>What Opens on Startup</value>
   </data>
   <data name="StartupActionDescription" xml:space="preserve">
     <value>What Chart Builder opens with when started with no command line.</value>
@@ -426,10 +610,10 @@
     <value>startup open blank new chart recent start launch</value>
   </data>
   <data name="StartupBlankChart" xml:space="preserve">
-    <value>A blank new chart</value>
+    <value>A Blank New Chart</value>
   </data>
   <data name="StartupReopenRecent" xml:space="preserve">
-    <value>The most recently opened song</value>
+    <value>The Most Recently Opened Song</value>
   </data>
   <data name="UnsavedRecoverTitle" xml:space="preserve">
     <value>Recover Unsaved Chart</value>
@@ -521,13 +705,13 @@ Open it anyway?</value>
     <comment>{0} is how many.</comment>
   </data>
   <data name="PlayToolTip" xml:space="preserve">
-    <value>Play (Space)</value>
+    <value>Play</value>
   </data>
   <data name="PauseToolTip" xml:space="preserve">
-    <value>Pause (Space)</value>
+    <value>Pause</value>
   </data>
   <data name="PlayPauseButton" xml:space="preserve">
-    <value>Play or pause</value>
+    <value>Play or Pause</value>
   </data>
   <data name="SpeedToolTip" xml:space="preserve">
     <value>How fast the song plays</value>
@@ -563,7 +747,7 @@ Open it anyway?</value>
     <value>Calibrate Audio Latency</value>
   </data>
   <data name="CalibrationPromptFormat" xml:space="preserve">
-    <value>{0} is not calibrated. Calibration lines up what you see with what you hear, which note timing depends on. Takes about a minute.</value>
+    <value>{0} is not calibrated.</value>
     <comment>{0} is the audio output device's name.</comment>
   </data>
   <data name="CalibrationPromptConfirm" xml:space="preserve">
@@ -573,16 +757,16 @@ Open it anyway?</value>
     <value>Audio</value>
   </data>
   <data name="AudioLatencyLabel" xml:space="preserve">
-    <value>Audio/visual latency</value>
+    <value>Audio/Visual Latency</value>
   </data>
   <data name="AudioLatencyDescription" xml:space="preserve">
-    <value>How much later audio is heard than the screen shows it, per output device. Drawn audio shifts by it. This adds to the latency detected from the device.</value>
+    <value>How much later audio is heard than the screen shows it, per output device.</value>
   </data>
   <data name="AudioLatencyKeywords" xml:space="preserve">
     <value>latency delay offset sync calibrate calibration audio video lag bluetooth</value>
   </data>
   <data name="DetectLatencyLabel" xml:space="preserve">
-    <value>Detect output latency</value>
+    <value>Detect Output Latency</value>
     <comment>A switch: whether the latency read from the output device's buffers is added to its calibrated latency.</comment>
   </data>
   <data name="DetectLatencyDescription" xml:space="preserve">
@@ -595,7 +779,7 @@ Open it anyway?</value>
     <value>Calibrate…</value>
   </data>
   <data name="PromptForCalibrationLabel" xml:space="preserve">
-    <value>Offer to calibrate a new output device</value>
+    <value>Offer to Calibrate a New Output Device</value>
   </data>
   <data name="PromptForCalibrationDescription" xml:space="preserve">
     <value>When a song first plays on an uncalibrated device, ask whether to calibrate it.</value>
@@ -607,7 +791,7 @@ Open it anyway?</value>
     <value>Editing</value>
   </data>
   <data name="TempoEditsLabel" xml:space="preserve">
-    <value>When a tempo changes</value>
+    <value>When a Tempo Changes</value>
   </data>
   <data name="TempoEditsDescription" xml:space="preserve">
     <value>Whether notes keep their ticks and move with the grid, or keep their times and stay put in the audio. Keep ticks while building the tempo map.</value>
@@ -616,10 +800,10 @@ Open it anyway?</value>
     <value>tempo bpm keep ticks times retick grid</value>
   </data>
   <data name="TempoEditsKeepTicks" xml:space="preserve">
-    <value>Notes keep their ticks</value>
+    <value>Notes Keep Their Ticks</value>
   </data>
   <data name="TempoEditsKeepTimes" xml:space="preserve">
-    <value>Notes keep their times</value>
+    <value>Notes Keep Their Times</value>
   </data>
   <data name="ChartSettingsTab" xml:space="preserve">
     <value>Chart Settings</value>
@@ -649,7 +833,7 @@ Open it anyway?</value>
     <value>Drums</value>
   </data>
   <data name="ChartSettingsDrumsToolTip" xml:space="preserve">
-    <value>Switching between 4-lane and Pro keeps notes as they are. To or from 5-lane converts them and lists any unplaced. Undo brings them back.</value>
+    <value>Switching between 4-lane and Pro keeps notes as they are. To or from 5-lane converts them and lists any unplaced.</value>
   </data>
   <data name="DrumsFourLane" xml:space="preserve">
     <value>4-lane</value>
@@ -665,7 +849,7 @@ Open it anyway?</value>
     <comment>{0} is the drum variant: 4-lane, Pro or 5-lane.</comment>
   </data>
   <data name="DrumConversionReportFormat" xml:space="preserve">
-    <value>Converted the drums to {0}. Unplaced notes: {1}. Undo brings them back.</value>
+    <value>Converted the drums to {0}. Unplaced notes: {1}.</value>
     <comment>{0} is the drum variant; {1} how many notes are listed below.</comment>
   </data>
   <data name="DrumConversionFromFourLane" xml:space="preserve">
@@ -793,11 +977,11 @@ Open it anyway?</value>
     <value>{0}'s name doesn't say which stem it is, or another file is already that stem</value>
   </data>
   <data name="DefaultSnapLabel" xml:space="preserve">
-    <value>Default snap</value>
+    <value>Default Snap</value>
     <comment>A setting: the grid notes snap to when the editor opens.</comment>
   </data>
   <data name="DefaultSnapDescription" xml:space="preserve">
-    <value>The grid notes snap to on open. [ and ] change it while editing.</value>
+    <value>The grid notes snap to on open. The snap keys change it while editing.</value>
     <comment>The default snap setting's description.</comment>
   </data>
   <data name="DefaultSnapKeywords" xml:space="preserve">
@@ -809,7 +993,7 @@ Open it anyway?</value>
     <comment>A snap, as a fraction of a whole note, e.g. "1/16".</comment>
   </data>
   <data name="DefaultEditorViewLabel" xml:space="preserve">
-    <value>Default view</value>
+    <value>Default View</value>
     <comment>A setting: how a lane shows the chart when it's opened.</comment>
   </data>
   <data name="DefaultEditorViewDescription" xml:space="preserve">
@@ -829,11 +1013,11 @@ Open it anyway?</value>
     <comment>A lane's view: horizontal, time running left to right.</comment>
   </data>
   <data name="EditorHighwaySpeedLabel" xml:space="preserve">
-    <value>Highway speed</value>
+    <value>Highway Speed</value>
     <comment>A setting: how fast notes go by in the editor.</comment>
   </data>
   <data name="EditorHighwaySpeedDescription" xml:space="preserve">
-    <value>How fast notes pass in a lane with no look-ahead set. Set a lane's own from its header, or with Ctrl+wheel, + and −.</value>
+    <value>How fast notes pass in a lane with no look-ahead set. Set a lane's own from its header, or with Ctrl+wheel or the look-ahead keys.</value>
     <comment>The highway speed setting's description.</comment>
   </data>
   <data name="EditorHighwaySpeedKeywords" xml:space="preserve">
@@ -841,7 +1025,7 @@ Open it anyway?</value>
     <comment>Search words for the highway speed setting, separated by spaces.</comment>
   </data>
   <data name="WheelDirectionLabel" xml:space="preserve">
-    <value>Wheel scroll direction</value>
+    <value>Wheel Scroll Direction</value>
     <comment>A setting: which way the mouse wheel moves through the song in the editor.</comment>
   </data>
   <data name="WheelDirectionDescription" xml:space="preserve">
@@ -853,15 +1037,15 @@ Open it anyway?</value>
     <comment>Search words for the wheel scroll direction setting, separated by spaces.</comment>
   </data>
   <data name="WheelDirectionUpIsLater" xml:space="preserve">
-    <value>Wheel up moves later</value>
+    <value>Wheel Up Moves Later</value>
     <comment>A wheel scroll direction: turning the wheel up moves later in the song.</comment>
   </data>
   <data name="WheelDirectionDownIsLater" xml:space="preserve">
-    <value>Wheel down moves later</value>
+    <value>Wheel Down Moves Later</value>
     <comment>A wheel scroll direction: turning the wheel down moves later in the song.</comment>
   </data>
   <data name="MetronomeVolumeLabel" xml:space="preserve">
-    <value>Metronome volume</value>
+    <value>Metronome Volume</value>
     <comment>A setting: how loud the metronome is.</comment>
   </data>
   <data name="MetronomeVolumeDescription" xml:space="preserve">
@@ -873,7 +1057,7 @@ Open it anyway?</value>
     <comment>Search words for the metronome volume setting, separated by spaces.</comment>
   </data>
   <data name="HitSoundVolumeLabel" xml:space="preserve">
-    <value>Hit sound volume</value>
+    <value>Hit Sound Volume</value>
     <comment>A setting: how loud the hit sounds are.</comment>
   </data>
   <data name="HitSoundVolumeDescription" xml:space="preserve">
@@ -885,7 +1069,7 @@ Open it anyway?</value>
     <comment>Search words for the hit sound volume setting, separated by spaces.</comment>
   </data>
   <data name="MasterVolumeLabel" xml:space="preserve">
-    <value>Master volume</value>
+    <value>Master Volume</value>
     <comment>A setting: how loud everything is.</comment>
   </data>
   <data name="MasterVolumeDescription" xml:space="preserve">
@@ -901,27 +1085,23 @@ Open it anyway?</value>
     <comment>The transport bar's volume button's tooltip.</comment>
   </data>
   <data name="LoopToolTipFormat" xml:space="preserve">
-    <value>Loop the region from {0} to {1}. L sets it from the selection.</value>
+    <value>Repeat the region from {0} to {1}. Tap L briefly, or click here, to turn repeating on or off.</value>
     <comment>The loop button's tooltip, with the loop region's start and end times.</comment>
   </data>
   <data name="LoopNoneToolTip" xml:space="preserve">
-    <value>Loop a region. Select a span of the song, then press L to set the region.</value>
+    <value>Loop a region. Pick the Loop tool, or hold L, and drag over a stretch of a lane; drawing it doesn't start the song repeating.</value>
     <comment>The loop button's tooltip when there's no loop region yet.</comment>
   </data>
   <data name="LatencyFormat" xml:space="preserve">
     <value>{0} ms</value>
     <comment>The calibrated audio/visual latency, in the transport bar, e.g. "42 ms".</comment>
   </data>
-  <data name="NothingToPlayStatus" xml:space="preserve">
-    <value>Select notes or a span of the song to play it.</value>
-    <comment>Said when Shift+Space is pressed with nothing selected.</comment>
-  </data>
   <data name="NothingToLoopStatus" xml:space="preserve">
     <value>Select notes or a span of the song to loop it.</value>
-    <comment>Said when L is pressed with nothing selected.</comment>
+    <comment>Said when preview practice starts with no loop region and nothing selected to make one from.</comment>
   </data>
   <data name="TapTempoNotPlayingStatus" xml:space="preserve">
-    <value>Play the song, then tap B in time with it.</value>
+    <value>Play the song, then tap in time with it.</value>
     <comment>Said when B (tap tempo) is pressed while the song isn't playing.</comment>
   </data>
   <data name="TapTempoStartedStatusFormat" xml:space="preserve">
@@ -953,11 +1133,11 @@ Open it anyway?</value>
     <comment>A button: add a tempo marker one beat before the anchor so the edit can be made.</comment>
   </data>
   <data name="LaneShowHighwayToolTip" xml:space="preserve">
-    <value>Show as a highway (V)</value>
+    <value>Show as a highway</value>
     <comment>A lane's button tooltip: switch the lane to the vertical highway view.</comment>
   </data>
   <data name="LaneShowTimelineToolTip" xml:space="preserve">
-    <value>Show as a timeline (V)</value>
+    <value>Show as a timeline</value>
     <comment>A lane's button tooltip: switch the lane to the horizontal timeline view.</comment>
   </data>
   <data name="LaneNoPartFormat" xml:space="preserve">
@@ -975,10 +1155,6 @@ Open it anyway?</value>
   <data name="LaneGhostToolTip" xml:space="preserve">
     <value>Ghost difficulty: another difficulty drawn faintly behind this one, for checking a reduction</value>
     <comment>The ghost difficulty button's tooltip.</comment>
-  </data>
-  <data name="LaneDifficultyToolTipFormat" xml:space="preserve">
-    <value>{0} (Ctrl+1–4)</value>
-    <comment>A difficulty letter's tooltip in a lane's header, with the difficulty's name.</comment>
   </data>
   <data name="PropertiesBadBeats" xml:space="preserve">
     <value>Enter how many beats the span lasts, such as 4.</value>
@@ -1153,8 +1329,12 @@ Open it anyway?</value>
     <comment>The Tempo tool's tooltip.</comment>
   </data>
   <data name="ToolSyncToolTip" xml:space="preserve">
-    <value>Drag over two or more chords of a lane to sync them: every exactly matching passage highlights, and edits in the region apply to each. Click again to clear.</value>
+    <value>Drag over a stretch of a lane to keep it in sync: every passage exactly matching it highlights, and edits in the region are made in each. Drag its edges to resize it, or its middle to move it; click a matching passage to sync from there. Hold Ctrl+Shift for the same without picking the tool. Hover the region and click its X to clear it.</value>
     <comment>The Sync tool's tooltip.</comment>
+  </data>
+  <data name="ToolLoopToolTip" xml:space="preserve">
+    <value>Drag over a stretch of a lane to loop it. Drag its edges to resize it, or its middle to move it; drawing it doesn't start the song repeating. Hold its key for the same without picking the tool, and tap it briefly, having touched nothing, to start or stop repeating it. Hover the region and click its X to clear it, or middle-click with the tool picked.</value>
+    <comment>The Loop tool's tooltip.</comment>
   </data>
   <data name="ToolPhraseToolTip" xml:space="preserve">
     <value>Drag along the lanes to add a phrase of the picked kind. With any tool, click a phrase in the side rail to select it, drag to move it, or drag either end to resize it. S puts star power over the selection.</value>
@@ -1180,21 +1360,21 @@ Open it anyway?</value>
     <comment>A place option on 5-fret and GHL lanes: the chord is forced to a hammer-on or pull-off.</comment>
   </data>
   <data name="PlaceHopoToolTip" xml:space="preserve">
-    <value>Make the chord each note goes in a forced HOPO (H).</value>
+    <value>Make the chord each note goes in a forced HOPO</value>
   </data>
   <data name="PlaceStrum" xml:space="preserve">
     <value>Strum</value>
     <comment>A place option on 5-fret and GHL lanes: the chord is forced to a strum.</comment>
   </data>
   <data name="PlaceStrumToolTip" xml:space="preserve">
-    <value>Make the chord each note goes in a forced strum (G).</value>
+    <value>Make the chord each note goes in a forced strum</value>
   </data>
   <data name="PlaceTap" xml:space="preserve">
     <value>Tap</value>
     <comment>A place option on 5-fret and GHL lanes: the chord is a tap note.</comment>
   </data>
   <data name="PlaceTapToolTip" xml:space="preserve">
-    <value>Make the chord each note goes in a tap (T).</value>
+    <value>Make the chord each note goes in a tap</value>
   </data>
   <data name="PlaceOpen" xml:space="preserve">
     <value>Open</value>
@@ -1229,7 +1409,7 @@ Open it anyway?</value>
     <comment>A place option on Pro drums lanes: yellow, blue and green pads are made toms.</comment>
   </data>
   <data name="PlaceTomToolTip" xml:space="preserve">
-    <value>Make each placed yellow, blue or green pad a tom (C). Toms are marked for every difficulty.</value>
+    <value>Make each placed yellow, blue or green pad a tom. Toms are marked for every difficulty</value>
   </data>
   <data name="PlaceNormal" xml:space="preserve">
     <value>Normal</value>
@@ -1243,14 +1423,14 @@ Open it anyway?</value>
     <comment>A place option on drums lanes: pads are accents, hit harder.</comment>
   </data>
   <data name="PlaceAccentToolTip" xml:space="preserve">
-    <value>Place pads as accents, hit harder (A). Kicks stay normal.</value>
+    <value>Place pads as accents, hit harder. Kicks stay normal</value>
   </data>
   <data name="PlaceGhost" xml:space="preserve">
     <value>Ghost</value>
     <comment>A place option on drums lanes: pads are ghost notes, hit softer.</comment>
   </data>
   <data name="PlaceGhostToolTip" xml:space="preserve">
-    <value>Place pads as ghost notes, hit softer (Shift+A). Kicks stay normal.</value>
+    <value>Place pads as ghost notes, hit softer. Kicks stay normal</value>
   </data>
   <data name="PlaceDoubleKick" xml:space="preserve">
     <value>2× Kick</value>
@@ -1360,7 +1540,7 @@ Open it anyway?</value>
     <comment>The snap checkbox and picker: notes snap to the grid.</comment>
   </data>
   <data name="SnapToolTip" xml:space="preserve">
-    <value>The grid notes snap to, as a fraction of a whole note. [ and ] change it.</value>
+    <value>The grid notes snap to, as a fraction of a whole note. The snap keys change it.</value>
     <comment>The snap controls' tooltip.</comment>
   </data>
   <data name="SnapButtonToolTip" xml:space="preserve">
@@ -1379,20 +1559,12 @@ Open it anyway?</value>
     <value>Play a sound for each note of the shown lanes as it reaches the strike line.</value>
     <comment>The hit sounds checkbox's tooltip.</comment>
   </data>
-  <data name="LatencyLabel" xml:space="preserve">
-    <value>Latency</value>
-    <comment>The transport bar's latency button's label, before the value.</comment>
-  </data>
   <data name="LatencyToolTip" xml:space="preserve">
     <value>The calibrated audio/visual latency for this output. Click to calibrate.</value>
     <comment>The transport bar's latency button's tooltip.</comment>
   </data>
-  <data name="LaneLookAheadFormat" xml:space="preserve">
-    <value>{0:0.0} s</value>
-    <comment>A lane's look-ahead, in its header: how many seconds it shows beyond the strike line, e.g. "2.0 s".</comment>
-  </data>
   <data name="LaneLookAheadToolTip" xml:space="preserve">
-    <value>Look-ahead: how many seconds the lane shows beyond the strike line. Ctrl+wheel, + and − change it too.</value>
+    <value>Look-ahead: how many seconds the lane shows beyond the strike line. Ctrl+wheel and the look-ahead keys change it too.</value>
     <comment>The lane header's look-ahead button's tooltip.</comment>
   </data>
   <data name="LaneLookAheadLabel" xml:space="preserve">
@@ -1411,18 +1583,18 @@ Open it anyway?</value>
     <value>Discard</value>
     <comment>Closes without saving, in the prompt when the Editor closes with unsaved edits.</comment>
   </data>
-  <data name="SaveAndPackToolTip" xml:space="preserve">
-    <value>Save, then review and export the song to a .sng</value>
+  <data name="PackToolTip" xml:space="preserve">
+    <value>Review and pack the song to a .sng, including its unsaved changes. The song itself isn't saved.</value>
   </data>
-  <data name="SaveAndPackSngToolTip" xml:space="preserve">
-    <value>Save, then review and save a copy of the .sng elsewhere</value>
-    <comment>Save and pack's tooltip when the song open is a .sng.</comment>
+  <data name="PackSngToolTip" xml:space="preserve">
+    <value>Review and save a copy of the .sng elsewhere, including its unsaved changes. The song itself isn't saved.</value>
+    <comment>Pack's tooltip when the song open is a .sng.</comment>
   </data>
   <data name="ExportCopyToolTip" xml:space="preserve">
     <value>Write a copy of the song, with the chart and song.ini changes, to another folder</value>
   </data>
   <data name="ExportCopyNewChartToolTip" xml:space="preserve">
-    <value>Save the new chart first; its copy is made from its song folder</value>
+    <value>Save the new chart first</value>
     <comment>Export copy's tooltip, disabled, for a new chart that hasn't been saved yet.</comment>
   </data>
   <data name="ExportCopyPickerTitle" xml:space="preserve">
@@ -1492,7 +1664,7 @@ Saving also changes song.ini:
     <value>The chart wasn't saved: {0}</value>
   </data>
   <data name="SaveReadBackFailedFormat" xml:space="preserve">
-    <value>The chart wasn't saved: it didn't read back as written ({0}). Nothing on disk changed. This is a bug; the log has details.</value>
+    <value>The chart wasn't saved: it didn't read back as written ({0}). Nothing on disk changed. See logs.</value>
     <comment>{0} is where the written chart differs from the one in the editor.</comment>
   </data>
   <data name="SavedStatus" xml:space="preserve">
@@ -1546,8 +1718,18 @@ Saving also changes song.ini:
   <data name="FirstSaveLockedFormat" xml:space="preserve">
     <value>{0} is open in another Chart Builder.</value>
   </data>
-  <data name="FirstSaveNeedsNameAndArtist" xml:space="preserve">
-    <value>Set the song's name and artist in Chart Settings' Metadata before saving.</value>
+  <data name="SongInfoTitle" xml:space="preserve">
+    <value>Song Details</value>
+  </data>
+  <data name="SongInfoIntro" xml:space="preserve">
+    <value>A new chart needs the song's name and the artist before it can be saved. They are written to song.ini, and the song folder's name starts from them.</value>
+  </data>
+  <data name="SongInfoNameLabel" xml:space="preserve">
+    <value>Name</value>
+    <comment>The song's title, the name key in song.ini.</comment>
+  </data>
+  <data name="SongInfoArtistLabel" xml:space="preserve">
+    <value>Artist</value>
   </data>
   <data name="FirstSaveSongLabel" xml:space="preserve">
     <value>Song</value>
@@ -1597,24 +1779,24 @@ Saving also changes song.ini:
   <data name="PendingReasonDrumLayout" xml:space="preserve">
     <value>How the drums are read: the drum variant the chart has.</value>
   </data>
-  <data name="PendingReasonImportSettings" xml:space="preserve">
-    <value>The sustain cutoff imported .chart sustains need to stay sustains as notes.mid.</value>
+  <data name="PendingReasonSustainCutoff" xml:space="preserve">
+    <value>The sustain cutoff the chart's shortest sustain needs to play as a sustain.</value>
   </data>
   <data name="PendingReasonMultiplierNote" xml:space="preserve">
     <value>The chart's star power is saved on note 116, so multiplier_note no longer applies.</value>
   </data>
   <data name="AutosaveMinutesLabel" xml:space="preserve">
-    <value>Autosave every</value>
+    <value>Autosave Every</value>
     <comment>The Settings row for how often the chart is autosaved.</comment>
   </data>
   <data name="AutosaveMinutesDescription" xml:space="preserve">
-    <value>Minutes between autosaves of the open chart, for crash recovery. Also autosaves when playback stops. Autosaves live in Chart Builder's settings folder, never in the song.</value>
+    <value>Minutes between autosaves of the open chart, for crash recovery.</value>
   </data>
   <data name="AutosaveMinutesKeywords" xml:space="preserve">
     <value>autosave recovery crash backup minutes interval</value>
   </data>
   <data name="PackFolderLabel" xml:space="preserve">
-    <value>Pack folder</value>
+    <value>Pack Folder</value>
   </data>
   <data name="PackFolderDescription" xml:space="preserve">
     <value>The export dialog's default .sng location. When empty, it starts at the song's parent folder. The dialog always asks before writing.</value>
@@ -1625,9 +1807,9 @@ Saving also changes song.ini:
   <data name="PackFolderEmpty" xml:space="preserve">
     <value>Ask every time</value>
   </data>
-  <data name="SaveAndPackPickerTitle" xml:space="preserve">
+  <data name="PackPickerTitle" xml:space="preserve">
     <value>Pack the .sng Into</value>
-    <comment>The folder picker's title for Save and pack; the .sng is written inside the one picked.</comment>
+    <comment>The folder picker's title for Pack; the .sng is written inside the one picked.</comment>
   </data>
   <data name="ExportSngTitle" xml:space="preserve">
     <value>Export Song</value>
@@ -1740,7 +1922,7 @@ Saving also changes song.ini:
     <comment>Beside Export while it's off because of chart errors; ExportSngErrorsFormat explains it in full.</comment>
   </data>
   <data name="ExportSngPendingFormat" xml:space="preserve">
-    <value>{0} unsaved change(s) will be saved on Export.</value>
+    <value>{0} unsaved change(s) will be in the .sng; the song itself isn't saved.</value>
     <comment>{0} is the pending change count.</comment>
   </data>
   <data name="ExportSngExportButton" xml:space="preserve">
@@ -1748,18 +1930,6 @@ Saving also changes song.ini:
   </data>
   <data name="ExportSngNoFolder" xml:space="preserve">
     <value>Choose where the .sng goes.</value>
-  </data>
-  <data name="ExportSngCopiedFormat" xml:space="preserve">
-    <value>Saved and copied the .sng to {0}.</value>
-    <comment>{0} is the .sng written.</comment>
-  </data>
-  <data name="ExportSngSkippedInUseFormat" xml:space="preserve">
-    <value>Saved, but nothing written: {0} is being edited in another Chart Builder or Chart Packer window.</value>
-    <comment>{0} is the .sng that's open.</comment>
-  </data>
-  <data name="ExportSngSkippedExistsFormat" xml:space="preserve">
-    <value>Saved, but nothing written: {0} is already there, and the choice is to skip it.</value>
-    <comment>{0} is the .sng that exists.</comment>
   </data>
   <data name="ExportSngAudioHeading" xml:space="preserve">
     <value>Audio</value>
@@ -1842,11 +2012,14 @@ Saving also changes song.ini:
     <value>Fixed {0} {1} findings.</value>
     <comment>After Fix All. {0} is how many were fixed, {1} the rule ID (CHR023).</comment>
   </data>
-  <data name="SaveAndPackErrorsToolTipFormat" xml:space="preserve">
+  <data name="PackErrorsToolTipFormat" xml:space="preserve">
     <value>The chart has {0} errors the games read differently than written. Fix them before packing; Save still works.</value>
   </data>
-  <data name="SaveAndPackErrorsFormat" xml:space="preserve">
-    <value>Saved, but not packed: the chart has {0} errors. See Findings.</value>
+  <data name="PackErrorsFormat" xml:space="preserve">
+    <value>Not packed: the chart has {0} errors. See Findings.</value>
+  </data>
+  <data name="PackCopyUnreadable" xml:space="preserve">
+    <value>Not packed: the copy made to pack couldn't be read as a song.</value>
   </data>
   <data name="SectionsTab" xml:space="preserve">
     <value>Sections</value>
@@ -1943,7 +2116,11 @@ Saving also changes song.ini:
     <value>Delete it, as one step to undo</value>
   </data>
   <data name="SectionsKeysHint" xml:space="preserve">
-    <value>Ctrl+↑ / Ctrl+↓ move the cursor to the next/previous section.</value>
+    <value>Moves the cursor to the next section</value>
+  </data>
+  <data name="SectionsPreviousKeysHint" xml:space="preserve">
+    <value>Moves the cursor to the previous section</value>
+    <comment>A hint under the Sections list: what the previous-section key does. Its key is added after it.</comment>
   </data>
   <data name="TempoMapTab" xml:space="preserve">
     <value>Tempo Map</value>
@@ -2013,14 +2190,15 @@ Saving also changes song.ini:
     <comment>Said when a time signature's beats typed in the Tempo map tab aren't a whole number.</comment>
   </data>
   <data name="TempoMapKeysHint" xml:space="preserve">
-    <value>Ctrl+Shift+↑ / Ctrl+Shift+↓ move the cursor to the next/previous tempo or time signature change. The Tempo tool adds and drags tempo markers on the lanes.</value>
+    <value>Moves the cursor to the next tempo or time signature change</value>
   </data>
-  <data name="GenerateFillsHeading" xml:space="preserve">
-    <value>Generate Fills</value>
+  <data name="TempoMapPreviousKeysHint" xml:space="preserve">
+    <value>Moves the cursor to the previous tempo or time signature change</value>
+    <comment>A hint under the Tempo map list: what the previous-change key does. Its key is added after it.</comment>
   </data>
-  <data name="GenerateFillsIntro" xml:space="preserve">
-    <value>Propose drum fills over the selection, or the whole part, to keep or drop before they're added.</value>
-    <comment>The Generate fills dialog's introduction.</comment>
+  <data name="TempoMapToolHint" xml:space="preserve">
+    <value>The Tempo tool adds and drags tempo markers on the lanes.</value>
+    <comment>A hint under the Tempo map list.</comment>
   </data>
   <data name="GenerateFillsSpacingLabel" xml:space="preserve">
     <value>Spacing (measures)</value>
@@ -2048,108 +2226,124 @@ Saving also changes song.ini:
   <data name="GenerateFillsEndAnyNote" xml:space="preserve">
     <value>Any note</value>
   </data>
-  <data name="GenerateScopeLabel" xml:space="preserve">
-    <value>Over</value>
-    <comment>Generate fills and Generate star power: where the phrases are proposed, the selection or the whole part.</comment>
-  </data>
   <data name="GenerateScopeSelection" xml:space="preserve">
-    <value>The selection</value>
+    <value>Selection</value>
     <comment>Generate fills and Generate star power: the phrases are proposed over the selection's span.</comment>
   </data>
   <data name="GenerateScopeWholePart" xml:space="preserve">
-    <value>The whole part</value>
+    <value>Whole Part</value>
     <comment>Generate fills and Generate star power: the phrases are proposed over the whole part.</comment>
-  </data>
-  <data name="GenerateButton" xml:space="preserve">
-    <value>Generate</value>
-    <comment>Generate fills and Generate star power: proposes the phrases, shown as ghosts to keep or drop.</comment>
-  </data>
-  <data name="GenerateStarPowerHeading" xml:space="preserve">
-    <value>Generate Star Power</value>
   </data>
   <data name="GenerateStarPowerTitleFormat" xml:space="preserve">
     <value>Generate Star Power: {0}</value>
     <comment>The Generate star power dialog's title. {0} is the part, e.g. Guitar.</comment>
   </data>
-  <data name="GenerateStarPowerIntro" xml:space="preserve">
-    <value>Propose star power phrases over the selection, or the whole part, to keep or drop before they're added.</value>
-    <comment>The Generate star power dialog's introduction.</comment>
-  </data>
   <data name="GenerateStarPowerSpacingLabel" xml:space="preserve">
-    <value>Spacing (seconds)</value>
+    <value>Spacing (Seconds)</value>
     <comment>About how many seconds apart generated star power phrases are.</comment>
   </data>
   <data name="GenerateStarPowerSpacingToolTip" xml:space="preserve">
     <value>Roughly how far apart phrases are, in seconds of the part's playing; long rests do not count. A whole part gets at least four.</value>
   </data>
   <data name="GenerateStarPowerSpikesLabel" xml:space="preserve">
-    <value>Charge for hard passages</value>
+    <value>Charge for Hard Passages</value>
     <comment>A check box: place phrases so a player has enough star power to activate going into each hard passage.</comment>
   </data>
   <data name="GenerateStarPowerSpikesToolTip" xml:space="preserve">
     <value>Place phrases to give half a meter, enough to activate, before each hardest passage the difficulty graph finds. Off, they're only spread evenly.</value>
   </data>
-  <data name="StarPowerRunFormat" xml:space="preserve">
-    <value>{0} of {1} proposed star power phrases kept</value>
-    <comment>The bar over the lanes while Generate star power runs. {0} is how many are kept, {1} how many were proposed.</comment>
+  <data name="StarPowerModeLabel" xml:space="preserve">
+    <value>Existing Star Power</value>
+    <comment>What Generate star power does with the star power a part already has.</comment>
   </data>
-  <data name="StarPowerRunHint" xml:space="preserve">
-    <value>Click a ghost in the rail's star power row to keep or drop it. Esc cancels.</value>
+  <data name="StarPowerRegionsHeading" xml:space="preserve">
+    <value>Regions</value>
+    <comment>The star power window's ribbon of proposed regions.</comment>
   </data>
-  <data name="StarPowerRunAdd" xml:space="preserve">
-    <value>Add star power</value>
-    <comment>Adds the kept star power phrases, as one step to undo.</comment>
+  <data name="StarPowerPlanSummaryFormat" xml:space="preserve">
+    <value>{0} of {1} Kept — {2} of Star Power</value>
+    <comment>{0} is how many regions are kept, {1} how many there are, {2} how long they add up to, e.g. 2:14.</comment>
   </data>
-  <data name="StarPowerRunAddToolTip" xml:space="preserve">
-    <value>Add the kept star power phrases, as one step to undo</value>
+  <data name="StarPowerRoleFiller" xml:space="preserve">
+    <value>Filler</value>
+    <comment>A proposed star power phrase that spreads the phrases over the part.</comment>
   </data>
-  <data name="ProposalRunPrevious" xml:space="preserve">
-    <value>◀ Previous</value>
-    <comment>The bar over the lanes while Generate fills or Generate star power runs: goes to the proposal before the cursor.</comment>
+  <data name="StarPowerRoleLeadInFormat" xml:space="preserve">
+    <value>Lead-In for {0}</value>
+    <comment>A proposed star power phrase that charges the meter for the hard passage at {0}, e.g. 1:52.</comment>
   </data>
-  <data name="ProposalRunPreviousToolTip" xml:space="preserve">
-    <value>Go to the proposal before the cursor</value>
+  <data name="StarPowerExistingHeading" xml:space="preserve">
+    <value>Existing Star Power</value>
   </data>
-  <data name="ProposalRunNext" xml:space="preserve">
-    <value>Next ▶</value>
-    <comment>The bar over the lanes while Generate fills or Generate star power runs: goes to the proposal after the cursor.</comment>
+  <data name="StarPowerNoRegions" xml:space="preserve">
+    <value>No regions. Regenerate to propose some.</value>
   </data>
-  <data name="ProposalRunNextToolTip" xml:space="preserve">
-    <value>Go to the proposal after the cursor</value>
+  <data name="StarPowerUnchargedFormat" xml:space="preserve">
+    <value>{0} hard passages not charged</value>
+    <comment>{0} is how many hard passages the kept star power doesn't give enough meter for, when it's more than one.</comment>
   </data>
-  <data name="ProposalRunNoneBefore" xml:space="preserve">
-    <value>No proposal before the cursor.</value>
+  <data name="StarPowerUnchargedOne" xml:space="preserve">
+    <value>1 hard passage not charged</value>
+    <comment>A hard passage the kept star power doesn't give enough meter for, when it's the only one.</comment>
   </data>
-  <data name="ProposalRunNoneAfter" xml:space="preserve">
-    <value>No proposal after the cursor.</value>
+  <data name="StarPowerApply" xml:space="preserve">
+    <value>Apply Star Power</value>
+    <comment>Applies the kept regions to the chart, as one step to undo.</comment>
   </data>
-  <data name="ProposalGhostToolTipFormat" xml:space="preserve">
-    <value>Proposed {0}: click to keep or drop it</value>
-    <comment>A proposed phrase's ghost in the phrase rail. {0} is its kind in lower case, e.g. "star power" or "drum fill".</comment>
+  <data name="StarPowerApplyToolTip" xml:space="preserve">
+    <value>Apply the kept star power regions, as one step to undo</value>
   </data>
-  <data name="FillRunFormat" xml:space="preserve">
-    <value>{0} of {1} proposed fills kept</value>
-    <comment>The bar over the lanes while Generate fills runs. {0} is how many are kept, {1} how many were proposed.</comment>
+  <data name="StarPowerCharged" xml:space="preserve">
+    <value>Charged</value>
+    <comment>A lead-in's chip, in the star power window's region list: the kept plan gives enough meter for its hard passage.</comment>
   </data>
-  <data name="FillRunHint" xml:space="preserve">
-    <value>Click a ghost in the rail's fills row to keep or drop it. Esc cancels.</value>
+  <data name="StarPowerNotCharged" xml:space="preserve">
+    <value>Not Charged</value>
+    <comment>A lead-in's chip, in the star power window's region list: the kept plan gives less than half a meter for its hard passage.</comment>
   </data>
-  <data name="FillRunKeepAll" xml:space="preserve">
-    <value>Keep all</value>
+  <data name="StarPowerNothingToApply" xml:space="preserve">
+    <value>No Regions to Apply</value>
+    <comment>The star power window's footer, in place of the kept/total summary when there are no regions.</comment>
   </data>
-  <data name="FillRunDropAll" xml:space="preserve">
-    <value>Drop all</value>
+  <data name="StarPowerNoSpot" xml:space="preserve">
+    <value>No star power phrase fits: none has enough notes clear of sections, solos' edges, drum fills and the star power there, early enough for it to be used.</value>
   </data>
-  <data name="FillRunAdd" xml:space="preserve">
-    <value>Add fills</value>
-    <comment>Adds the kept fills, as one step to undo.</comment>
+  <data name="StarPowerNoNotes" xml:space="preserve">
+    <value>The part has no notes to propose star power over.</value>
   </data>
-  <data name="FillRunAddToolTip" xml:space="preserve">
-    <value>Add the kept fills, as one step to undo</value>
+  <data name="StarPowerUnsupportedInstrument" xml:space="preserve">
+    <value>Star power is generated only for 5-fret parts (keys included), GHL and drums.</value>
   </data>
-  <data name="FillRunCancel" xml:space="preserve">
-    <value>Cancel</value>
-    <comment>Ends Generate fills, adding nothing.</comment>
+  <data name="StarPowerHasStarPower" xml:space="preserve">
+    <value>The part has star power already. Replace it, or select a span to add beside it.</value>
+  </data>
+  <data name="SyncClearToolTip" xml:space="preserve">
+    <value>Clear the synchronized region</value>
+    <comment>The small X at a synchronized region's top right, which takes the region away.</comment>
+  </data>
+  <data name="SyncMoveToolTip" xml:space="preserve">
+    <value>Drag to move the synchronized region</value>
+    <comment>The body of a synchronized region, which a drag moves along time.</comment>
+  </data>
+  <data name="SyncResizeToolTip" xml:space="preserve">
+    <value>Drag to resize the synchronized region</value>
+    <comment>An end of a synchronized region, which a drag resizes the region by.</comment>
+  </data>
+  <data name="SyncSourceToolTip" xml:space="preserve">
+    <value>Click to synchronize from this passage</value>
+    <comment>A passage synced with a synchronized region, which a click makes the region's source.</comment>
+  </data>
+  <data name="LoopClearToolTip" xml:space="preserve">
+    <value>Clear the loop region</value>
+    <comment>The small X at the loop region's top right, which takes the region away.</comment>
+  </data>
+  <data name="LoopMoveToolTip" xml:space="preserve">
+    <value>Drag to move the loop region</value>
+    <comment>The body of the loop region, which a drag moves along time.</comment>
+  </data>
+  <data name="LoopResizeToolTip" xml:space="preserve">
+    <value>Drag to resize the loop region</value>
+    <comment>An end of the loop region, which a drag resizes the region by.</comment>
   </data>
   <data name="SettingsCategoryPlayback" xml:space="preserve">
     <value>Playback</value>
@@ -2160,16 +2354,16 @@ Saving also changes song.ini:
     <comment>Settings: the category of the waveforms and spectrograms drawn while playing.</comment>
   </data>
   <data name="LaneBackdropLabel" xml:space="preserve">
-    <value>Lanes show</value>
+    <value>Lanes Show</value>
   </data>
   <data name="LaneBackdropDescription" xml:space="preserve">
-    <value>Whether a lane draws audio as a waveform or spectrogram until switched, from the lane's audio button or with W.</value>
+    <value>Whether a lane draws audio as a waveform or spectrogram until switched</value>
   </data>
   <data name="LaneBackdropKeywords" xml:space="preserve">
     <value>waveform spectrogram audio lane behind beside</value>
   </data>
   <data name="WaveformFidelityLabel" xml:space="preserve">
-    <value>Waveform detail</value>
+    <value>Waveform Detail</value>
     <comment>Settings: the row that picks how finely waveforms are read.</comment>
   </data>
   <data name="WaveformFidelityDescription" xml:space="preserve">
@@ -2197,10 +2391,10 @@ Saving also changes song.ini:
     <comment>A choice of Waveform detail: how long each bar of the waveform is.</comment>
   </data>
   <data name="SpectrogramBudgetLabel" xml:space="preserve">
-    <value>Spectrogram memory budget (MB)</value>
+    <value>Spectrogram Memory Budget (MB)</value>
   </data>
   <data name="SpectrogramBudgetDescription" xml:space="preserve">
-    <value>How much memory all stems' spectrograms may take together. Least recently used stems release first. Spectrograms are never written to disk.</value>
+    <value>How much memory all stems' spectrograms may take together.</value>
   </data>
   <data name="SpectrogramBudgetKeywords" xml:space="preserve">
     <value>spectrogram memory budget ram megabytes</value>
@@ -2227,7 +2421,7 @@ Saving also changes song.ini:
     <value>Spectrogram</value>
   </data>
   <data name="LaneShowToolTip" xml:space="preserve">
-    <value>Waveform or spectrogram (W)</value>
+    <value>Waveform or spectrogram</value>
   </data>
   <data name="LanePlacementLabel" xml:space="preserve">
     <value>Placement</value>
@@ -2308,7 +2502,7 @@ Saving also changes song.ini:
     <value>Snap to onset</value>
   </data>
   <data name="SnapToOnsetToolTip" xml:space="preserve">
-    <value>Snap to onset (O): placed and moved notes go to the nearest onset within half a grid step</value>
+    <value>Placed and moved notes go to the nearest onset within half a grid step</value>
   </data>
   <data name="SnapToOnsetOnStatus" xml:space="preserve">
     <value>Snap to onset is on: notes go to the nearest onset within half a grid step.</value>
@@ -2320,7 +2514,7 @@ Saving also changes song.ini:
     <value>Nudge</value>
   </data>
   <data name="NudgeToOnsetsToolTip" xml:space="preserve">
-    <value>Nudge to onsets (Shift+O): move selected notes to their nearest onsets</value>
+    <value>Nudge to onsets: move selected notes to their nearest onsets</value>
   </data>
   <data name="NudgeNothingSelected" xml:space="preserve">
     <value>Select the notes to nudge to their onsets first.</value>
@@ -2510,7 +2704,7 @@ Saving also changes song.ini:
     <value>Copy Difficulty</value>
   </data>
   <data name="CopyDifficultyConfirmFormat" xml:space="preserve">
-    <value>{0} has {1} notes, which {2} will replace. Undo puts them back.</value>
+    <value>{0} has {1} notes, which {2} will replace</value>
   </data>
   <data name="CopyDifficultyConfirmButton" xml:space="preserve">
     <value>Replace</value>
@@ -2526,11 +2720,11 @@ Saving also changes song.ini:
   </data>
   <data name="LaneGenerateStarPower" xml:space="preserve">
     <value>Generate star power…</value>
-    <comment>A lane's Edit menu item, on 5-fret and keys lanes: opens Generate star power's options for the lane's part.</comment>
+    <comment>A lane's Edit menu item, on 5-fret and keys lanes: opens the star power generator's window for the lane's part.</comment>
   </data>
   <data name="LaneGenerateFills" xml:space="preserve">
     <value>Generate fills…</value>
-    <comment>A lane's Edit menu item, on drums lanes: opens Generate fills' options.</comment>
+    <comment>A lane's Edit menu item, on drums lanes: opens the fills generator's window for the lane's part.</comment>
   </data>
   <data name="ReduceTitleFormat" xml:space="preserve">
     <value>Reduce {0}</value>
@@ -2647,7 +2841,7 @@ Saving also changes song.ini:
     <value>Show</value>
   </data>
   <data name="ReductionRulesLabel" xml:space="preserve">
-    <value>Default reduction rules</value>
+    <value>Default Reduction Rules</value>
   </data>
   <data name="ReductionRulesDescription" xml:space="preserve">
     <value>The rules Reduce starts from: chord size, frets, thinning by grid and time, forcing, sustains, and drum pads and kick. Each run can change them.</value>
@@ -2686,19 +2880,26 @@ Saving also changes song.ini:
     <value>Select lane</value>
   </data>
   <data name="LaneSelectSection" xml:space="preserve">
-    <value>Select section at cursor (Ctrl+Shift+A)</value>
+    <value>Select section at cursor</value>
   </data>
   <data name="LaneCut" xml:space="preserve">
-    <value>Cut (Ctrl+X)</value>
+    <value>Cut</value>
   </data>
   <data name="LaneCopy" xml:space="preserve">
-    <value>Copy (Ctrl+C)</value>
+    <value>Copy</value>
   </data>
   <data name="LanePaste" xml:space="preserve">
-    <value>Paste at cursor (Ctrl+V)</value>
+    <value>Paste at cursor</value>
   </data>
   <data name="LanePasteMerge" xml:space="preserve">
-    <value>Paste and merge (Ctrl+Shift+V)</value>
+    <value>Paste and merge</value>
+  </data>
+  <data name="LaneDelete" xml:space="preserve">
+    <value>Delete</value>
+  </data>
+  <data name="LaneQuantize" xml:space="preserve">
+    <value>Quantize to grid</value>
+    <comment>The lane's Edit menu: puts the selected notes, and their sustains' ends, on the quantize grid, which the toolbar sets. The grid isn't named as the menu isn't rebuilt when it changes.</comment>
   </data>
   <data name="LaneTransform" xml:space="preserve">
     <value>Transform</value>
@@ -2707,10 +2908,10 @@ Saving also changes song.ini:
     <value>Lefty flip</value>
   </data>
   <data name="TransformShiftUp" xml:space="preserve">
-    <value>Shift up a lane (Alt+Shift+→)</value>
+    <value>Shift up a lane</value>
   </data>
   <data name="TransformShiftDown" xml:space="preserve">
-    <value>Shift down a lane (Alt+Shift+←)</value>
+    <value>Shift down a lane</value>
   </data>
   <data name="TransformClearSustains" xml:space="preserve">
     <value>Clear sustains</value>
@@ -2743,10 +2944,10 @@ Saving also changes song.ini:
     <value>Record</value>
   </data>
   <data name="RecordStartToolTip" xml:space="preserve">
-    <value>Record mode (R): playing records your keys and devices into the focused lane; pausing adds the pass as one step</value>
+    <value>Record mode: playing records your keys and devices into the focused lane; pausing adds the pass as one step</value>
   </data>
   <data name="RecordStopToolTip" xml:space="preserve">
-    <value>Record mode is on (R): playing the song records into the focused lane. Click to turn it off.</value>
+    <value>Record mode is on: playing the song records into the focused lane. Click to turn it off</value>
   </data>
   <data name="RecordModeToolTip" xml:space="preserve">
     <value>How a recorded pass goes in: merged with what's there, or over the selected range or the played stretch</value>
@@ -2783,10 +2984,10 @@ Saving also changes song.ini:
     <value>Click a lane to record into first.</value>
   </data>
   <data name="RecordingMergeFormat" xml:space="preserve">
-    <value>Recording into {0} · {1}, merging. Space stops and adds the pass, Esc cancels it, R turns record mode off.</value>
+    <value>Recording into {0} · {1}, merging. {2} stops and adds the pass, {3} cancels it, {4} turns record mode off.</value>
   </data>
   <data name="RecordingOverwriteFormat" xml:space="preserve">
-    <value>Recording into {0} · {1}, overwriting. Space stops and adds the pass, Esc cancels it, R turns record mode off.</value>
+    <value>Recording into {0} · {1}, overwriting. {2} stops and adds the pass, {3} cancels it, {4} turns record mode off.</value>
   </data>
   <data name="RecordedFormat" xml:space="preserve">
     <value>Recorded {0} notes, as one step.</value>
@@ -2813,7 +3014,7 @@ Saving also changes song.ini:
     <value>Window</value>
   </data>
   <data name="PreviewOpenWindowToolTip" xml:space="preserve">
-    <value>Open the preview in a window of its own; F11 there for full screen</value>
+    <value>Open the preview in a window of its own, which can go full screen</value>
   </data>
   <data name="PreviewPractice" xml:space="preserve">
     <value>Practice</value>
@@ -2888,7 +3089,7 @@ Saving also changes song.ini:
     <value>Difficulty</value>
   </data>
   <data name="DifficultyTrackToolTip" xml:space="preserve">
-    <value>The part and difficulty analyzed: the focused lane, or one picked</value>
+    <value>The part and difficulty analyzed</value>
   </data>
   <data name="DifficultyOpenWindowToolTip" xml:space="preserve">
     <value>Show the analysis in a window of its own, with room for the graph</value>
@@ -2897,7 +3098,7 @@ Saving also changes song.ini:
     <value>Nothing to analyze: focus a five-fret lane with notes, or pick one.</value>
   </data>
   <data name="DifficultyFailed" xml:space="preserve">
-    <value>The difficulty couldn't be worked out. The log says why.</value>
+    <value>The difficulty couldn't be worked out. See logs.</value>
   </data>
   <data name="DifficultyRankFormat" xml:space="preserve">
     <value>Rank {0:0.0}</value>
@@ -2969,7 +3170,7 @@ Saving also changes song.ini:
     <value>Difficulty by attribute</value>
   </data>
   <data name="DifficultySpiderToolTip" xml:space="preserve">
-    <value>Each attribute's difficulty: the ring is 100, the limit of realistic clean play. The dashed shape is the whole chart.</value>
+    <value>Each attribute's difficulty</value>
   </data>
   <data name="DifficultyGraphName" xml:space="preserve">
     <value>Difficulty over the song</value>
@@ -3048,14 +3249,14 @@ Saving also changes song.ini:
     <comment>{0} is the file name; {1} is the reason.</comment>
   </data>
   <data name="ArtVideoNeedsFfmpeg" xml:space="preserve">
-    <value>The video can't preview: FFmpeg isn't installed with Chart Builder. It's still saved with the song.</value>
+    <value>The video can't preview: FFmpeg isn't installed with Chart Builder.</value>
   </data>
   <data name="ArtVideoStartLabel" xml:space="preserve">
     <value>Video start (ms)</value>
     <comment>Beside the box under the background video that sets song.ini's video_start_time.</comment>
   </data>
   <data name="ArtVideoStartToolTip" xml:space="preserve">
-    <value>Where the song starts in the video, to line it up with the audio: song.ini's video_start_time. Positive skips that much video; negative holds the first frame that long. The video previews each value at the playhead.</value>
+    <value>Where the song starts in the video</value>
   </data>
   <data name="ArtVideoStartRevertToolTip" xml:space="preserve">
     <value>Put the video start back as saved</value>
@@ -3064,14 +3265,14 @@ Saving also changes song.ini:
     <value>Audio delay (ms)</value>
   </data>
   <data name="ChartSettingsDelayToolTip" xml:space="preserve">
-    <value>How much later than its notes the chart plays: song.ini's delay</value>
+    <value>How much later than its notes the chart plays</value>
   </data>
   <data name="ChartSettingsDifficultyHeader" xml:space="preserve">
     <value>Difficulty</value>
     <comment>Above the Parts rows' rating boxes.</comment>
   </data>
   <data name="ChartSettingsPartToolTip" xml:space="preserve">
-    <value>Whether the chart has this part. Turning off a part with notes asks first.</value>
+    <value>Whether the chart has this part.</value>
   </data>
   <data name="ChartSettingsDifficultyToolTip" xml:space="preserve">
     <value>The part's difficulty rating, 0 to 6 as the games show it; ? while unrated. Click to change it</value>
@@ -3091,7 +3292,7 @@ Saving also changes song.ini:
     <value>Tracks</value>
   </data>
   <data name="ChartSettingsTracksNote" xml:space="preserve">
-    <value>Mute, solo and volume are listen-only: not saved or undone.</value>
+    <value>Mute, solo and volume are listen-only</value>
   </data>
   <data name="PendingFileFormat" xml:space="preserve">
     <value>{0} from {1}</value>
@@ -3147,7 +3348,7 @@ Saving also changes song.ini:
     <comment>Shown over a vocal phrase's bar in the phrase strip.</comment>
   </data>
   <data name="LaneDifficultyPickerToolTip" xml:space="preserve">
-    <value>Difficulty shown (Ctrl+1–4)</value>
+    <value>Difficulty shown</value>
     <comment>The drop-down that stands in for the difficulty letters in a lane's header when the lane is too narrow for them.</comment>
   </data>
   <data name="SettingsCategoryInput" xml:space="preserve">
@@ -3155,7 +3356,7 @@ Saving also changes song.ini:
     <comment>Settings: the category of the instrument devices, their bindings and playtest.</comment>
   </data>
   <data name="InputDevicesLabel" xml:space="preserve">
-    <value>Instrument devices</value>
+    <value>Instrument Devices</value>
     <comment>Settings: the row that opens the Input devices window.</comment>
   </data>
   <data name="InputDevicesDescription" xml:space="preserve">
@@ -3167,15 +3368,15 @@ Saving also changes song.ini:
     <comment>Settings: search words for the Instrument devices row, separated by semicolons.</comment>
   </data>
   <data name="InputDevicesButton" xml:space="preserve">
-    <value>Input devices…</value>
+    <value>Input Devices…</value>
     <comment>Settings: the button that opens the Input devices window.</comment>
   </data>
   <data name="InputResetBindingsButton" xml:space="preserve">
-    <value>Reset bindings</value>
+    <value>Reset Bindings</value>
     <comment>Settings: the button that puts every instrument's bindings back to the keyboard's defaults.</comment>
   </data>
   <data name="PlaytestEarlyLabel" xml:space="preserve">
-    <value>Playtest hit window, early (ms)</value>
+    <value>Playtest Hit Window, Early (ms)</value>
     <comment>Settings: how long before a note a playtest takes a hit for it.</comment>
   </data>
   <data name="PlaytestEarlyDescription" xml:space="preserve">
@@ -3187,7 +3388,7 @@ Saving also changes song.ini:
     <comment>Settings: search words for the early hit window, separated by semicolons.</comment>
   </data>
   <data name="PlaytestLateLabel" xml:space="preserve">
-    <value>Playtest hit window, late (ms)</value>
+    <value>Playtest Hit Window, Late (ms)</value>
     <comment>Settings: how long after a note a playtest takes a hit for it.</comment>
   </data>
   <data name="PlaytestLateDescription" xml:space="preserve">
@@ -3199,7 +3400,7 @@ Saving also changes song.ini:
     <comment>Settings: search words for the late hit window, separated by semicolons.</comment>
   </data>
   <data name="PlaytestCymbalsLabel" xml:space="preserve">
-    <value>Cymbals must match</value>
+    <value>Cymbals Must Match</value>
     <comment>Settings: whether Pro drums cymbal notes need a cymbal hit.</comment>
   </data>
   <data name="PlaytestCymbalsDescription" xml:space="preserve">
@@ -3211,7 +3412,7 @@ Saving also changes song.ini:
     <comment>Settings: search words for Cymbals must match, separated by semicolons.</comment>
   </data>
   <data name="PlaytestDoubleKickLabel" xml:space="preserve">
-    <value>Judge the 2× kick</value>
+    <value>Judge the 2× Kick</value>
     <comment>Settings: whether a playtest judges Expert+ double kick notes.</comment>
   </data>
   <data name="PlaytestDoubleKickDescription" xml:space="preserve">
@@ -3223,7 +3424,7 @@ Saving also changes song.ini:
     <comment>Settings: search words for Judge the 2× kick, separated by semicolons.</comment>
   </data>
   <data name="PlaytestOverhitsLabel" xml:space="preserve">
-    <value>Overhits break the combo</value>
+    <value>Overhits Break the Combo</value>
     <comment>Settings: whether a drum hit with no note to hit breaks the playtest combo.</comment>
   </data>
   <data name="PlaytestOverhitsDescription" xml:space="preserve">
@@ -3235,7 +3436,7 @@ Saving also changes song.ini:
     <comment>Settings: search words for Overhits break the combo, separated by semicolons.</comment>
   </data>
   <data name="PlaytestDynamicsLabel" xml:space="preserve">
-    <value>Judge accents and ghosts</value>
+    <value>Judge Accents and Ghosts</value>
     <comment>Settings: whether a playtest checks how hard drum accents and ghosts are hit.</comment>
   </data>
   <data name="PlaytestDynamicsDescription" xml:space="preserve">
@@ -3247,7 +3448,7 @@ Saving also changes song.ini:
     <comment>Settings: search words for Judge accents and ghosts, separated by semicolons.</comment>
   </data>
   <data name="GuitarRecordStyleLabel" xml:space="preserve">
-    <value>Guitar records by</value>
+    <value>Guitar Records By</value>
     <comment>Settings: how a guitar controller records notes in record mode.</comment>
   </data>
   <data name="GuitarRecordStyleDescription" xml:space="preserve">
@@ -3263,11 +3464,59 @@ Saving also changes song.ini:
     <comment>Settings: a guitar controller records a note on each strum.</comment>
   </data>
   <data name="GuitarRecordStyleFrets" xml:space="preserve">
-    <value>Pressing frets</value>
+    <value>Pressing Frets</value>
     <comment>Settings: a guitar controller records a note on each fret pressed.</comment>
   </data>
+  <data name="PlaybackCountdownLabel" xml:space="preserve">
+    <value>Count Down Before Starting</value>
+    <comment>Settings: whether record mode and playtest count 3, 2, 1 before the song starts.</comment>
+  </data>
+  <data name="PlaybackCountdownDescription" xml:space="preserve">
+    <value>Counts 3, 2, 1 before the song starts when you record or playtest, so you can get ready. Playing the song normally starts at once.</value>
+    <comment>Settings: what Count down before starting does.</comment>
+  </data>
+  <data name="PlaybackCountdownKeywords" xml:space="preserve">
+    <value>countdown;count in;count down;record;playtest;play;ready;delay</value>
+    <comment>Settings: search words for Count down before starting, separated by semicolons.</comment>
+  </data>
+  <data name="PlaybackCountdownOff" xml:space="preserve">
+    <value>Never</value>
+    <comment>Settings: no countdown before the song starts.</comment>
+  </data>
+  <data name="PlaybackCountdownRecord" xml:space="preserve">
+    <value>When Recording</value>
+    <comment>Settings: a countdown before a pass of record mode starts.</comment>
+  </data>
+  <data name="PlaybackCountdownPlay" xml:space="preserve">
+    <value>When Playtesting</value>
+    <comment>Settings: a countdown before a playtest, an instrument playing the chart, starts.</comment>
+  </data>
+  <data name="PlaybackCountdownBoth" xml:space="preserve">
+    <value>When Recording and Playtesting</value>
+    <comment>Settings: a countdown before record mode or a playtest starts.</comment>
+  </data>
+  <data name="CountdownSecondsLabel" xml:space="preserve">
+    <value>Countdown Length (Seconds)</value>
+    <comment>Settings: how many seconds the countdown before the song starts counts.</comment>
+  </data>
+  <data name="CountdownSecondsDescription" xml:space="preserve">
+    <value>How many seconds the countdown counts before recording or playtesting starts the song, from 1 to 10.</value>
+    <comment>Settings: what Countdown length does.</comment>
+  </data>
+  <data name="CountdownSecondsKeywords" xml:space="preserve">
+    <value>countdown;count in;seconds;length;duration;delay;timer</value>
+    <comment>Settings: search words for Countdown length, separated by semicolons.</comment>
+  </data>
+  <data name="CountdownMessageFormat" xml:space="preserve">
+    <value>Starting in {0}… Press {1} or {2} to cancel.</value>
+    <comment>Message bar: the song starts after the countdown. {0} is the seconds left, {1} the key that plays and pauses, {2} the key that cancels.</comment>
+  </data>
+  <data name="CountdownCancelled" xml:space="preserve">
+    <value>Countdown cancelled.</value>
+    <comment>Message bar: the countdown before the song starts was stopped.</comment>
+  </data>
   <data name="RecordDynamicsLabel" xml:space="preserve">
-    <value>Dynamics from velocity</value>
+    <value>Dynamics from Velocity</value>
     <comment>Settings: whether a MIDI kit records accents and ghosts by how hard it is hit.</comment>
   </data>
   <data name="RecordDynamicsDescription" xml:space="preserve">
@@ -3291,7 +3540,7 @@ Saving also changes song.ini:
     <comment>The transport bar: the button that lists what the playtest found.</comment>
   </data>
   <data name="PlaytestProblemsToolTip" xml:space="preserve">
-    <value>Notes missed, overstrums, overhits and dropped sustains, over every pass (N, Shift+N)</value>
+    <value>Notes missed, overstrums, overhits and dropped sustains, over every pass</value>
     <comment>The Problems button's tooltip.</comment>
   </data>
   <data name="PlaytestProblemMiss" xml:space="preserve">
@@ -3503,7 +3752,7 @@ Saving also changes song.ini:
     <comment>The Input devices window: keeps the control where it is.</comment>
   </data>
   <data name="InputKeyReserved" xml:space="preserve">
-    <value>Space, Esc, P and N are the editor's, and can't be bound.</value>
+    <value>That key is reserved for the editor's play, playtest and cancel keys, and can't be bound.</value>
     <comment>The Input devices window: a reserved key was pressed while binding.</comment>
   </data>
   <data name="InputCalibrationAlreadyOpen" xml:space="preserve">
@@ -3651,11 +3900,11 @@ Saving also changes song.ini:
     <comment>The transport bar: the button that turns playtest on and off, for screen readers.</comment>
   </data>
   <data name="PlaytestStartToolTip" xml:space="preserve">
-    <value>Playtest (P): playing the song plays the focused lane with keyboard and controllers, judged as the games judge it</value>
+    <value>Playtest: playing the song plays the focused lane with keyboard and controllers, judged as the games judge it</value>
     <comment>The Playtest button's tooltip while playtest is off.</comment>
   </data>
   <data name="PlaytestStopToolTip" xml:space="preserve">
-    <value>Playtest is on (P): playing the song playtests the focused lane. Click to turn it off.</value>
+    <value>Playtest is on: playing the song playtests the focused lane. Click to turn it off</value>
     <comment>The Playtest button's tooltip while playtest is on.</comment>
   </data>
   <data name="PlaytestOnFormat" xml:space="preserve">
@@ -3790,10 +4039,6 @@ Saving also changes song.ini:
     <value>Highway</value>
     <comment>The Preview tab's section with the highway.</comment>
   </data>
-  <data name="PreviewLookAheadFormat" xml:space="preserve">
-    <value>{0:0.0} s</value>
-    <comment>How far ahead the preview looks, e.g. "1.4 s".</comment>
-  </data>
   <data name="DifficultyRatingSection" xml:space="preserve">
     <value>Rating</value>
     <comment>The Difficulty tab's section with the rank and the spider graph.</comment>
@@ -3805,5 +4050,518 @@ Saving also changes song.ini:
   <data name="SectionsMoveToPlayheadToolTip" xml:space="preserve">
     <value>Move this event to the playhead, on the grid</value>
     <comment>A Sections row's Move to the playhead button.</comment>
+  </data>
+  <data name="GenerateModeReplace" xml:space="preserve">
+    <value>Replace</value>
+    <comment>What a generator does with the phrases a part already has: replaces them with the kept proposals.</comment>
+  </data>
+  <data name="GenerateModeAdd" xml:space="preserve">
+    <value>Add Alongside</value>
+    <comment>What a generator does with the phrases a part already has: keeps them and adds the kept proposals beside them.</comment>
+  </data>
+  <data name="GeneratePreviewAutomationName" xml:space="preserve">
+    <value>Highway preview</value>
+  </data>
+  <data name="GenerateTimelineAutomationName" xml:space="preserve">
+    <value>Song timeline</value>
+  </data>
+  <data name="GenerateRegionDetailFormat" xml:space="preserve">
+    <value>{0} notes – {1}</value>
+    <comment>A proposal's notes and length, e.g. "8 notes – 2.0 s".</comment>
+  </data>
+  <data name="GenerateExistingReplaced" xml:space="preserve">
+    <value>Will Be Replaced</value>
+  </data>
+  <data name="GenerateExistingKept" xml:space="preserve">
+    <value>Kept Alongside</value>
+  </data>
+  <data name="GenerateNoProposalsKept" xml:space="preserve">
+    <value>Keep at least one to apply.</value>
+  </data>
+  <data name="GenerateEmptyHint" xml:space="preserve">
+    <value>Change the options or mode, or select a span, then Regenerate.</value>
+  </data>
+  <data name="GeneratePreviewHeading" xml:space="preserve">
+    <value>Preview</value>
+    <comment>The generation window's preview controls.</comment>
+  </data>
+  <data name="GenerateLookAheadLabel" xml:space="preserve">
+    <value>Look Ahead</value>
+    <comment>How far ahead the generation window's highway shows.</comment>
+  </data>
+  <data name="GenerateLookAheadToolTip" xml:space="preserve">
+    <value>How far ahead of the strike line the highway shows; more makes longer proposals easier to draw.</value>
+  </data>
+  <data name="GenerateTimelineHeading" xml:space="preserve">
+    <value>Whole Song</value>
+    <comment>The generation window's whole-song timeline.</comment>
+  </data>
+  <data name="GenerateEmptyHeading" xml:space="preserve">
+    <value>Nothing to Propose</value>
+    <comment>The generation window's preview, when nothing could be proposed; the reason follows under it.</comment>
+  </data>
+  <data name="GenerateRegenerate" xml:space="preserve">
+    <value>Regenerate</value>
+    <comment>Works the plan out again with the options as they are now.</comment>
+  </data>
+  <data name="GenerateRegenerateToolTip" xml:space="preserve">
+    <value>Propose the plan again with these options</value>
+  </data>
+  <data name="GenerateRegenerateConfirm" xml:space="preserve">
+    <value>Replace the proposals as they are now?</value>
+    <comment>Shown when Regenerate would lose the kept or dropped proposals.</comment>
+  </data>
+  <data name="GenerateRegenerateConfirmYes" xml:space="preserve">
+    <value>Regenerate</value>
+  </data>
+  <data name="GenerateRegenerateConfirmNo" xml:space="preserve">
+    <value>Keep Them</value>
+  </data>
+  <data name="GenerateKeepAll" xml:space="preserve">
+    <value>Keep All</value>
+  </data>
+  <data name="GenerateDropAll" xml:space="preserve">
+    <value>Drop All</value>
+  </data>
+  <data name="GenerateKeepToolTip" xml:space="preserve">
+    <value>Keep This Proposal</value>
+  </data>
+  <data name="GenerateRegionJumpToolTip" xml:space="preserve">
+    <value>Jump to This Proposal</value>
+    <comment>Clicking a proposal in the generation window's list moves the playhead to it.</comment>
+  </data>
+  <data name="GeneratePreviousRegionToolTip" xml:space="preserve">
+    <value>Previous Proposal</value>
+  </data>
+  <data name="GenerateNextRegionToolTip" xml:space="preserve">
+    <value>Next Proposal</value>
+  </data>
+  <data name="GenerateFillsTitleFormat" xml:space="preserve">
+    <value>Generate Fills: {0}</value>
+    <comment>The Generate fills window's title. {0} is the part, e.g. Drums.</comment>
+  </data>
+  <data name="GenerateFillsApply" xml:space="preserve">
+    <value>Add Fills</value>
+    <comment>Applies the kept fills to the chart, as one step to undo.</comment>
+  </data>
+  <data name="GenerateFillsApplyToolTip" xml:space="preserve">
+    <value>Add the kept fills, as one step to undo</value>
+  </data>
+  <data name="GenerateFillsModeLabel" xml:space="preserve">
+    <value>Existing Fills</value>
+    <comment>What Generate fills does with the fills a part already has.</comment>
+  </data>
+  <data name="GenerateFillsRegionsHeading" xml:space="preserve">
+    <value>Fills</value>
+  </data>
+  <data name="GenerateFillsExistingHeading" xml:space="preserve">
+    <value>Existing Fills</value>
+  </data>
+  <data name="GenerateFillsRoleFormat" xml:space="preserve">
+    <value>{0} at {1}</value>
+    <comment>A fill's row: {0} is what it ends on, a crash or any note, and {1} is when, e.g. "Crash at 1:52".</comment>
+  </data>
+  <data name="GenerateFillsPlanSummaryFormat" xml:space="preserve">
+    <value>{0} of {1} Kept - {2} of Fills</value>
+    <comment>{0} is how many fills are kept, {1} how many there are, {2} how long they add up to, e.g. 0:08.</comment>
+  </data>
+  <data name="GenerateFillsNothingToApply" xml:space="preserve">
+    <value>No Fills to Add</value>
+    <comment>The Generate fills window's footer, in place of the kept/total summary when there are no fills.</comment>
+  </data>
+  <data name="GenerateFillsNoRegions" xml:space="preserve">
+    <value>No fills. Regenerate to propose some.</value>
+  </data>
+  <data name="GenerateFillsNoDrumNotes" xml:space="preserve">
+    <value>The drums have no notes to propose fills over.</value>
+  </data>
+  <data name="GenerateFillsTooFewStarPower" xml:space="preserve">
+    <value>Fills are proposed only after the second star power phrase ends, and the drums have fewer than two.</value>
+  </data>
+  <data name="GenerateFillsNoCrashSpot" xml:space="preserve">
+    <value>No fill fits: none ends on a crash on a measure's first beat that every difficulty with notes has a note on, after the second star power phrase and clear of star power, other fills and [coda].</value>
+  </data>
+  <data name="GenerateFillsNoNoteSpot" xml:space="preserve">
+    <value>No fill fits: none ends on a note on a measure's first beat that every difficulty with notes has, after the second star power phrase and clear of star power, other fills and [coda].</value>
+  </data>
+  <data name="KeyCategoryEditor" xml:space="preserve">
+    <value>Editor</value>
+    <comment>Heading in the keyboard shortcuts list over everything the editor's keys do; the headings below it nest under this one.</comment>
+  </data>
+  <data name="KeyCategoryNavigation" xml:space="preserve">
+    <value>Navigation</value>
+    <comment>Heading in the keyboard shortcuts list, under Editor, over going to a measure and finding passages.</comment>
+  </data>
+  <data name="KeyCategoryTools" xml:space="preserve">
+    <value>Tools</value>
+    <comment>Heading in the keyboard shortcuts list, under Editor, over the keys that pick an editing tool.</comment>
+  </data>
+  <data name="KeyCategoryPlaytest" xml:space="preserve">
+    <value>Playtest and Recording</value>
+    <comment>Heading in the keyboard shortcuts list, under Editor, over playtest and record mode.</comment>
+  </data>
+  <data name="KeyCategoryCursor" xml:space="preserve">
+    <value>Cursor</value>
+    <comment>Heading in the keyboard shortcuts list, under Editor, over the keys that move the cursor.</comment>
+  </data>
+  <data name="KeyCategorySelection" xml:space="preserve">
+    <value>Selection</value>
+    <comment>Heading in the keyboard shortcuts list, under Editor, over selecting and moving notes.</comment>
+  </data>
+  <data name="KeyCategoryNotes" xml:space="preserve">
+    <value>Notes</value>
+    <comment>Heading in the keyboard shortcuts list, under Editor, over placing notes and changing what they are.</comment>
+  </data>
+  <data name="KeyCategoryClipboard" xml:space="preserve">
+    <value>Clipboard</value>
+    <comment>Heading in the keyboard shortcuts list, under Editor, over cut, copy, paste and delete.</comment>
+  </data>
+  <data name="KeyCategoryLane" xml:space="preserve">
+    <value>Lane</value>
+    <comment>Heading in the keyboard shortcuts list, under Editor, over how a lane looks and listens: snap, look-ahead, audio.</comment>
+  </data>
+  <data name="KeyCategoryMouse" xml:space="preserve">
+    <value>Mouse</value>
+    <comment>Heading in the keyboard shortcuts list, under Editor, over what the mouse does with a key held. Not changeable.</comment>
+  </data>
+  <data name="KeyCategoryPreview" xml:space="preserve">
+    <value>Preview</value>
+    <comment>Heading in the keyboard shortcuts list over the keys of the Preview window.</comment>
+  </data>
+  <data name="KeyCategoryGeneratePhrases" xml:space="preserve">
+    <value>Generate Phrases</value>
+    <comment>Heading in the keyboard shortcuts list over the keys of the Generate star power and Generate fills window.</comment>
+  </data>
+  <data name="KeyActionNewChart" xml:space="preserve">
+    <value>New Chart</value>
+    <comment>Name of the New chart shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionOpenChart" xml:space="preserve">
+    <value>Open Song</value>
+    <comment>Name of the Open song shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionGoToMeasure" xml:space="preserve">
+    <value>Go to Measure</value>
+    <comment>Name of the Go to measure shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionFind" xml:space="preserve">
+    <value>Find Matching Passages</value>
+    <comment>Name of the Find matching passages shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionFindNext" xml:space="preserve">
+    <value>Next Match</value>
+    <comment>Name of the Next match shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionFindPrevious" xml:space="preserve">
+    <value>Previous Match</value>
+    <comment>Name of the Previous match shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionToolSelect" xml:space="preserve">
+    <value>Select Tool</value>
+    <comment>Name of the Select tool shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionToolPlace" xml:space="preserve">
+    <value>Place Tool</value>
+    <comment>Name of the Place tool shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionToolErase" xml:space="preserve">
+    <value>Erase Tool</value>
+    <comment>Name of the Erase tool shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionToolPhrase" xml:space="preserve">
+    <value>Phrase Tool</value>
+    <comment>Name of the Phrase tool shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionToolTempo" xml:space="preserve">
+    <value>Tempo Tool</value>
+    <comment>Name of the Tempo tool shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionToolSync" xml:space="preserve">
+    <value>Sync Tool</value>
+    <comment>Name of the Sync tool shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionLoopTool" xml:space="preserve">
+    <value>Hold Loop Tool</value>
+    <comment>Name of the Hold the Loop tool shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionPlaytestToggle" xml:space="preserve">
+    <value>Playtest</value>
+    <comment>Name of the Playtest shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionPlaytestNext" xml:space="preserve">
+    <value>Next Playtest Problem</value>
+    <comment>Name of the Next playtest problem shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionPlaytestPrevious" xml:space="preserve">
+    <value>Previous Playtest Problem</value>
+    <comment>Name of the Previous playtest problem shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionRecordToggle" xml:space="preserve">
+    <value>Record Mode</value>
+    <comment>Name of the Record mode shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionCursorUp" xml:space="preserve">
+    <value>Step Cursor Up</value>
+    <comment>Name of the Step cursor up shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionCursorDown" xml:space="preserve">
+    <value>Step Cursor Down</value>
+    <comment>Name of the Step cursor down shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionCursorLeft" xml:space="preserve">
+    <value>Step Cursor Left</value>
+    <comment>Name of the Step cursor left shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionCursorRight" xml:space="preserve">
+    <value>Step Cursor Right</value>
+    <comment>Name of the Step cursor right shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionSectionNext" xml:space="preserve">
+    <value>Next Section</value>
+    <comment>Name of the Next section shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionSectionPrevious" xml:space="preserve">
+    <value>Previous Section</value>
+    <comment>Name of the Previous section shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionTempoChangeNext" xml:space="preserve">
+    <value>Next Tempo or Time Signature Change</value>
+    <comment>Name of the Next tempo or time signature change shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionTempoChangePrevious" xml:space="preserve">
+    <value>Previous Tempo or Time Signature Change</value>
+    <comment>Name of the Previous tempo or time signature change shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionMeasureNext" xml:space="preserve">
+    <value>Next Measure</value>
+    <comment>Name of the Next measure shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionMeasurePrevious" xml:space="preserve">
+    <value>Previous Measure</value>
+    <comment>Name of the Previous measure shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionGoToStart" xml:space="preserve">
+    <value>Go to Start</value>
+    <comment>Name of the Go to the start shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionGoToEnd" xml:space="preserve">
+    <value>Go to End</value>
+    <comment>Name of the Go to the end shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionSelectionMoveUp" xml:space="preserve">
+    <value>Move Selection Up</value>
+    <comment>Name of the Move selection up shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionSelectionMoveDown" xml:space="preserve">
+    <value>Move Selection Down</value>
+    <comment>Name of the Move selection down shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionSelectionMoveLeft" xml:space="preserve">
+    <value>Move Selection Left</value>
+    <comment>Name of the Move selection left shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionSelectionMoveRight" xml:space="preserve">
+    <value>Move Selection Right</value>
+    <comment>Name of the Move selection right shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionSelectionShiftUp" xml:space="preserve">
+    <value>Shift Selection Up</value>
+    <comment>Name of the Shift selection up shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionSelectionShiftDown" xml:space="preserve">
+    <value>Shift Selection Down</value>
+    <comment>Name of the Shift selection down shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionSelectionShiftLeft" xml:space="preserve">
+    <value>Shift Selection Left</value>
+    <comment>Name of the Shift selection left shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionSelectionShiftRight" xml:space="preserve">
+    <value>Shift Selection Right</value>
+    <comment>Name of the Shift selection right shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionSelectAll" xml:space="preserve">
+    <value>Select All</value>
+    <comment>Name of the Select all shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionSelectSection" xml:space="preserve">
+    <value>Select Section at Cursor</value>
+    <comment>Name of the Select the section at the cursor shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionQuantize" xml:space="preserve">
+    <value>Quantize Selection</value>
+    <comment>Name of the Quantize selection shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionCut" xml:space="preserve">
+    <value>Cut</value>
+    <comment>Name of the Cut shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionCopy" xml:space="preserve">
+    <value>Copy</value>
+    <comment>Name of the Copy shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionPaste" xml:space="preserve">
+    <value>Paste</value>
+    <comment>Name of the Paste shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionPasteMerge" xml:space="preserve">
+    <value>Paste and Merge</value>
+    <comment>Name of the Paste and merge shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionDelete" xml:space="preserve">
+    <value>Delete</value>
+    <comment>Name of the Delete shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionCancel" xml:space="preserve">
+    <value>Cancel, Close, or Clear</value>
+    <comment>Name of the Cancel, close or clear shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionSnapCoarser" xml:space="preserve">
+    <value>Coarser Snap</value>
+    <comment>Name of the Coarser snap shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionSnapFiner" xml:space="preserve">
+    <value>Finer Snap</value>
+    <comment>Name of the Finer snap shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionLookAheadLess" xml:space="preserve">
+    <value>Look Less Far Ahead</value>
+    <comment>Name of the Look less far ahead shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionLookAheadMore" xml:space="preserve">
+    <value>Look Further Ahead</value>
+    <comment>Name of the Look further ahead shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionAudioBackdrop" xml:space="preserve">
+    <value>Waveform or Spectrogram</value>
+    <comment>Name of the Waveform or spectrogram shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionSnapToOnset" xml:space="preserve">
+    <value>Snap to Onset</value>
+    <comment>Name of the Snap to onset shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionNudgeToOnsets" xml:space="preserve">
+    <value>Nudge to Onsets</value>
+    <comment>Name of the Nudge to onsets shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionToggleView" xml:space="preserve">
+    <value>Highway or Timeline</value>
+    <comment>Name of the Highway or timeline shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionTapTempo" xml:space="preserve">
+    <value>Tap Tempo</value>
+    <comment>Name of the Tap tempo shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionNoteLane1" xml:space="preserve">
+    <value>Lane 1 Note</value>
+    <comment>Name of the Lane 1 note shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionNoteLane2" xml:space="preserve">
+    <value>Lane 2 Note</value>
+    <comment>Name of the Lane 2 note shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionNoteLane3" xml:space="preserve">
+    <value>Lane 3 Note</value>
+    <comment>Name of the Lane 3 note shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionNoteLane4" xml:space="preserve">
+    <value>Lane 4 Note</value>
+    <comment>Name of the Lane 4 note shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionNoteLane5" xml:space="preserve">
+    <value>Lane 5 Note</value>
+    <comment>Name of the Lane 5 note shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionNoteLane6" xml:space="preserve">
+    <value>Lane 6 Note</value>
+    <comment>Name of the Lane 6 note shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionNoteOpen" xml:space="preserve">
+    <value>Open Note or Kick</value>
+    <comment>Name of the Open note or kick shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionNoteDoubleKick" xml:space="preserve">
+    <value>Double Kick</value>
+    <comment>Name of the Double kick shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionNoteForceHopo" xml:space="preserve">
+    <value>Force HOPO</value>
+    <comment>Name of the Force HOPO shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionNoteForceStrum" xml:space="preserve">
+    <value>Force Strum</value>
+    <comment>Name of the Force strum shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionNoteTap" xml:space="preserve">
+    <value>Tap</value>
+    <comment>Name of the Tap shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionNoteCymbal" xml:space="preserve">
+    <value>Cymbal</value>
+    <comment>Name of the Cymbal shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionNoteAccent" xml:space="preserve">
+    <value>Accent</value>
+    <comment>Name of the Accent shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionNoteGhost" xml:space="preserve">
+    <value>Ghost</value>
+    <comment>Name of the Ghost shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionNoteStarPower" xml:space="preserve">
+    <value>Star Power</value>
+    <comment>Name of the Star power shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionDifficultyEasy" xml:space="preserve">
+    <value>Show Easy</value>
+    <comment>Name of the Show Easy shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionDifficultyMedium" xml:space="preserve">
+    <value>Show Medium</value>
+    <comment>Name of the Show Medium shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionDifficultyHard" xml:space="preserve">
+    <value>Show Hard</value>
+    <comment>Name of the Show Hard shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionDifficultyExpert" xml:space="preserve">
+    <value>Show Expert</value>
+    <comment>Name of the Show Expert shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionMouseScroll" xml:space="preserve">
+    <value>Move Cursor One Grid Step</value>
+    <comment>Name of the Move the cursor a grid step shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionMouseFastScroll" xml:space="preserve">
+    <value>Move Cursor Four Grid Steps</value>
+    <comment>Name of the Move the cursor four grid steps shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionMouseZoom" xml:space="preserve">
+    <value>Change Look-Ahead</value>
+    <comment>Name of the Change the look-ahead shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionMouseSync" xml:space="preserve">
+    <value>Use Sync Tool While Held</value>
+    <comment>Name of the Use the Sync tool while held shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionPreviewFullScreen" xml:space="preserve">
+    <value>Full Screen</value>
+    <comment>Name of the Full screen shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionPreviewExitFullScreen" xml:space="preserve">
+    <value>Leave Full Screen</value>
+    <comment>Name of the Leave full screen shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionPreviousRegion" xml:space="preserve">
+    <value>Previous Region</value>
+    <comment>Name of the Previous region shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionNextRegion" xml:space="preserve">
+    <value>Next Region</value>
+    <comment>Name of the Next region shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionApplyPhrases" xml:space="preserve">
+    <value>Apply</value>
+    <comment>Name of the Apply shortcut, in the keyboard shortcuts list.</comment>
   </data>
 </root>

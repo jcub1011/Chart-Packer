@@ -161,10 +161,50 @@ public sealed partial class EditorTools
     }
 
     /// <summary>
-    /// Drags out a synchronized region on the pressed lane's track, both ends on the grid (the Sync tool). Once it's drawn,
-    /// the tool picked before Sync comes back; when it's refused, Sync stays, to draw another. A click draws nothing.
+    /// Where a synchronized region's end dragged to <paramref name="pointer"/> goes, the other end at
+    /// <paramref name="fixedEnd"/>, and the region reaching one after it (<paramref name="after"/>) or one before it: to
+    /// the grid, or to exactly a 32nd note's length (<see cref="SyncRegion.MinLength"/>) when the pointer is nearer that,
+    /// or has crossed it, so the shortest region is one 32nd note however the pointer moves. Never before the start.
     /// </summary>
-    private sealed class SyncGesture(EditorTools tools, ChartPoint pressed) : Gesture(tools)
+    private long SyncEdgeAt(double pointer, long fixedEnd, bool after) =>
+        EdgeAt(pointer, fixedEnd, after, SyncRegion.MinLength(Chart.Resolution));
+
+    /// <summary>
+    /// Where the loop region's end dragged to <paramref name="pointer"/> goes, as <see cref="SyncEdgeAt"/> has a
+    /// synchronized region's: a loop is never shorter than a 32nd note either, nor before the start.
+    /// </summary>
+    private long LoopEdgeAt(double pointer, double fixedEnd, bool after) =>
+        EdgeAt(pointer, fixedEnd, after, LoopMinLength);
+
+    /// <summary>How short the loop region may be: one 32nd note's worth of ticks, as a synchronized region is.</summary>
+    private long LoopMinLength => SyncRegion.MinLength(Chart.Resolution);
+
+    /// <summary>
+    /// Where an end dragged to <paramref name="pointer"/> goes, the other end at <paramref name="fixedEnd"/>, and the
+    /// span reaching one after it (<paramref name="after"/>) or one before it: to the grid, or to exactly
+    /// <paramref name="min"/> ticks from the other end when the pointer is nearer that, or has crossed it, so the
+    /// shortest span is <paramref name="min"/> ticks however the pointer moves. Never before the start.
+    /// </summary>
+    private long EdgeAt(double pointer, double fixedEnd, bool after, long min)
+    {
+        double limit = Math.Max(0, after ? fixedEnd + min : fixedEnd - min);
+        long limited = after ? (long)Math.Ceiling(limit) : (long)Math.Floor(limit);
+        if (after ? pointer <= limit : pointer >= limit)
+            return limited;
+
+        // The minimum is a step of its own, which the end goes to when the pointer is nearer it than the grid's step.
+        long at = Snap.Nearest(pointer, Map);
+        at = after ? Math.Max(at, limited) : Math.Min(at, limited);
+        return Math.Abs(pointer - limit) < Math.Abs(pointer - at) ? limited : at;
+    }
+
+    /// <summary>
+    /// Drags out a synchronized region on the pressed lane's track, both ends on the grid (the Sync tool), or with Ctrl
+    /// + Shift held, which picks the tool up for as long as they're held. Once it's drawn, the tool picked before Sync
+    /// comes back; a click draws nothing. Pressed on a passage synced with the region, a click makes that passage the
+    /// region's source instead (a drag there draws a new region).
+    /// </summary>
+    private sealed class SyncGesture(EditorTools tools, ChartPoint pressed, long? clickedMatch = null) : Gesture(tools)
     {
         private bool _moved;
 
@@ -173,10 +213,15 @@ public sealed partial class EditorTools
             _moved |= Math.Abs(point.Tick - pressed.Tick) > pressed.Tolerance;
             if (!_moved)
                 return;
-            var snap = Tools.Snap;
-            long a = snap.Nearest(Math.Max(0, pressed.Tick), Tools.Map);
-            long b = snap.Nearest(Math.Max(0, point.Tick), Tools.Map);
-            Session.Sync.Draft = a == b ? null : (pressed.Track, Math.Min(a, b), Math.Max(a, b));
+            long a = Tools.Snap.Nearest(Math.Max(0, pressed.Tick), Tools.Map);
+            long b = Tools.SyncEdgeAt(point.Tick, a, after: point.Tick >= pressed.Tick);
+            if (a == b)
+            {
+                Session.Sync.Draft = null;
+                return;
+            }
+
+            Session.Sync.Draft = (pressed.Track, Math.Min(a, b), Math.Max(a, b));
         }
 
         public override void Release(ChartPoint point)
@@ -184,10 +229,286 @@ public sealed partial class EditorTools
             Drag(point);
             var draft = Session.Sync.Draft;
             Session.Sync.Draft = null;
-            if (draft is var (track, from, to) && Session.Sync.Define(track, from, to))
-                Session.Tool = Session.ToolBeforeSync;
+            if (draft is var (track, from, to))
+            {
+                if (Session.Sync.Define(track, from, to) && Session.Tool == EditorTool.Sync)
+                    Session.Tool = Session.ToolBeforeSync;
+            }
+            else if (clickedMatch is { } start)
+            {
+                Session.Sync.MakeSource(start);
+            }
         }
 
         public override void Cancel() => Session.Sync.Draft = null;
+    }
+
+    /// <summary>
+    /// Drags the synchronized region along time, by its body, both ends keeping their distance on the grid. The
+    /// passages matching it are found again where it lands. Nothing moves until the pointer has, so a click only
+    /// picks the region up.
+    /// </summary>
+    private sealed class SyncMoveGesture(EditorTools tools, ChartPoint pressed) : Gesture(tools)
+    {
+        private readonly (long From, long To) _span = tools._session.Sync.Span!.Value;
+
+        // The span last dragged to, so one the pointer hasn't left isn't made again.
+        private (long From, long To)? _dragged;
+        private bool _moved;
+
+        public override void Drag(ChartPoint point)
+        {
+            _moved |= Math.Abs(point.Tick - pressed.Tick) > pressed.Tolerance;
+            if (!_moved)
+                return;
+            long length = _span.To - _span.From;
+            long from = Math.Max(0, Tools.Snap.Nearest(_span.From + (point.Tick - pressed.Tick), Tools.Map));
+            if (_dragged == (from, from + length))
+                return;
+            _dragged = (from, from + length);
+            Session.Sync.DragTo(from, from + length);
+        }
+
+        public override void Release(ChartPoint point)
+        {
+            Drag(point);
+            if (_moved && Session.Sync.Span is var (from, to))
+                Session.Sync.Redefine(from, to);
+        }
+
+        public override void Cancel()
+        {
+            if (_moved)
+                Session.Sync.DragTo(_span.From, _span.To);
+        }
+    }
+
+    /// <summary>
+    /// Drags one end of the synchronized region to the grid, the other staying where it is. It never crosses the other
+    /// end, and is never shorter than a 32nd note, which the end snaps down to. The passages matching it are found again
+    /// as it's resized.
+    /// </summary>
+    private sealed class SyncResizeGesture(EditorTools tools, ChartPoint pressed, bool start) : Gesture(tools)
+    {
+        private readonly (long From, long To) _span = tools._session.Sync.Span!.Value;
+
+        // The span last dragged to, so one the pointer hasn't left isn't made again.
+        private (long From, long To)? _dragged;
+        private bool _moved;
+
+        public override void Drag(ChartPoint point)
+        {
+            _moved |= Math.Abs(point.Tick - pressed.Tick) > pressed.Tolerance;
+            if (!_moved)
+                return;
+            long at = Tools.SyncEdgeAt(point.Tick, start ? _span.To : _span.From, after: !start);
+            (long From, long To) span = start ? (at, _span.To) : (_span.From, at);
+            if (span == _span || span == _dragged)
+                return;
+            _dragged = span;
+            Session.Sync.DragTo(span.From, span.To);
+        }
+
+        public override void Release(ChartPoint point)
+        {
+            Drag(point);
+            if (_moved && Session.Sync.Span is var (from, to))
+                Session.Sync.Redefine(from, to);
+        }
+
+        public override void Cancel()
+        {
+            if (_moved)
+                Session.Sync.DragTo(_span.From, _span.To);
+        }
+    }
+
+    /// <summary>
+    /// Drags out the loop region along the song, both ends on the grid, with the Loop tool picked or L held (charter-spec
+    /// C10 item 2). Once it's drawn, the tool picked before Loop comes back; a click draws nothing.
+    /// </summary>
+    private sealed class LoopGesture(EditorTools tools, double tick, double tolerance) : Gesture(tools)
+    {
+        // The region it had before the drag, which is put back if the gesture is taken back.
+        private readonly (double Start, double End)? _before = tools._session.Loop?.Span;
+
+        // The span last dragged to, so one the pointer hasn't left isn't made again.
+        private (long From, long To)? _drawn;
+        private bool _moved;
+
+        public override void Drag(ChartPoint point) => DragTo(point.Tick);
+
+        public override void Drag(VocalPoint point) => DragTo(point.Tick);
+
+        public override void Release(ChartPoint point) => ReleaseAt(point.Tick);
+
+        public override void Release(VocalPoint point) => ReleaseAt(point.Tick);
+
+        public override void Cancel() => Restore();
+
+        private void DragTo(double pointer)
+        {
+            _moved |= Math.Abs(pointer - tick) > tolerance;
+            if (!_moved)
+                return;
+            long from = Tools.Snap.Nearest(Math.Max(0, tick), Tools.Map);
+            long to = Tools.LoopEdgeAt(pointer, from, after: pointer >= tick);
+            (long From, long To) span = (Math.Min(from, to), Math.Max(from, to));
+            if (span == _drawn)
+                return;
+            _drawn = span;
+            Session.Loop?.DragTo(Session.AudioAt(span.From), Session.AudioAt(span.To));
+        }
+
+        private void ReleaseAt(double pointer)
+        {
+            DragTo(pointer);
+            if (_drawn is not { } span)
+                return;
+            Session.DefineLoop(Session.AudioAt(span.From), Session.AudioAt(span.To));
+            if (Session.Tool == EditorTool.Loop)
+                Session.Tool = Session.ToolBeforeLoop;
+        }
+
+        // The region it had before, or none: the one drawn so far was only a preview, and looping was off without one.
+        private void Restore()
+        {
+            if (_before is { } span)
+                Session.Loop?.DragTo(span.Start, span.End);
+            else
+                Session.Loop?.Clear();
+        }
+    }
+
+    /// <summary>
+    /// Drags the loop region along time by its body, both ends keeping their distance on the grid (charter-spec C10 item
+    /// 2). Nothing moves until the pointer has, so a click only picks the region up.
+    /// </summary>
+    private sealed class LoopMoveGesture : Gesture
+    {
+        private readonly double _tick;
+        private readonly double _tolerance;
+        private readonly (double Start, double End) _span;
+
+        // Where the region starts, in ticks, as it's drawn rather than on the grid: it's only snapped once it's dragged.
+        private readonly double _from;
+        private readonly long _length;
+
+        // The span last dragged to, so one the pointer hasn't left isn't made again.
+        private (long From, long To)? _dragged;
+        private bool _moved;
+
+        public LoopMoveGesture(EditorTools tools, double tick, double tolerance)
+            : base(tools)
+        {
+            _tick = tick;
+            _tolerance = tolerance;
+            _span = tools._session.Loop!.Span!.Value;
+            _from = Session.TickAt(_span.Start);
+            _length = Math.Max(Tools.LoopMinLength, (long)Math.Round(Session.TickAt(_span.End) - _from));
+        }
+
+        public override void Drag(ChartPoint point) => DragTo(point.Tick);
+
+        public override void Drag(VocalPoint point) => DragTo(point.Tick);
+
+        public override void Release(ChartPoint point) => ReleaseAt(point.Tick);
+
+        public override void Release(VocalPoint point) => ReleaseAt(point.Tick);
+
+        public override void Cancel()
+        {
+            if (_moved)
+                Session.Loop?.DragTo(_span.Start, _span.End);
+        }
+
+        private void DragTo(double pointer)
+        {
+            _moved |= Math.Abs(pointer - _tick) > _tolerance;
+            if (!_moved)
+                return;
+            long from = Math.Max(0, Tools.Snap.Nearest(_from + (pointer - _tick), Tools.Map));
+            (long From, long To) span = (from, from + _length);
+            if (span == _dragged)
+                return;
+            _dragged = span;
+            Session.Loop?.DragTo(Session.AudioAt(span.From), Session.AudioAt(span.To));
+        }
+
+        private void ReleaseAt(double pointer)
+        {
+            if (!_moved)
+                return;
+            DragTo(pointer);
+            if (Session.Loop?.Span is { } span)
+                Session.DefineLoop(span.Start, span.End);
+        }
+    }
+
+    /// <summary>
+    /// Drags one end of the loop region to the grid, the other staying where it is (charter-spec C10 item 2). It never
+    /// crosses the other end, and is never shorter than a 32nd note, which the end snaps down to.
+    /// </summary>
+    private sealed class LoopResizeGesture : Gesture
+    {
+        private readonly double _tick;
+        private readonly double _tolerance;
+        private readonly (double Start, double End) _span;
+
+        // Its ends in ticks, as they're drawn rather than on the grid: only the end dragged is snapped.
+        private readonly double _from;
+        private readonly double _to;
+        private readonly bool _start;
+
+        // The span last dragged to, so one the pointer hasn't left isn't made again.
+        private (long From, long To)? _dragged;
+        private bool _moved;
+
+        public LoopResizeGesture(EditorTools tools, double tick, double tolerance, bool start)
+            : base(tools)
+        {
+            _tick = tick;
+            _tolerance = tolerance;
+            _start = start;
+            _span = tools._session.Loop!.Span!.Value;
+            _from = Session.TickAt(_span.Start);
+            _to = Session.TickAt(_span.End);
+        }
+
+        public override void Drag(ChartPoint point) => DragTo(point.Tick);
+
+        public override void Drag(VocalPoint point) => DragTo(point.Tick);
+
+        public override void Release(ChartPoint point) => ReleaseAt(point.Tick);
+
+        public override void Release(VocalPoint point) => ReleaseAt(point.Tick);
+
+        public override void Cancel()
+        {
+            if (_moved)
+                Session.Loop?.DragTo(_span.Start, _span.End);
+        }
+
+        private void DragTo(double pointer)
+        {
+            _moved |= Math.Abs(pointer - _tick) > _tolerance;
+            if (!_moved)
+                return;
+            long at = Tools.LoopEdgeAt(pointer, _start ? _to : _from, after: !_start);
+            (long From, long To) span = _start ? (at, (long)Math.Round(_to)) : ((long)Math.Round(_from), at);
+            if (span == _dragged || (!_start && span.To <= span.From) || (_start && span.From >= span.To))
+                return;
+            _dragged = span;
+            Session.Loop?.DragTo(Session.AudioAt(span.From), Session.AudioAt(span.To));
+        }
+
+        private void ReleaseAt(double pointer)
+        {
+            if (!_moved)
+                return;
+            DragTo(pointer);
+            if (Session.Loop?.Span is { } span)
+                Session.DefineLoop(span.Start, span.End);
+        }
     }
 }

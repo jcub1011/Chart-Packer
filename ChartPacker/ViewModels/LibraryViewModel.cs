@@ -43,9 +43,9 @@ namespace ChartPacker.ViewModels
 
     /// <summary>The left panel: a picked folder, the song sources found under it, and Pack/Unpack/Merge/Validate/Deduplicate.</summary>
     /// <remarks>
-    /// Scanning only happens on an explicit <see cref="RescanCommand"/>, or as the first step of
-    /// <see cref="DeduplicateCommand"/>. Picking a folder, changing
-    /// the depth or launching the app never scans; the list is flagged as out of date instead.
+    /// Scanning only happens on an explicit <see cref="RescanCommand"/>, as the first step of
+    /// <see cref="DeduplicateCommand"/>, or at launch when <see cref="ScanOnLaunch"/> is on (see <see cref="StartLaunchScan"/>).
+    /// Picking a folder or changing the depth never scans; the list is flagged as out of date instead.
     /// The same goes for a pack or unpack job, which changes what's on disk.
     /// <para>
     /// <see cref="Entries"/> is what the list shows: the scanned songs that pass <see cref="Filter"/>'s
@@ -404,6 +404,27 @@ namespace ChartPacker.ViewModels
             set => _settings.Settings.ScanParallelism = Math.Max(value, AppSettings.MinScanParallelism);
         }
 
+        /// <summary>Whether the app scans the remembered songs folder as it starts.</summary>
+        public bool ScanOnLaunch
+        {
+            get => _settings.Settings.ScanOnLaunch;
+            set => _settings.Settings.ScanOnLaunch = value;
+        }
+
+        /// <summary>Whether choosing a songs folder, with Browse or by dropping it on the window, scans it straight away.</summary>
+        public bool ScanOnFolderChange
+        {
+            get => _settings.Settings.ScanOnFolderChange;
+            set => _settings.Settings.ScanOnFolderChange = value;
+        }
+
+        /// <summary>Scans the remembered folder if <see cref="ScanOnLaunch"/> is on and there is one. Called once, as the app starts.</summary>
+        public void StartLaunchScan()
+        {
+            if (ScanOnLaunch && RescanCommand.CanExecute(null))
+                RescanCommand.Execute(null);
+        }
+
         /// <summary>Which copy the Deduplicate window keeps by default when a song is both a folder and a .sng.</summary>
         public DedupKindPreference DedupKeepPreference
         {
@@ -411,7 +432,8 @@ namespace ChartPacker.ViewModels
             set => _settings.Settings.DedupKeepPreference = value;
         }
 
-        private bool CanBrowse() => !Job.IsRunning;
+        /// <summary>Whether a folder can be chosen, by browsing or dropping one on the window: not while a job is running.</summary>
+        public bool CanBrowse() => !Job.IsRunning;
 
         /// <summary>The title bar's songs folder tooltip: what it does, or while a job runs, why it can't.</summary>
         public string SongsFolderToolTip => Job.IsRunning ? Strings.BrowseBusyToolTip : Strings.BrowseToolTip;
@@ -423,11 +445,33 @@ namespace ChartPacker.ViewModels
         private async Task BrowseAsync()
         {
             var path = await _folderPicker.PickFolderAsync(Strings.BrowseDialogTitle, FolderPath);
-            if (path is null)
+            if (path is null || !CanBrowse())
                 return;
 
+            SetFolderAndMaybeScan(path);
+        }
+
+        private void SetFolder(string path)
+        {
             FolderPath = path;
             _settings.Settings.LastFolder = path;
+        }
+
+        /// <summary>Sets the library to <paramref name="path"/>, then scans it when <see cref="ScanOnFolderChange"/> is on and a scan can start.</summary>
+        private void SetFolderAndMaybeScan(string path)
+        {
+            SetFolder(path);
+            if (ScanOnFolderChange && RescanCommand.CanExecute(null))
+                RescanCommand.Execute(null);
+        }
+
+        /// <summary>Sets the library to <paramref name="path"/> as a folder dropped on the window does, and scans it when <see cref="ScanOnFolderChange"/> is on.</summary>
+        public void OpenDroppedFolder(string path)
+        {
+            if (!CanBrowse() || !Directory.Exists(path))
+                return;
+
+            SetFolderAndMaybeScan(path);
         }
 
         private bool CanRescan() => FolderPath is not null && !Job.IsRunning;
@@ -932,7 +976,12 @@ namespace ChartPacker.ViewModels
 
             // Drafts for songs that were deleted or moved can never be saved.
             if (completed)
+            {
                 _drafts.DiscardMissing();
+
+                // Songs without unsaved changes aren't held, so may have changed since their drafts' earlier states.
+                _drafts.ResetEmptyHistories();
+            }
 
             IsSearching = false;
             IsScanning = false;

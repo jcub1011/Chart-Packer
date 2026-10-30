@@ -71,6 +71,7 @@ public sealed class UserConfigGuard
         [
             UserConfigPaths.SettingsFile, UserConfigPaths.BuilderSettingsFile, UserConfigPaths.ReductionRulesFile,
             UserConfigPaths.AudioLatencyFile, UserConfigPaths.InputBindingsFile, UserConfigPaths.UpdateSettingsFile,
+            UserConfigPaths.KeybindsFile,
         ];
         string recovery = Path.GetRelativePath(folder, UserConfigPaths.RecoveryFolder) + Path.DirectorySeparatorChar;
         return files.Any(f => string.Equals(Path.GetRelativePath(folder, f), path, StringComparison.OrdinalIgnoreCase))

@@ -29,6 +29,7 @@ namespace ChartBuilder.Views
         {
             InitializeComponent();
             AddHandler(KeyDownEvent, FieldKeys.OnKeyDown);
+            AddHandler(KeyDownEvent, OnFieldEscape, RoutingStrategies.Tunnel);
             AddHandler(ContextRequestedEvent, OnRowContextRequested, RoutingStrategies.Tunnel);
         }
 
@@ -118,6 +119,25 @@ namespace ChartBuilder.Views
                 e.Cancel = true;
         }
 
+        // Escape in the BPM or tick box takes back what's typed, as a field's Escape does. Their text is the box's own, so
+        // the row is filled again from the chart rather than a binding put back.
+        private void OnFieldEscape(object? sender, KeyEventArgs e)
+        {
+            if (e.Key != Key.Escape || e.Source is not Visual source
+                || source.FindAncestorOfType<NumericUpDown>(includeSelf: true) is not { DataContext: TempoChangeItem item } box)
+            {
+                return;
+            }
+
+            if (box.Name == "BpmBox")
+                _viewModel?.RevertBpm(item);
+            else if (box.Name == "TickBox")
+                _viewModel?.RevertTick(item);
+            else
+                return;
+            e.Handled = true;
+        }
+
         // A change added to be typed into: brought into view, as the list only makes the rows on screen, and once it's laid
         // out, its BPM is selected to type over, or its time signature's editor opened on its beats.
         private void OnEditRequested(object? sender, TempoFieldRequest request) => Dispatcher.UIThread.Post(
@@ -132,11 +152,19 @@ namespace ChartBuilder.Views
 
                         if (request.Field == TempoField.Bpm)
                         {
-                            if (row.GetVisualDescendants().OfType<TextBox>().FirstOrDefault(b => b.Name == "BpmBox") is not { } box)
+                            if (row.GetVisualDescendants().OfType<NumericUpDown>().FirstOrDefault(b => b.Name == "BpmBox") is not { } box)
                                 return;
                             box.BringIntoView();
-                            box.Focus();
-                            box.SelectAll();
+                            if (box.GetVisualDescendants().OfType<TextBox>().FirstOrDefault() is { } text)
+                            {
+                                text.Focus();
+                                text.SelectAll();
+                            }
+                            else
+                            {
+                                box.Focus();
+                            }
+
                             return;
                         }
 

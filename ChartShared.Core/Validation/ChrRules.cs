@@ -53,7 +53,10 @@ public static class ChrRules
     /// <summary>A sustain runs into the next note on its lane, so the games cut it short.</summary>
     public const string Chr020 = "CHR020";
 
-    /// <summary>A sustain is shorter than the sustain cutoff, so the games read it as a plain note.</summary>
+    /// <summary>
+    /// A sustain is shorter than the sustain cutoff, so the games read it as a plain note. Retired: Chart Builder derives
+    /// the cutoff from the chart, so the rule no longer runs.
+    /// </summary>
     public const string Chr021 = "CHR021";
 
     /// <summary>An open note in a chord with frets.</summary>
@@ -115,7 +118,7 @@ public static class ChrRules
     /// <summary>A star power phrase or solo with no notes in it on one charted difficulty, though another has some.</summary>
     public const string Chr065 = "CHR065";
 
-    /// <summary>A 5-fret or keys part with notes has no star power phrases.</summary>
+    /// <summary>A part star power can be generated for has notes but no star power phrases.</summary>
     public const string Chr066 = "CHR066";
 
     /// <summary>A part is in the chart but has no notes on any difficulty.</summary>

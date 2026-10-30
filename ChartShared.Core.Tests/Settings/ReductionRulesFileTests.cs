@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using ChartShared.Core.Charting.Authoring;
 using ChartShared.Core.Charts;
 using ChartShared.Core.Settings;
@@ -122,5 +123,39 @@ public sealed class ReductionRulesFileTests
         Assert.IsTrue(mine.Reset());
 
         Assert.AreEqual(ReductionDefaults.Shipped.FiveFretHard, new ReductionRulesFile(_path, null).Load().FiveFretHard);
+    }
+
+    [TestMethod]
+    public void ASaveStampsTheSchemaVersion()
+    {
+        var file = new ReductionRulesFile(_path, null);
+        var rules = file.Load();
+        Assert.IsTrue(file.Save(rules));
+
+        Assert.AreEqual(ReductionRulesFile.SchemaVersion, (int)JsonNode.Parse(File.ReadAllText(_path))!["SchemaVersion"]!);
+    }
+
+    [TestMethod]
+    public void ALegacyFileIsStampedByTheNextSave()
+    {
+        File.WriteAllText(_path, """{ "FiveFretHard": { "MaxChordSize": 2, "HighestLane": 4, "ThinningDivision": 4 } }""");
+
+        var file = new ReductionRulesFile(_path, null);
+        var rules = file.Load();
+        Assert.IsTrue(file.Save(rules));
+
+        Assert.AreEqual(ReductionRulesFile.SchemaVersion, (int)JsonNode.Parse(File.ReadAllText(_path))!["SchemaVersion"]!);
+    }
+
+    [TestMethod]
+    public void AFileFromANewerBuildIsLeftUntouched()
+    {
+        const string newer = """{ "SchemaVersion": 7, "FiveFretHard": { "MaxChordSize": 2, "HighestLane": 4, "ThinningDivision": 4 } }""";
+        File.WriteAllText(_path, newer);
+
+        var file = new ReductionRulesFile(_path, null);
+        Assert.IsFalse(file.Reset());
+
+        Assert.AreEqual(newer, File.ReadAllText(_path));
     }
 }

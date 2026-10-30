@@ -406,7 +406,7 @@ public static class MidiChartLoader
                 {
                     var note = gem.Note;
                     int lane = Cover(opens, note.Start) ? ChartNote.OpenLane : gem.Lane;
-                    if (!track.Notes.Add(new EditableNote(note.Start, note.End - note.Start, lane)))
+                    if (!track.Notes.Add(new EditableNote(note.Start, EditableNote.NormalizeSustain(note.End - note.Start), lane)))
                         Issue(ChartLoadIssueKind.DuplicateOpen, difficulty, note.Start, note.Pitch);
                     else if (lane == ChartNote.OpenLane && Kind == ChartInstrumentKind.FiveFret)
                         _part.EnhancedOpens = true; // Opens are written below green, which needs the event.

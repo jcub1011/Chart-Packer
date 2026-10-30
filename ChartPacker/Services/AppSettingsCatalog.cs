@@ -4,6 +4,7 @@ using System.Linq;
 using ChartPacker.Resources;
 using ChartPacker.ViewModels;
 using ChartShared.Audio.Waveforms;
+using ChartShared.Core.Charting;
 using ChartShared.Core.Dedup;
 using ChartShared.Core.Jobs;
 using ChartShared.Core.Settings;
@@ -32,23 +33,45 @@ namespace ChartPacker.Services
             SettingsService settings,
             Action calibrate)
         {
-            var libraryCategory = new SettingCategory("library", Strings.SettingsCategoryLibrary);
+            var libraryCategory = new SettingCategory("library", Strings.SettingsCategoryLibrary, iconKey: "InputFolderStroke");
             var scanning = new SettingCategory("library.scanning", Strings.SettingsCategoryScanning, libraryCategory);
             var duplicates = new SettingCategory("library.dedup", Strings.SettingsCategoryDuplicates, libraryCategory);
-            var output = new SettingCategory("output", Strings.SettingsCategoryOutput);
+            var output = new SettingCategory("output", Strings.SettingsCategoryOutput, iconKey: "OutputFolderStroke");
             var packing = new SettingCategory("output.packing", Strings.SettingsCategoryPacking, output);
             var downloadsCategory = new SettingCategory("output.downloads", Strings.SettingsCategoryDownloads, output);
-            var playback = new SettingCategory("playback", Strings.SettingsCategoryPlayback);
+            var playback = new SettingCategory("playback", Strings.SettingsCategoryPlayback, iconKey: "VolumeStroke");
             var audio = new SettingCategory("playback.audio", Strings.SettingsCategoryAudio, playback);
             var visualizers = new SettingCategory("playback.visualizers", Strings.SettingsCategoryVisualizers, playback);
             var scrubbing = new SettingCategory("playback.scrubbing", Strings.SettingsCategoryScrubbing, playback);
-            var general = new SettingCategory("general", SharedStrings.SettingsCategoryGeneral);
+            var general = new SettingCategory("general", SharedStrings.SettingsCategoryGeneral, iconKey: "SettingsStroke");
             var appearance = new SettingCategory("general.appearance", Strings.SettingsCategoryAppearance, general);
             var logging = new SettingCategory("general.logging", SharedStrings.SettingsCategoryLogging, general);
 
             return new SettingsCatalog(
                 [libraryCategory, scanning, duplicates, output, packing, downloadsCategory, playback, audio, visualizers, scrubbing, general, appearance, logging],
                 [
+                    new ToggleSetting
+                    {
+                        Id = "library.scanOnLaunch",
+                        Category = scanning,
+                        Label = Strings.ScanOnLaunchLabel,
+                        Description = Strings.ScanOnLaunchDescription,
+                        Keywords = SettingKeywords.Split(Strings.ScanOnLaunchKeywords),
+                        DefaultValue = AppSettings.DefaultScanOnLaunch,
+                        Get = () => library.ScanOnLaunch,
+                        Set = scan => library.ScanOnLaunch = scan,
+                    },
+                    new ToggleSetting
+                    {
+                        Id = "library.scanOnFolderChange",
+                        Category = scanning,
+                        Label = Strings.ScanOnFolderChangeLabel,
+                        Description = Strings.ScanOnFolderChangeDescription,
+                        Keywords = SettingKeywords.Split(Strings.ScanOnFolderChangeKeywords),
+                        DefaultValue = AppSettings.DefaultScanOnFolderChange,
+                        Get = () => library.ScanOnFolderChange,
+                        Set = scan => library.ScanOnFolderChange = scan,
+                    },
                     new IntegerSetting
                     {
                         Id = "library.scanDepth",
@@ -280,20 +303,16 @@ namespace ChartPacker.Services
                         Get = () => highway.Placement,
                         Set = placement => highway.Placement = placement,
                     },
-                    new RangeSetting
+                    new LookAheadSetting
                     {
-                        Id = "playback.highwayNoteSpeed",
+                        Id = "playback.highwayLookAhead",
                         Category = visualizers,
-                        Label = Strings.HighwayNoteSpeedLabel,
-                        Description = Strings.HighwayNoteSpeedDescription,
-                        Keywords = SettingKeywords.Split(Strings.HighwayNoteSpeedKeywords),
-                        DefaultValue = AppSettings.DefaultHighwayNoteSpeed,
-                        Minimum = AppSettings.MinHighwayNoteSpeed,
-                        Maximum = AppSettings.MaxHighwayNoteSpeed,
-                        SmallChange = 0.1,
-                        Format = speed => speed.ToString("0.0", CultureInfo.CurrentCulture) + "×",
-                        Get = () => highway.NoteSpeed,
-                        Set = speed => highway.NoteSpeed = speed,
+                        Label = Strings.HighwayLookAheadLabel,
+                        Description = Strings.HighwayLookAheadDescription,
+                        Keywords = SettingKeywords.Split(Strings.HighwayLookAheadKeywords),
+                        DefaultValue = AppSettings.DefaultHighwayLookAhead,
+                        Get = () => highway.LookAhead,
+                        Set = seconds => highway.LookAhead = seconds,
                     },
                     new ChoiceSetting<ScrubStep>
                     {

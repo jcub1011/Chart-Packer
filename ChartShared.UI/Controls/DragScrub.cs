@@ -18,9 +18,13 @@ namespace ChartShared.UI.Controls
     /// steps, Ctrl a tenth of one. The pointer shows a sideways arrow over the box to say so.
     /// </summary>
     /// <remarks>
-    /// <para>A click without a drag edits the text as usual, and while the box is being typed in it doesn't drag
-    /// at all. Enter keeps what was typed and stops editing: focus moves to the nearest focusable
-    /// ancestor, so a box in a flyout can be left without closing the flyout.</para>
+    /// <para>A click without a drag edits the text as usual, selecting the value as a number box does, and a sideways drag
+    /// scrubs it once it passes the threshold, whether or not it was being typed in. Enter keeps what was typed and stops
+    /// editing: focus moves to the nearest focusable ancestor, so a box in a flyout can be left without closing the
+    /// flyout.</para>
+    /// <para>The press is taken whether or not the box is being typed in: a number box's text box takes a press it sees,
+    /// selecting its value and capturing the pointer — which the box may then hand to its spinner — and the drag would
+    /// never begin.</para>
     /// <para>While it's typed in, Up and Down and the mouse wheel step the value by its increment, as the box does by
     /// itself; with Shift they step ten times as far. Ctrl does nothing to them: they step in whole increments. Over a
     /// box that isn't being typed in, the wheel scrolls what the box is in, so scrolling past it changes nothing.</para>
@@ -229,12 +233,13 @@ namespace ChartShared.UI.Controls
 
         private static void OnPressed(object? sender, PointerPressedEventArgs e)
         {
-            if (sender is not NumericUpDown box || !box.IsEffectivelyEnabled || box.IsKeyboardFocusWithin
+            if (sender is not NumericUpDown box || !box.IsEffectivelyEnabled || box.IsReadOnly
                 || !e.GetCurrentPoint(box).Properties.IsLeftButtonPressed)
                 return;
 
-            var start = e.GetPosition(box);
-            Drags.AddOrUpdate(box, new Drag(e.Pointer, start, box.Value ?? 0, new FineDrag(box)));
+            // Taken whether or not the box has the keyboard, so its text box never takes the press first: a click's edit
+            // is given back when the pointer is let go without moving.
+            Drags.AddOrUpdate(box, new Drag(e.Pointer, e.GetPosition(box), box.Value ?? 0, new FineDrag(box)));
             e.Pointer.Capture(box);
             e.Handled = true;
         }
@@ -244,7 +249,6 @@ namespace ChartShared.UI.Controls
             if (sender is not NumericUpDown box || !Drags.TryGetValue(box, out var drag) || drag.Pointer != e.Pointer)
                 return;
 
-            e.Handled = true;
             var at = e.GetPosition(box);
             if (!drag.IsDragging)
             {
@@ -252,20 +256,24 @@ namespace ChartShared.UI.Controls
                     return;
 
                 drag.IsDragging = true;
+                if (e.Pointer.Captured != box)
+                    e.Pointer.Capture(box);
 
                 // From where it was pressed, so the first step counts the way past the threshold too.
                 drag.Fine.Start(drag.Start);
                 SetCursor(box, HeldPointer.CanHold ? HeldPointer.Hidden : Sideways);
             }
 
+            e.Handled = true;
             double dx = drag.Fine.Move(at).X;
             if (dx == 0)
                 return;
 
-            double perPixel = GetStep(box) * (e.KeyModifiers.HasFlag(KeyModifiers.Shift) ? ShiftFactor : e.KeyModifiers.HasFlag(KeyModifiers.Control) ? 0.1 : 1);
+            double step = GetStep(box);
+            double perPixel = step * (e.KeyModifiers.HasFlag(KeyModifiers.Shift) ? ShiftFactor : e.KeyModifiers.HasFlag(KeyModifiers.Control) ? 0.1 : 1);
             drag.Moved += dx * perPixel;
 
-            decimal wanted = Math.Round(drag.StartValue + (decimal)drag.Moved, MidpointRounding.AwayFromZero);
+            decimal wanted = ScrubMath.DraggedValue(drag.StartValue, drag.Moved, step);
             decimal value = Math.Clamp(wanted, box.Minimum, box.Maximum);
 
             // Held at a limit, the way back starts at once rather than after undoing the overshoot.

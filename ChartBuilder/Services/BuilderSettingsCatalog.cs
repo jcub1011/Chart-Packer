@@ -27,14 +27,14 @@ namespace ChartBuilder.Services
         /// <param name="resetBindings">Puts every instrument profile's bindings back to the keyboard's defaults.</param>
         public static SettingsCatalog Create(BuilderSettingsService settings, AudioLatencyService latency, Action calibrate, Action editReductionRules, Action openInputDevices, Action resetBindings)
         {
-            var charter = new SettingCategory("charter", Strings.SettingsCategoryCharter);
+            var charter = new SettingCategory("charter", Strings.SettingsCategoryCharter, iconKey: "EditChartStroke");
             var newCharts = new SettingCategory("charter.newCharts", Strings.SettingsCategoryNewCharts, charter);
             var editing = new SettingCategory("charter.editing", Strings.SettingsCategoryEditing, charter);
-            var playback = new SettingCategory("playback", Strings.SettingsCategoryPlayback);
+            var playback = new SettingCategory("playback", Strings.SettingsCategoryPlayback, iconKey: "VolumeStroke");
             var audio = new SettingCategory("playback.audio", Strings.SettingsCategoryAudio, playback);
             var visualizers = new SettingCategory("playback.visualizers", Strings.SettingsCategoryVisualizers, playback);
-            var input = new SettingCategory("input", Strings.SettingsCategoryInput);
-            var general = new SettingCategory("general", SharedStrings.SettingsCategoryGeneral);
+            var input = new SettingCategory("input", Strings.SettingsCategoryInput, iconKey: "MidiStroke");
+            var general = new SettingCategory("general", SharedStrings.SettingsCategoryGeneral, iconKey: "SettingsStroke");
             var logging = new SettingCategory("general.logging", SharedStrings.SettingsCategoryLogging, general);
 
             return new SettingsCatalog(
@@ -117,6 +117,37 @@ namespace ChartBuilder.Services
                         ],
                         Get = () => settings.Settings.GuitarRecordStyle,
                         Set = style => settings.Settings.GuitarRecordStyle = style,
+                    },
+                    new ChoiceSetting<PlaybackCountdownMode>
+                    {
+                        Id = "input.playbackCountdown",
+                        Category = input,
+                        Label = Strings.PlaybackCountdownLabel,
+                        Description = Strings.PlaybackCountdownDescription,
+                        Keywords = SettingKeywords.Split(Strings.PlaybackCountdownKeywords),
+                        DefaultValue = PlaybackCountdownMode.Both,
+                        Choices =
+                        [
+                            new SettingChoice<PlaybackCountdownMode>(PlaybackCountdownMode.Off, Strings.PlaybackCountdownOff),
+                            new SettingChoice<PlaybackCountdownMode>(PlaybackCountdownMode.Record, Strings.PlaybackCountdownRecord),
+                            new SettingChoice<PlaybackCountdownMode>(PlaybackCountdownMode.Play, Strings.PlaybackCountdownPlay),
+                            new SettingChoice<PlaybackCountdownMode>(PlaybackCountdownMode.Both, Strings.PlaybackCountdownBoth),
+                        ],
+                        Get = () => settings.Settings.PlaybackCountdown,
+                        Set = mode => settings.Settings.PlaybackCountdown = mode,
+                    },
+                    new IntegerSetting
+                    {
+                        Id = "input.countdownSeconds",
+                        Category = input,
+                        Label = Strings.CountdownSecondsLabel,
+                        Description = Strings.CountdownSecondsDescription,
+                        Keywords = SettingKeywords.Split(Strings.CountdownSecondsKeywords),
+                        DefaultValue = BuilderSettings.DefaultCountdownSeconds,
+                        Minimum = BuilderSettings.MinCountdownSeconds,
+                        Maximum = BuilderSettings.MaxCountdownSeconds,
+                        Get = () => settings.Settings.CountdownSeconds,
+                        Set = seconds => settings.Settings.CountdownSeconds = seconds,
                     },
                     new ToggleSetting
                     {
@@ -286,7 +317,7 @@ namespace ChartBuilder.Services
                         Keywords = SettingKeywords.Split(Strings.PackFolderKeywords),
                         DefaultValue = null,
                         EmptyLabel = Strings.PackFolderEmpty,
-                        PickerTitle = Strings.SaveAndPackPickerTitle,
+                        PickerTitle = Strings.PackPickerTitle,
                         Get = () => settings.Settings.DefaultPackFolder,
                         Set = folder => settings.Settings.DefaultPackFolder = folder,
                     },

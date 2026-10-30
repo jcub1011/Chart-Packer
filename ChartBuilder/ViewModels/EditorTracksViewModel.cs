@@ -48,6 +48,7 @@ namespace ChartBuilder.ViewModels
             _execute = execute;
             foreach (string stem in AudioStems.Stems)
                 _addCommands[stem] = new RelayCommand(() => _ = SetTrackAsync(stem), () => CanEdit);
+            AddTrackOptions = TrackStaging.OptionsFor(stem => _addCommands[stem]);
             _playback.PropertyChanged += OnPlaybackChanged;
             _song.Changed += OnSongChanged;
             _song.TracksChanged += OnSongTracksChanged;
@@ -65,7 +66,7 @@ namespace ChartBuilder.ViewModels
         [ObservableProperty]
         public partial IReadOnlyList<RemovedTrackRow> RemovedTracks { get; private set; } = [];
 
-        /// <summary>The Add track menu: every stem, labelled to replace the ones the song has.</summary>
+        /// <summary>The Add track menu: every stem, labelled with its name.</summary>
         [ObservableProperty]
         public partial IReadOnlyList<StemOption> AddTrackOptions { get; private set; } = [];
 
@@ -179,10 +180,9 @@ namespace ChartBuilder.ViewModels
             return [.. _playback.Tracks.Where(r => stems.Contains(r.Track.Stem))];
         }
 
-        /// <summary>Lists the tracks removed and labels Add track, as the song's tracks are now.</summary>
+        /// <summary>Lists the tracks removed, as the song's tracks are now.</summary>
         private void Refresh()
         {
-            AddTrackOptions = TrackStaging.OptionsFor(_song.Tracks.Select(t => t.Stem), stem => _addCommands[stem]);
             if (!RemovedNames().SequenceEqual(RemovedTracks.Select(r => r.Name)))
                 _ = ShowSizesAsync();
         }
