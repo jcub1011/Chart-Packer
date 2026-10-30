@@ -1,0 +1,263 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- The look of the Settings and Shortcuts windows: a list of categories down the left, a page header, and sections of
+         flat rows, as the main windows' library and song inspector are built. The two windows include it in their own
+         styles rather than the app's, as names such as .rail and .row would restyle other windows. Every colour is a
+         theme brush, so the windows follow the owner's recolouring. -->
+
+    <!-- The category list, tinted when selected with a bar at its left, as the library's rows are. The bar is always there
+         (transparent), so selecting doesn't shift the row. -->
+    <Style Selector="ListBox.rail">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Padding" Value="0" />
+    </Style>
+    <Style Selector="ListBox.rail ListBoxItem">
+        <Setter Property="Padding" Value="10,0,8,0" />
+        <Setter Property="MinHeight" Value="34" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Margin" Value="0" />
+        <Setter Property="CornerRadius" Value="0" />
+        <Setter Property="BorderThickness" Value="3,0,0,0" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+    </Style>
+    <Style Selector="ListBox.rail ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+    </Style>
+    <Style Selector="ListBox.rail ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource AccentTintBrush}" />
+        <Setter Property="Foreground" Value="#FFFFFF" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+    </Style>
+    <Style Selector="ListBox.rail ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource AccentTintStrongBrush}" />
+    </Style>
+    <!-- How many in a category have a change not yet written (a badge), or match the search (plain text). -->
+    <Style Selector="Border.rail-count">
+        <Setter Property="MinWidth" Value="16" />
+        <Setter Property="Height" Value="16" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Padding" Value="4,0" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+    </Style>
+    <Style Selector="Border.rail-count > TextBlock">
+        <Setter Property="FontSize" Value="10" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Foreground" Value="White" />
+        <Setter Property="HorizontalAlignment" Value="Center" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="TextBlock.rail-matches">
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="Opacity" Value="0.6" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <!-- The page: its name, what it holds, and its sections. -->
+    <Style Selector="TextBlock.page-title">
+        <Setter Property="FontSize" Value="18" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="TextBlock.page-subtitle">
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="Opacity" Value="0.6" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style Selector="Border.section">
+        <Setter Property="BorderThickness" Value="0,0,0,1" />
+        <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+        <Setter Property="Padding" Value="0,0,0,6" />
+    </Style>
+    <Style Selector="Border.section > TextBlock">
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Opacity" Value="0.8" />
+    </Style>
+
+    <!-- One setting or shortcut: flat, with a hairline under it and a tint under the pointer, as the song inspector's
+         metadata rows are. The bar at its left is the accent while the row has a change that isn't written yet. -->
+    <Style Selector="Border.row">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0,0,0,1" />
+        <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+        <Setter Property="Padding" Value="0,7,4,7" />
+    </Style>
+    <Style Selector="Border.row:pointerover">
+        <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+    </Style>
+    <!-- A button that's only there while the pointer is over its row, or it has the keyboard's focus. It's still there to be
+         pressed, as the rows are always laid out the same. -->
+    <Style Selector="Border.row Button.reveal">
+        <Setter Property="Opacity" Value="0" />
+    </Style>
+    <Style Selector="Border.row:pointerover Button.reveal, Border.row Button.reveal:focus-within">
+        <Setter Property="Opacity" Value="1" />
+    </Style>
+    <!-- A row of buttons only has no editor beside them, so they end where the editors of other rows do: the empty editor
+         column is gone, and the gap that was after it goes with it. -->
+    <Style Selector="ItemsControl.row-actions.alone">
+        <Setter Property="Margin" Value="0,0,-12,0" />
+    </Style>
+    <Style Selector="Border.row-bar">
+        <Setter Property="Width" Value="2" />
+        <Setter Property="CornerRadius" Value="1" />
+        <Setter Property="Margin" Value="0,1,10,1" />
+        <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="Border.row-bar.modified">
+        <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+    </Style>
+    <!-- The shortcut just jumped to from the keyboard map. -->
+    <Style Selector="Border.row.revealed">
+        <Setter Property="Background" Value="{DynamicResource AccentTintFaintBrush}" />
+    </Style>
+    <Style Selector="TextBlock.row-description">
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="Opacity" Value="0.6" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style Selector="TextBlock.row-note">
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontStyle" Value="Italic" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+        <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+    </Style>
+    <Style Selector="TextBlock.row-note.warning">
+        <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}" />
+    </Style>
+    <!-- Locked while what it depends on is off, or fixed: listed, but dimmed. -->
+    <Style Selector="Border.row.locked :is(Control).row-dim">
+        <Setter Property="Opacity" Value="0.55" />
+    </Style>
+
+    <!-- The footer's left side: what the buttons beside it would write, or why a key was refused. -->
+    <Style Selector="TextBlock.footer-status">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+    </Style>
+    <Style Selector="TextBlock.footer-status.warning">
+        <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}" />
+    </Style>
+
+    <!-- A key. A button, as keys are to be pressed, with a thicker lower edge so it reads as the key on a keyboard
+         that it's labelled as. -->
+    <Style Selector="Button.keycap">
+        <Setter Property="MinWidth" Value="28" />
+        <Setter Property="Padding" Value="8,3,8,2" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="CornerRadius" Value="4" />
+        <Setter Property="BorderThickness" Value="1,1,1,2" />
+        <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+        <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.keycap:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource ToolPressedBrush}" />
+    </Style>
+    <Style Selector="Button.keycap:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="BorderThickness" Value="1,2,1,1" />
+    </Style>
+    <Style Selector="Button.keycap.capturing">
+        <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+    </Style>
+    <Style Selector="Button.keycap.capturing /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource AccentTintBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}" />
+    </Style>
+
+    <!-- A switch between two views: radio buttons, so one is always picked, drawn as small toggles as the library's
+         All | Any switch is. -->
+    <Style Selector="RadioButton.seg">
+        <Setter Property="Theme" Value="{StaticResource {x:Type ToggleButton}}" />
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="Height" Value="24" />
+        <Setter Property="Padding" Value="12,0" />
+        <Setter Property="CornerRadius" Value="4" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <!-- A key of the keyboard view. Tinted by what has it in the layer shown: the accent when something does, amber when
+         shortcuts that can be live together share it, dimmed when only fixed ones have it. The one picked is outlined. -->
+    <Style Selector="Button.mapkey">
+        <Setter Property="Height" Value="30" />
+        <Setter Property="Padding" Value="0,1,0,0" />
+        <Setter Property="CornerRadius" Value="4" />
+        <Setter Property="BorderThickness" Value="1,1,1,2" />
+        <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Opacity" Value="0.7" />
+    </Style>
+    <Style Selector="Button.mapkey:pointerover">
+        <Setter Property="Opacity" Value="1" />
+    </Style>
+    <Style Selector="Button.mapkey:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+    </Style>
+    <Style Selector="Button.mapkey.bound">
+        <Setter Property="Opacity" Value="1" />
+        <Setter Property="Foreground" Value="#FFFFFF" />
+    </Style>
+    <Style Selector="Button.mapkey.bound /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource AccentTintBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}" />
+    </Style>
+    <Style Selector="Button.mapkey.bound:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource AccentTintStrongBrush}" />
+    </Style>
+    <Style Selector="Button.mapkey.fixed">
+        <Setter Property="Opacity" Value="0.55" />
+    </Style>
+    <Style Selector="Button.mapkey.clashing">
+        <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}" />
+    </Style>
+    <Style Selector="Button.mapkey.clashing /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource WarningTintBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource WarningBorderBrush}" />
+    </Style>
+    <Style Selector="Button.mapkey.elsewhere">
+        <Setter Property="Opacity" Value="0.85" />
+    </Style>
+    <Style Selector="Button.mapkey.elsewhere /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}" />
+    </Style>
+    <Style Selector="Button.mapkey.selected /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="BorderBrush" Value="{DynamicResource AccentHighlightBrush}" />
+    </Style>
+
+    <!-- The legend's swatches, which are drawn as the keys are. -->
+    <Style Selector="Border.swatch">
+        <Setter Property="Width" Value="14" />
+        <Setter Property="Height" Value="12" />
+        <Setter Property="CornerRadius" Value="3" />
+        <Setter Property="BorderThickness" Value="1,1,1,2" />
+        <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.swatch.bound">
+        <Setter Property="Background" Value="{DynamicResource AccentTintBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}" />
+    </Style>
+    <Style Selector="Border.swatch.clashing">
+        <Setter Property="Background" Value="{DynamicResource WarningTintBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource WarningBorderBrush}" />
+    </Style>
+    <Style Selector="Border.swatch.elsewhere">
+        <Setter Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}" />
+    </Style>
+    <Style Selector="Border.swatch.fixed">
+        <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+        <Setter Property="Opacity" Value="0.55" />
+    </Style>
+</Styles>

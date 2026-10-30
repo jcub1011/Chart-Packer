@@ -33,17 +33,17 @@ namespace ChartPacker.Services
             SettingsService settings,
             Action calibrate)
         {
-            var libraryCategory = new SettingCategory("library", Strings.SettingsCategoryLibrary);
+            var libraryCategory = new SettingCategory("library", Strings.SettingsCategoryLibrary, iconKey: "InputFolderStroke");
             var scanning = new SettingCategory("library.scanning", Strings.SettingsCategoryScanning, libraryCategory);
             var duplicates = new SettingCategory("library.dedup", Strings.SettingsCategoryDuplicates, libraryCategory);
-            var output = new SettingCategory("output", Strings.SettingsCategoryOutput);
+            var output = new SettingCategory("output", Strings.SettingsCategoryOutput, iconKey: "OutputFolderStroke");
             var packing = new SettingCategory("output.packing", Strings.SettingsCategoryPacking, output);
             var downloadsCategory = new SettingCategory("output.downloads", Strings.SettingsCategoryDownloads, output);
-            var playback = new SettingCategory("playback", Strings.SettingsCategoryPlayback);
+            var playback = new SettingCategory("playback", Strings.SettingsCategoryPlayback, iconKey: "VolumeStroke");
             var audio = new SettingCategory("playback.audio", Strings.SettingsCategoryAudio, playback);
             var visualizers = new SettingCategory("playback.visualizers", Strings.SettingsCategoryVisualizers, playback);
             var scrubbing = new SettingCategory("playback.scrubbing", Strings.SettingsCategoryScrubbing, playback);
-            var general = new SettingCategory("general", SharedStrings.SettingsCategoryGeneral);
+            var general = new SettingCategory("general", SharedStrings.SettingsCategoryGeneral, iconKey: "SettingsStroke");
             var appearance = new SettingCategory("general.appearance", Strings.SettingsCategoryAppearance, general);
             var logging = new SettingCategory("general.logging", SharedStrings.SettingsCategoryLogging, general);
 

@@ -15,58 +15,52 @@ namespace ChartShared.UI.ViewModels.Keybinds
     /// <summary>One category of shortcuts in the keyboard shortcuts window, under its name as a heading.</summary>
     public sealed class KeybindGroupViewModel(string title, IReadOnlyList<KeybindRowViewModel> rows)
     {
+        /// <summary>The heading, or empty for a category's own shortcuts under its page header.</summary>
         public string Title { get; } = title;
+
+        public bool HasTitle => Title.Length > 0;
 
         public IReadOnlyList<KeybindRowViewModel> Rows { get; } = rows;
     }
 
     /// <summary>
-    /// An entry in the keyboard shortcuts window's tree: a category, which shows its shortcuts; one shortcut, under its
-    /// category, which jumps to it in the list; or the "All shortcuts" entry at the top.
+    /// An entry in the keyboard shortcuts window's list of categories: a top-level category, which shows its shortcuts and
+    /// those of the categories nested in it, or the "All Shortcuts" entry at the top.
     /// </summary>
     public sealed partial class KeybindNodeViewModel : ObservableObject
     {
-        internal KeybindNodeViewModel(string label, string path, IReadOnlyList<KeybindNodeViewModel> children, bool isExpanded)
+        internal KeybindNodeViewModel(string label, string path, string subtitle, int? matchCount)
         {
             Label = label;
             Path = path;
-            Children = children;
-            IsExpanded = isExpanded;
-        }
-
-        private KeybindNodeViewModel(KeybindRowViewModel shortcut)
-        {
-            Label = shortcut.Name;
-            Path = shortcut.Category;
-            Children = [];
-            Shortcut = shortcut;
+            Subtitle = subtitle;
+            MatchCount = matchCount;
         }
 
         /// <summary>The entry that shows every shortcut, so there's always a way back from a selected category.</summary>
-        internal static KeybindNodeViewModel All() => new(SharedStrings.KeybindsAllCategories, "", [], isExpanded: false);
-
-        /// <summary>The entry for one shortcut, in the tree under its category.</summary>
-        internal static KeybindNodeViewModel ForShortcut(KeybindRowViewModel shortcut) => new(shortcut);
+        internal static KeybindNodeViewModel All(int? matchCount) => new(SharedStrings.KeybindsAllCategories, "", "", matchCount);
 
         public string Label { get; }
 
-        /// <summary>
-        /// The names from the root down, joined by <see cref="KeyAction.CategorySeparator"/>: the category's own, or for a
-        /// shortcut the category it's in; empty for "All shortcuts".
-        /// </summary>
+        /// <summary>The category's name; empty for "All Shortcuts".</summary>
         public string Path { get; }
-
-        /// <summary>The shortcut this entry jumps to; null for a category or "All shortcuts".</summary>
-        public KeybindRowViewModel? Shortcut { get; }
-
-        public bool IsShortcut => Shortcut is not null;
 
         public bool IsAll => Path.Length == 0;
 
-        public IReadOnlyList<KeybindNodeViewModel> Children { get; }
+        /// <summary>The page header's second line: the categories nested in this one, comma separated.</summary>
+        public string Subtitle { get; }
 
+        /// <summary>How many shortcuts match the search, or <see langword="null"/> while there isn't one.</summary>
+        public int? MatchCount { get; }
+
+        public bool HasMatchCount => MatchCount is not null;
+
+        /// <summary>How many of its shortcuts have keys that differ from the defaults.</summary>
         [ObservableProperty]
-        public partial bool IsExpanded { get; set; }
+        [NotifyPropertyChangedFor(nameof(HasModified))]
+        public partial int ModifiedCount { get; set; }
+
+        public bool HasModified => ModifiedCount > 0;
     }
 
     /// <summary>One key of a shortcut, as a button: it opens a menu to change the key or remove it.</summary>
@@ -193,10 +187,10 @@ namespace ChartShared.UI.ViewModels.Keybinds
         private readonly IConfirmationService _confirmation;
         private readonly Func<bool> _save;
 
-        private readonly KeybindNodeViewModel _all = KeybindNodeViewModel.All();
+        private KeybindNodeViewModel _all = KeybindNodeViewModel.All(null);
 
-        // The category whose shortcuts the list shows, with those nested under it; null for every one. It follows a category
-        // picked in the tree, and moves to a shortcut's category only when the shortcut jumped to isn't in the list.
+        // The top-level category whose shortcuts the list shows, with those nested under it; null for every one. It follows
+        // the category picked, and moves to a shortcut's category only when the shortcut jumped to isn't in the list.
         private string? _scope;
 
         private KeybindRowViewModel? _captureRow;
@@ -222,20 +216,42 @@ namespace ChartShared.UI.ViewModels.Keybinds
             _confirmation = confirmation;
             _save = save;
             _rows = [.. live.Catalog.Select(action => new KeybindRowViewModel(action, this))];
+            Map = new KeyboardMapViewModel(this, _rows);
             RefreshAll();
-            RebuildTree();
+            RebuildCategories();
         }
 
-        /// <summary>The category tree; while searching, only the categories with a match.</summary>
+        /// <summary>The keyboard view, which shows the same keys the list does.</summary>
+        public KeyboardMapViewModel Map { get; }
+
+        /// <summary>The top-level categories; while searching, only the ones with a match. "All Shortcuts" comes first.</summary>
         [ObservableProperty]
         public partial IReadOnlyList<KeybindNodeViewModel> Categories { get; set; } = [];
 
-        /// <summary>
-        /// The entry picked in the tree. A category shows its shortcuts, with those nested under it; "All shortcuts" (or none)
-        /// shows every category; a shortcut jumps to it in the list (<see cref="RevealRequested"/>).
-        /// </summary>
+        /// <summary>The category picked. It shows its shortcuts, with those nested under it; "All Shortcuts" (or none) shows every category.</summary>
         [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(PageTitle), nameof(PageSubtitle), nameof(HasPageSubtitle))]
         public partial KeybindNodeViewModel? SelectedCategory { get; set; }
+
+        /// <summary>Whether the window shows the keys of a keyboard rather than the list of shortcuts.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(IsListView), nameof(PageTitle), nameof(PageSubtitle), nameof(HasPageSubtitle))]
+        public partial bool IsKeyboardView { get; set; }
+
+        /// <summary>Whether the window shows the list; the other half of <see cref="IsKeyboardView"/>, for the toggle's other button.</summary>
+        public bool IsListView
+        {
+            get => !IsKeyboardView;
+            set => IsKeyboardView = !value;
+        }
+
+        /// <summary>The page header: the category picked, or the keyboard's.</summary>
+        public string PageTitle => IsKeyboardView ? SharedStrings.KeybindsMapTitle : SelectedCategory?.Label ?? _all.Label;
+
+        /// <summary>What the page holds: the nested categories of the one picked, or how to use the keyboard.</summary>
+        public string PageSubtitle => IsKeyboardView ? SharedStrings.KeybindsMapSubtitle : SelectedCategory?.Subtitle ?? "";
+
+        public bool HasPageSubtitle => PageSubtitle.Length > 0;
 
         /// <summary>Raised when the list should scroll to a shortcut, which it has been made to show and has outlined.</summary>
         public event EventHandler<KeybindRowViewModel>? RevealRequested;
@@ -272,23 +288,24 @@ namespace ChartShared.UI.ViewModels.Keybinds
         /// <summary>The window's copy of the keys, which the rows show; the app's are untouched until <see cref="Apply"/>.</summary>
         internal KeyMap Working => _working;
 
+        // Searching is of the list, so it takes the window back to it; the keyboard view has no search, so it clears one.
         partial void OnSearchTextChanged(string value)
         {
             IsSearching = !string.IsNullOrWhiteSpace(value);
-            RebuildTree();
+            if (IsSearching)
+                IsKeyboardView = false;
+            RebuildCategories();
+        }
+
+        partial void OnIsKeyboardViewChanged(bool value)
+        {
+            CancelCapture();
+            if (value && IsSearching)
+                SearchText = "";
         }
 
         partial void OnSelectedCategoryChanged(KeybindNodeViewModel? value)
         {
-            if (value?.Shortcut is { } shortcut)
-            {
-                Reveal(shortcut);
-                return;
-            }
-
-            // A category opens as it's picked, so what's in it is in view.
-            if (value is { IsAll: false })
-                value.IsExpanded = true;
             _scope = value is null or { IsAll: true } ? null : value.Path;
             ClearRevealed();
             RebuildGroups();
@@ -297,19 +314,49 @@ namespace ChartShared.UI.ViewModels.Keybinds
         /// <summary>
         /// Jumps to a shortcut: makes sure the list shows it, outlines it until something else is chosen, and has the list
         /// scroll to it. The list keeps what it shows if the shortcut is in it already, so jumping about within a category,
-        /// or from "All shortcuts", doesn't narrow it.
+        /// or from "All Shortcuts", doesn't narrow it. A search that doesn't match the shortcut is cleared, as the shortcut
+        /// must be in the list to be scrolled to.
         /// </summary>
         public void Reveal(KeybindRowViewModel row)
         {
+            if (IsSearching && !Searched().Contains(row))
+                SearchText = "";
+
             if (_scope is not null && !InCategory(row, _scope))
-            {
-                _scope = row.Category;
-                RebuildGroups();
-            }
+                SelectedCategory = Categories.FirstOrDefault(c => !c.IsAll && InCategory(row, c.Path)) ?? _all;
 
             ClearRevealed();
             row.IsRevealed = true;
             RevealRequested?.Invoke(this, row);
+        }
+
+        /// <summary>Takes the window to the list, scrolled to a shortcut that was picked in the keyboard view.</summary>
+        internal void ShowInList(KeybindRowViewModel row)
+        {
+            IsKeyboardView = false;
+            Reveal(row);
+        }
+
+        /// <summary>
+        /// Binds <paramref name="row"/> to <paramref name="chord"/>, a key picked in the keyboard view, as a key pressed for it in
+        /// the list would be: a clash is asked about, and a key that can't be used is refused with a line saying why.
+        /// </summary>
+        internal async Task BindKeyAsync(KeybindRowViewModel row, KeyChord chord)
+        {
+            BeginCapture(row, null);
+            if (!ReferenceEquals(_captureRow, row))
+                return;
+
+            try
+            {
+                await CaptureAsync(chord);
+            }
+            finally
+            {
+                // A key that was refused leaves the wait on, for the list's sake; there's no key to wait for here.
+                if (ReferenceEquals(_captureRow, row))
+                    CancelCapture();
+            }
         }
 
         private void ClearRevealed()
@@ -544,7 +591,16 @@ namespace ChartShared.UI.ViewModels.Keybinds
                 row.Refresh(_working, note);
             }
 
+            Map.Refresh();
+            RefreshCounts();
             RebuildGroups();
+        }
+
+        // How many shortcuts in each category differ from the defaults, which the list of categories shows.
+        private void RefreshCounts()
+        {
+            foreach (var node in Categories)
+                node.ModifiedCount = _rows.Count(row => row.IsModified && (node.IsAll || InCategory(row, node.Path)));
         }
 
         private static void AddNote(Dictionary<string, List<string>> notes, string id, string other)
@@ -560,39 +616,39 @@ namespace ChartShared.UI.ViewModels.Keybinds
             return search.Length == 0 ? _rows : [.. _rows.Where(row => Matches(row, search))];
         }
 
-        // Rebuilds the tree for the search, and selects "All shortcuts" so every match shows until a category is picked.
-        private void RebuildTree()
+        // Rebuilds the list of categories for the search, and picks "All Shortcuts" so every match shows until a category is.
+        private void RebuildCategories()
         {
-            // Categories open while searching, so every match is in sight; otherwise they start closed, as a long list
-            // of shortcuts would fill the tree.
-            var items = Searched().Select(row => (Path: row.Category.Split(KeyAction.CategorySeparator), Row: row)).ToList();
-            Categories = [_all, .. Nest(items, 0, "", expanded: IsSearching)];
+            var searched = Searched();
+            string[] roots = [.. searched.Select(row => RootOf(row.Category)).Distinct()];
 
-            if (SelectedCategory == _all)
-            {
-                ClearRevealed();
-                RebuildGroups();
-            }
-            else
-            {
-                SelectedCategory = _all;
-            }
+            // A new "All Shortcuts" entry each time, to carry the match count, so it's never the one already picked and the
+            // list is rebuilt for the new matches.
+            _all = KeybindNodeViewModel.All(IsSearching ? searched.Count : null);
+            Categories =
+            [
+                _all,
+                .. roots.Select(root => new KeybindNodeViewModel(root, root, SubtitleOf(searched, root), IsSearching ? searched.Count(row => InCategory(row, root)) : null)),
+            ];
+            RefreshCounts();
+            SelectedCategory = _all;
         }
 
-        // The entries at one depth of the tree, in the order they were registered: the categories, each with its own entries
-        // beneath, then the shortcuts that sit in this category itself.
-        private static List<KeybindNodeViewModel> Nest(List<(string[] Path, KeybindRowViewModel Row)> items, int depth, string parent, bool expanded)
-        {
-            var nodes = new List<KeybindNodeViewModel>();
-            foreach (var group in items.Where(item => item.Path.Length > depth).GroupBy(item => item.Path[depth]))
-            {
-                string path = parent.Length == 0 ? group.Key : parent + KeyAction.CategorySeparator + group.Key;
-                nodes.Add(new KeybindNodeViewModel(group.Key, path, Nest([.. group], depth + 1, path, expanded), expanded));
-            }
+        private static string RootOf(string category) => category.Split(KeyAction.CategorySeparator)[0];
 
-            nodes.AddRange(items.Where(item => item.Path.Length == depth).Select(item => KeybindNodeViewModel.ForShortcut(item.Row)));
-            return nodes;
-        }
+        // The categories nested directly in a top-level one that the search shows, in the order they were registered.
+        private static string SubtitleOf(List<KeybindRowViewModel> searched, string root) =>
+            string.Join(
+                ", ",
+                searched.Where(row => InCategory(row, root) && row.Category != root)
+                    .Select(row => row.Category.Split(KeyAction.CategorySeparator)[1])
+                    .Distinct());
+
+        // A group's heading: its category's path, or under a top-level category (where its page header says that much) the rest of it.
+        private string TitleOf(string category) =>
+            _scope is not { } scope ? category
+            : category == scope ? ""
+            : category[(scope.Length + KeyAction.CategorySeparator.Length)..];
 
         private void RebuildGroups()
         {
@@ -600,10 +656,10 @@ namespace ChartShared.UI.ViewModels.Keybinds
             if (_scope is { } scope)
                 shown = [.. shown.Where(row => InCategory(row, scope))];
 
-            // Groups in the order their first shortcut was registered, each under its whole path as a heading.
+            // Groups in the order their first shortcut was registered, each under its path as a heading.
             Groups =
             [
-                .. shown.GroupBy(row => row.Category).Select(group => new KeybindGroupViewModel(group.Key, [.. group])),
+                .. shown.GroupBy(row => row.Category).Select(group => new KeybindGroupViewModel(TitleOf(group.Key), [.. group])),
             ];
             OnPropertyChanged(nameof(HasNoMatches));
         }

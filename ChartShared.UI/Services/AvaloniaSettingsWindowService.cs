@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Avalonia.Controls;
+using ChartShared.UI.Theming;
 using ChartShared.UI.ViewModels.Settings;
 using ChartShared.UI.Views;
 
@@ -28,6 +29,7 @@ namespace ChartShared.UI.Services
             var dialog = new SettingsWindow { AppName = appName };
             dialog.DataContext = createViewModel(new AvaloniaFolderPickerService(() => dialog));
             WindowChrome.UseOwnerIcon(dialog, window);
+            DynamicTheme.InheritFrom(window, dialog);
 
             // Over the owner's frame, fitted to its screen. The window's own CenterOwner is left for when the owner's
             // middle isn't known.

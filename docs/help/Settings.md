@@ -6,9 +6,13 @@ A searchable list of settings, grouped by category. Both apps use this window, e
 
 ## What's In It
 
-- A category list on the left and a search box (Ctrl+E).
-- Changed settings are outlined until applied, and each has a button to reset it.
+- A category list on the left and a search box (Ctrl+E). **All Settings** at the top shows every category, and while you search, each category shows how many of its settings match.
+- Each page names its category and the sections in it.
+- A bar beside a setting, and a number beside its category, mark changes that have not been applied yet. The bottom left says how many there are.
+- A setting that differs from its default has a button to reset it.
 - **OK** applies and closes, **Apply** applies without closing, and **Cancel** discards.
+
+Both this window and **Shortcuts** take on the colours of the song selected in Chart Packer, as the main window does.
 
 ## Chart Packer's Settings
 

@@ -5,6 +5,7 @@ using Avalonia.Controls;
 using Avalonia.Platform.Storage;
 using ChartShared.UI.Keybinds;
 using ChartShared.UI.Resources;
+using ChartShared.UI.Theming;
 using ChartShared.UI.ViewModels.Keybinds;
 using ChartShared.UI.Views;
 
@@ -38,6 +39,7 @@ namespace ChartShared.UI.Services
                 new AvaloniaConfirmationService(() => dialog),
                 keys.Save);
             WindowChrome.UseOwnerIcon(dialog, window);
+            DynamicTheme.InheritFrom(window, dialog);
 
             // Over the owner's frame, fitted to its screen, as the Settings window is.
             if (WindowPlacement.CenterOf(window) is { } center)

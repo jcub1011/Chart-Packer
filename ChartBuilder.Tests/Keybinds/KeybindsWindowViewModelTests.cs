@@ -17,6 +17,9 @@ public sealed class KeybindsWindowViewModelTests
 
         public bool Confirms { get; set; } = true;
 
+        /// <summary>When set, a choice fails, as a dialog that couldn't be shown would.</summary>
+        public bool Throws { get; set; }
+
         public List<string> Asked { get; } = [];
 
         public List<string> Alerts { get; } = [];
@@ -30,6 +33,8 @@ public sealed class KeybindsWindowViewModelTests
         public Task<ConfirmChoice> ChooseAsync(string title, string message, string firstLabel, string secondLabel, string? firstIcon = null, string? secondIcon = null)
         {
             Asked.Add(message);
+            if (Throws)
+                throw new InvalidOperationException("The dialog couldn't be shown.");
             return Pending?.Task ?? Task.FromResult(Choice);
         }
 
@@ -394,63 +399,61 @@ public sealed class KeybindsWindowViewModelTests
 
     private static string[] RowIds(KeybindsWindowViewModel vm) => [.. vm.Groups.SelectMany(g => g.Rows).Select(r => r.Action.Id)];
 
+    private static KeycapViewModel Cap(KeybindsWindowViewModel vm, string name) =>
+        vm.Map.Rows.SelectMany(r => r.Keys).Single(k => k.IsKey && k.Key.Name == name);
+
     [TestMethod]
-    public void CategoriesNestInATreeUnderAllShortcuts()
+    public void CategoriesAreAFlatListOfTheTopLevelOnesUnderAllShortcuts()
     {
         var vm = Open();
 
         CollectionAssert.AreEqual(new[] { "All Shortcuts", "File", "Edit", "Playback", "Search", "Editor" }, Labels(vm.Categories));
-        var editor = vm.Categories.Single(c => c.Label == "Editor");
-        CollectionAssert.AreEqual(new[] { "Notes", "View", "Go to measure" }, Labels(editor.Children), "categories first, then the category's own shortcuts");
-        Assert.AreEqual("Editor › Notes", editor.Children[0].Path);
         Assert.IsTrue(vm.Categories[0].IsAll);
         Assert.AreSame(vm.Categories[0], vm.SelectedCategory);
+        Assert.AreEqual("All Shortcuts", vm.PageTitle);
     }
 
     [TestMethod]
-    public void EachShortcutIsAnEntryUnderItsCategory()
+    public void ACategoryNamesTheOnesNestedInItInItsPageHeader()
     {
         var vm = Open();
 
-        var file = vm.Categories.Single(c => c.Label == "File");
-        CollectionAssert.AreEqual(new[] { "Save", "Open Settings" }, Labels(file.Children));
-        Assert.IsTrue(file.Children.All(c => c.IsShortcut));
-        Assert.IsFalse(file.IsShortcut);
-        Assert.AreEqual("File", file.Children[0].Path);
-        Assert.AreSame(Row(vm, SharedKeys.Save), file.Children[0].Shortcut);
-
-        var notes = vm.Categories.Single(c => c.Label == "Editor").Children.Single(c => c.Label == "Notes");
-        CollectionAssert.AreEqual(new[] { "Force HOPO", "Add to selection" }, Labels(notes.Children), "fixed shortcuts are entries too");
-    }
-
-    [TestMethod]
-    public void CategoriesStartClosedOpenWhileSearchingAndOpenWhenPicked()
-    {
-        var vm = Open();
         var editor = vm.Categories.Single(c => c.Label == "Editor");
-        Assert.IsTrue(vm.Categories.Where(c => !c.IsAll).All(c => !c.IsExpanded));
+        Assert.AreEqual("Notes, View", editor.Subtitle);
+        Assert.AreEqual("", vm.Categories.Single(c => c.Label == "File").Subtitle);
 
         vm.SelectedCategory = editor;
-        Assert.IsTrue(editor.IsExpanded);
-
-        vm.SearchText = "e";
-        Assert.IsTrue(vm.Categories.Where(c => !c.IsAll).All(c => c.IsExpanded));
-        Assert.IsTrue(vm.Categories.Single(c => c.Label == "Editor").Children.Where(c => !c.IsShortcut).All(c => c.IsExpanded));
+        Assert.AreEqual("Editor", vm.PageTitle);
+        Assert.AreEqual("Notes, View", vm.PageSubtitle);
+        Assert.IsTrue(vm.HasPageSubtitle);
     }
 
     [TestMethod]
-    public void PickingAShortcutJumpsToItWithoutNarrowingTheList()
+    public void ACategoryShowsItsOwnShortcutsAndThoseNestedInItUnderTheRestOfTheirPath()
+    {
+        var vm = Open();
+
+        vm.SelectedCategory = vm.Categories.Single(c => c.Label == "Editor");
+
+        CollectionAssert.AreEquivalent(new[] { "test.hopo", "test.mouse", "test.snap", "test.measure" }, RowIds(vm));
+        CollectionAssert.AreEqual(new[] { "Notes", "View", "" }, vm.Groups.Select(g => g.Title).ToArray(), "the page header says Editor, so its own shortcuts need no heading");
+        Assert.IsFalse(vm.Groups[2].HasTitle);
+    }
+
+    [TestMethod]
+    public void JumpingToAShortcutWithAllShortcutsPickedDoesNotNarrowTheList()
     {
         var vm = Open();
         var raised = new List<KeybindRowViewModel>();
         vm.RevealRequested += (_, row) => raised.Add(row);
         var hopo = Row(vm, "test.hopo");
 
-        vm.SelectedCategory = vm.Categories.Single(c => c.Label == "Editor").Children.Single(c => c.Label == "Notes").Children[0];
+        vm.Reveal(hopo);
 
         CollectionAssert.AreEqual(new[] { hopo }, raised);
         Assert.IsTrue(hopo.IsRevealed);
         Assert.AreEqual(7, vm.Groups.Count, "the list still shows every category");
+        Assert.IsTrue(vm.SelectedCategory!.IsAll);
     }
 
     [TestMethod]
@@ -460,22 +463,27 @@ public sealed class KeybindsWindowViewModelTests
         var editor = vm.Categories.Single(c => c.Label == "Editor");
         vm.SelectedCategory = editor;
 
-        vm.SelectedCategory = editor.Children.Single(c => c.Label == "View").Children[0];
+        vm.Reveal(Row(vm, "test.snap"));
 
+        Assert.AreSame(editor, vm.SelectedCategory);
         CollectionAssert.AreEquivalent(new[] { "test.hopo", "test.mouse", "test.snap", "test.measure" }, RowIds(vm));
         Assert.IsTrue(Row(vm, "test.snap").IsRevealed);
     }
 
     [TestMethod]
-    public void JumpingToAShortcutOutsideTheCurrentCategoryShowsItsCategory()
+    public void JumpingToAShortcutOutsideTheCurrentCategoryPicksItsCategory()
     {
         var vm = Open();
+        var hopo = Row(vm, "test.hopo");
+        var snap = Row(vm, "test.snap");
         vm.SelectedCategory = vm.Categories.Single(c => c.Label == "File");
 
-        vm.SelectedCategory = vm.Categories.Single(c => c.Label == "Editor").Children.Single(c => c.Label == "View").Children[0];
+        vm.Reveal(hopo);
 
-        CollectionAssert.AreEqual(new[] { "test.snap" }, RowIds(vm));
-        Assert.IsTrue(Row(vm, "test.snap").IsRevealed);
+        Assert.AreEqual("Editor", vm.SelectedCategory!.Label);
+        CollectionAssert.AreEquivalent(new[] { "test.hopo", "test.mouse", "test.snap", "test.measure" }, RowIds(vm));
+        Assert.IsTrue(hopo.IsRevealed);
+        Assert.IsFalse(snap.IsRevealed);
     }
 
     [TestMethod]
@@ -508,39 +516,6 @@ public sealed class KeybindsWindowViewModelTests
     }
 
     [TestMethod]
-    public void SearchingLeavesOnlyTheMatchingShortcutsInTheTree()
-    {
-        var vm = Open();
-
-        vm.SearchText = "snap";
-
-        var view = vm.Categories.Single(c => c.Label == "Editor").Children.Single();
-        CollectionAssert.AreEqual(new[] { "Coarser snap" }, Labels(view.Children));
-        Assert.IsTrue(vm.SelectedCategory!.IsAll);
-    }
-
-    [TestMethod]
-    public void AParentCategoryShowsItsOwnShortcutsAndThoseNestedInIt()
-    {
-        var vm = Open();
-
-        vm.SelectedCategory = vm.Categories.Single(c => c.Label == "Editor");
-
-        CollectionAssert.AreEquivalent(new[] { "test.hopo", "test.mouse", "test.snap", "test.measure" }, RowIds(vm));
-    }
-
-    [TestMethod]
-    public void AChildCategoryShowsOnlyItsOwn()
-    {
-        var vm = Open();
-
-        vm.SelectedCategory = vm.Categories.Single(c => c.Label == "Editor").Children.Single(c => c.Label == "Notes");
-
-        CollectionAssert.AreEquivalent(new[] { "test.hopo", "test.mouse" }, RowIds(vm));
-        Assert.AreEqual("Editor › Notes", vm.Groups.Single().Title);
-    }
-
-    [TestMethod]
     public void ACategoryNamedLikeAnotherPrefixIsNotMistakenForItsParent()
     {
         var live = new KeyMap(new KeybindCatalog(
@@ -556,7 +531,7 @@ public sealed class KeybindsWindowViewModelTests
     }
 
     [TestMethod]
-    public void SearchingNarrowsTheTreeAndSelectsAllShortcuts()
+    public void SearchingNarrowsTheListOfCategoriesCountsTheMatchesAndPicksAllShortcuts()
     {
         var vm = Open();
         vm.SelectedCategory = vm.Categories.Single(c => c.Label == "File");
@@ -564,12 +539,290 @@ public sealed class KeybindsWindowViewModelTests
         vm.SearchText = "snap";
 
         CollectionAssert.AreEqual(new[] { "All Shortcuts", "Editor" }, Labels(vm.Categories));
-        CollectionAssert.AreEqual(new[] { "View" }, Labels(vm.Categories[1].Children));
         Assert.IsTrue(vm.SelectedCategory!.IsAll);
         CollectionAssert.AreEqual(new[] { "test.snap" }, RowIds(vm));
+        Assert.AreEqual(1, vm.Categories[0].MatchCount);
+        Assert.AreEqual(1, vm.Categories[1].MatchCount);
 
         vm.SearchText = "";
         Assert.AreEqual(6, vm.Categories.Count);
+        Assert.IsNull(vm.Categories[0].MatchCount);
+        Assert.IsFalse(vm.Categories[1].HasMatchCount);
+    }
+
+    [TestMethod]
+    public async Task CategoriesCountTheShortcutsThatDifferFromTheDefaults()
+    {
+        var vm = Open();
+        var save = Row(vm, SharedKeys.Save);
+        var file = vm.Categories.Single(c => c.Label == "File");
+        Assert.AreEqual(0, file.ModifiedCount);
+        Assert.IsFalse(file.HasModified);
+
+        await Capture(vm, save, "Ctrl+W", save.Chips[0]);
+
+        Assert.AreEqual(1, file.ModifiedCount);
+        Assert.IsTrue(file.HasModified);
+        Assert.AreEqual(1, vm.Categories[0].ModifiedCount, "All Shortcuts counts every category's");
+        Assert.AreEqual(0, vm.Categories.Single(c => c.Label == "Edit").ModifiedCount);
+
+        save.ResetCommand.Execute(null);
+        Assert.AreEqual(0, file.ModifiedCount);
+    }
+
+    [TestMethod]
+    public void SearchingTakesTheWindowBackToTheListAndTheKeyboardViewClearsTheSearch()
+    {
+        var vm = Open();
+        vm.IsKeyboardView = true;
+        Assert.IsFalse(vm.IsListView);
+        Assert.AreEqual("Keyboard Map", vm.PageTitle);
+
+        vm.SearchText = "save";
+        Assert.IsFalse(vm.IsKeyboardView);
+        Assert.IsTrue(vm.IsListView);
+
+        vm.IsKeyboardView = true;
+        Assert.AreEqual("", vm.SearchText);
+        Assert.AreEqual(6, vm.Categories.Count);
+
+        vm.IsListView = true;
+        Assert.IsFalse(vm.IsKeyboardView);
+    }
+
+    [TestMethod]
+    public void TheKeyboardTintsTheKeysTheModifierLayerHas()
+    {
+        var vm = Open();
+
+        Assert.IsTrue(Cap(vm, "H").IsBound, "Force HOPO is bare H");
+        Assert.IsFalse(Cap(vm, "S").IsBound, "Ctrl+S isn't S on its own");
+
+        vm.Map.Ctrl = true;
+
+        Assert.IsTrue(Cap(vm, "S").IsBound);
+        Assert.AreEqual("Save", Cap(vm, "S").Actions.Single().Name);
+        Assert.AreEqual("Save", Cap(vm, "S").ToolTipText);
+        Assert.IsFalse(Cap(vm, "H").IsBound);
+        Assert.IsTrue(Cap(vm, "Z").IsFixed, "Undo can't be changed");
+        Assert.IsFalse(Cap(vm, "S").IsFixed);
+        Assert.IsFalse(Cap(vm, "S").IsClashing);
+    }
+
+    [TestMethod]
+    public void KeysThatShortcutsLiveTogetherShareAreFlaggedAsClashing()
+    {
+        _live.Set("test.find", KeyChord.List("Ctrl+G"));
+        var vm = Open();
+        vm.Map.Ctrl = true;
+
+        Assert.IsTrue(Cap(vm, "G").IsClashing, "Find and Go to measure are both Ctrl+G, in scopes that are live together");
+        Assert.IsFalse(Cap(vm, "S").IsClashing);
+    }
+
+    [TestMethod]
+    public void AShortcutOnAKeyTheKeyboardDoesNotDrawIsShownBesideIt()
+    {
+        _live.Set("test.hopo", KeyChord.List("NumPadAdd"));
+        var vm = Open();
+
+        Assert.IsTrue(vm.Map.HasOtherKeys);
+        var other = vm.Map.OtherKeys.Single();
+        Assert.AreEqual("Num +", other.Key.Name);
+        Assert.IsTrue(other.IsBound);
+        Assert.IsFalse(other.CanBind);
+
+        other.SelectCommand.Execute(null);
+        Assert.IsFalse(vm.Map.CanAssign, "there's no token to bind to a key that isn't drawn");
+        Assert.AreEqual("Force HOPO", vm.Map.Bindings.Single().Name);
+
+        vm.Map.Ctrl = true;
+        Assert.IsFalse(vm.Map.HasOtherKeys);
+    }
+
+    [TestMethod]
+    public void PickingAKeyListsWhatIsOnItInTheLayerShown()
+    {
+        var vm = Open();
+        vm.Map.Ctrl = true;
+
+        Cap(vm, "S").SelectCommand.Execute(null);
+
+        Assert.IsTrue(vm.Map.HasSelection);
+        Assert.AreEqual("Ctrl+S", vm.Map.SelectedChordText);
+        Assert.AreEqual("Save", vm.Map.Bindings.Single().Name);
+        Assert.IsTrue(Cap(vm, "S").IsSelected);
+        Assert.IsFalse(vm.Map.IsUnboundSelection);
+
+        vm.Map.Shift = true;
+        Assert.AreEqual("Ctrl+Shift+S", vm.Map.SelectedChordText, "the pick stays while the layer changes");
+        Assert.AreEqual(0, vm.Map.Bindings.Count);
+        Assert.IsTrue(vm.Map.IsUnboundSelection);
+        StringAssert.Contains(vm.Map.UnboundText, "Ctrl+Shift+S");
+        Assert.IsTrue(vm.Map.CanAssign);
+    }
+
+    [TestMethod]
+    public async Task AKeyPickedInTheKeyboardViewCanBeBoundToAShortcut()
+    {
+        var vm = Open();
+        vm.Map.Ctrl = true;
+        Cap(vm, "K").SelectCommand.Execute(null);
+        var find = Row(vm, "test.find");
+        CollectionAssert.Contains(vm.Map.AssignChoices.ToList(), find);
+        Assert.IsFalse(vm.Map.AssignChoices.Any(r => !r.IsEditable), "a shortcut that can't change isn't offered");
+
+        vm.Map.AssignTo = find;
+        await Task.Yield();
+
+        Assert.IsNull(vm.Map.AssignTo, "it clears, ready for the next");
+        Assert.AreEqual(find, Cap(vm, "K").Actions.Single());
+        Assert.AreEqual("Find", vm.Map.Bindings.Single().Name);
+        Assert.IsTrue(find.Chips.Any(c => c.Chord.ToString() == "Ctrl+K"));
+        Assert.AreEqual("Ctrl+F", _live.Display("test.find"), "staged until OK");
+        Assert.IsFalse(vm.IsCapturing);
+    }
+
+    [TestMethod]
+    public void TypingNarrowsTheShortcutsOfferedForAKeyByNameAndCategory()
+    {
+        var vm = Open();
+        vm.Map.Ctrl = true;
+        Cap(vm, "K").SelectCommand.Execute(null);
+        var all = vm.Map.AssignChoices.Select(r => r.Action.Id).ToArray();
+        CollectionAssert.AreEqual(all, vm.Map.FilteredAssignChoices.Select(r => r.Action.Id).ToArray(), "nothing typed offers every one");
+        Assert.IsFalse(vm.Map.HasNoAssignMatches);
+
+        vm.Map.AssignSearch = "FIND";
+        CollectionAssert.AreEqual(new[] { "test.find" }, vm.Map.FilteredAssignChoices.Select(r => r.Action.Id).ToArray(), "case doesn't matter");
+
+        vm.Map.AssignSearch = "playback next";
+        CollectionAssert.AreEqual(new[] { SharedKeys.NextChange }, vm.Map.FilteredAssignChoices.Select(r => r.Action.Id).ToArray(), "every word, in the name or the category, in any order");
+
+        vm.Map.AssignSearch = "zzzz";
+        Assert.AreEqual(0, vm.Map.FilteredAssignChoices.Count);
+        Assert.IsTrue(vm.Map.HasNoAssignMatches);
+        Assert.AreEqual(all.Length, vm.Map.AssignChoices.Count, "the choices themselves are unchanged");
+    }
+
+    [TestMethod]
+    public async Task BindingAShortcutClearsWhatWasTypedToFindIt()
+    {
+        var vm = Open();
+        vm.Map.Ctrl = true;
+        Cap(vm, "K").SelectCommand.Execute(null);
+        vm.Map.AssignSearch = "find";
+
+        vm.Map.AssignTo = Row(vm, "test.find");
+        await Task.Yield();
+
+        Assert.AreEqual("", vm.Map.AssignSearch);
+        Assert.IsNull(vm.Map.AssignTo);
+    }
+
+    [TestMethod]
+    public void TheChoicesAreFilteredAgainWhenAnotherKeyIsPicked()
+    {
+        var vm = Open();
+        vm.Map.Ctrl = true;
+        Cap(vm, "K").SelectCommand.Execute(null);
+        vm.Map.AssignSearch = "find";
+        Assert.AreEqual(1, vm.Map.FilteredAssignChoices.Count);
+
+        Cap(vm, "S").SelectCommand.Execute(null);
+
+        Assert.AreEqual(1, vm.Map.FilteredAssignChoices.Count, "Find is offered for Ctrl+S too, as it has room for another key");
+        Assert.IsFalse(vm.Map.FilteredAssignChoices.Any(r => r.Action.Id == SharedKeys.Save), "but Save, which already has the key, isn't");
+        vm.Map.AssignSearch = "save";
+        Assert.IsTrue(vm.Map.HasNoAssignMatches);
+    }
+
+    [TestMethod]
+    public async Task AKeyBoundFromTheKeyboardViewIsWrittenForTheShortcutsScope()
+    {
+        var vm = Open();
+        Cap(vm, ";").SelectCommand.Execute(null);
+
+        await vm.BindKeyAsync(Row(vm, "test.hopo"), new KeyChord(Cap(vm, ";").Key.TokenFor(KeyMatch.Physical), KeyMods.None));
+
+        Assert.IsTrue(vm.Working.ChordsOf("test.hopo").Any(c => c.Key == "Semicolon"), "a canvas key is a physical one");
+        Assert.AreEqual("Force HOPO", Cap(vm, ";").Actions.Single().Name);
+    }
+
+    [TestMethod]
+    public async Task AClashFromTheKeyboardViewIsAskedAboutAsInTheList()
+    {
+        var vm = Open();
+        _confirmation.Choice = ConfirmChoice.Cancel;
+
+        await vm.BindKeyAsync(Row(vm, "test.find"), KeyChord.Parse("Ctrl+S"));
+
+        Assert.AreEqual(1, _confirmation.Asked.Count);
+        Assert.AreEqual("Ctrl+F", Row(vm, "test.find").Chips.Single().Chord.ToString());
+        Assert.IsFalse(vm.IsCapturing);
+
+        _confirmation.Choice = ConfirmChoice.Second;
+        await vm.BindKeyAsync(Row(vm, "test.find"), KeyChord.Parse("Ctrl+S"));
+
+        CollectionAssert.AreEquivalent(new[] { "Ctrl+F", "Ctrl+S" }, Row(vm, "test.find").Chips.Select(c => c.Chord.ToString()).ToArray(), "kept on both");
+        Assert.AreEqual("Ctrl+S", Row(vm, SharedKeys.Save).Chips.Single().Chord.ToString());
+    }
+
+    [TestMethod]
+    public async Task AKeyThatCannotBeUsedIsRefusedFromTheKeyboardViewWithAReasonAndNothingIsLeftWaiting()
+    {
+        var vm = Open();
+
+        await vm.BindKeyAsync(Row(vm, "test.find"), KeyChord.Parse("Alt+F4"));
+
+        Assert.IsNotNull(vm.StatusMessage);
+        Assert.IsFalse(vm.IsCapturing);
+        Assert.AreEqual("Ctrl+F", Row(vm, "test.find").Chips.Single().Chord.ToString());
+    }
+
+    [TestMethod]
+    public void ATakenOffKeyIsRemovedFromTheShortcutAndTheKeyboard()
+    {
+        var vm = Open();
+        vm.Map.Ctrl = true;
+        Cap(vm, "S").SelectCommand.Execute(null);
+
+        vm.Map.Bindings.Single().RemoveCommand.Execute(null);
+
+        Assert.AreEqual(0, Row(vm, SharedKeys.Save).Chips.Count);
+        Assert.IsFalse(Cap(vm, "S").IsBound);
+        Assert.IsTrue(vm.Map.IsUnboundSelection);
+    }
+
+    [TestMethod]
+    public void AFixedShortcutOnAPickedKeyCannotBeTakenOffIt()
+    {
+        var vm = Open();
+        vm.Map.Ctrl = true;
+        Cap(vm, "Z").SelectCommand.Execute(null);
+
+        var binding = vm.Map.Bindings.Single();
+
+        Assert.IsTrue(binding.IsLocked);
+        Assert.IsFalse(binding.CanRemove);
+        Assert.IsFalse(binding.RemoveCommand.CanExecute(null));
+    }
+
+    [TestMethod]
+    public void ShowingAShortcutInTheListLeavesTheKeyboardAndJumpsToIt()
+    {
+        var vm = Open();
+        var raised = new List<KeybindRowViewModel>();
+        vm.RevealRequested += (_, row) => raised.Add(row);
+        vm.IsKeyboardView = true;
+        vm.Map.Ctrl = true;
+        Cap(vm, "S").SelectCommand.Execute(null);
+
+        vm.Map.Bindings.Single().ShowInListCommand.Execute(null);
+
+        Assert.IsFalse(vm.IsKeyboardView);
+        CollectionAssert.AreEqual(new[] { Row(vm, SharedKeys.Save) }, raised);
+        Assert.IsTrue(Row(vm, SharedKeys.Save).IsRevealed);
     }
 
     [TestMethod]
@@ -639,5 +892,107 @@ public sealed class KeybindsWindowViewModelTests
 
         Assert.AreEqual(KeyMatch.Physical, vm.CaptureAction!.Scope.Match);
         await Task.CompletedTask;
+    }
+
+    [TestMethod]
+    public async Task TakingTheLastShortcutOffAKeyNotOnTheKeyboardDropsThePickForGood()
+    {
+        _live.Set("test.hopo", KeyChord.List("NumPadAdd"));
+        var vm = Open();
+        vm.Map.OtherKeys.Single().SelectCommand.Execute(null);
+
+        vm.Map.Bindings.Single().RemoveCommand.Execute(null);
+
+        Assert.IsFalse(vm.Map.HasSelection);
+        Assert.IsFalse(vm.Map.HasOtherKeys);
+
+        await Capture(vm, Row(vm, "test.hopo"), "NumPadAdd");
+
+        Assert.IsTrue(vm.Map.HasOtherKeys);
+        Assert.IsFalse(vm.Map.HasSelection, "binding the key again doesn't pick it again");
+    }
+
+    [TestMethod]
+    public void TheCapsOfKeysNotOnTheKeyboardAreKeptAcrossARefresh()
+    {
+        _live.Set("test.hopo", KeyChord.List("NumPadAdd"));
+        var vm = Open();
+        var before = vm.Map.OtherKeys.Single();
+
+        vm.Map.Refresh();
+        Assert.AreSame(before, vm.Map.OtherKeys.Single());
+
+        vm.Map.Shift = true;
+        Assert.IsFalse(vm.Map.HasOtherKeys);
+        vm.Map.Shift = false;
+        Assert.AreSame(before, vm.Map.OtherKeys.Single(), "the same cap comes back with the layer");
+    }
+
+    [TestMethod]
+    public void JumpingToAShortcutTheSearchHidesClearsTheSearch()
+    {
+        var vm = Open();
+        var raised = new List<KeybindRowViewModel>();
+        vm.RevealRequested += (_, row) => raised.Add(row);
+        var hopo = Row(vm, "test.hopo");
+        vm.SearchText = "find";
+        Assert.IsTrue(vm.IsSearching);
+        CollectionAssert.DoesNotContain(RowIds(vm), "test.hopo");
+
+        vm.Reveal(hopo);
+
+        Assert.AreEqual("", vm.SearchText);
+        CollectionAssert.Contains(RowIds(vm), "test.hopo");
+        Assert.IsTrue(hopo.IsRevealed);
+        CollectionAssert.AreEqual(new[] { hopo }, raised);
+    }
+
+    [TestMethod]
+    public void ACategoryNamesOnlyTheNestedOnesTheSearchShows()
+    {
+        var vm = Open();
+
+        vm.SearchText = "snap";
+
+        Assert.AreEqual("View", vm.Categories.Single(c => c.Label == "Editor").Subtitle);
+
+        vm.SearchText = "";
+        Assert.AreEqual("Notes, View", vm.Categories.Single(c => c.Label == "Editor").Subtitle);
+    }
+
+    [TestMethod]
+    public void AKeyBoundOnlyWithOtherModifiersSaysSoRatherThanLookingFree()
+    {
+        var vm = Open();
+        var s = Cap(vm, "S");
+
+        Assert.IsFalse(s.IsBound, "Ctrl+S isn't S on its own");
+        Assert.IsTrue(s.IsBoundElsewhere);
+        StringAssert.Contains(s.ToolTipText, "Ctrl+S Save");
+        Assert.IsFalse(Cap(vm, "J").IsBoundElsewhere, "nothing is bound to J in any layer");
+
+        s.SelectCommand.Execute(null);
+        Assert.IsTrue(vm.Map.HasElsewhere);
+        StringAssert.Contains(vm.Map.ElsewhereText, "Ctrl+S Save");
+
+        vm.Map.Ctrl = true;
+        Assert.IsTrue(Cap(vm, "S").IsBound);
+        Assert.IsFalse(Cap(vm, "S").IsBoundElsewhere, "it's bound in the layer shown");
+    }
+
+    [TestMethod]
+    public async Task ABindingThatFailsFromTheKeyboardViewIsShownAndLeavesNothingWaiting()
+    {
+        _confirmation.Throws = true;
+        var vm = Open();
+        vm.Map.Ctrl = true;
+        Cap(vm, "G").SelectCommand.Execute(null);
+
+        vm.Map.AssignTo = Row(vm, "test.find");
+        await Task.Yield();
+
+        Assert.IsTrue(vm.HasStatus, "Ctrl+G is Go to measure's, so the dialog was asked, and failed");
+        Assert.IsNull(vm.Map.AssignTo);
+        Assert.IsFalse(vm.IsCapturing);
     }
 }

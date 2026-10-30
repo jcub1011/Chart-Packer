@@ -137,7 +137,7 @@
     <value>The list is out of date. Select Scan to update it.</value>
   </data>
   <data name="ScanDepthLabel" xml:space="preserve">
-    <value>Search depth</value>
+    <value>Search Depth</value>
   </data>
   <data name="LibraryListName" xml:space="preserve">
     <value>Songs</value>
@@ -248,7 +248,7 @@
     <value>Write next to the scanned songs again</value>
   </data>
   <data name="OverwriteLabel" xml:space="preserve">
-    <value>If the output exists</value>
+    <value>If the Output Exists</value>
   </data>
   <data name="OverwriteToolTip" xml:space="preserve">
     <value>What to do when the .sng or folder being written already exists</value>
@@ -499,7 +499,7 @@
     <value>Pack and unpack results</value>
   </data>
   <data name="FlatPackLabel" xml:space="preserve">
-    <value>Pack into one folder (flat)</value>
+    <value>Pack into One Folder (Flat)</value>
   </data>
   <data name="FlatPackToolTip" xml:space="preserve">
     <value>Put every packed .sng directly in the output folder instead of mirroring the scanned layout. On name conflicts, the first packed keeps the name; others are skipped or renamed with "Keep both".</value>
@@ -736,7 +736,7 @@
     <value>Playback position</value>
   </data>
   <data name="VolumeName" xml:space="preserve">
-    <value>Master volume</value>
+    <value>Master Volume</value>
   </data>
   <data name="PlaybackSpeedLabel" xml:space="preserve">
     <value>Speed</value>
@@ -898,7 +898,7 @@
     <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
   </data>
   <data name="ScanParallelismLabel" xml:space="preserve">
-    <value>Parallel reads</value>
+    <value>Parallel Reads</value>
   </data>
   <data name="ScanParallelismDescription" xml:space="preserve">
     <value>How many folders a scan searches and songs it reads at once. Deduplicate compares this many files at once too.</value>
@@ -908,7 +908,7 @@
     <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
   </data>
   <data name="ScanOnLaunchLabel" xml:space="preserve">
-    <value>Scan on launch</value>
+    <value>Scan on Launch</value>
   </data>
   <data name="ScanOnLaunchDescription" xml:space="preserve">
     <value>Scan the songs folder from last time as the app starts. When off, use Scan to search it.</value>
@@ -918,7 +918,7 @@
     <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
   </data>
   <data name="ScanOnFolderChangeLabel" xml:space="preserve">
-    <value>Scan on folder change</value>
+    <value>Scan on Folder Change</value>
   </data>
   <data name="ScanOnFolderChangeDescription" xml:space="preserve">
     <value>Scan a songs folder as soon as you choose or drop it. When off, use Scan to search it.</value>
@@ -936,7 +936,7 @@
     <comment>Button in the empty library list, shown when a songs folder is set but hasn't been scanned.</comment>
   </data>
   <data name="OutputFolderLabel" xml:space="preserve">
-    <value>Output folder</value>
+    <value>Output Folder</value>
   </data>
   <data name="OutputFolderDescription" xml:space="preserve">
     <value>Where Pack and Unpack write.</value>
@@ -965,7 +965,7 @@
     <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
   </data>
   <data name="PitchCorrectionLabel" xml:space="preserve">
-    <value>Keep pitch when changing speed</value>
+    <value>Keep Pitch When Changing Speed</value>
   </data>
   <data name="PitchCorrectionDescription" xml:space="preserve">
     <value>Play songs faster or slower at their own pitch by stretching the audio in time. When off, pitch rises and falls with speed.</value>
@@ -978,7 +978,7 @@
     <value>Visualizers</value>
   </data>
   <data name="ShowWaveformsLabel" xml:space="preserve">
-    <value>Show waveforms</value>
+    <value>Show Waveforms</value>
   </data>
   <data name="ShowWaveformsDescription" xml:space="preserve">
     <value>Draw the song's and each track's waveform.</value>
@@ -988,7 +988,7 @@
     <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
   </data>
   <data name="ShowSpectrumLabel" xml:space="preserve">
-    <value>Show spectrum</value>
+    <value>Show Spectrum</value>
   </data>
   <data name="ShowSpectrumDescription" xml:space="preserve">
     <value>Draw the moving spectrum behind the details panel during playback. When off, it isn't computed at all.</value>
@@ -1001,7 +1001,7 @@
     <value>Appearance</value>
   </data>
   <data name="AlbumArtThemeLabel" xml:space="preserve">
-    <value>Take colors from album art</value>
+    <value>Take Colors from Album Art</value>
   </data>
   <data name="AlbumArtThemeDescription" xml:space="preserve">
     <value>Tints the main window, its accent color, and the spectrum to match the selected song's album art. When off, the app keeps its own colors.</value>
@@ -1244,7 +1244,7 @@
     <value>Reset the video offset</value>
   </data>
   <data name="HighwayLookAheadLabel" xml:space="preserve">
-    <value>Seek ahead</value>
+    <value>Seek Ahead</value>
   </data>
   <data name="HighwayLookAheadDescription" xml:space="preserve">
     <value>How many seconds ahead of the strike line the note highway shows.</value>
@@ -1254,7 +1254,7 @@
     <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
   </data>
   <data name="ShowHighwayLabel" xml:space="preserve">
-    <value>Show note highway</value>
+    <value>Show Note Highway</value>
   </data>
   <data name="ShowHighwayDescription" xml:space="preserve">
     <value>Draw the chart's notes falling with the audio. Pick instruments from the note highway's button: next to the Image and Video switch, or in its row's caption.</value>
@@ -1264,36 +1264,36 @@
     <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
   </data>
   <data name="HighwayPlacementLabel" xml:space="preserve">
-    <value>Note highway position</value>
+    <value>Note Highway Position</value>
   </data>
   <data name="HighwayPlacementDescription" xml:space="preserve">
-    <value>Where the note highway is drawn: over the background, as in a game, or in its own row below the lyrics, leaving the background clear. Needs Show note highway.</value>
+    <value>Where the note highway is drawn: over the background, as in a game, or in its own row below the lyrics, leaving the background clear. Needs Show Note Highway.</value>
   </data>
   <data name="HighwayPlacementKeywords" xml:space="preserve">
     <value>highway position placement location row lane overlay background video lyrics</value>
     <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
   </data>
   <data name="HighwayPlacementBackground" xml:space="preserve">
-    <value>Over the background</value>
+    <value>Over the Background</value>
   </data>
   <data name="HighwayPlacementRow" xml:space="preserve">
-    <value>In its own row</value>
+    <value>In Its Own Row</value>
   </data>
   <data name="ShowLaneWaveformsLabel" xml:space="preserve">
-    <value>Show waveforms in lanes</value>
+    <value>Show Waveforms in Lanes</value>
   </data>
   <data name="ShowLaneWaveformsDescription" xml:space="preserve">
-    <value>Draw each instrument's track behind its notes, and the vocals track behind the lyrics, to align the chart with the audio. A lane with no track of its own shows the song's track. Needs Show waveforms.</value>
+    <value>Draw each instrument's track behind its notes, and the vocals track behind the lyrics, to align the chart with the audio. A lane with no track of its own shows the song's track. Needs Show Waveforms.</value>
   </data>
   <data name="ShowLaneWaveformsKeywords" xml:space="preserve">
     <value>waveform lanes highway lyrics align alignment offset sync timing audio track stem</value>
     <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
   </data>
   <data name="WaveformFidelityLabel" xml:space="preserve">
-    <value>Waveform detail</value>
+    <value>Waveform Detail</value>
   </data>
   <data name="WaveformFidelityDescription" xml:space="preserve">
-    <value>How finely each track's waveform is read: finer detail shows note starts more sharply in the lanes but takes longer to read and more memory. Changing it re-reads the tracks. Needs Show waveforms.</value>
+    <value>How finely each track's waveform is read: finer detail shows note starts more sharply in the lanes but takes longer to read and more memory. Changing it re-reads the tracks. Needs Show Waveforms.</value>
   </data>
   <data name="WaveformFidelityKeywords" xml:space="preserve">
     <value>waveform resolution fidelity detail quality precision sharp fine lanes highway</value>
@@ -1767,7 +1767,7 @@
     <value>Duplicates</value>
   </data>
   <data name="DedupKeepLabel" xml:space="preserve">
-    <value>Keep by default</value>
+    <value>Keep by Default</value>
   </data>
   <data name="DedupKeepByDefaultLabel" xml:space="preserve">
     <value>Keep by Default</value>
@@ -1777,7 +1777,7 @@
     <value>The .sng</value>
   </data>
   <data name="DedupKeepFolder" xml:space="preserve">
-    <value>The folder</value>
+    <value>The Folder</value>
   </data>
   <data name="DedupKeepDescription" xml:space="preserve">
     <value>Which copy Deduplicate keeps by default when a song exists both as a folder and a .sng. You can still pick another copy in each group.</value>
@@ -2118,7 +2118,7 @@ Each song is rechecked first. Changed songs, or ones whose kept copy is missing,
     <value>Downloads</value>
   </data>
   <data name="DownloadFolderLabel" xml:space="preserve">
-    <value>Download folder</value>
+    <value>Download Folder</value>
   </data>
   <data name="DownloadFolderDescription" xml:space="preserve">
     <value>Where files and songs saved from a right-click menu go.</value>
@@ -2135,7 +2135,7 @@ Each song is rechecked first. Changed songs, or ones whose kept copy is missing,
     <value>Choose the Download Folder</value>
   </data>
   <data name="AskDownloadLocationLabel" xml:space="preserve">
-    <value>Ask where to save each download</value>
+    <value>Ask Where to Save Each Download</value>
   </data>
   <data name="AskDownloadLocationDescription" xml:space="preserve">
     <value>Shows a save dialog for every download, starting in the download folder.</value>
@@ -2149,7 +2149,7 @@ Each song is rechecked first. Changed songs, or ones whose kept copy is missing,
     <comment>A settings category: moving through the song by dragging the seek bar or a lane, or with the wheel.</comment>
   </data>
   <data name="ScrubStepLabel" xml:space="preserve">
-    <value>Ctrl+scroll step</value>
+    <value>Ctrl+Scroll Step</value>
   </data>
   <data name="ScrubStepDescription" xml:space="preserve">
     <value>How far each wheel notch moves the song with Ctrl held over the seek bar, highway, or lyrics: to the next note of this length on the chart's beat grid.</value>
@@ -2185,7 +2185,7 @@ Each song is rechecked first. Changed songs, or ones whose kept copy is missing,
     <value>Thirty-second note</value>
   </data>
   <data name="FineScrubSpeedLabel" xml:space="preserve">
-    <value>Seek bar Ctrl+drag speed</value>
+    <value>Seek Bar Ctrl+Drag Speed</value>
   </data>
   <data name="FineScrubSpeedDescription" xml:space="preserve">
     <value>How far the song moves per pixel dragged with Ctrl held on the seek bar, regardless of song length.</value>
@@ -2195,7 +2195,7 @@ Each song is rechecked first. Changed songs, or ones whose kept copy is missing,
     <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
   </data>
   <data name="LaneFineScrubLabel" xml:space="preserve">
-    <value>Highway and lyrics Ctrl+drag</value>
+    <value>Highway and Lyrics Ctrl+Drag</value>
   </data>
   <data name="LaneFineScrubDescription" xml:space="preserve">
     <value>How much finer a Ctrl+drag is than a plain drag on a highway or the lyrics.</value>
@@ -2476,7 +2476,7 @@ Each song is rechecked first. Changed songs, or ones whose kept copy is missing,
     <comment>{0} is the output path.</comment>
   </data>
   <data name="AudioLatencyLabel" xml:space="preserve">
-    <value>Audio/visual latency</value>
+    <value>Audio/Visual Latency</value>
   </data>
   <data name="AudioLatencyDescription" xml:space="preserve">
     <value>How much later audio is heard than shown, measured per output device by the calibration tool. This adds to the latency detected from the device.</value>
@@ -2485,7 +2485,7 @@ Each song is rechecked first. Changed songs, or ones whose kept copy is missing,
     <value>latency delay offset sync calibrate calibration audio video lag bluetooth</value>
   </data>
   <data name="DetectLatencyLabel" xml:space="preserve">
-    <value>Detect output latency</value>
+    <value>Detect Output Latency</value>
     <comment>A switch: whether the latency read from the output device's buffers is added to its calibrated latency.</comment>
   </data>
   <data name="DetectLatencyDescription" xml:space="preserve">
