@@ -163,6 +163,10 @@ namespace ChartBuilder.Controls
         private bool _settingTip;
         private DispatcherTimer? _tipTimer;
 
+        // Where the pointer is over the timeline, in its own coordinates; null while it's elsewhere. A tip opens above the
+        // timeline at this x, so it never covers the waveform and playhead being scrubbed.
+        private Point? _pointer;
+
         // The picture of everything but the playhead, the size and scaling it was drawn at, and whether what it shows has
         // changed since.
         private RenderTargetBitmap? _content;
@@ -247,6 +251,8 @@ namespace ChartBuilder.Controls
         {
             _playhead = new PlayheadLayer(this);
             VisualChildren.Add(_playhead);
+            ToolTip.SetPlacement(this, PlacementMode.Custom);
+            ToolTip.SetCustomPopupPlacementCallback(this, placement => TipPlacement.PlaceAbove(placement, this, _pointer));
         }
 
         /// <summary>The playhead while stopped, and where scrubbing puts it, in seconds of audio.</summary>
@@ -953,9 +959,16 @@ namespace ChartBuilder.Controls
             e.Handled = true;
         }
 
+        protected override void OnPointerEntered(PointerEventArgs e)
+        {
+            base.OnPointerEntered(e);
+            _pointer = e.GetPosition(this);
+        }
+
         protected override void OnPointerMoved(PointerEventArgs e)
         {
             base.OnPointerMoved(e);
+            _pointer = e.GetPosition(this);
             if (ReferenceEquals(e.Pointer.Captured, this))
                 Scrub(e);
             else
@@ -965,6 +978,7 @@ namespace ChartBuilder.Controls
         protected override void OnPointerExited(PointerEventArgs e)
         {
             base.OnPointerExited(e);
+            _pointer = null;
             ShowSectionTip(null);
         }
 
