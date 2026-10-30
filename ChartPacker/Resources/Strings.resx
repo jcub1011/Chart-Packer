@@ -1,10 +1,86 @@
 <?xml version="1.0" encoding="utf-8"?>
 <root>
+  <!-- 
+    Microsoft ResX Schema 
+    
+    Version 2.0
+    
+    The primary goals of this format is to allow a simple XML format 
+    that is mostly human readable. The generation and parsing of the 
+    various data types are done through the TypeConverter classes 
+    associated with the data types.
+    
+    Example:
+    
+    ... ado.net/XML headers & schema ...
+    <resheader name="resmimetype">text/microsoft-resx</resheader>
+    <resheader name="version">2.0</resheader>
+    <resheader name="reader">System.Resources.ResXResourceReader, System.Windows.Forms, ...</resheader>
+    <resheader name="writer">System.Resources.ResXResourceWriter, System.Windows.Forms, ...</resheader>
+    <data name="Name1"><value>this is my long string</value><comment>this is a comment</comment></data>
+    <data name="Color1" type="System.Drawing.Color, System.Drawing">Blue</data>
+    <data name="Bitmap1" mimetype="application/x-microsoft.net.object.binary.base64">
+        <value>[base64 mime encoded serialized .NET Framework object]</value>
+    </data>
+    <data name="Icon1" type="System.Drawing.Icon, System.Drawing" mimetype="application/x-microsoft.net.object.bytearray.base64">
+        <value>[base64 mime encoded string representing a byte array form of the .NET Framework object]</value>
+        <comment>This is a comment</comment>
+    </data>
+                
+    There are any number of "resheader" rows that contain simple 
+    name/value pairs.
+    
+    Each data row contains a name, and value. The row also contains a 
+    type or mimetype. Type corresponds to a .NET class that support 
+    text/value conversion through the TypeConverter architecture. 
+    Classes that don't support this are serialized and stored with the 
+    mimetype set.
+    
+    The mimetype is used for serialized objects, and tells the 
+    ResXResourceReader how to depersist the object. This is currently not 
+    extensible. For a given mimetype the value must be set accordingly:
+    
+    Note - application/x-microsoft.net.object.binary.base64 is the format 
+    that the ResXResourceWriter will generate, however the reader can 
+    read any of the formats listed below.
+    
+    mimetype: application/x-microsoft.net.object.binary.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Binary.BinaryFormatter
+            : and then encoded with base64 encoding.
+    
+    mimetype: application/x-microsoft.net.object.soap.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Soap.SoapFormatter
+            : and then encoded with base64 encoding.
+
+    mimetype: application/x-microsoft.net.object.bytearray.base64
+    value   : The object must be serialized into a byte array 
+            : using a System.ComponentModel.TypeConverter
+            : and then encoded with base64 encoding.
+    -->
   <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
     <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
     <xsd:element name="root" msdata:IsDataSet="true">
       <xsd:complexType>
         <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
           <xsd:element name="data">
             <xsd:complexType>
               <xsd:sequence>
@@ -773,13 +849,13 @@
     <value>Lyrics offset</value>
   </data>
   <data name="LyricsOffsetToolTip" xml:space="preserve">
-    <value>Moves lyrics and vocal notes later (positive) or earlier (negative). Saving rewrites the chart.</value>
+    <value>Moves lyrics and vocal notes later (positive) or earlier (negative).</value>
   </data>
   <data name="LyricsRevertOffsetToolTip" xml:space="preserve">
     <value>Reset the lyrics offset</value>
   </data>
   <data name="LyricsOffsetBeforeStartFormat" xml:space="preserve">
-    <value>The lyrics would start {0} ms before the song, so this can't be saved. Move them at least that much later.</value>
+    <value>The lyrics would start {0} ms before the song, so this can't be saved.</value>
     <comment>{0} is a number of milliseconds: how much later the lyrics must move to start with the song.</comment>
   </data>
   <data name="PickLyricsTitle" xml:space="preserve">
@@ -825,7 +901,7 @@
     <value>Parallel reads</value>
   </data>
   <data name="ScanParallelismDescription" xml:space="preserve">
-    <value>How many folders a scan searches and songs it reads at once. Deduplicate compares this many files at once too. Higher is faster on SSDs and network drives; 1 reads one at a time.</value>
+    <value>How many folders a scan searches and songs it reads at once. Deduplicate compares this many files at once too.</value>
   </data>
   <data name="ScanParallelismKeywords" xml:space="preserve">
     <value>threads parallel parallelism concurrency workers speed performance</value>
@@ -895,7 +971,7 @@
     <value>Show waveforms</value>
   </data>
   <data name="ShowWaveformsDescription" xml:space="preserve">
-    <value>Draw the song's and each track's waveform. When off, tracks aren't read ahead, saving work on slower computers. The song's length shows once played.</value>
+    <value>Draw the song's and each track's waveform.</value>
   </data>
   <data name="ShowWaveformsKeywords" xml:space="preserve">
     <value>waveform peaks visualizer visualiser performance slow</value>
@@ -918,7 +994,7 @@
     <value>Take colors from album art</value>
   </data>
   <data name="AlbumArtThemeDescription" xml:space="preserve">
-    <value>Tints the main window, its accent color, and the spectrum to match the selected song's album art, fading between songs. When off, the app keeps its own colors.</value>
+    <value>Tints the main window, its accent color, and the spectrum to match the selected song's album art. When off, the app keeps its own colors.</value>
   </data>
   <data name="AlbumArtThemeKeywords" xml:space="preserve">
     <value>colour color theme dynamic accent tint cover art album artwork palette</value>
@@ -1140,7 +1216,7 @@
     <value>Audio offset</value>
   </data>
   <data name="AudioOffsetToolTip" xml:space="preserve">
-    <value>Moves all audio later (positive) or earlier (negative) relative to the chart and lyrics. The background video stays with the audio and has its own offset. Saved as song.ini's delay.</value>
+    <value>Moves all audio later (positive) or earlier (negative) relative to the chart and lyrics.</value>
   </data>
   <data name="AudioRevertOffsetToolTip" xml:space="preserve">
     <value>Reset the audio offset</value>
@@ -1149,7 +1225,7 @@
     <value>Video Offset</value>
   </data>
   <data name="VideoOffsetToolTip" xml:space="preserve">
-    <value>Moves the background video later (positive) or earlier (negative) relative to the audio. Saved as song.ini's video_start_time.</value>
+    <value>Moves the background video later (positive) or earlier (negative) relative to the audio.</value>
   </data>
   <data name="VideoOffsetButtonToolTip" xml:space="preserve">
     <value>Line the video up with the audio</value>
@@ -1161,7 +1237,7 @@
     <value>Seek ahead</value>
   </data>
   <data name="HighwayLookAheadDescription" xml:space="preserve">
-    <value>How many seconds ahead of the strike line the note highway shows. Looking further ahead makes the notes fall more slowly.</value>
+    <value>How many seconds ahead of the strike line the note highway shows.</value>
   </data>
   <data name="HighwayLookAheadKeywords" xml:space="preserve">
     <value>highway look ahead lookahead scroll speed hyperspeed note speed notes chart falling</value>
@@ -1346,7 +1422,7 @@
     <value>Alignment</value>
   </data>
   <data name="MergeAlignmentDescription" xml:space="preserve">
-    <value>How far each song's chart shifts to match the kept audio; its parts, lyrics, and video shift with it. Auto-align matches each song to one already aligned: by a shared part, its full or opening note pattern, or by mixed-down audio. Then fine-tune each part with the note highway's offsets.</value>
+    <value>How far each song's chart shifts to match the kept audio; its parts, lyrics, and video shift with it. Fine-tune each part with the note highway's offsets.</value>
   </data>
   <data name="MergeAlignmentLabel" xml:space="preserve">
     <value>Offset</value>
@@ -1669,10 +1745,10 @@
     <value>The preview can't be put together: {0}</value>
   </data>
   <data name="MergePreviewNote" xml:space="preserve">
-    <value>Preview of the merged song. Offsets set on its note highway apply at merge; everything else can be edited after merging.</value>
+    <value>Preview of the merged song.</value>
   </data>
   <data name="DedupToolTip" xml:space="preserve">
-    <value>Find duplicate songs across the library, including different charts of the same song, and move unneeded copies to the trash. Rescans first to compare what's on disk now.</value>
+    <value>Find duplicate songs across the library. Rescans first to compare what's on disk now.</value>
   </data>
   <data name="DedupWindowTitle" xml:space="preserve">
     <value>Deduplicate Library</value>
@@ -1743,7 +1819,7 @@
     <value>Every file and all metadata match, so deleting a copy loses nothing. One copy per group is kept.</value>
   </data>
   <data name="DedupSameChartDescription" xml:space="preserve">
-    <value>The chart matches, but metadata or other files differ. Review the differences, then delete by group or all at once, or open a group in Merge to combine metadata and files.</value>
+    <value>The chart matches, but metadata or other files differ.</value>
   </data>
   <data name="DedupMergeDescription" xml:space="preserve">
     <value>Same artist and title with different charts. Merge them into one new .sng, then delete the charts it came from.</value>
@@ -2393,7 +2469,7 @@ Each song is rechecked first. Changed songs, or ones whose kept copy is missing,
     <value>Audio/visual latency</value>
   </data>
   <data name="AudioLatencyDescription" xml:space="preserve">
-    <value>How much later audio is heard than shown, measured per output device by the calibration tool. The highway, lyrics, and background are drawn that much earlier. This adds to the latency detected from the device.</value>
+    <value>How much later audio is heard than shown, measured per output device by the calibration tool. This adds to the latency detected from the device.</value>
   </data>
   <data name="AudioLatencyKeywords" xml:space="preserve">
     <value>latency delay offset sync calibrate calibration audio video lag bluetooth</value>
@@ -2403,7 +2479,7 @@ Each song is rechecked first. Changed songs, or ones whose kept copy is missing,
     <comment>A switch: whether the latency read from the output device's buffers is added to its calibrated latency.</comment>
   </data>
   <data name="DetectLatencyDescription" xml:space="preserve">
-    <value>Read the output device's buffer latency from the system and add it to the calibrated latency. Excludes Bluetooth and display delay, so calibrate to cover those. Shared with Chart Builder.</value>
+    <value>Read the output device's buffer latency from the system and add it to the calibrated latency. You still need to do manual calibration with this enabled. Shared with Chart Builder.</value>
   </data>
   <data name="DetectLatencyKeywords" xml:space="preserve">
     <value>detect automatic auto latency delay buffer hardware device sync calibration audio lag</value>
@@ -2534,7 +2610,7 @@ Each song is rechecked first. Changed songs, or ones whose kept copy is missing,
     <comment>Library right-click menu: opens the Generate lower difficulties window for the selected songs.</comment>
   </data>
   <data name="GenerateLowerDifficultiesToolTip" xml:space="preserve">
-    <value>Fill in Hard, Medium, and Easy from the difficulty above each, skipping charted ones. New charts go into the songs' drafts until saved.</value>
+    <value>Fill in Hard, Medium, and Easy from the difficulty above each, skipping charted ones.</value>
   </data>
   <data name="LowerDifficultiesTitle" xml:space="preserve">
     <value>Generate Lower Difficulties</value>
