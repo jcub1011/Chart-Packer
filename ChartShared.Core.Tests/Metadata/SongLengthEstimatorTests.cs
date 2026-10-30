@@ -42,10 +42,10 @@ public sealed class SongLengthEstimatorTests
     public void DeleteRoot() => _root.Delete(recursive: true);
 
     [TestMethod]
-    public void LengthIsTheLongestPartPlusTheBuffer()
+    public void LengthIsTheLongestPart()
     {
-        Assert.AreEqual(6000L, new SongLengthEstimate(3000, 5000, 4000).SongLengthMs);
-        Assert.AreEqual(1500L, new SongLengthEstimate(null, 500, null).SongLengthMs);
+        Assert.AreEqual(5000L, new SongLengthEstimate(3000, 5000, 4000).SongLengthMs);
+        Assert.AreEqual(500L, new SongLengthEstimate(null, 500, null).SongLengthMs);
         Assert.IsNull(new SongLengthEstimate(null, null, null).SongLengthMs);
     }
 
@@ -77,7 +77,7 @@ public sealed class SongLengthEstimatorTests
         var estimate = Estimate(entry);
 
         Assert.AreEqual(2500L, estimate.ChartEndMs);
-        Assert.AreEqual(3500L, estimate.SongLengthMs);
+        Assert.AreEqual(2500L, estimate.SongLengthMs);
     }
 
     [TestMethod]
