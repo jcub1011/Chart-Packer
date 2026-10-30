@@ -390,7 +390,7 @@
     <value>Auto-set song length</value>
   </data>
   <data name="AutoSetLengthToolTip" xml:space="preserve">
-    <value>Set each song's length to its longest part (last chart note, longest audio track, or background video) plus 1 second</value>
+    <value>Set each song's length to its longest part (last chart note, longest audio track, or background video)</value>
   </data>
   <data name="DifficultyDistinctBadge" xml:space="preserve">
     <value>*</value>

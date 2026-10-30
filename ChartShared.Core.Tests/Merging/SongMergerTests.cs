@@ -121,7 +121,7 @@ public sealed class SongMergerTests
         Assert.AreEqual("Metal", metadata["genre"]);
         Assert.AreEqual("True", metadata["pro_drums"]);
         Assert.IsFalse(metadata.ContainsKey("preview_start_time"));
-        Assert.IsGreaterThan(SongLengthEstimate.BufferMs, long.Parse(metadata["song_length"]));
+        Assert.IsGreaterThan(0L, long.Parse(metadata["song_length"]));
 
         Assert.AreSequenceEqual(
             ["notes.mid", "guitar.ogg", "drums.ogg", "album.png"], [.. read.Files.Select(f => f.Name)], Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
