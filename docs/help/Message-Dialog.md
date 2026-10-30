@@ -1,9 +1,5 @@
-# Message dialog
+# Message Dialog
 
-A small notice in Chart Packer with only an **OK** button. For example, it tells you that every song passed [validation](Validator.md).
-
-Enter or Escape closes it.
-
-*Details and screenshots are coming.*
+It's a plain dialog that shows a message.
 
 [Back to Home](Home.md)

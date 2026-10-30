@@ -876,7 +876,7 @@
     <comment>Under the latency when it can't be read from the device, or detection is off in Settings.</comment>
   </data>
   <data name="CalibrationDetectedToolTip" xml:space="preserve">
-    <value>Device-buffer latency reported by the system is added to the latency set here while Detect output latency is on. Excludes Bluetooth and display delay: set those here.</value>
+    <value>Device-buffer latency reported by the system is added to the latency set here while Detect output latency is on.</value>
   </data>
   <data name="CalibrationSave" xml:space="preserve">
     <value>Save</value>
@@ -968,7 +968,7 @@
     <value>The offset couldn't be saved.</value>
   </data>
   <data name="CalibrationDeviceHowText" xml:space="preserve">
-    <value>No sound: hit along with what you see. Any button, fret, strum, key, or pad counts; releases don't. The result accounts for device lag, screen lag, and your timing bias; playtests subtract it from every input from the device.</value>
+    <value>No sound: hit along with what you see. Any button, fret, strum, key, or pad counts.</value>
   </data>
   <data name="CalibrationAudioUnavailableFormat" xml:space="preserve">
     <value>The audio can't be played: {0}</value>
@@ -1007,10 +1007,10 @@
     <value>There weren't enough taps near the clicks to measure. Try again.</value>
   </data>
   <data name="CalibrationTapHowText" xml:space="preserve">
-    <value>Notes are hidden while you tap, so follow the sound alone. Any key or highway click counts; releases don't. The result goes into the latency above; check it against the notes before saving.</value>
+    <value>Any key or highway click counts.</value>
   </data>
   <data name="CalibrationTapDevicesNote" xml:space="preserve">
-    <value>Instrument devices count too. A device calibrated under Input devices has its offset subtracted, improving accuracy.</value>
+    <value>Instrument devices count too. A device calibrated under Input devices has its offset subtracted.</value>
   </data>
   <data name="ReductionRulesHeading" xml:space="preserve">
     <value>Rules</value>

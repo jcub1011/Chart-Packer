@@ -3,35 +3,34 @@
 ## Install
 
 1. Download `ChartPacker-<version>-win-x64-setup.exe` (or the portable zip) from the [releases page](https://github.com/jcub1011/Chart-Packer/releases).
-2. Run the installer. It installs for the current user without needing administrator rights, unless you choose all users.
-3. Choose **Chart Packer and Chart Builder** (the default), or **Custom** to leave out Chart Builder.
+2. Run the installer.
 
-FFmpeg is included, so there is nothing else to install.
+All FFmpeg dependencies come bundled.
 
-Releases aren't code-signed, so Windows SmartScreen shows "Windows protected your PC" the first time. Choose **More info**, then **Run anyway**.
+Releases aren't code-signed, so Windows SmartScreen shows "Windows protected your PC" the first time. Make sure you download the installer from the GitHub releases page and not from other sources.
 
-The installer also makes `.sng` files open in Chart Builder, shows an `.sng`'s album art as its Explorer thumbnail, and adds **Open with Chart Builder** to folders (when Chart Builder is installed).
+When Chart Builder is installed, it becomes the default program for `.sng` files and adds an **Open with Chart Builder** option to the right-click menu of folders.
 
-## Pack and unpack songs with Chart Packer
+## Pack and Unpack Songs With Chart Packer
 
-1. Open Chart Packer and choose **File**, then **Choose Songs Folder…** (or drag a folder onto the window). It scans for `.sng` files and song folders.
+1. Open Chart Packer, choose **File**, then **Choose Songs Folder…**, and then **File**, **Rescan** (F5) to scan for `.sng` files and song folders. Dragging a folder onto the window sets it and scans straight away.
 2. Select songs in the library list. The right side shows each song's details.
 3. Use the **Pack** menu to pack song folders into `.sng` files, or to unpack `.sng` files into folders.
 4. Click the status bar at the bottom to see the results in [Job Progress](Job-Progress.md).
 
-See [Chart Packer](Chart-Packer.md) for the full tour.
+See [Chart Packer](Chart-Packer.md) for more information.
 
-## Make a chart with Chart Builder
+## Make a Chart With Chart Builder
 
 1. Open Chart Builder. It starts with an empty "Untitled Chart".
-2. Drop audio files onto the window to start a chart from them, or use **File**, then **Open…** to edit an existing song.
+2. Drop audio files onto the window to start a chart from them (each file name must say which stem it is, such as `song` or `guitar`), or use **File**, then **Open…** to edit an existing song.
 3. Add tracks and fill in the metadata in the Chart Settings tab, then chart notes in the lanes.
 4. **File**, then **Save** (Ctrl+S) saves the chart. A new chart asks where to put its folder ([First Save](First-Save.md)).
 5. **File**, then **Pack…** exports a `.sng` ([Export Song](Export-SNG.md)).
 
-See [Chart Builder](Chart-Builder.md) for the full tour.
+See [Chart Builder](Chart-Builder.md) for more information.
 
-## Getting help
+## Getting Help
 
 Every window has a **?** button in its title bar. Click it, or press **F1**, to open that window's page here.
 

@@ -1,15 +1,11 @@
-# Crash dialog
+# Crash Dialog
 
-Appears when the app hits an unexpected error. The app carries on rather than closing, but it may not behave as expected until it restarts, so save soon.
+Appears when the app hits an unexpected error. For most errors the app carries on rather than closing, but it may not behave as expected until it restarts, so save soon. Some errors still end the app.
 
-## What's in it
+## What's In It
 
 - **Show details** and **Copy details**, to see or copy the error.
-- **Open log folder**, and **Report on GitHub**.
+- **Open log folder** (only when logging is on) and **Report on GitHub**.
 - **Quit** (which asks about unsaved changes first) and **Keep working**.
-
-If more errors arrive while it's open, it says how many.
-
-*Details and screenshots are coming.*
 
 [Back to Home](Home.md)

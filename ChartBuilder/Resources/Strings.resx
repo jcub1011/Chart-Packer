@@ -747,7 +747,7 @@ Open it anyway?</value>
     <value>Calibrate Audio Latency</value>
   </data>
   <data name="CalibrationPromptFormat" xml:space="preserve">
-    <value>{0} is not calibrated. Calibration lines up what you see with what you hear, which note timing depends on. Takes about a minute.</value>
+    <value>{0} is not calibrated.</value>
     <comment>{0} is the audio output device's name.</comment>
   </data>
   <data name="CalibrationPromptConfirm" xml:space="preserve">
@@ -760,7 +760,7 @@ Open it anyway?</value>
     <value>Audio/visual latency</value>
   </data>
   <data name="AudioLatencyDescription" xml:space="preserve">
-    <value>How much later audio is heard than the screen shows it, per output device. Drawn audio shifts by it. This adds to the latency detected from the device.</value>
+    <value>How much later audio is heard than the screen shows it, per output device.</value>
   </data>
   <data name="AudioLatencyKeywords" xml:space="preserve">
     <value>latency delay offset sync calibrate calibration audio video lag bluetooth</value>
@@ -833,7 +833,7 @@ Open it anyway?</value>
     <value>Drums</value>
   </data>
   <data name="ChartSettingsDrumsToolTip" xml:space="preserve">
-    <value>Switching between 4-lane and Pro keeps notes as they are. To or from 5-lane converts them and lists any unplaced. Undo brings them back.</value>
+    <value>Switching between 4-lane and Pro keeps notes as they are. To or from 5-lane converts them and lists any unplaced.</value>
   </data>
   <data name="DrumsFourLane" xml:space="preserve">
     <value>4-lane</value>
@@ -849,7 +849,7 @@ Open it anyway?</value>
     <comment>{0} is the drum variant: 4-lane, Pro or 5-lane.</comment>
   </data>
   <data name="DrumConversionReportFormat" xml:space="preserve">
-    <value>Converted the drums to {0}. Unplaced notes: {1}. Undo brings them back.</value>
+    <value>Converted the drums to {0}. Unplaced notes: {1}.</value>
     <comment>{0} is the drum variant; {1} how many notes are listed below.</comment>
   </data>
   <data name="DrumConversionFromFourLane" xml:space="preserve">
@@ -1594,7 +1594,7 @@ Open it anyway?</value>
     <value>Write a copy of the song, with the chart and song.ini changes, to another folder</value>
   </data>
   <data name="ExportCopyNewChartToolTip" xml:space="preserve">
-    <value>Save the new chart first; its copy is made from its song folder</value>
+    <value>Save the new chart first</value>
     <comment>Export copy's tooltip, disabled, for a new chart that hasn't been saved yet.</comment>
   </data>
   <data name="ExportCopyPickerTitle" xml:space="preserve">
@@ -1664,7 +1664,7 @@ Saving also changes song.ini:
     <value>The chart wasn't saved: {0}</value>
   </data>
   <data name="SaveReadBackFailedFormat" xml:space="preserve">
-    <value>The chart wasn't saved: it didn't read back as written ({0}). Nothing on disk changed. This is a bug; the log has details.</value>
+    <value>The chart wasn't saved: it didn't read back as written ({0}). Nothing on disk changed. See logs.</value>
     <comment>{0} is where the written chart differs from the one in the editor.</comment>
   </data>
   <data name="SavedStatus" xml:space="preserve">
@@ -1780,7 +1780,7 @@ Saving also changes song.ini:
     <comment>The Settings row for how often the chart is autosaved.</comment>
   </data>
   <data name="AutosaveMinutesDescription" xml:space="preserve">
-    <value>Minutes between autosaves of the open chart, for crash recovery. Also autosaves when playback stops. Autosaves live in Chart Builder's settings folder, never in the song.</value>
+    <value>Minutes between autosaves of the open chart, for crash recovery.</value>
   </data>
   <data name="AutosaveMinutesKeywords" xml:space="preserve">
     <value>autosave recovery crash backup minutes interval</value>
@@ -2347,7 +2347,7 @@ Saving also changes song.ini:
     <value>Lanes show</value>
   </data>
   <data name="LaneBackdropDescription" xml:space="preserve">
-    <value>Whether a lane draws audio as a waveform or spectrogram until switched, from the lane's audio button or with W.</value>
+    <value>Whether a lane draws audio as a waveform or spectrogram until switched</value>
   </data>
   <data name="LaneBackdropKeywords" xml:space="preserve">
     <value>waveform spectrogram audio lane behind beside</value>
@@ -2384,7 +2384,7 @@ Saving also changes song.ini:
     <value>Spectrogram memory budget (MB)</value>
   </data>
   <data name="SpectrogramBudgetDescription" xml:space="preserve">
-    <value>How much memory all stems' spectrograms may take together. Least recently used stems release first. Spectrograms are never written to disk.</value>
+    <value>How much memory all stems' spectrograms may take together.</value>
   </data>
   <data name="SpectrogramBudgetKeywords" xml:space="preserve">
     <value>spectrogram memory budget ram megabytes</value>
@@ -2694,7 +2694,7 @@ Saving also changes song.ini:
     <value>Copy Difficulty</value>
   </data>
   <data name="CopyDifficultyConfirmFormat" xml:space="preserve">
-    <value>{0} has {1} notes, which {2} will replace. Undo puts them back.</value>
+    <value>{0} has {1} notes, which {2} will replace</value>
   </data>
   <data name="CopyDifficultyConfirmButton" xml:space="preserve">
     <value>Replace</value>
@@ -3079,7 +3079,7 @@ Saving also changes song.ini:
     <value>Difficulty</value>
   </data>
   <data name="DifficultyTrackToolTip" xml:space="preserve">
-    <value>The part and difficulty analyzed: the focused lane, or one picked</value>
+    <value>The part and difficulty analyzed</value>
   </data>
   <data name="DifficultyOpenWindowToolTip" xml:space="preserve">
     <value>Show the analysis in a window of its own, with room for the graph</value>
@@ -3088,7 +3088,7 @@ Saving also changes song.ini:
     <value>Nothing to analyze: focus a five-fret lane with notes, or pick one.</value>
   </data>
   <data name="DifficultyFailed" xml:space="preserve">
-    <value>The difficulty couldn't be worked out. The log says why.</value>
+    <value>The difficulty couldn't be worked out. See logs.</value>
   </data>
   <data name="DifficultyRankFormat" xml:space="preserve">
     <value>Rank {0:0.0}</value>
@@ -3160,7 +3160,7 @@ Saving also changes song.ini:
     <value>Difficulty by attribute</value>
   </data>
   <data name="DifficultySpiderToolTip" xml:space="preserve">
-    <value>Each attribute's difficulty: the ring is 100, the limit of realistic clean play. The dashed shape is the whole chart.</value>
+    <value>Each attribute's difficulty</value>
   </data>
   <data name="DifficultyGraphName" xml:space="preserve">
     <value>Difficulty over the song</value>
@@ -3239,14 +3239,14 @@ Saving also changes song.ini:
     <comment>{0} is the file name; {1} is the reason.</comment>
   </data>
   <data name="ArtVideoNeedsFfmpeg" xml:space="preserve">
-    <value>The video can't preview: FFmpeg isn't installed with Chart Builder. It's still saved with the song.</value>
+    <value>The video can't preview: FFmpeg isn't installed with Chart Builder.</value>
   </data>
   <data name="ArtVideoStartLabel" xml:space="preserve">
     <value>Video start (ms)</value>
     <comment>Beside the box under the background video that sets song.ini's video_start_time.</comment>
   </data>
   <data name="ArtVideoStartToolTip" xml:space="preserve">
-    <value>Where the song starts in the video, to line it up with the audio: song.ini's video_start_time. Positive skips that much video; negative holds the first frame that long. The video previews each value at the playhead.</value>
+    <value>Where the song starts in the video</value>
   </data>
   <data name="ArtVideoStartRevertToolTip" xml:space="preserve">
     <value>Put the video start back as saved</value>
@@ -3255,14 +3255,14 @@ Saving also changes song.ini:
     <value>Audio delay (ms)</value>
   </data>
   <data name="ChartSettingsDelayToolTip" xml:space="preserve">
-    <value>How much later than its notes the chart plays: song.ini's delay</value>
+    <value>How much later than its notes the chart plays</value>
   </data>
   <data name="ChartSettingsDifficultyHeader" xml:space="preserve">
     <value>Difficulty</value>
     <comment>Above the Parts rows' rating boxes.</comment>
   </data>
   <data name="ChartSettingsPartToolTip" xml:space="preserve">
-    <value>Whether the chart has this part. Turning off a part with notes asks first.</value>
+    <value>Whether the chart has this part.</value>
   </data>
   <data name="ChartSettingsDifficultyToolTip" xml:space="preserve">
     <value>The part's difficulty rating, 0 to 6 as the games show it; ? while unrated. Click to change it</value>
@@ -3282,7 +3282,7 @@ Saving also changes song.ini:
     <value>Tracks</value>
   </data>
   <data name="ChartSettingsTracksNote" xml:space="preserve">
-    <value>Mute, solo and volume are listen-only: not saved or undone.</value>
+    <value>Mute, solo and volume are listen-only</value>
   </data>
   <data name="PendingFileFormat" xml:space="preserve">
     <value>{0} from {1}</value>
@@ -3490,7 +3490,7 @@ Saving also changes song.ini:
     <comment>Settings: how many seconds the countdown before the song starts counts.</comment>
   </data>
   <data name="CountdownSecondsDescription" xml:space="preserve">
-    <value>How many seconds the countdown counts before recording or playtesting starts the song, from 1 to 10. It only counts when Count down before starting covers what you're starting.</value>
+    <value>How many seconds the countdown counts before recording or playtesting starts the song, from 1 to 10.</value>
     <comment>Settings: what Countdown length does.</comment>
   </data>
   <data name="CountdownSecondsKeywords" xml:space="preserve">
