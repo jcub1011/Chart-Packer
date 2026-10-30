@@ -6,6 +6,8 @@ New here? Start with [Getting Started](Getting-Started.md).
 
 Every window has a **?** button in its title bar (or press **F1**) that opens its page below.
 
+This wiki gives a high-level overview of what each window does and its idiosyncrasies. If you are unsure what a specific button does, hover over it with your mouse; it will likely have a tooltip describing its behavior.
+
 ## Chart Packer
 
 - [Chart Packer](Chart-Packer.md): the main window
@@ -25,12 +27,10 @@ Every window has a **?** button in its title bar (or press **F1**) that opens it
 - [Input Devices](Input-Devices.md)
 - [Messages](Messages.md)
 
-## Both apps
+## Both Apps
 
 - [Settings](Settings.md)
 - [Keyboard Shortcuts](Keyboard-Shortcuts.md)
 - [Calibration](Calibration.md)
 - [Chart Issues](Chart-Issues.md)
 - [Confirm dialogs](Confirm-Dialog.md) and the [crash dialog](Crash-Dialog.md)
-
-*These pages are short overviews for now. Details and screenshots are coming.*

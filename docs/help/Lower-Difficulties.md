@@ -4,7 +4,7 @@ Fills in Hard, Medium and Easy for the selected songs from the difficulty above 
 
 **Open it from:** Chart Packer, **Tools**, then **Generate Lower Difficulties…**, or right-click selected songs in the library.
 
-## What's in it
+## What's In It
 
 - Chips for which difficulties and parts to generate, and what to do with ones that already have notes (skip or replace).
 - The rules, with **Reset** and **Save as defaults** (shared with Chart Builder).
@@ -12,11 +12,10 @@ Fills in Hard, Medium and Easy for the selected songs from the difficulty above 
 - An optional preview of the result. Space plays and pauses, N goes to the next change, and Shift+N to the previous.
 - **Generate**, **Stop**, **Save**, and **Close**.
 
-## Good to know
+## Good to Know
 
 - Generated charts are drafts. Save them from this window or from the library.
 - A song that another app has open is refused.
-
-*Details and screenshots are coming.*
+- Don't accept the generated difficulties as-is. They are intended to be a starting point for charting.
 
 [Back to Home](Home.md)

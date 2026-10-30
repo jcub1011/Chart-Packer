@@ -4,14 +4,12 @@ Previews what will be packed into a `.sng` and asks where it goes. Nothing is wr
 
 **Open it from:** Chart Builder, **File**, then **Pack…**. Pack is off while the chart has errors in Findings. A new chart is saved first ([First Save](First-Save.md)).
 
-## What's in it
+## What's In It
 
 - A preview card: album art, title, artist, album, genre, year, length and charter.
 - **Destination:** a folder, and what to do if the `.sng` already exists (overwrite it, rename it, or skip).
 - **Audio:** each stem and whether it will be transcoded to Opus, with a quality choice.
 - **Song metadata:** a collapsible list.
 - **Export** and **Cancel**. Progress is shown in [Export Progress](Export-Progress.md).
-
-*Details and screenshots are coming.*
 
 [Back to Home](Home.md)
