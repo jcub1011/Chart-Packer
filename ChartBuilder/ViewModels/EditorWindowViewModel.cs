@@ -302,7 +302,10 @@ namespace ChartBuilder.ViewModels
         /// A change from Chart settings or the Art tab (charter-spec C1), as one undoable step. Playback goes on, so the
         /// tempo can be found by ear; the beats follow the change.
         /// </summary>
-        private void ApplyChartSettings(IChartCommand command)
+        private void ApplyChartSettings(IChartCommand command) => TryApplyChartSettings(command);
+
+        /// <summary>As <see cref="ApplyChartSettings"/>; false when the change was refused, so the caller can stop.</summary>
+        private bool TryApplyChartSettings(IChartCommand command)
         {
             try
             {
@@ -313,11 +316,12 @@ namespace ChartBuilder.ViewModels
                 // Refused before anything changed, as every command checks first, so Chart settings shows the chart again.
                 Messages.Error(string.Format(CultureInfo.CurrentCulture, Strings.ChartSettingsNotAppliedFormat, ex.Message));
                 ChartSettings.Reload();
-                return;
+                return false;
             }
 
             if (DrumConversionText.ConversionIn(command) is { Report: { } report } conversion)
                 ReportConversion(conversion, report);
+            return true;
         }
 
         /// <summary>

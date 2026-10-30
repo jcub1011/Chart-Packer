@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using ChartBuilder.Resources;
 using ChartShared.Audio.Encoding;
 using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Commands;
 using ChartShared.Core.Charting.Saving;
 using ChartShared.Core.Charts;
 using ChartShared.Core.Jobs;
@@ -491,9 +492,10 @@ namespace ChartBuilder.ViewModels
         }
 
         /// <summary>
-        /// A new chart's first save (charter-spec C1): once Chart settings has its name and artist, asks where its
+        /// A new chart's first save (charter-spec C1): asks for its name and artist if either isn't set, then where its
         /// song folder goes, makes the folder, then locks the song, puts it on the recent songs and goes on with it as a
-        /// song opened from there.
+        /// song opened from there. The name and artist are put in the chart only once the folder is chosen, so cancelling
+        /// leaves the chart as it was.
         /// </summary>
         private async Task<bool> FirstSaveAsync()
         {
@@ -501,13 +503,17 @@ namespace ChartBuilder.ViewModels
             string Value(string key) => pairs.LastOrDefault(p => p.Key.Equals(key, StringComparison.OrdinalIgnoreCase)).Value?.Trim() ?? "";
             string name = Value("name");
             string artist = Value("artist");
+            bool asked = false;
             if (name.Length == 0 || artist.Length == 0)
             {
-                // They're set in Chart settings' Metadata, which is brought up, expanded, to set them in.
-                Messages.Error(Strings.FirstSaveNeedsNameAndArtist);
-                PanelLayout.SetCollapsed(ChartSettingsTab, MetadataSection, false);
-                ShowLeftPanel(ChartSettingsTab);
-                return false;
+                // Whichever is set starts filled in; both are needed for the folder's name.
+                var info = new SongInfoViewModel(name, artist);
+                if (!await _services.FirstSave.AskSongInfoAsync(info))
+                    return false;
+
+                name = info.Name.Trim();
+                artist = info.Artist.Trim();
+                asked = true;
             }
 
             var dialog = new FirstSaveViewModel(
@@ -535,6 +541,14 @@ namespace ChartBuilder.ViewModels
                 await _confirmations.AlertAsync(
                     Strings.SongLockedTitle,
                     LockedText(target.FullPath, Strings.FirstSaveLockedFormat, Strings.FirstSaveLockedInPackerFormat, Strings.FirstSaveLockedElsewhereFormat));
+                return false;
+            }
+
+            if (asked && SongCommands.SetValues(Song, new Dictionary<string, string?> { ["name"] = name, ["artist"] = artist }) is { } set
+                && !TryApplyChartSettings(set))
+            {
+                // Refused, so the song folder would be named for values the chart doesn't have.
+                songLock.Dispose();
                 return false;
             }
 

@@ -724,9 +724,10 @@ value at the playhead as it changes, and the value is set as one undo step once 
 
 **The first save** of a new chart ([C17](#c17-save-and-export)).
 
-- The song's **name and artist** are set in Chart settings' Metadata. The save can't go ahead until
-  both are set: it says so and brings Chart settings up. The dialog shows them, and starts the
-  folder name from them.
+- The song's **name and artist** are set in Chart settings' Metadata. If either isn't set, the save
+  first asks for them in a small Song Details dialog, with the one that is set already filled in; if
+  both are set it doesn't show it. Cancelling it cancels the save. What it's given is set as one
+  undoable step. The folder dialog shows them, and starts the folder name from them.
 - It asks where the song folder goes: a parent folder and a folder name.
   - The parent folder is by default the last one used for a new chart, otherwise Chart Packer's
     library root (read from Chart Packer's settings, never written).

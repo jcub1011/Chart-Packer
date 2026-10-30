@@ -1718,8 +1718,18 @@ Saving also changes song.ini:
   <data name="FirstSaveLockedFormat" xml:space="preserve">
     <value>{0} is open in another Chart Builder.</value>
   </data>
-  <data name="FirstSaveNeedsNameAndArtist" xml:space="preserve">
-    <value>Set the song's name and artist in Chart Settings' Metadata before saving.</value>
+  <data name="SongInfoTitle" xml:space="preserve">
+    <value>Song Details</value>
+  </data>
+  <data name="SongInfoIntro" xml:space="preserve">
+    <value>A new chart needs the song's name and the artist before it can be saved. They are written to song.ini, and the song folder's name starts from them.</value>
+  </data>
+  <data name="SongInfoNameLabel" xml:space="preserve">
+    <value>Name</value>
+    <comment>The song's title, the name key in song.ini.</comment>
+  </data>
+  <data name="SongInfoArtistLabel" xml:space="preserve">
+    <value>Artist</value>
   </data>
   <data name="FirstSaveSongLabel" xml:space="preserve">
     <value>Song</value>
