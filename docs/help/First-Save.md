@@ -4,7 +4,7 @@ Asks where a new chart's folder goes. A new chart has no folder yet, and this ma
 
 ## What's In It
 
-- **Song:** the title and artist (set in Chart Settings, under Metadata, before saving).
+- **Song:** the title and artist. When either isn't set yet, a Song Details dialog asks for them first, with the one that is set already filled in; both are needed. They're also set in Chart Settings, under Metadata.
 - **Save In:** the parent folder, with **Browse…**.
 - **Folder Name:** the new folder's name, with the full path shown below it.
 - **Save** and **Cancel**.
