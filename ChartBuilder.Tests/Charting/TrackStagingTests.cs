@@ -54,12 +54,11 @@ public sealed class TrackStagingTests
     }
 
     [TestMethod]
-    public void TheAddTrackMenuOffersToReplaceTheStemsTheSongHas()
+    public void TheAddTrackMenuLabelsEveryStemWithJustItsName()
     {
-        var options = TrackStaging.OptionsFor(["guitar"], _ => new CommunityToolkit.Mvvm.Input.RelayCommand(() => { }));
+        var options = TrackStaging.OptionsFor(_ => new CommunityToolkit.Mvvm.Input.RelayCommand(() => { }));
 
         Assert.HasCount(ChartShared.Core.Scanning.AudioStems.Stems.Count, options);
-        Assert.AreNotEqual("guitar", options.Single(o => o.Stem == "guitar").Label);
-        Assert.AreEqual("bass", options.Single(o => o.Stem == "bass").Label);
+        Assert.IsTrue(options.All(o => o.Label == o.Stem));
     }
 }
