@@ -36,6 +36,22 @@ public static class SongFileCommit
     public static Task MoveOverAsync(string source, string target, CancellationToken cancellationToken = default, TimeSpan? patience = null) =>
         RetryAsync(target, () => File.Move(source, target, overwrite: true), patience ?? Patience, cancellationToken);
 
+    /// <summary>
+    /// Replaces <paramref name="target"/> with <paramref name="source"/>, which a reader holding it open can allow: a
+    /// caller that opens the file sharing the delete, as a song's <c>.sng</c> is, doesn't stop its save.
+    /// </summary>
+    /// <remarks>
+    /// A move over a file that's open is refused even when the reader shares the delete, but a replace isn't. The old
+    /// file stays open for whoever holds it, so what they're reading goes on being what they opened. A filesystem with
+    /// no replace of its own is moved into instead.
+    /// </remarks>
+    /// <param name="patience">How long to keep trying while <paramref name="target"/> is in use; <see cref="DefaultPatience"/> when not given.</param>
+    /// <exception cref="IOException">The replace failed, or the target was still in use once <paramref name="patience"/> ran out.</exception>
+    /// <exception cref="UnauthorizedAccessException">Access is denied, or the target was still in use once <paramref name="patience"/> ran out.</exception>
+    /// <exception cref="OperationCanceledException">Cancelled while waiting.</exception>
+    internal static void ReplaceOver(string source, string target, CancellationToken cancellationToken = default, TimeSpan? patience = null) =>
+        Retry(target, () => Replace(source, target), patience ?? Patience, cancellationToken);
+
     /// <summary>Moves <paramref name="source"/> to <paramref name="target"/>, which isn't there, as for a song's file set aside.</summary>
     /// <param name="patience">How long to keep trying while <paramref name="source"/> is in use; <see cref="DefaultPatience"/> when not given.</param>
     /// <exception cref="IOException">The move failed, or the source was still in use once <paramref name="patience"/> ran out.</exception>
@@ -56,6 +72,32 @@ public static class SongFileCommit
     /// <remarks>Waits without holding a thread.</remarks>
     public static Task DeleteAsync(string path, CancellationToken cancellationToken = default, TimeSpan? patience = null) =>
         RetryAsync(path, () => File.Delete(path), patience ?? Patience, cancellationToken);
+
+    // Replaces a file that exists, or moves into place a target that doesn't, as the first write of a new file does.
+    private static void Replace(string source, string target)
+    {
+        if (!File.Exists(target))
+        {
+            File.Move(source, target);
+            return;
+        }
+
+        try
+        {
+            File.Replace(source, target, destinationBackupFileName: null);
+        }
+        catch (Exception e) when (CannotReplace(e))
+        {
+            // A filesystem or share with no replace of its own, where a move into place still works, as it did before.
+            File.Move(source, target, overwrite: true);
+        }
+    }
+
+    // Whether e says the filesystem can't replace a file at all, rather than that this one is in use. Only then is a
+    // move tried instead, which can't leave a reader reading the file it opened.
+    private static bool CannotReplace(Exception e) =>
+        e is PlatformNotSupportedException
+        || (OperatingSystem.IsWindows() && e is IOException && (e.HResult & 0xFFFF) is 1 or 50);
 
     private static void Retry(string path, Action action, TimeSpan patience, CancellationToken cancellationToken)
     {

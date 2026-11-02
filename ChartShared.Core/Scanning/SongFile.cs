@@ -56,7 +56,8 @@ public static class SongFile
 
         return await Task.Run(() =>
         {
-            using SafeFileHandle handle = File.OpenHandle(entry.FullPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            // The delete is shared, so reading the art doesn't hold up a save that replaces the .sng.
+            using SafeFileHandle handle = File.OpenHandle(entry.FullPath, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
             var read = SngReader.Read(handle, cancellationToken);
             if (read.Header is not { } header)
                 return null;
@@ -70,6 +71,7 @@ public static class SongFile
     /// Opens the file <paramref name="storedName"/> of <paramref name="entry"/>, matched ignoring
     /// case, for reading and seeking: a folder's file as it is, or a <c>.sng</c>'s unmasked as
     /// it's read. A <c>/</c>-separated name opens a file in a subfolder. Disposing the stream closes the file.
+    /// A <c>.sng</c>'s stream shares the delete, so a save may replace the <c>.sng</c> while it's read.
     /// </summary>
     /// <returns>The stream, or <see langword="null"/> when there's no such file.</returns>
     /// <exception cref="IOException">The file can't be read.</exception>
@@ -85,8 +87,9 @@ public static class SongFile
             return path is null ? null : new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 64 * 1024);
         }
 
-        // The handle is opened first, so the index read is of the file it reads.
-        SafeFileHandle handle = File.OpenHandle(entry.FullPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+        // The handle is opened first, so the index read is of the file it reads. It shares the delete, so a save can
+        // replace the .sng while this reads it; the stream keeps reading the copy it opened.
+        SafeFileHandle handle = File.OpenHandle(entry.FullPath, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
         try
         {
             var read = SngReader.Read(handle, cancellationToken);

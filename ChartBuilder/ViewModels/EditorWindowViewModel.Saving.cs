@@ -400,7 +400,7 @@ namespace ChartBuilder.ViewModels
             }
 
             var entry = Song.Entry!;
-            bool released = false;
+            var released = ReleasedFiles.None;
             IsSaving = true;
             try
             {
@@ -422,12 +422,11 @@ namespace ChartBuilder.ViewModels
                 await WriteRecoveryForSaveAsync(written.Bytes, version);
 
                 // The files the save replaces or removes are kept first, so undo can still bring them back, and the editor
-                // lets go of the ones it has open, which couldn't be replaced while it held them. A .sng save rewrites
-                // the .sng itself, so every handle to it is let go of: playback and editor audio hold it open with
-                // FileShare.Read, which would otherwise block the replace, and their stored offsets would be stale after.
+                // lets go of the ones it has open, which couldn't be replaced while it held them. A .sng's readers share
+                // the delete, so a .sng save leaves its audio and video playing.
                 var stash = _stash ??= MediaStash.Create();
                 var kept = await Task.Run(() => stash.KeepAsync(Song, slots));
-                released = ReleaseFilesFor(entry, slots);
+                released = ReleaseFilesFor(slots);
                 var findings = await Task.Run(() => ChartSaver.SaveAsync(entry, request, written));
                 if (FirstError(findings) is { } error)
                 {
@@ -455,40 +454,53 @@ namespace ChartBuilder.ViewModels
             finally
             {
                 IsSaving = false;
-                if (released)
-                    ReopenFiles();
+                if (released != ReleasedFiles.None)
+                    ReopenFiles(released);
             }
+        }
+
+        /// <summary>What a save let go of, so only that is opened again once it's done.</summary>
+        [Flags]
+        private enum ReleasedFiles
+        {
+            None = 0,
+            Tracks = 1,
+            Video = 2,
         }
 
         /// <summary>
         /// Lets go of the song's files the save replaces or removes, which are held open while
         /// they're played and drawn: the audio, when a track changes, and the background video, when it does.
-        /// A <c>.sng</c> save rewrites the <c>.sng</c> itself, so it always lets go of the audio and the video,
-        /// which hold the <c>.sng</c> open and couldn't be replaced while they held it.
         /// </summary>
-        /// <returns>Whether anything was let go of, to be opened again once the save is done.</returns>
-        private bool ReleaseFilesFor(SongEntry entry, IReadOnlyCollection<MediaSlot> slots)
+        /// <returns>What was let go of, to be opened again once the save is done.</returns>
+        private ReleasedFiles ReleaseFilesFor(IReadOnlyCollection<MediaSlot> slots)
         {
-            bool isSng = entry.Kind == SongEntryKind.SngFile;
-            bool tracks = isSng || slots.Any(s => s.Kind == MediaKind.Track);
-            bool video = isSng || slots.Contains(MediaSlot.BackgroundVideo);
-            if (tracks)
+            var released = ReleasedFiles.None;
+            if (slots.Any(s => s.Kind == MediaKind.Track))
             {
                 _tracksTimer.Stop();
                 Playback.Release();
                 Audio.Release();
+                released |= ReleasedFiles.Tracks;
             }
 
-            if (video)
+            if (slots.Contains(MediaSlot.BackgroundVideo))
+            {
                 Art.Release();
-            return tracks || video;
+                released |= ReleasedFiles.Video;
+            }
+
+            return released;
         }
 
         /// <summary>Opens what <see cref="ReleaseFilesFor"/> let go of again, as the song is now: saved, or as it was.</summary>
-        private void ReopenFiles()
+        private void ReopenFiles(ReleasedFiles released)
         {
-            _ = ReloadAudioAsync();
-            Art.Refresh();
+            // Only what was let go of: a video's save doesn't tear down and rebuild the audio and its waveforms.
+            if ((released & ReleasedFiles.Tracks) != 0)
+                _ = ReloadAudioAsync();
+            if ((released & ReleasedFiles.Video) != 0)
+                Art.Refresh();
         }
 
         /// <summary>

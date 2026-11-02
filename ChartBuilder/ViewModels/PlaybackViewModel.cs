@@ -66,6 +66,9 @@ namespace ChartBuilder.ViewModels
         private bool _seeking;
         private bool _disposed;
 
+        // Whether the song was playing when its audio was let go of, which opening it again carries on with.
+        private bool _resumeAfterRelease;
+
         // Counts the opens, so an open that finishes after a later one began is let go of.
         private int _openings;
 
@@ -394,10 +397,11 @@ namespace ChartBuilder.ViewModels
 
         /// <summary>
         /// Lets go of the audio and its files, as a save that replaces or removes a track needs; <see cref="ReloadAsync"/>
-        /// opens it again. Playback stops.
+        /// opens it again. Playback stops, and is taken up again by <see cref="ReloadAsync"/> if it was playing.
         /// </summary>
         public void Release()
         {
+            _resumeAfterRelease |= IsPlaying;
             ++_openings;
             if (_player is { IsPlaying: true } playing)
             {
@@ -424,9 +428,10 @@ namespace ChartBuilder.ViewModels
             if (_disposed)
                 return;
 
-            // Where it was drawn, which letting go pauses at.
-            bool wasPlaying = IsPlaying;
+            // Where it was drawn, which letting go pauses at, and whether it was playing, which Release remembers.
             Release();
+            bool wasPlaying = _resumeAfterRelease;
+            _resumeAfterRelease = false;
             double position = PositionSeconds;
             _tracks = tracks;
             Message = null;

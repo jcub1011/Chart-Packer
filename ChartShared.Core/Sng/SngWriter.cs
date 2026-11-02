@@ -22,7 +22,7 @@ public sealed record SngSourceFile(string StoredName, string SourcePath, long Le
 /// </para>
 /// <para>
 /// Unlike the reference writer, this one stores files contiguously in index order (A5), writes to
-/// a temp file and renames it into place so a target is never left half written (A6), and never
+/// a temp file and moves it into place so a target is never left half written (A6), and never
 /// holds a whole file in memory. The temp file is written through to disk chunk by chunk, so a
 /// cancel takes effect within one chunk instead of waiting on a flush of the whole file. It does no validation of names or metadata: callers check those
 /// first (see <c>PackPlanner</c>).
@@ -45,7 +45,7 @@ public static class SngWriter
     /// <param name="files">Files, written in order.</param>
     /// <param name="overwrite">Whether an existing <paramref name="targetPath"/> is replaced.</param>
     /// <param name="verify">
-    /// Whether to re-read the temp file with <see cref="SngReader"/> before renaming it into place.
+    /// Whether to re-read the temp file with <see cref="SngReader"/> before moving it into place.
     /// If that finds an error, the temp file is removed and the target is left untouched.
     /// </param>
     /// <param name="bytesWritten">Receives the running count of file-data bytes written.</param>
@@ -114,8 +114,8 @@ public static class SngWriter
     /// The file is re-read first, and left untouched if that finds a structural error. The new file
     /// keeps the files in index order with their stored names; only the metadata section and the
     /// <c>contentsIndex</c> values change. Gaps between files and bytes after the FileData section
-    /// (SNG041, SNG043) aren't carried over. The rewrite goes to a temp file, is verified, and is then
-    /// renamed over the original.
+    /// (SNG041, SNG043) aren't carried over. The rewrite goes to a temp file, is verified, and then
+    /// replaces the original in place, so a song open in the editor can go on playing it.
     /// </remarks>
     /// <param name="sngPath">The <c>.sng</c> to rewrite.</param>
     /// <param name="metadata">The complete new metadata, written in order.</param>
@@ -221,7 +221,7 @@ public static class SngWriter
     private static FileStream CreateTemp(string tempPath) =>
         new(tempPath, FileMode.Create, FileAccess.Write, FileShare.None, bufferSize: 64 * 1024, FileOptions.WriteThrough);
 
-    /// <summary>Optionally verifies the finished temp file, then renames it over the target.</summary>
+    /// <summary>Optionally verifies the finished temp file, then replaces the target with it.</summary>
     private static IReadOnlyList<Finding> VerifyAndCommit(string tempPath, string targetPath, bool overwrite, bool verify, CancellationToken cancellationToken)
     {
         IReadOnlyList<Finding> findings = [];
@@ -238,7 +238,7 @@ public static class SngWriter
 
         cancellationToken.ThrowIfCancellationRequested();
         if (overwrite)
-            SongFileCommit.MoveOver(tempPath, targetPath, cancellationToken);
+            SongFileCommit.ReplaceOver(tempPath, targetPath, cancellationToken);
         else
             File.Move(tempPath, targetPath);
         return findings;
