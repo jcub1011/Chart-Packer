@@ -1,34 +1,111 @@
-# Chart Packer
-A GUI application used to build, pack, and unpack charts for Clone Hero, YARG, and other rhythm games.
+# About
 
-Releases aren't code-signed, so Windows SmartScreen shows "Windows protected your PC" the first time
-the installer runs. Choose **More info → Run anyway**.
+Chart Packer is a small suite of tools for building and managing song charts for Clone Hero and YARG. It supports folders and `.sng` files.
 
-To build the installer locally, install [Inno Setup](https://jrsoftware.org/isinfo.php) 7 or later, then run
-`pwsh build/publish.ps1` followed by `iscc installer/ChartPacker.iss`. The output goes to `dist/`.
+## Chart Builder
 
-## Features
+### Chart a Wide Variety of Instruments
 
-### Chart Packer
+Chart `.mid` files with 5-fret, 6-fret, and drum parts.
 
-- Chart metadata editing
-- Chart merging
-- Chart validation
-- Library deduplication
-- Chart conversion to and from the `.sng` format
+![5-fret, 6-fret, and drum note lanes](<screenshots/5 Fret, 6 Fret, and Drum Demo.webp>)
 
-### Chart Builder
+### Support for Multi-Stem Audio
 
-- Make charts with the `.mid` format
-- Auto-difficulty generation
-- Waveform visualization
-- Audio transcoding to `.opus`
-- Support for 5 fret and 6 fret instruments + drums
-- Auto star-power generation
+Supports adding individual instrument stems to a chart.
 
-## Acknowledgements
+![Multi-stem track list in Chart Builder](<screenshots/Multi-stem Demo.webp>)
+
+### Lower Difficulty Generation
+
+Quickly create good starting points for charting lower difficulties.
+
+![Difficulty generator with reduction options](<screenshots/Difficulty Reduction Demo.webp>)
+
+### Star Power Phrase Generation
+
+Easily create star power phrases for the whole track.
+
+![Automatic star power phrase generation](<screenshots/Auto Star Power Generation Demo.webp>)
+
+### Waveform Visualization
+
+See audio waveforms and spectrograms while charting.
+
+![Waveform and spectrogram lanes beside the chart grid](<screenshots/Waveform Visualization Demo.webp>)
+
+### Simple Export Management
+
+Export projects to the `.sng` format within the app, with automatic transcoding.
+
+![Export screen with automatic transcoding](<screenshots/Auto Transcode Demo.webp>)
+
+## Chart Packer
+
+Point it at a folder, and it finds your songs: `.sng` files, plus folders containing a `song.ini`.
+
+### Inspect Songs
+
+Inspect song metadata, notes, artwork, and more.
+
+![Song preview with metadata and artwork](<screenshots/Preview Demonstration.webp>)
+
+### Bulk Packing & Unpacking
+
+You can pack multiple folders into the `.sng` format and unpack `.sng` files into folders.
+
+![Bulk pack progress](<screenshots/Bulk Pack Demo.webp>)
+
+### Bulk Metadata Editing
+
+Edit metadata across many songs at once, or individually.
+
+![Bulk metadata edit preview](<screenshots/Bulk Edit Demo.webp>)
+
+### Chart Validation
+
+Validate charts to get a report of issues, with quick fixes for common ones.
+
+![Chart validation results](<screenshots/Validation Demo.webp>)
+
+### Chart Merging
+
+Merge multiple charts into one chart, picking the best of what each chart has to offer.
+
+![Song merge comparison](<screenshots/Song Merge Demo.webp>)
+
+### Library Deduplication
+
+Deduplicate your entire library to weed out accidental duplicate downloads.
+
+![Library deduplication results](<screenshots/Deduplication Demo.webp>)
+
+### Bulk Generate Easier Song Difficulties
+
+Generate lower difficulties for songs across your entire library.
+
+![Bulk difficulty reduction screen](<screenshots/Bulk Difficulty Reduction Generation.webp>)
+
+## Good to Know
+
+- Chart Builder opens `.sng` files directly and converts `.chart` to `.mid` on save. Back up the original first, because that conversion loses information.
+- Lower difficulties are generated as drafts. Treat them as a starting point, not a finished chart.
+- The installer isn't code-signed. Windows SmartScreen shows "Windows protected your PC" the first time; choose **More info → Run anyway**.
+
+## Building from Source
+
+Install [Inno Setup](https://jrsoftware.org/isinfo.php) 7 or later, then run:
+
+```powershell
+pwsh build/publish.ps1
+iscc installer/ChartPacker.iss
+```
+
+The output goes to `dist/`.
+
+## Acknowledgments
 
 The `.sng` format is defined by [mdsitton/SngFileFormat](https://github.com/mdsitton/SngFileFormat)
-(MIT License, (c) Matthew Sitton). Chart-Packer is an independent implementation that follows its
-specification and matches its reference tools' behaviour. See
+(MIT License, © Matthew Sitton). Chart-Packer is an independent implementation that follows its
+specification and matches the behavior of its reference tools. See
 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) for details and the license text.
