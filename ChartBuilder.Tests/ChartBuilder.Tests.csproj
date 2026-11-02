@@ -18,12 +18,14 @@
     <ProjectReference Include="..\ChartBuilder\ChartBuilder.csproj" />
   </ItemGroup>
 
-  <!-- Shared with ChartShared.Core.Tests rather than copied: the MIDI fixture builder, and the guard that fails the
-       run if a test touches the real config folder (every test project carries one). -->
+  <!-- Shared with ChartShared.Core.Tests rather than copied: the MIDI fixture builder, the fake audio output the
+       playback tests play through, and the guard that fails the run if a test touches the real config folder (every
+       test project carries one). -->
   <ItemGroup>
     <Compile Include="..\ChartShared.Core.Tests\Charts\MidiBuilder.cs" Link="Shared\MidiBuilder.cs" />
     <Compile Include="..\ChartShared.Core.Tests\Isolation\FolderSnapshot.cs" Link="Shared\FolderSnapshot.cs" />
     <Compile Include="..\ChartShared.Core.Tests\Isolation\UserConfigGuard.cs" Link="Shared\UserConfigGuard.cs" />
+    <Compile Include="..\ChartShared.Core.Tests\Audio\FakeOutput.cs" Link="Shared\FakeOutput.cs" />
   </ItemGroup>
 
   <ItemGroup>

@@ -43,7 +43,8 @@ public sealed class SongFileReader : IDisposable
         if (entry.Kind != SongEntryKind.SngFile)
             return new SongFileReader(entry, SongFile.ListFolder(entry.FullPath), null, null);
 
-        var handle = File.OpenHandle(entry.FullPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+        // The delete is shared, so a save can replace the .sng while it's read; the reader keeps the copy it opened.
+        var handle = File.OpenHandle(entry.FullPath, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
         try
         {
             var read = SngReader.Read(handle, cancellationToken);

@@ -2,6 +2,7 @@ using ChartShared.Audio.Playback;
 using ChartShared.Core.Scanning;
 using ChartShared.Core.Sng;
 using ChartShared.Core.Tests.Sng;
+using ChartShared.Core.Validation;
 using static ChartShared.Core.Tests.Audio.TestAudio;
 
 namespace ChartShared.Core.Tests.Audio;
@@ -39,6 +40,26 @@ public sealed class SongAudioTests
 
         // Every handle is closed, so the .sng can be replaced, as saving does.
         File.Delete(entry.FullPath);
+    }
+
+    [TestMethod]
+    public async Task ASngCanBeRewrittenWhileItsAudioIsOpen()
+    {
+        byte[] song = Wav(200, 8000, 1, (n, _) => (n % 100) / 100f);
+        var builder = new SngBuilder().AddMetadata("name", "Old");
+        builder.AddFile("song.wav", Masked(builder, song));
+        var entry = WriteSng(builder);
+
+        using var audio = SongAudio.Open(entry, [Track("song.wav")], TestContext.CancellationToken);
+        float[] expected = ReadAll(audio.Tracks[0].Source!);
+
+        var findings = await SngWriter.RewriteMetadataAsync(
+            entry.FullPath, [KeyValuePair.Create("name", "New")], TestContext.CancellationToken);
+
+        Assert.DoesNotContain(f => f.Severity == Severity.Error, findings);
+        using (var source = audio.OpenSource(audio.Tracks[0].Track))
+            Assert.AreSequenceEqual(expected, ReadAll(source));
+        Assert.AreEqual("New", SngReader.Read(entry.FullPath, TestContext.CancellationToken).Metadata.Single(p => p.Key == "name").Value);
     }
 
     [TestMethod]

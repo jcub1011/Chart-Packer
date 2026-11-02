@@ -150,7 +150,9 @@ namespace ChartBuilder.ViewModels
         private readonly Func<Task<string?>> _pick;
         private readonly Action<IChartCommand> _execute;
         private CancellationTokenSource? _loadCts;
-        private (MediaRef Ref, OpenedSong? Opened)? _shown;
+
+        // Whether the slot has been shown, and what it held then, so a save that leaves it as it was doesn't show it again.
+        private (bool Shown, string Key) _shown;
 
         internal ArtSlotViewModel(ArtViewModel owner, MediaSlot slot, string title, Func<Task<string?>> pick, Action<IChartCommand> execute)
         {
@@ -306,12 +308,13 @@ namespace ChartBuilder.ViewModels
             OnPropertyChanged(nameof(Timeline));
             RefreshCommands();
 
-            bool same = _shown is { } shown && shown.Ref == effective && ReferenceEquals(shown.Opened, song.Opened);
+            string key = KeyOf(effective);
+            bool same = _shown.Shown && _shown.Key == key;
             if (IsVideoSlot && (!same || (_owner.IsShown != (Video is not null) && HasFile)))
                 ShowVideo(effective);
             else if (!IsVideoSlot && !same)
                 _ = ShowImageAsync(effective);
-            _shown = (effective, song.Opened);
+            _shown = (true, key);
         }
 
         internal void StopVideo()
@@ -323,7 +326,7 @@ namespace ChartBuilder.ViewModels
                 playback.Dispose();
             }
 
-            _shown = null;
+            _shown = default;
         }
 
         private void ShowVideo(MediaRef effective)
@@ -460,6 +463,15 @@ namespace ChartBuilder.ViewModels
             var files = _owner.Song.StoredFilesOf(Slot);
             return Slot.Kind == MediaKind.AlbumArt ? ChartShared.Core.Scanning.AlbumArt.Pick(files, n => n) : SongBackgrounds.Pick(files, n => n, Slot.BackgroundKind!.Value);
         }
+
+        // What the slot holds for deciding whether it's what was shown: the file it will hold, not the save it was as of,
+        // so a save that leaves the slot as it was doesn't read it again.
+        private string KeyOf(MediaRef effective) => effective switch
+        {
+            MediaRef.SourceRef source => "source:" + source.Path,
+            MediaRef.StoredRef => "stored:" + StoredName(),
+            _ => "none",
+        };
 
         private string NoteFor(MediaRef effective) =>
             effective is MediaRef.NoneRef && _owner.Song.StoredFilesOf(Slot).Count > 0 ? Strings.ArtRemovedNote : Strings.ArtNoneNote;

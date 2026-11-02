@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using ChartShared.Core.Scanning;
 using ChartShared.Core.Sng;
 using ChartShared.Core.Tests.Sng;
+using ChartShared.Core.Validation;
 
 namespace ChartShared.Core.Tests;
 
@@ -41,6 +42,23 @@ public sealed class SongFileTests
         Assert.AreEqual(Hash(Data), await SongFile.HashAsync(entry, "video.webm", TestContext.CancellationToken));
         Assert.IsNull(await SongFile.ReadAsync(entry, "video.webm", Data.Length - 1, TestContext.CancellationToken));
         Assert.IsNull(await SongFile.HashAsync(entry, "video.mp4", TestContext.CancellationToken));
+    }
+
+    [TestMethod]
+    public async Task AnOpenStreamDoesNotStopTheSngBeingReplaced()
+    {
+        var builder = new SngBuilder();
+        builder.AddFile("notes.chart", Masked(builder, [5])).AddFile("video.webm", Masked(builder, Data));
+        var entry = WriteSng(builder);
+
+        using var stream = SongFile.OpenRead(entry, "video.webm", TestContext.CancellationToken);
+        var findings = await SngWriter.RewriteMetadataAsync(
+            entry.FullPath, [KeyValuePair.Create("name", "Saved")], TestContext.CancellationToken);
+
+        Assert.DoesNotContain(f => f.Severity == Severity.Error, findings);
+        using var read = new MemoryStream();
+        await stream!.CopyToAsync(read, TestContext.CancellationToken);
+        Assert.AreSequenceEqual(Data, read.ToArray());
     }
 
     [TestMethod]

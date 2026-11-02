@@ -16,9 +16,10 @@ public sealed record OpenedTrack(SongTrack Track, IPcmSource? Source, string? Er
 /// new chart, which has no song yet, has only the latter.
 /// </summary>
 /// <remarks>
-/// Every file is opened for reading only, sharing reads, so nothing can replace or delete it
-/// until this is disposed: dispose it before saving the song. (A loose file that fails to read is let go of and opened
-/// again, see <see cref="ReopeningStream"/>, and is unheld for that moment.) All of a <c>.sng</c>'s tracks read
+/// Every file is opened for reading only. A <c>.sng</c>'s handle shares the delete too, so a save may replace the
+/// <c>.sng</c> while it is played: this keeps reading the copy it opened, which a save doesn't change the audio in.
+/// A file of a song folder is held until this is disposed. A track of a folder that fails to read is let go of and
+/// opened again (see <see cref="ReopeningStream"/>), and is unheld for that moment. All of a <c>.sng</c>'s tracks read
 /// through one handle. Each source is read by one thread at a time, but separate sources, including
 /// those of <see cref="OpenSource"/>, may be read on separate threads.
 /// </remarks>
@@ -66,9 +67,11 @@ public sealed class SongAudio : IDisposable
         {
             if (entry?.Kind == SongEntryKind.SngFile && tracks.Any(t => !t.IsStaged))
             {
-                // The handle is opened first, so the index read is of the file it reads.
-                handle = File.OpenHandle(entry.FullPath, FileMode.Open, FileAccess.Read, FileShare.Read);
-                var read = SngReader.Read(entry.FullPath, cancellationToken);
+                // The index is read through the handle it plays through, so a save that replaces the .sng between the
+                // two doesn't leave this playing at the wrong offsets. It shares the delete, so a save can replace the
+                // .sng while this plays on from the copy it opened.
+                handle = File.OpenHandle(entry.FullPath, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
+                var read = SngReader.Read(handle, cancellationToken);
                 if (read.Header is { } header)
                 {
                     mask = header.Mask;

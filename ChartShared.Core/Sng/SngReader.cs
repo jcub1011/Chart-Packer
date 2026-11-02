@@ -59,7 +59,8 @@ public static class SngReader
     public static SngReadResult Read(string path, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
-        using SafeFileHandle handle = File.OpenHandle(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+        // The delete is shared, so a save can replace the .sng while its index is read; this reads the copy it opened.
+        using SafeFileHandle handle = File.OpenHandle(path, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
         return Read(handle, cancellationToken);
     }
 

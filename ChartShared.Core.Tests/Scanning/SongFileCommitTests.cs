@@ -41,6 +41,18 @@ public sealed class SongFileCommitTests
     }
 
     [TestMethod]
+    public void AReplaceCanBeDoneWhileAReaderSharesDelete()
+    {
+        using var reader = new FileStream(_target, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
+
+        SongFileCommit.ReplaceOver(_temp, _target, TestContext.CancellationToken);
+
+        Assert.AreSequenceEqual(new byte[] { 2 }, File.ReadAllBytes(_target));
+        Assert.AreEqual(1, reader.ReadByte(), "The reader goes on reading the file it opened.");
+        Assert.IsFalse(File.Exists(_temp));
+    }
+
+    [TestMethod]
     public void AReplaceGivesUpOnAReaderThatHoldsOn()
     {
         using (new FileStream(_target, FileMode.Open, FileAccess.Read, FileShare.Read))

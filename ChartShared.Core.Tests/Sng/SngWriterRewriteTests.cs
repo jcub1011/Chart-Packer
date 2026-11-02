@@ -134,6 +134,21 @@ public sealed class SngWriterRewriteTests
     }
 
     [TestMethod]
+    public async Task ARewriteCanBeDoneWhileAReaderSharesDelete()
+    {
+        string sng = await CreateSngAsync([KeyValuePair.Create("name", "A")], ("notes.chart", [1, 2, 3]));
+        using var reader = File.OpenHandle(sng, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
+
+        var findings = await SngWriter.RewriteMetadataAsync(sng, [KeyValuePair.Create("name", "B")], TestContext.CancellationToken);
+
+        Assert.DoesNotContain(f => f.Severity == Severity.Error, findings);
+        var after = SngReader.Read(sng, TestContext.CancellationToken);
+        Assert.AreEqual("B", after.Metadata.Single(p => p.Key == "name").Value);
+        Assert.AreSequenceEqual(new byte[] { 1, 2, 3 }, Extract(sng, after, "notes.chart"));
+        Assert.IsFalse(File.Exists(sng + SngWriter.TempSuffix));
+    }
+
+    [TestMethod]
     public async Task RemovingAFileLeavesTheRest()
     {
         string sng = await CreateSngAsync([KeyValuePair.Create("name", "A")], ("album.png", [9, 9]), ("notes.chart", [1, 2, 3]));
