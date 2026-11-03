@@ -15,7 +15,7 @@
 
   <ItemGroup>
     <None Update="Audio\Fixtures\*.ogg;Audio\Fixtures\*.opus;Audio\Fixtures\*.mp3" CopyToOutputDirectory="PreserveNewest" />
-    <None Update="Video\Fixtures\*.mp4;Video\Fixtures\*.webm" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Video\Fixtures\*.mp4;Video\Fixtures\*.webm;Video\Fixtures\*.mkv" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

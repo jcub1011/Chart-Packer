@@ -2,8 +2,9 @@
 
 `ChartShared.Ffmpeg` binds FFmpeg 9.0's shared libraries (`avformat`, `avcodec`, `avutil`,
 `swscale`, and `swresample`, which the Opus decoder needs). `ChartShared.Video` plays songs'
-background videos through them. `ChartShared.Audio` decodes Vorbis, Opus and MPEG audio packets
-with them, having read the containers itself. The libraries go in
+background videos through them and rewrites a video without its audio when packing.
+`ChartShared.Audio` decodes Vorbis, Opus and MPEG audio packets with them, having read the
+containers itself, and reads a video's audio track through `avformat` for alignment. The libraries go in
 `ChartShared.Ffmpeg/runtimes/<rid>/native/`, which is gitignored. From there they're copied beside
 the executable on build and publish, as SDL's library is.
 
@@ -23,6 +24,8 @@ managed decoders.
 This builds FFmpeg from the `n9.0.2` tag with only what the app needs, and nothing GPL or non-free:
 
 - the demuxers and decoders of the registered video formats (sng-spec §8);
+- the muxers of the same formats and the `file` protocol, so a packed video can be rewritten
+  without its audio track;
 - the decoders of the registered audio formats: `vorbis`, `opus`, `mp1float`, `mp2float` and
   `mp3float`;
 - swresample.

@@ -7,7 +7,8 @@ namespace ChartShared.Ffmpeg.Interop;
 // their leading fields, up to the last one read; the rest of each struct is FFmpeg's to allocate.
 // FfmpegLibrary refuses any other major version, since the layouts can change between them.
 // FFmpeg's own names are kept, so each binding reads like its header. Video uses avformat, avcodec
-// and swscale; audio only avcodec's decoders, given packets our own code has read.
+// and swscale; a video's audio track uses avformat to read its packets and avcodec's decoder;
+// song audio otherwise only uses avcodec's decoders, given packets our own code has read.
 
 /// <summary>The leading fields of <c>AVCodec</c> (libavcodec/codec.h).</summary>
 [StructLayout(LayoutKind.Sequential)]
@@ -81,6 +82,23 @@ internal unsafe struct AVCodecParameters
     public int level;
     public int width;
     public int height;
+    public AVRational sample_aspect_ratio;
+    public AVRational framerate;
+    public int field_order;
+    public int color_range;
+    public int color_primaries;
+    public int color_trc;
+    public int color_space;
+    public int chroma_location;
+    public int video_delay;
+    public AVChannelLayout ch_layout;
+    public int sample_rate;
+    public int block_align;
+    public int frame_size;
+    public int initial_padding;
+    public int trailing_padding;
+    public int seek_preroll;
+    public int alpha_mode;
 }
 
 /// <summary>The leading fields of <c>AVIOContext</c> (libavformat/avio.h).</summary>
@@ -198,6 +216,9 @@ internal static unsafe partial class Native
     public const int SeekSize = 0x10000;
     public const int SeekForce = 0x20000;
 
+    // libavformat/avio.h: AVIO_FLAG_WRITE.
+    public const int AvioFlagWrite = 2;
+
     // FFERRTAG('E','O','F',' ').
     public const int ErrorEof = -('E' | ('O' << 8) | ('F' << 16) | (' ' << 24));
 
@@ -251,6 +272,24 @@ internal static unsafe partial class Native
     [LibraryImport(AvFormat, EntryPoint = "avformat_alloc_context")]
     public static partial AVFormatContext* avformat_alloc_context();
 
+    [LibraryImport(AvFormat, EntryPoint = "avformat_alloc_output_context2")]
+    public static partial int avformat_alloc_output_context2(AVFormatContext** context, void* outputFormat, byte* formatName, byte* fileName);
+
+    [LibraryImport(AvFormat, EntryPoint = "avformat_new_stream")]
+    public static partial AVStream* avformat_new_stream(AVFormatContext* context, void* codec);
+
+    [LibraryImport(AvFormat, EntryPoint = "avformat_write_header")]
+    public static partial int avformat_write_header(AVFormatContext* context, void** options);
+
+    [LibraryImport(AvFormat, EntryPoint = "av_interleaved_write_frame")]
+    public static partial int av_interleaved_write_frame(AVFormatContext* context, AVPacket* packet);
+
+    [LibraryImport(AvFormat, EntryPoint = "av_write_trailer")]
+    public static partial int av_write_trailer(AVFormatContext* context);
+
+    [LibraryImport(AvFormat, EntryPoint = "avformat_free_context")]
+    public static partial void avformat_free_context(AVFormatContext* context);
+
     [LibraryImport(AvFormat, EntryPoint = "avformat_open_input")]
     public static partial int avformat_open_input(AVFormatContext** context, byte* url, void* format, void** options);
 
@@ -269,6 +308,12 @@ internal static unsafe partial class Native
     [LibraryImport(AvFormat, EntryPoint = "avformat_close_input")]
     public static partial void avformat_close_input(AVFormatContext** context);
 
+    [LibraryImport(AvFormat, EntryPoint = "avio_open")]
+    public static partial int avio_open(AVIOContext** context, byte* url, int flags);
+
+    [LibraryImport(AvFormat, EntryPoint = "avio_closep")]
+    public static partial int avio_closep(AVIOContext** context);
+
     [LibraryImport(AvFormat, EntryPoint = "avio_alloc_context")]
     public static partial AVIOContext* avio_alloc_context(
         byte* buffer, int bufferSize, int writeFlag, void* opaque,
@@ -285,6 +330,12 @@ internal static unsafe partial class Native
 
     [LibraryImport(AvCodec, EntryPoint = "avcodec_find_decoder_by_name", StringMarshalling = StringMarshalling.Utf8)]
     public static partial AVCodec* avcodec_find_decoder_by_name(string name);
+
+    [LibraryImport(AvCodec, EntryPoint = "avcodec_find_decoder")]
+    public static partial AVCodec* avcodec_find_decoder(int codecId);
+
+    [LibraryImport(AvCodec, EntryPoint = "avcodec_parameters_copy")]
+    public static partial int avcodec_parameters_copy(AVCodecParameters* destination, AVCodecParameters* source);
 
     [LibraryImport(AvCodec, EntryPoint = "avcodec_parameters_alloc")]
     public static partial AVCodecParameters* avcodec_parameters_alloc();
@@ -321,6 +372,9 @@ internal static unsafe partial class Native
 
     [LibraryImport(AvCodec, EntryPoint = "av_packet_unref")]
     public static partial void av_packet_unref(AVPacket* packet);
+
+    [LibraryImport(AvCodec, EntryPoint = "av_packet_rescale_ts")]
+    public static partial void av_packet_rescale_ts(AVPacket* packet, AVRational source, AVRational destination);
 
     // libswscale
     [LibraryImport(SwScale, EntryPoint = "swscale_version")]

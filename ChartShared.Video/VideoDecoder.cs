@@ -1,5 +1,3 @@
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using ChartShared.Ffmpeg;
 using ChartShared.Ffmpeg.Interop;
 using Serilog;
@@ -22,9 +20,7 @@ public sealed unsafe class VideoDecoder : IDisposable
 
     private static ILogger Logger => Log.ForContext<VideoDecoder>();
 
-    private readonly Stream _stream;
-    private GCHandle _streamHandle;
-    private AVIOContext* _io;
+    private readonly FfmpegStreamInput _input;
     private AVFormatContext* _format;
     private void* _codec;
     private AVPacket* _packet;
@@ -65,35 +61,11 @@ public sealed unsafe class VideoDecoder : IDisposable
 
     private VideoDecoder(Stream stream, int maxWidth)
     {
-        _stream = stream;
+        _input = FfmpegStreamInput.Open(stream);
+        _format = _input.Format;
         try
         {
-            _streamHandle = GCHandle.Alloc(stream);
-            byte* buffer = (byte*)Native.av_malloc(IoBufferSize);
-            if (buffer == null)
-                throw new OutOfMemoryException();
-
-            delegate* unmanaged[Cdecl]<void*, long, int, long> seek = stream.CanSeek ? &Seek : null;
-            _io = Native.avio_alloc_context(buffer, IoBufferSize, 0, (void*)GCHandle.ToIntPtr(_streamHandle), &Read, null, seek);
-            if (_io == null)
-            {
-                Native.av_freep(&buffer);
-                throw new OutOfMemoryException();
-            }
-
-            _format = Native.avformat_alloc_context();
-            if (_format == null)
-                throw new OutOfMemoryException();
-            _format->pb = _io;
-
-            AVFormatContext* format = _format;
-            int result = Native.avformat_open_input(&format, null, null, null);
-
-            // On failure the context is freed and set to null; the custom I/O is still ours.
-            _format = format;
-            Check(result, "The file isn't a video FFmpeg can read");
-            Check(Native.avformat_find_stream_info(_format, null), "The video's streams couldn't be read");
-
+            int result;
             void* decoder = null;
             _streamIndex = Native.av_find_best_stream(_format, Native.MediaTypeVideo, -1, -1, &decoder, 0);
             Check(_streamIndex, "The file has no video stream that can be decoded");
@@ -487,25 +459,8 @@ public sealed unsafe class VideoDecoder : IDisposable
             _codec = null;
         }
 
-        if (_format != null)
-        {
-            AVFormatContext* format = _format;
-            Native.avformat_close_input(&format);
-            _format = null;
-        }
-
-        // The custom I/O isn't closed with the input; its buffer may have been replaced since.
-        if (_io != null)
-        {
-            Native.av_freep(&_io->buffer);
-            AVIOContext* io = _io;
-            Native.avio_context_free(&io);
-            _io = null;
-        }
-
-        if (_streamHandle.IsAllocated)
-            _streamHandle.Free();
-        _stream.Dispose();
+        _format = null;
+        _input.Dispose();
     }
 
     private TimeSpan ToTime(long timestamp)
@@ -540,59 +495,4 @@ public sealed unsafe class VideoDecoder : IDisposable
             throw new InvalidDataException($"{message} (FFmpeg error {result}).");
     }
 
-    // Read and Seek are called by FFmpeg, so no exception may leave them: it can't unwind through FFmpeg's frames, and the
-    // runtime ends the process instead, with an ExecutionEngineException and nothing logged. Each catches everything and
-    // tells FFmpeg the read failed, which it reports as a damaged or unreadable video. What isn't an expected I/O failure
-    // is logged, as it's a bug in the stream.
-
-    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
-    private static int Read(void* opaque, byte* buffer, int size)
-    {
-        try
-        {
-            var stream = (Stream)GCHandle.FromIntPtr((IntPtr)opaque).Target!;
-            int read = stream.Read(new Span<byte>(buffer, size));
-            return read == 0 ? Native.ErrorEof : read;
-        }
-        catch (Exception ex) when (ex is IOException or ObjectDisposedException or UnauthorizedAccessException)
-        {
-            Logger.Debug(ex, "A video read failed");
-            return Native.ErrorIo;
-        }
-        catch (Exception ex)
-        {
-            Logger.Error(ex, "A video read threw unexpectedly; FFmpeg is told the read failed");
-            return Native.ErrorIo;
-        }
-    }
-
-    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
-    private static long Seek(void* opaque, long offset, int whence)
-    {
-        try
-        {
-            var stream = (Stream)GCHandle.FromIntPtr((IntPtr)opaque).Target!;
-            if ((whence & Native.SeekSize) != 0)
-                return stream.Length;
-
-            var origin = (whence & ~Native.SeekForce) switch
-            {
-                0 => SeekOrigin.Begin,
-                1 => SeekOrigin.Current,
-                2 => SeekOrigin.End,
-                _ => (SeekOrigin?)null,
-            };
-            return origin is { } o ? stream.Seek(offset, o) : Native.ErrorIo;
-        }
-        catch (Exception ex) when (ex is IOException or ObjectDisposedException or NotSupportedException or ArgumentException)
-        {
-            Logger.Debug(ex, "A video seek to {Offset} ({Whence}) failed", offset, whence);
-            return Native.ErrorIo;
-        }
-        catch (Exception ex)
-        {
-            Logger.Error(ex, "A video seek to {Offset} ({Whence}) threw unexpectedly; FFmpeg is told it failed", offset, whence);
-            return Native.ErrorIo;
-        }
-    }
 }

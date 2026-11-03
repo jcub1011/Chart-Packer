@@ -647,6 +647,11 @@ one FFmpeg can play. Under the video, a **Video start** box sets `video_start_ti
 line the video up with the audio: positive skips that much of the video, negative holds its first
 frame. It can be typed or dragged sideways, as Chart Packer's offset boxes can; the video shows each
 value at the playhead as it changes, and the value is set as one undo step once it's left alone.
+Beside it, **Auto Align by Waveform** uses the video's audio track and the song's mix, with the
+Merge window's `AudioAligner`, to set the start as one undo step. It's disabled, saying why, when
+the video has no audio track. Under the row, the chart's waveform sits above the video's on one time
+axis; dragging either moves the video start, previewing as it goes and setting one undo step when
+let go.
 
 **Timing.**
 
@@ -2390,6 +2395,10 @@ Acceptance criteria:
    - The `.sng` leaves out what only Chart Builder reads: the tempo anchors ([§7.3](#73-text-events))
      and the `song.ini` keys of parts the chart has no notes in (SNG062). A song opened from a
      `.sng` is copied the same way.
+   - **Strip Audio from Video Background**, on by default and remembered between exports, rewrites
+     the staged copy's background video without its audio streams before packing. It's offered only
+     for a song with a video. If FFmpeg can't rewrite that video, export says so and packs the video
+     with its audio rather than failing.
    - The song itself isn't saved: the `.sng` is packed from a copy, made as **Export copy** makes it, in
      a temp folder that is removed after. Only a new chart is saved first, as it has no folder yet.
 4. **Export copy** writes the song with its draft applied to another folder, using the existing

@@ -16,6 +16,7 @@ using ChartShared.Core.Merging;
 using ChartShared.Core.Metadata;
 using ChartShared.Core.Scanning;
 using ChartShared.Core.Text;
+using ChartShared.UI.Controls;
 using ChartShared.UI.Resources;
 using ChartShared.UI.Services;
 using ChartShared.UI.ViewModels;
@@ -1261,7 +1262,7 @@ namespace ChartPacker.ViewModels
                 return text;
 
             // Where, as song time in the source chart, so they can be found in a chart editor.
-            string times = string.Join(", ", warning.Times.Take(WarningTimesShown).Select(t => Controls.AlignmentTimelineView.FormatTime(t.TotalSeconds, 1)));
+            string times = string.Join(", ", warning.Times.Take(WarningTimesShown).Select(t => AlignmentTimelineView.FormatTime(t.TotalSeconds, 1)));
             if (warning.Times.Count > WarningTimesShown)
                 times = string.Format(CultureInfo.CurrentCulture, Strings.MergeIssueMoreTimesFormat, times, warning.Times.Count - WarningTimesShown);
             return string.Format(CultureInfo.CurrentCulture, Strings.MergeIssueTimesFormat, text, times);

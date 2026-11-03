@@ -80,43 +80,67 @@
                 <!-- Under the background video: where in it the song starts, marked while it's a pending change. The
                      video shows each value as it's typed or dragged; it's set as one undo step once left alone. -->
                 <Panel IsVisible="{Binding ShowsVideoStart}">
-                    <Grid DataContext="{Binding VideoStart}"
-                          x:DataType="vm:VideoStartViewModel"
-                          ColumnDefinitions="Auto,*,Auto,Auto"
-                          ColumnSpacing="4">
-                        <TextBlock Grid.Column="0" Classes="marker" VerticalAlignment="Center" Text="{Binding Marker}" />
-                        <TextBlock Grid.Column="1"
-                                   Classes="muted note"
-                                   VerticalAlignment="Center"
-                                   Text="{x:Static res:Strings.ArtVideoStartLabel}" />
-                        <NumericUpDown Grid.Column="2"
-                                       ui:DragScrub.IsEnabled="True"
-                                       Width="96"
-                                       ShowButtonSpinner="False"
+                    <StackPanel DataContext="{Binding VideoStart}"
+                                x:DataType="vm:VideoStartViewModel"
+                                Spacing="6">
+                        <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" ColumnSpacing="4">
+                            <TextBlock Grid.Column="0" Classes="marker" VerticalAlignment="Center" Text="{Binding Marker}" />
+                            <TextBlock Grid.Column="1"
+                                       Classes="muted note"
                                        VerticalAlignment="Center"
-                                       Value="{Binding StartMs}"
-                                       IsEnabled="{Binding CanEdit}"
-                                       Increment="1"
-                                       Minimum="{x:Static vm:VideoStartViewModel.MinStartMs}"
-                                       Maximum="{x:Static vm:VideoStartViewModel.MaxStartMs}"
-                                       FormatString="+0;-0;0"
-                                       ParsingNumberStyle="Integer"
-                                       AutomationProperties.Name="{x:Static res:Strings.ArtVideoStartLabel}">
-                            <ToolTip.Tip>
-                                <StackPanel MaxWidth="320" Spacing="6">
-                                    <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.ArtVideoStartToolTip}" />
-                                    <TextBlock Classes="muted" TextWrapping="Wrap" Text="{x:Static sres:SharedStrings.OffsetControlsHelp}" />
-                                </StackPanel>
-                            </ToolTip.Tip>
-                        </NumericUpDown>
-                        <Button Grid.Column="3"
-                                Classes="nudge"
-                                Command="{Binding RevertCommand}"
-                                ToolTip.Tip="{x:Static res:Strings.ArtVideoStartRevertToolTip}"
-                                AutomationProperties.Name="{x:Static res:Strings.ArtVideoStartRevertToolTip}">
-                            <ui:LineIcon Width="12" Height="12" Data="{StaticResource RevertStroke}" />
-                        </Button>
-                    </Grid>
+                                       Text="{x:Static res:Strings.ArtVideoStartLabel}" />
+                            <Button Grid.Column="2"
+                                    Classes="nudge"
+                                    Command="{Binding AutoAlignCommand}"
+                                    ToolTip.Tip="{Binding AutoAlignToolTip}"
+                                    ToolTip.ShowOnDisabled="True"
+                                    AutomationProperties.Name="{x:Static res:Strings.ArtVideoAutoAlignToolTip}">
+                                <ui:LineIcon Width="12" Height="12" Data="{StaticResource OffsetStroke}" />
+                            </Button>
+                            <NumericUpDown Grid.Column="3"
+                                           ui:DragScrub.IsEnabled="True"
+                                           Width="96"
+                                           ShowButtonSpinner="False"
+                                           VerticalAlignment="Center"
+                                           Value="{Binding StartMs}"
+                                           IsEnabled="{Binding CanEdit}"
+                                           Increment="1"
+                                           Minimum="{x:Static vm:VideoStartViewModel.MinStartMs}"
+                                           Maximum="{x:Static vm:VideoStartViewModel.MaxStartMs}"
+                                           FormatString="+0;-0;0"
+                                           ParsingNumberStyle="Integer"
+                                           AutomationProperties.Name="{x:Static res:Strings.ArtVideoStartLabel}">
+                                <ToolTip.Tip>
+                                    <StackPanel MaxWidth="320" Spacing="6">
+                                        <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.ArtVideoStartToolTip}" />
+                                        <TextBlock Classes="muted" TextWrapping="Wrap" Text="{x:Static sres:SharedStrings.OffsetControlsHelp}" />
+                                    </StackPanel>
+                                </ToolTip.Tip>
+                            </NumericUpDown>
+                            <Button Grid.Column="4"
+                                    Classes="nudge"
+                                    Command="{Binding RevertCommand}"
+                                    ToolTip.Tip="{x:Static res:Strings.ArtVideoStartRevertToolTip}"
+                                    AutomationProperties.Name="{x:Static res:Strings.ArtVideoStartRevertToolTip}">
+                                <ui:LineIcon Width="12" Height="12" Data="{StaticResource RevertStroke}" />
+                            </Button>
+                        </Grid>
+
+                        <!-- The chart's waveform over the video's: dragging lines the video up by ear. -->
+                        <ui:AlignmentTimelineView ReferenceName="{x:Static res:Strings.ArtVideoAlignChart}"
+                                                   SongName="{x:Static res:Strings.ArtVideoAlignVideo}"
+                                                   ReferenceWaveform="{Binding ChartWaveform}"
+                                                   SongWaveform="{Binding VideoWaveform}"
+                                                   OffsetSeconds="{Binding WaveformOffsetSeconds}"
+                                                   DragAnywhereMovesOffset="True"
+                                                   IsEnabled="{Binding CanEdit}"
+                                                   IsVisible="{Binding HasVideoAudio}" />
+                        <TextBlock Classes="hint"
+                                   FontSize="12"
+                                   TextWrapping="Wrap"
+                                   Text="{Binding VideoAudioNote}"
+                                   IsVisible="{Binding HasVideoAudioNote}" />
+                    </StackPanel>
                 </Panel>
                 <TextBlock Classes="error" Text="{Binding Error}" IsVisible="{Binding HasError}" />
             </StackPanel>

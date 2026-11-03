@@ -70,6 +70,8 @@ namespace ChartBuilder.ViewModels
         /// <param name="folders">Picks the export location.</param>
         /// <param name="browseTitle">The folder picker's title.</param>
         /// <param name="exists">Whether a path exists; the file system by default.</param>
+        /// <param name="hasVideo">The song has a background video.</param>
+        /// <param name="initialStripAudio">Whether stripping the video's audio starts on.</param>
         public ExportSngViewModel(
             string songTitle,
             IReadOnlyList<ExportMetadataRow> metadata,
@@ -87,7 +89,9 @@ namespace ChartBuilder.ViewModels
             string browseTitle,
             Func<string, bool>? exists = null,
             bool transcodeAvailable = true,
-            int initialBitrateKbps = 128)
+            int initialBitrateKbps = 128,
+            bool hasVideo = false,
+            bool initialStripAudio = true)
         {
             ArgumentNullException.ThrowIfNull(songTitle);
             ArgumentNullException.ThrowIfNull(metadata);
@@ -111,6 +115,8 @@ namespace ChartBuilder.ViewModels
             ErrorCount = errorCount;
             PendingCount = pendingCount;
             IsTranscodeAvailable = transcodeAvailable;
+            HasVideo = hasVideo;
+            StripAudioFromVideo = initialStripAudio;
 
             PolicyChoices =
             [
@@ -242,6 +248,13 @@ namespace ChartBuilder.ViewModels
 
         /// <summary>Whether this build can transcode to Opus at all.</summary>
         public bool IsTranscodeAvailable { get; }
+
+        /// <summary>Whether the song has a background video, so the strip option applies.</summary>
+        public bool HasVideo { get; }
+
+        /// <summary>Whether the packed video is rewritten without its audio track. On by default.</summary>
+        [ObservableProperty]
+        public partial bool StripAudioFromVideo { get; set; }
 
         /// <summary>Whether auto-transcode is on. Off by default; unavailable for <c>.sng</c> sources.</summary>
         [ObservableProperty]
