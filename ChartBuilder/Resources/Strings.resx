@@ -1934,6 +1934,22 @@ Saving also changes song.ini:
   <data name="ExportSngAudioHeading" xml:space="preserve">
     <value>Audio</value>
   </data>
+  <data name="ExportSngVideoHeading" xml:space="preserve">
+    <value>Video</value>
+  </data>
+  <data name="ExportSngStripAudioLabel" xml:space="preserve">
+    <value>Strip Audio from Video Background</value>
+  </data>
+  <data name="ExportSngStripAudioHint" xml:space="preserve">
+    <value>The packed video keeps its picture but not its soundtrack.</value>
+  </data>
+  <data name="ExportSngStripAudioUnavailable" xml:space="preserve">
+    <value>FFmpeg isn't available, so the video will be packed with its audio.</value>
+  </data>
+  <data name="ExportSngStripAudioFailedFormat" xml:space="preserve">
+    <value>The video's audio couldn't be stripped, so it will be packed with it: {0}</value>
+    <comment>{0} is the reason.</comment>
+  </data>
   <data name="ExportSngLocationHeading" xml:space="preserve">
     <value>Destination</value>
   </data>
@@ -3260,6 +3276,50 @@ Saving also changes song.ini:
   </data>
   <data name="ArtVideoStartRevertToolTip" xml:space="preserve">
     <value>Put the video start back as saved</value>
+  </data>
+  <data name="ArtVideoAutoAlignToolTip" xml:space="preserve">
+    <value>Auto Align by Waveform</value>
+    <comment>On the stopwatch button beside the video start box. It lines the video up using the video's audio track.</comment>
+  </data>
+  <data name="ArtVideoAutoAlignNoAudio" xml:space="preserve">
+    <value>Auto alignment isn't possible as the video doesn't have audio.</value>
+  </data>
+  <data name="ArtVideoAutoAlignLoading" xml:space="preserve">
+    <value>Reading the video's audio to align it…</value>
+  </data>
+  <data name="ArtVideoAutoAlignNoChartAudio" xml:space="preserve">
+    <value>Auto alignment isn't possible as the chart has no audio.</value>
+  </data>
+  <data name="ArtVideoAutoAlignNoFfmpeg" xml:space="preserve">
+    <value>Auto alignment isn't possible as FFmpeg isn't installed.</value>
+  </data>
+  <data name="ArtVideoAutoAlignFailed" xml:space="preserve">
+    <value>The video's audio couldn't be aligned with the chart.</value>
+  </data>
+  <data name="ArtVideoAutoAlignReadingChart" xml:space="preserve">
+    <value>Reading the chart's audio to align it…</value>
+  </data>
+  <data name="ArtVideoAutoAlignAmbiguous" xml:space="preserve">
+    <value>The video's audio lines up with the chart in more than one place, so the start wasn't changed. Move the waveform by hand.</value>
+  </data>
+  <data name="ArtVideoAutoAlignDrift" xml:space="preserve">
+    <value>The video's audio drifts against the chart's over the song, so one start can't line them all up. Move the waveform by hand.</value>
+  </data>
+  <data name="ArtVideoAutoAlignWeakFormat" xml:space="preserve">
+    <value>The video's audio doesn't match the chart's closely enough to line them up ({0:P0} alike), so the start wasn't changed.</value>
+    <comment>{0} is the share of the audio that matches, from 0 to 1.</comment>
+  </data>
+  <data name="ArtVideoAudioUnreadableFormat" xml:space="preserve">
+    <value>The video's audio couldn't be read: {0}</value>
+    <comment>{0} is the reason.</comment>
+  </data>
+  <data name="ArtVideoAlignChart" xml:space="preserve">
+    <value>Chart</value>
+    <comment>The chart waveform's label above the video waveform.</comment>
+  </data>
+  <data name="ArtVideoAlignVideo" xml:space="preserve">
+    <value>Video</value>
+    <comment>The video waveform's label below the chart waveform.</comment>
   </data>
   <data name="ChartSettingsDelayLabel" xml:space="preserve">
     <value>Audio delay (ms)</value>

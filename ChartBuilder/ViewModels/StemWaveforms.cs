@@ -80,6 +80,34 @@ namespace ChartBuilder.ViewModels
                 Read(_tracks, channels: false);
         }
 
+        /// <summary>The peaks <paramref name="source"/> is made of, as much as has been read; empty until any has been.</summary>
+        public IReadOnlyList<StemPeaks> Peaks(AudioSource source)
+        {
+            ArgumentNullException.ThrowIfNull(source);
+            return [.. PeaksOf(source.Tracks, channels: false).Select(p => p.Peaks)];
+        }
+
+        /// <summary>
+        /// Whether <paramref name="source"/>'s stems have all been read as far as they can be: each has its peaks to the
+        /// end, or couldn't be read at all. Until then its waveform is only as much as has been read so far.
+        /// </summary>
+        public bool IsComplete(AudioSource source)
+        {
+            ArgumentNullException.ThrowIfNull(source);
+            lock (_lock)
+            {
+                foreach (var track in source.Tracks)
+                {
+                    if (_failed.Contains(track))
+                        continue;
+                    if (!_peaks.TryGetValue(track, out var peaks) || peaks.ReadCount != peaks.Count)
+                        return false;
+                }
+            }
+
+            return true;
+        }
+
         /// <summary><paramref name="source"/>'s waveform, its channels combined, as much as has been read; null until any has been.</summary>
         public Waveform? Mono(AudioSource source)
         {

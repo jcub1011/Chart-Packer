@@ -29,9 +29,10 @@ public sealed unsafe class FfmpegAudioDecoder : IDisposable
     /// output of Vorbis's first packet, which only primes the decoder. Otherwise nothing is dropped, and the caller
     /// trims what it should, such as Opus's pre-skip.
     /// </param>
+    /// <param name="sampleRate">The stream's sample rate, when the container gives it; 0 when it doesn't.</param>
     /// <exception cref="InvalidOperationException">FFmpeg, or that decoder, isn't available; see <see cref="IsAvailable"/>.</exception>
     /// <exception cref="InvalidDataException">The decoder won't open with <paramref name="extradata"/>.</exception>
-    public FfmpegAudioDecoder(string decoder, int channels, ReadOnlySpan<byte> extradata, bool trimsStart)
+    public FfmpegAudioDecoder(string decoder, int channels, ReadOnlySpan<byte> extradata, bool trimsStart, int sampleRate = 0)
     {
         ArgumentNullException.ThrowIfNull(decoder);
         ArgumentOutOfRangeException.ThrowIfLessThan(channels, 1);
@@ -50,6 +51,17 @@ public sealed unsafe class FfmpegAudioDecoder : IDisposable
                 throw new OutOfMemoryException();
             parameters->codec_type = Native.MediaTypeAudio;
             parameters->codec_id = codec->id;
+            parameters->sample_rate = sampleRate;
+            if (channels is 1 or 2)
+            {
+                parameters->ch_layout = new AVChannelLayout
+                {
+                    order = Native.ChannelOrderNative,
+                    nb_channels = channels,
+                    u = channels == 1 ? Native.ChannelMaskMono : Native.ChannelMaskStereo,
+                    opaque = null,
+                };
+            }
 
             if (!extradata.IsEmpty)
             {

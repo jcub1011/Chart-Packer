@@ -9,6 +9,7 @@ Previews what will be packed into a `.sng` and asks where it goes. Nothing is wr
 - A preview card: album art, title, artist, album, genre, year, length and charter.
 - **Destination:** a folder, and what to do if the `.sng` already exists (overwrite it, rename it, or skip).
 - **Audio:** each stem and whether it will be transcoded to Opus, with a quality choice.
+- **Video:** when the song has a background video, **Strip Audio from Video Background** (on by default) packs it without its soundtrack. The choice is remembered. If FFmpeg can't rewrite the video, it's packed with its audio and a warning is shown.
 - **Song metadata:** a collapsible list.
 - **Export** and **Cancel**. Progress is shown in [Export Progress](Export-Progress.md).
 
