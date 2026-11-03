@@ -245,6 +245,9 @@ namespace ChartBuilder.Services
         /// <summary>The export dialog's Opus quality the last time it was confirmed, in kbps per stereo stem.</summary>
         public int LastTranscodeBitrateKbps { get; set; } = 128;
 
+        /// <summary>Whether the export dialog's strip-audio-from-video choice was on the last time it was confirmed. On by default.</summary>
+        public bool LastStripVideoAudio { get; set; } = true;
+
         /// <summary>Whether the first song played on an output device that has no calibrated latency offers the calibration tool (charter-spec C11).</summary>
         public bool PromptForCalibration { get; set; } = true;
 

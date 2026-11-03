@@ -13,6 +13,11 @@
     <InternalsVisibleTo Include="ChartShared.Video" />
   </ItemGroup>
 
+  <!-- FFmpeg's I/O callbacks can't let an exception escape, so what they catch unexpectedly is logged. -->
+  <ItemGroup>
+    <PackageReference Include="Serilog" />
+  </ItemGroup>
+
   <!-- FFmpeg's shared libraries, built by build/ffmpeg (see its README), ship beside the
        executable like SDL's. Without them the app still runs: videos just aren't previewed,
        and audio is decoded by the managed decoders. -->

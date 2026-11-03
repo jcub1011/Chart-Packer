@@ -10,10 +10,9 @@ using Avalonia.Media;
 using Avalonia.Media.Immutable;
 using ChartShared.Audio.Waveforms;
 using ChartShared.Core.Charts;
-using ChartShared.UI.Controls;
 using ChartShared.UI.Controls.Highway;
 
-namespace ChartPacker.Controls
+namespace ChartShared.UI.Controls
 {
     /// <summary>A part's notes as <see cref="AlignmentTimelineView"/> draws them: when each starts and ends, its row and its colour, in start order.</summary>
     public sealed class TimelineNotes
@@ -84,8 +83,8 @@ namespace ChartPacker.Controls
     }
 
     /// <summary>
-    /// Two songs on one time axis, to line one up with the other by eye: the kept audio's song's waveform and notes, and the
-    /// other song's moved by <see cref="OffsetSeconds"/>, each under the first's.
+    /// Two waveforms on one time axis, to line one up with the other by eye: the kept audio's song's or the chart's
+    /// waveform and notes, and the other song's or the video's moved by <see cref="OffsetSeconds"/>, each under the first's.
     /// </summary>
     /// <remarks>
     /// <para>Dragging the other song's lanes moves them, and the offset with them, as far as the pointer goes; with Ctrl held
@@ -118,6 +117,9 @@ namespace ChartPacker.Controls
 
         public static readonly StyledProperty<double> FineFactorProperty =
             AvaloniaProperty.Register<AlignmentTimelineView, double>(nameof(FineFactor), LaneScrub.DefaultFineFactor);
+
+        public static readonly StyledProperty<bool> DragAnywhereMovesOffsetProperty =
+            AvaloniaProperty.Register<AlignmentTimelineView, bool>(nameof(DragAnywhereMovesOffset));
 
         /// <summary>How many seconds the view shows when it starts.</summary>
         public const double StartSeconds = 12;
@@ -238,6 +240,13 @@ namespace ChartPacker.Controls
         {
             get => GetValue(FineFactorProperty);
             set => SetValue(FineFactorProperty, value);
+        }
+
+        /// <summary>Whether a drag anywhere on the view moves the offset, rather than only on the other song's lane.</summary>
+        public bool DragAnywhereMovesOffset
+        {
+            get => GetValue(DragAnywhereMovesOffsetProperty);
+            set => SetValue(DragAnywhereMovesOffsetProperty, value);
         }
 
         /// <summary>Shows half as much, about the middle.</summary>
@@ -438,7 +447,7 @@ namespace ChartPacker.Controls
         }
 
         /// <summary><paramref name="seconds"/> as <c>m:ss</c>, with <paramref name="decimals"/> places of a second; negative before the start.</summary>
-        internal static string FormatTime(double seconds, int decimals)
+        public static string FormatTime(double seconds, int decimals)
         {
             double rounded = Math.Round(Math.Abs(seconds), decimals, MidpointRounding.AwayFromZero);
             long minutes = (long)(rounded / 60);
@@ -532,7 +541,7 @@ namespace ChartPacker.Controls
             if (!point.Properties.IsLeftButtonPressed)
                 return;
 
-            _drag = LaneAt(point.Position) is { IsSong: true } ? DragKind.Offset : DragKind.Pan;
+            _drag = DragAnywhereMovesOffset || LaneAt(point.Position) is { IsSong: true } ? DragKind.Offset : DragKind.Pan;
             _lastX = point.Position.X;
             e.Pointer.Capture(this);
             if (LaneScrub.IsFine(e.KeyModifiers))
@@ -546,7 +555,7 @@ namespace ChartPacker.Controls
             var at = e.GetPosition(this);
             if (_drag == DragKind.None)
             {
-                Cursor = LaneAt(at) is { IsSong: true } ? MoveCursor : LaneScrub.HandCursor;
+                Cursor = DragAnywhereMovesOffset || LaneAt(at) is { IsSong: true } ? MoveCursor : LaneScrub.HandCursor;
                 _hoverX = at.X;
                 InvalidateVisual();
                 return;

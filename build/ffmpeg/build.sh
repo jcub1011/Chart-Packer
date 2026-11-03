@@ -179,9 +179,11 @@ cd "$build"
   --disable-avdevice --disable-avfilter \
   --enable-avformat --enable-avcodec --enable-swscale --enable-swresample \
   --enable-demuxer=mov,avi,matroska,ogg,mpegps,mpegvideo,m4v,h264,hevc,ivf \
+  --enable-muxer=mov,mp4,matroska,webm,avi,ogg,ivf,mpeg \
   --enable-decoder=h264,hevc,vp8,vp9,theora,mpeg1video,mpeg2video,mpeg4,msmpeg4v1,msmpeg4v2,msmpeg4v3,mjpeg,vorbis,opus,mp1float,mp2float,mp3float \
   --enable-parser=h264,hevc,vp8,vp9,mpegvideo,mpeg4video,mjpeg \
-  --enable-bsf=h264_mp4toannexb,hevc_mp4toannexb,vp9_superframe_split
+  --enable-bsf=h264_mp4toannexb,hevc_mp4toannexb,vp9_superframe_split,aac_adtstoasc,pgs_frame_merge \
+  --enable-protocol=file
 
 make -j"$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)"
 make install

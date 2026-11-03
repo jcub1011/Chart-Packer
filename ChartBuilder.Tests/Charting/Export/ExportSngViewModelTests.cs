@@ -27,7 +27,9 @@ public sealed class ExportSngViewModelTests
         Func<string, bool>? exists = null,
         IReadOnlyList<ExportStemRow>? stems = null,
         bool transcodeAvailable = true,
-        int bitrateKbps = 128) => new(
+        int bitrateKbps = 128,
+        bool hasVideo = false,
+        bool stripAudio = true) => new(
         "Artist – Name",
         [new ExportMetadataRow("name", "Name")],
         "album.png",
@@ -44,7 +46,9 @@ public sealed class ExportSngViewModelTests
         "Browse",
         exists ?? (_ => false),
         transcodeAvailable,
-        bitrateKbps);
+        bitrateKbps,
+        hasVideo,
+        stripAudio);
 
     [TestMethod]
     public void ShowsResolvedTargetAndAllowsExport()
@@ -373,5 +377,24 @@ public sealed class ExportSngViewModelTests
         vm.TranscodeToOpus = true;
 
         Assert.AreEqual(Strings.ExportSngTranscodeBlockedProblem, vm.Problem);
+    }
+
+    [TestMethod]
+    public void StripAudioFromVideoStartsOnAndShowsOnlyWithAVideo()
+    {
+        var withVideo = Dialog(hasVideo: true);
+        var withoutVideo = Dialog(hasVideo: false);
+
+        Assert.IsTrue(withVideo.HasVideo);
+        Assert.IsTrue(withVideo.StripAudioFromVideo);
+        Assert.IsFalse(withoutVideo.HasVideo);
+    }
+
+    [TestMethod]
+    public void StripAudioFromVideoRemembersTheLastChoice()
+    {
+        var vm = Dialog(hasVideo: true, stripAudio: false);
+
+        Assert.IsFalse(vm.StripAudioFromVideo);
     }
 }

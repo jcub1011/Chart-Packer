@@ -6,7 +6,6 @@
         xmlns:vm="using:ChartPacker.ViewModels"
         xmlns:res="using:ChartPacker.Resources"
         xmlns:sres="using:ChartShared.UI.Resources"
-        xmlns:ctl="using:ChartPacker.Controls"
         xmlns:ui="using:ChartShared.UI.Controls"
         mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="640"
         x:Class="ChartPacker.Views.MergeCompareWindow"
@@ -227,7 +226,7 @@
         <!-- Both songs on one timeline, flush on the surface as the library's list is. -->
         <Border Grid.Row="2" Background="{DynamicResource SurfaceBrush}" Padding="8">
             <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-                <ctl:AlignmentTimelineView x:Name="Timeline"
+                <ui:AlignmentTimelineView x:Name="Timeline"
                                            ReferenceName="{Binding ReferenceName}"
                                            SongName="{Binding SongName}"
                                            ReferenceWaveform="{Binding ReferenceWaveform}"

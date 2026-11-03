@@ -69,7 +69,7 @@ namespace ChartBuilder.ViewModels
             ChartSettings = new ChartSettingsViewModel(settings, services.Confirmations, song, ApplyChartSettings, () => Editor?.AudioAssist, () => Editor?.Session.ReadOptions);
             Metadata = new ChartMetadataViewModel(song, ApplyChartSettings, () => Playback.Clock());
             Tracks = new EditorTracksViewModel(song, Playback, services.FilePicker, ApplyChartSettings);
-            Art = new ArtViewModel(song, services.ImagePicker, services.FilePicker, ApplyChartSettings, Playback.Clock);
+            Art = new ArtViewModel(song, Audio, services.ImagePicker, services.FilePicker, ApplyChartSettings, Playback.Clock);
             _tracksTimer = new DispatcherTimer(TracksDelay, DispatcherPriority.Normal, (_, _) => _ = ReloadAudioAsync());
             _tracksTimer.Stop();
             PendingChanges = PendingChangesOf();

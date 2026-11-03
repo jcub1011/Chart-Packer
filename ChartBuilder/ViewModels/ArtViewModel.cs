@@ -38,14 +38,15 @@ namespace ChartBuilder.ViewModels
         /// <param name="filePicker">Picks a background.</param>
         /// <param name="execute">Makes an edit, as one undo step.</param>
         /// <param name="clock">Where the song is playing, which the video follows.</param>
-        public ArtViewModel(EditorSong song, IImagePickerService imagePicker, IFilePickerService filePicker, Action<IChartCommand> execute, Func<TimeSpan> clock)
+        public ArtViewModel(EditorSong song, EditorAudio audio, IImagePickerService imagePicker, IFilePickerService filePicker, Action<IChartCommand> execute, Func<TimeSpan> clock)
         {
             ArgumentNullException.ThrowIfNull(song);
+            ArgumentNullException.ThrowIfNull(audio);
             _song = song;
             AlbumArt = new ArtSlotViewModel(this, MediaSlot.AlbumArt, Strings.ArtAlbumArtTitle, () => imagePicker.PickImageAsync(Strings.ArtPickAlbumArtTitle), execute);
             BackgroundImage = new ArtSlotViewModel(this, MediaSlot.BackgroundImage, Strings.ArtBackgroundImageTitle, () => filePicker.PickBackgroundAsync(Strings.ArtPickBackgroundImageTitle), execute);
             BackgroundVideo = new ArtSlotViewModel(this, MediaSlot.BackgroundVideo, Strings.ArtBackgroundVideoTitle, () => filePicker.PickBackgroundAsync(Strings.ArtPickBackgroundVideoTitle), execute);
-            VideoStart = new VideoStartViewModel(song, execute);
+            VideoStart = new VideoStartViewModel(song, audio, execute);
             VideoStart.PreviewChanged += OnVideoStartPreviewChanged;
             Clock = clock;
             _song.Changed += OnSongChanged;
@@ -89,6 +90,7 @@ namespace ChartBuilder.ViewModels
                 if (_isShown == value)
                     return;
                 _isShown = value;
+                VideoStart.SetShown(value);
                 BackgroundVideo.Refresh();
             }
         }
@@ -343,6 +345,7 @@ namespace ChartBuilder.ViewModels
 
             FileName = name;
             Note = open is null ? NoteFor(effective) : null;
+            _owner.VideoStart.SetVideo(open, KeyOf(effective));
             _ = ShowSizeAsync(sizeKey);
 
             // One that can't play takes the default shape. One that will keeps the shape the tile has until it's open, so

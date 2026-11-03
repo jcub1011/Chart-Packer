@@ -359,6 +359,15 @@
                     </StackPanel>
                 </StackPanel>
 
+                <!-- The background video, when there is one: stripping its soundtrack before packing. -->
+                <StackPanel Spacing="8" IsVisible="{Binding HasVideo}">
+                    <TextBlock Classes="heading" Text="{x:Static res:Strings.ExportSngVideoHeading}" />
+                    <CheckBox Content="{x:Static res:Strings.ExportSngStripAudioLabel}"
+                              IsChecked="{Binding StripAudioFromVideo}" />
+                    <TextBlock Classes="hint"
+                               Text="{x:Static res:Strings.ExportSngStripAudioHint}" />
+                </StackPanel>
+
                 <!-- Every song.ini pair as it's exported, closed until it's wanted. -->
                 <StackPanel Spacing="8" IsVisible="{Binding HasMetadata}">
                     <ToggleButton x:Name="MetadataToggle"

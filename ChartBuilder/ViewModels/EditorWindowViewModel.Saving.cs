@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using ChartBuilder.Resources;
 using ChartShared.Audio.Encoding;
@@ -18,6 +19,7 @@ using ChartShared.Core.Scanning;
 using ChartShared.Core.Settings;
 using ChartShared.Core.Validation;
 using ChartShared.UI.Services;
+using ChartShared.Video;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Serilog;
@@ -126,6 +128,7 @@ namespace ChartBuilder.ViewModels
             remembered.LastExportPolicy = dialog.Policy;
             remembered.LastTranscodeToOpus = dialog.TranscodeToOpus;
             remembered.LastTranscodeBitrateKbps = dialog.TranscodeBitrateKbps;
+            remembered.LastStripVideoAudio = dialog.StripAudioFromVideo;
             _settings.Save();
 
             // The song itself isn't saved: what's packed is a copy of it with its unsaved changes, made in a temp folder.
@@ -182,6 +185,9 @@ namespace ChartBuilder.ViewModels
                     Messages.Error(Strings.PackCopyUnreadable);
                     return;
                 }
+
+                if (dialog.StripAudioFromVideo)
+                    await StripVideoAudioAsync(copy, _closing.Token);
 
                 await PackToSngAsync(copyEntry, staging, isSng ? OutputLayout.Flat : layout, dialog);
             }
@@ -246,6 +252,7 @@ namespace ChartBuilder.ViewModels
                 })
                 .OrderBy(t => AudioStems.OrderOf(t.Stem))
                 .ToList();
+            bool hasVideo = Song.EffectiveMedia(MediaSlot.BackgroundVideo) is not MediaRef.NoneRef;
 
             return new ExportSngViewModel(
                 Song.Title ?? entry.DisplayName,
@@ -263,7 +270,37 @@ namespace ChartBuilder.ViewModels
                 _services.FolderPicker,
                 Strings.PackPickerTitle,
                 transcodeAvailable: OpusTranscoder.IsAvailable,
-                initialBitrateKbps: _settings.Settings.LastTranscodeBitrateKbps);
+                initialBitrateKbps: _settings.Settings.LastTranscodeBitrateKbps,
+                hasVideo: hasVideo,
+                initialStripAudio: _settings.Settings.LastStripVideoAudio);
+        }
+
+        /// <summary>Rewrites the staged copy's background videos without their audio, when they have any.</summary>
+        private async Task StripVideoAudioAsync(string songFolder, CancellationToken cancellationToken)
+        {
+            var videos = Directory.EnumerateFiles(songFolder, "*", SearchOption.TopDirectoryOnly)
+                .Where(path => SongBackgrounds.IsName(Path.GetFileName(path), BackgroundKind.Video))
+                .ToList();
+            if (videos.Count == 0)
+                return;
+
+            if (!VideoAudioStripper.IsAvailable)
+            {
+                Messages.Warning(Strings.ExportSngStripAudioUnavailable);
+                return;
+            }
+
+            foreach (string video in videos)
+            {
+                try
+                {
+                    await Task.Run(() => VideoAudioStripper.StripInPlace(video, cancellationToken), cancellationToken);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or InvalidOperationException or NotSupportedException)
+                {
+                    Messages.Warning(string.Format(CultureInfo.CurrentCulture, Strings.ExportSngStripAudioFailedFormat, ex.Message));
+                }
+            }
         }
 
         /// <summary>Packs a song folder to the dialog's location with its if-exists choice, transcoding first when asked, behind a progress dialog.</summary>
