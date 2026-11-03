@@ -14,8 +14,10 @@
 #
 # Only what the app plays is built: the demuxers of the registered video extensions (sng-spec §8)
 # and the decoders their videos use, and the decoders of the registered audio formats (Vorbis, Opus,
-# MPEG audio), whose packets the app reads itself, so they need no demuxers. The Opus decoder needs
-# swresample. Nothing GPL or non-free is enabled, so the result is LGPL 2.1+.
+# MPEG audio), whose packets the app reads itself, so they need no demuxers. AAC is built too, for a
+# background video's audio track, which is read through avformat (so the container demuxer supplies
+# it). The Opus decoder needs swresample. Nothing GPL or non-free is enabled, so the result is
+# LGPL 2.1+.
 set -euo pipefail
 
 yes=
@@ -180,7 +182,7 @@ cd "$build"
   --enable-avformat --enable-avcodec --enable-swscale --enable-swresample \
   --enable-demuxer=mov,avi,matroska,ogg,mpegps,mpegvideo,m4v,h264,hevc,ivf \
   --enable-muxer=mov,mp4,matroska,webm,avi,ogg,ivf,mpeg \
-  --enable-decoder=h264,hevc,vp8,vp9,theora,mpeg1video,mpeg2video,mpeg4,msmpeg4v1,msmpeg4v2,msmpeg4v3,mjpeg,vorbis,opus,mp1float,mp2float,mp3float \
+  --enable-decoder=h264,hevc,vp8,vp9,theora,mpeg1video,mpeg2video,mpeg4,msmpeg4v1,msmpeg4v2,msmpeg4v3,mjpeg,aac,vorbis,opus,mp1float,mp2float,mp3float \
   --enable-parser=h264,hevc,vp8,vp9,mpegvideo,mpeg4video,mjpeg \
   --enable-bsf=h264_mp4toannexb,hevc_mp4toannexb,vp9_superframe_split,aac_adtstoasc,pgs_frame_merge \
   --enable-protocol=file

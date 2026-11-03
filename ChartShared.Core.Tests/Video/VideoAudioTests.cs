@@ -81,7 +81,9 @@ public sealed class VideoAudioTests
     [TestMethod]
     public void AnAudioTrackIsDecodedAndSummarised()
     {
-        string audio = Path.Combine(AppContext.BaseDirectory, "Audio", "Fixtures", "chirp-stereo-44100.mp3");
+        // Ogg Vorbis, because the release builds only the demuxers of the registered video formats: an audio-only
+        // .ogv is one of those, while a bare .mp3 is a format the app never opens.
+        string audio = Path.Combine(AppContext.BaseDirectory, "Audio", "Fixtures", "chirp-stereo-44100.ogg");
 
         var read = VideoAudio.Read(File.OpenRead(audio), WaveformResolution.Low);
 

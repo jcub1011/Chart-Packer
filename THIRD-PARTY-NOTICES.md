@@ -275,8 +275,9 @@ frames, and Concentus decodes Opus packets, all in managed code. SDL plays the m
 its audio subsystem is used. Its native library (`SDL3.dll`, `libSDL3.so` or `libSDL3.dylib`)
 ships beside the executable.
 
-For background video (`ChartShared.Video`), FFmpeg's shared libraries decode the video and
-scale its frames. They ship beside the executable, unmodified, as separate files; see
+For background video (`ChartShared.Video`), FFmpeg's shared libraries decode the video, scale its
+frames, and decode its audio track (AAC, Vorbis, Opus or MPEG audio) for the waveform and alignment
+in the Art tab. They ship beside the executable, unmodified, as separate files; see
 [FFmpeg](#ffmpeg) below.
 
 ### MIT License

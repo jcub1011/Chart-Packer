@@ -28,6 +28,8 @@ This builds FFmpeg from the `n9.0.2` tag with only what the app needs, and nothi
   without its audio track;
 - the decoders of the registered audio formats: `vorbis`, `opus`, `mp1float`, `mp2float` and
   `mp3float`;
+- `aac`, which a background video's audio track commonly carries; it's read through `avformat`, so
+  the video's demuxer supplies it;
 - swresample.
 
 The result is LGPL 2.1+ and a few MB per RID.

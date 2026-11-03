@@ -162,10 +162,10 @@ through `IProgress<T>`.
   `swresample`, LGPL 2.1+), and has no packages. Audio uses it through a safe wrapper,
   `FfmpegAudioDecoder`; Video calls the bindings directly.
   - The libraries are built by `build/ffmpeg/build.sh` with only the registered video formats'
-    demuxers and decoders, the registered audio formats' decoders, and swresample (which the Opus
-    decoder needs), nothing GPL or non-free. They ship beside the executable like SDL's. Without
-    them the app still runs: videos aren't previewed, and audio is decoded by the managed
-    decoders.
+    demuxers and decoders, the registered audio formats' decoders, AAC (which a background video's
+    audio track can carry, read through `avformat`), and swresample (which the Opus decoder needs),
+    nothing GPL or non-free. They ship beside the executable like SDL's. Without them the app still
+    runs: videos aren't previewed, and audio is decoded by the managed decoders.
   - The bindings are written for one major version of each library, which is checked at load.
 - Any new dependency must be trim- and AOT-compatible, and the reason for it must be added to
   this section.
