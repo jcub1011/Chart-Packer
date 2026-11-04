@@ -114,10 +114,28 @@ public sealed record LaneProjection(LaneView View, double TimeFrom, double TimeL
     /// A lane laid out as given that shows <paramref name="lookAhead"/> seconds beyond its strike line, which is on
     /// <paramref name="viewport"/>'s cursor, <see cref="EditorViewport.StrikeFraction"/> of the way along.
     /// </summary>
+    /// <remarks>
+    /// <paramref name="lookAhead"/> is kept to a look-ahead's range (<see cref="EditorViewport.SpanOf"/>). A lane that may be in
+    /// pixels per second mode is given its <see cref="HighwayLength"/> instead, which knows how it is to be shown.
+    /// </remarks>
     public static LaneProjection Of(LaneView view, double timeFrom, double timeLength, double laneFrom, double laneSize, LaneSlots slots, EditorViewport viewport, double lookAhead)
     {
         ArgumentNullException.ThrowIfNull(viewport);
         var (start, end) = viewport.SpanOf(lookAhead);
+        return new LaneProjection(view, timeFrom, timeLength, laneFrom, laneSize, slots, start, end - start);
+    }
+
+    /// <summary>
+    /// A lane laid out as given whose length is <paramref name="length"/>: its look-ahead as it is, or, in pixels per second,
+    /// what the pixels from its strike line to its far end make of it, so the notes keep their distance when it's resized.
+    /// </summary>
+    public static LaneProjection Of(LaneView view, double timeFrom, double timeLength, double laneFrom, double laneSize, LaneSlots slots, EditorViewport viewport, HighwayLength length)
+    {
+        ArgumentNullException.ThrowIfNull(viewport);
+        double ahead = length.LookAheadFor(timeLength * (1 - EditorViewport.StrikeFraction));
+
+        // In pixels per second it's shown as it is, as it's as long as the lane is, not kept to a look-ahead's range.
+        var (start, end) = length.IsPixelsPerSecond ? viewport.SpanAhead(ahead) : viewport.SpanOf(ahead);
         return new LaneProjection(view, timeFrom, timeLength, laneFrom, laneSize, slots, start, end - start);
     }
 

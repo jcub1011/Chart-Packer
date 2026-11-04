@@ -1,5 +1,6 @@
 using System;
 using Avalonia;
+using ChartShared.Core.Charting;
 using ChartShared.Core.Charting.Editing;
 
 namespace ChartBuilder.Controls.Editing
@@ -25,7 +26,9 @@ namespace ChartBuilder.Controls.Editing
 
         protected override double BesideSizeFor(Size size) => Math.Clamp(size.Width * 0.2, 48, 140);
 
-        protected override LaneProjection Project(Size size, LaneSlots slots, EditorViewport viewport, double lookAhead, int phraseRows)
+        protected override double TimeAxisLength(Size size) => Math.Max(1, size.Height);
+
+        protected override LaneProjection Project(Size size, LaneSlots slots, EditorViewport viewport, HighwayLength length, int phraseRows)
         {
             int count = slots.Slots.Count;
             double phrases = PhraseRailSize(phraseRows);
@@ -33,7 +36,7 @@ namespace ChartBuilder.Controls.Editing
             double fixedWidth = RailWidth + onsets + MarkWidth + phrases + Extras.BesideSize;
             double laneSize = Math.Min(MaxLaneSize, Math.Max(1, size.Width - fixedWidth) / count);
             double left = Math.Max(0, (size.Width - (fixedWidth + (laneSize * count))) / 2);
-            return LaneProjection.Of(LaneView.Highway, 0, Math.Max(1, size.Height), left + RailWidth + onsets, laneSize, slots, viewport, lookAhead);
+            return LaneProjection.Of(LaneView.Highway, 0, Math.Max(1, size.Height), left + RailWidth + onsets, laneSize, slots, viewport, length);
         }
 
         protected override Rect LabelsArea(Size size, LaneProjection projection) =>

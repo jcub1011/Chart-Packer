@@ -336,6 +336,33 @@ namespace ChartBuilder.Services
                         Get = () => settings.Settings.EditorHighwaySpeed,
                         Set = speed => settings.Settings.EditorHighwaySpeed = speed,
                     },
+                    new ChoiceSetting<HighwayLengthMode>
+                    {
+                        Id = "charter.highwayLengthMode",
+                        Category = editing,
+                        Label = SharedStrings.HighwayLengthModeLabel,
+                        Description = SharedStrings.HighwayLengthModeDescription,
+                        Keywords = SettingKeywords.Split(SharedStrings.HighwayLengthModeKeywords),
+                        DefaultValue = HighwayLengthMode.PixelsPerSecond,
+                        Choices =
+                        [
+                            new SettingChoice<HighwayLengthMode>(HighwayLengthMode.LookAhead, SharedStrings.HighwayLengthModeLookAhead),
+                            new SettingChoice<HighwayLengthMode>(HighwayLengthMode.PixelsPerSecond, SharedStrings.HighwayLengthModePixelsPerSecond),
+                        ],
+                        Get = () => settings.Settings.HighwayLengthMode,
+                        Set = mode => settings.Settings.HighwayLengthMode = mode,
+                    },
+                    new PixelsPerSecondSetting
+                    {
+                        Id = "charter.editorPixelsPerSecond",
+                        Category = editing,
+                        Label = SharedStrings.HighwayPixelsPerSecondLabel,
+                        Description = SharedStrings.HighwayPixelsPerSecondDescription,
+                        Keywords = SettingKeywords.Split(SharedStrings.HighwayPixelsPerSecondKeywords),
+                        DefaultValue = HighwayPixelsPerSecond.Default,
+                        Get = () => settings.Settings.EditorPixelsPerSecond,
+                        Set = pixels => settings.Settings.EditorPixelsPerSecond = pixels,
+                    },
                     new ChoiceSetting<WheelScrollDirection>
                     {
                         Id = "charter.wheelDirection",

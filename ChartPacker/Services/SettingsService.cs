@@ -110,6 +110,11 @@ namespace ChartPacker.Services
             settings.HighwayLookAhead = HighwayLookAhead.Clamp(settings.HighwayLookAhead, AppSettings.DefaultHighwayLookAhead);
             settings.GenerateDifficultiesLookAhead = HighwayLookAhead.Clamp(settings.GenerateDifficultiesLookAhead, AppSettings.DefaultGenerateDifficultiesLookAhead);
 
+            if (!Enum.IsDefined(settings.HighwayLengthMode))
+                settings.HighwayLengthMode = AppSettings.DefaultHighwayLengthMode;
+            settings.HighwayPixelsPerSecond = HighwayPixelsPerSecond.Clamp(settings.HighwayPixelsPerSecond, AppSettings.DefaultHighwayPixelsPerSecond);
+            settings.GenerateDifficultiesPixelsPerSecond = HighwayPixelsPerSecond.Clamp(settings.GenerateDifficultiesPixelsPerSecond, AppSettings.DefaultGenerateDifficultiesPixelsPerSecond);
+
             settings.FineScrubMilliseconds = double.IsFinite(settings.FineScrubMilliseconds)
                 ? Math.Clamp(settings.FineScrubMilliseconds, AppSettings.MinFineScrubMilliseconds, AppSettings.MaxFineScrubMilliseconds)
                 : AppSettings.DefaultFineScrubMilliseconds;

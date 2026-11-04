@@ -110,6 +110,7 @@ namespace ChartShared.UI.ViewModels.Settings
             IntegerSetting integer => new IntegerSettingViewModel((SettingEdit<int>)edit, integer),
             RangeSetting range => new RangeSettingViewModel((SettingEdit<double>)edit, range),
             LookAheadSetting => new LookAheadSettingViewModel((SettingEdit<double>)edit),
+            PixelsPerSecondSetting => new PixelsPerSecondSettingViewModel((SettingEdit<double>)edit),
             FolderSetting folder => new FolderSettingViewModel((SettingEdit<string?>)edit, folder, folderPicker),
             TextSetting text => new TextSettingViewModel((SettingEdit<string>)edit, text),
             ActionSetting => new ActionSettingViewModel(edit),
@@ -198,6 +199,24 @@ namespace ChartShared.UI.ViewModels.Settings
         }
 
         public string ValueText => string.Format(CultureInfo.CurrentCulture, SharedStrings.LookAheadFormat, edit.Value);
+
+        protected override void OnValueChanged()
+        {
+            OnPropertyChanged(nameof(Value));
+            OnPropertyChanged(nameof(ValueText));
+        }
+    }
+
+    /// <summary>A highway's speed in pixels per second, shown as the length slider in that mode and its readout.</summary>
+    public sealed class PixelsPerSecondSettingViewModel(SettingEdit<double> edit) : SettingViewModel(edit)
+    {
+        public double Value
+        {
+            get => edit.Value;
+            set => edit.Value = value;
+        }
+
+        public string ValueText => string.Format(CultureInfo.CurrentCulture, SharedStrings.PixelsPerSecondFormat, edit.Value);
 
         protected override void OnValueChanged()
         {

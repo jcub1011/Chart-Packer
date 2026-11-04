@@ -9,6 +9,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Immutable;
 using ChartShared.Audio.Waveforms;
+using ChartShared.Core.Charting;
 using ChartShared.Core.Charts;
 using ChartShared.UI.Controls;
 
@@ -163,6 +164,15 @@ namespace ChartShared.UI.Controls.Highway
         public static readonly StyledProperty<double> LookAheadProperty =
             AvaloniaProperty.Register<NoteHighwayView, double>(nameof(LookAhead), 1.4);
 
+        public static readonly StyledProperty<HighwayLengthMode> LengthModeProperty =
+            AvaloniaProperty.Register<NoteHighwayView, HighwayLengthMode>(nameof(LengthMode));
+
+        public static readonly StyledProperty<double> PixelsPerSecondProperty =
+            AvaloniaProperty.Register<NoteHighwayView, double>(nameof(PixelsPerSecond), HighwayPixelsPerSecond.Default);
+
+        public static readonly StyledProperty<double> ShownLookAheadProperty =
+            AvaloniaProperty.Register<NoteHighwayView, double>(nameof(ShownLookAhead), 0, defaultBindingMode: Avalonia.Data.BindingMode.OneWayToSource);
+
         public static readonly StyledProperty<IReadOnlyList<Waveform?>?> WaveformsProperty =
             AvaloniaProperty.Register<NoteHighwayView, IReadOnlyList<Waveform?>?>(nameof(Waveforms));
 
@@ -249,7 +259,7 @@ namespace ChartShared.UI.Controls.Highway
 
         static NoteHighwayView()
         {
-            AffectsRender<NoteHighwayView>(SceneProperty, LookAheadProperty, WaveformsProperty, AreNotesOutlinedProperty, LengthSecondsProperty, SelectedPhraseProperty);
+            AffectsRender<NoteHighwayView>(SceneProperty, LookAheadProperty, LengthModeProperty, PixelsPerSecondProperty, WaveformsProperty, AreNotesOutlinedProperty, LengthSecondsProperty, SelectedPhraseProperty);
         }
 
         /// <summary>Raised when a highway is pressed, before the first <see cref="Scrubbed"/>.</summary>
@@ -275,11 +285,52 @@ namespace ChartShared.UI.Controls.Highway
             set => SetValue(ClockProperty, value);
         }
 
-        /// <summary>How far ahead of the strike line the highway shows, in seconds: less is faster.</summary>
+        /// <summary>How far ahead of the strike line the highway shows, in seconds: less is faster. Used in <see cref="HighwayLengthMode.LookAhead"/>.</summary>
         public double LookAhead
         {
             get => GetValue(LookAheadProperty);
             set => SetValue(LookAheadProperty, value);
+        }
+
+        /// <summary>Whether the highway's length is its <see cref="LookAhead"/> or its <see cref="PixelsPerSecond"/>.</summary>
+        public HighwayLengthMode LengthMode
+        {
+            get => GetValue(LengthModeProperty);
+            set => SetValue(LengthModeProperty, value);
+        }
+
+        /// <summary>
+        /// How many pixels of the highway a second of the song takes up, in <see cref="HighwayLengthMode.PixelsPerSecond"/>: the
+        /// notes keep their distance when the highway is resized, and a taller one shows further ahead.
+        /// </summary>
+        public double PixelsPerSecond
+        {
+            get => GetValue(PixelsPerSecondProperty);
+            set => SetValue(PixelsPerSecondProperty, value);
+        }
+
+        /// <summary>
+        /// How far ahead of the strike line the highway shows now, in seconds: its <see cref="LookAhead"/>, or in pixels per
+        /// second what the distance from the strike line to the top makes of it.
+        /// </summary>
+        public double EffectiveLookAhead => Math.Max(HighwayLookAhead.ShortestShown, new HighwayLength(LengthMode, LookAhead, PixelsPerSecond).LookAheadFor(Bounds.Height * StrikeFraction));
+
+        /// <summary>
+        /// <see cref="EffectiveLookAhead"/> as it was when the highway was last laid out, for something bound to it
+        /// (one way to the source): a highway with no size yet leaves it as it was, so it is zero until there is one.
+        /// Set by the highway, not by the user of it.
+        /// </summary>
+        public double ShownLookAhead
+        {
+            get => GetValue(ShownLookAheadProperty);
+            private set => SetCurrentValue(ShownLookAheadProperty, value);
+        }
+
+        // Says what the highway shows now, when what it depends on has changed, so it is read without being polled.
+        private void ShareShownLookAhead()
+        {
+            if (Bounds.Height > 0)
+                ShownLookAhead = EffectiveLookAhead;
         }
 
         /// <summary>
@@ -342,6 +393,8 @@ namespace ChartShared.UI.Controls.Highway
             }
             if (change.Property == SceneProperty || change.Property == IsVisibleProperty)
                 RequestFrame();
+            if (change.Property == BoundsProperty || change.Property == LookAheadProperty || change.Property == LengthModeProperty || change.Property == PixelsPerSecondProperty)
+                ShareShownLookAhead();
 
             // Shown again, it shows the notes falling until the pointer is over a highway again.
             if (change.Property == IsVisibleProperty && !IsVisible && !_isScrubbing)
@@ -384,7 +437,7 @@ namespace ChartShared.UI.Controls.Highway
 
             // The time read for this frame, rather than reading the clock again.
             double now = (_drawnAt != TimeSpan.MinValue ? _drawnAt : Clock?.Invoke() ?? TimeSpan.Zero).TotalSeconds;
-            double lookAhead = Math.Max(0.1, LookAhead);
+            double lookAhead = EffectiveLookAhead;
             double height = Bounds.Height;
             double strike = height * StrikeFraction;
             double Y(double time) => strike - ((time - now) / lookAhead * strike);
@@ -620,7 +673,7 @@ namespace ChartShared.UI.Controls.Highway
                 return;
 
             double now = (Clock?.Invoke() ?? TimeSpan.Zero).TotalSeconds;
-            double step = Math.Clamp(Math.Max(0.1, LookAhead) * 0.25, 0.1, 2);
+            double step = Math.Clamp(EffectiveLookAhead * 0.25, 0.1, 2);
             double target = Math.Clamp(now + (e.Delta.Y * step), 0, TimelineOf(scene));
             Scrubbed?.Invoke(this, new ScrubEventArgs(target));
             e.Handled = true;
@@ -645,7 +698,7 @@ namespace ChartShared.UI.Controls.Highway
         }
 
         /// <summary>How far the notes falling move in a pixel, in seconds, so a drag moves the notes as far as the pointer goes.</summary>
-        private double GrabSecondsPerPixel => Bounds.Height > 0 ? Math.Max(0.1, LookAhead) / (Bounds.Height * StrikeFraction) : 0;
+        private double GrabSecondsPerPixel => Bounds.Height > 0 ? EffectiveLookAhead / (Bounds.Height * StrikeFraction) : 0;
 
         protected override void OnPointerExited(PointerEventArgs e)
         {

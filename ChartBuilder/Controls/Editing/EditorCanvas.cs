@@ -321,10 +321,13 @@ namespace ChartBuilder.Controls.Editing
         private EditorSession? Session => _editor?.Session;
 
         /// <summary>
-        /// Where the time axis and the lanes are, for a canvas of <paramref name="size"/> showing <paramref name="lookAhead"/>
-        /// seconds beyond the strike line, with room kept for a phrase rail of <paramref name="phraseRows"/> rows.
+        /// Where the time axis and the lanes are, for a canvas of <paramref name="size"/> showing as far beyond the strike line
+        /// as <paramref name="length"/> says, with room kept for a phrase rail of <paramref name="phraseRows"/> rows.
         /// </summary>
-        protected abstract LaneProjection Project(Size size, LaneSlots slots, EditorViewport viewport, double lookAhead, int phraseRows);
+        protected abstract LaneProjection Project(Size size, LaneSlots slots, EditorViewport viewport, HighwayLength length, int phraseRows);
+
+        /// <summary>How long the time axis is, in pixels, for a canvas of <paramref name="size"/>: what <see cref="Project"/> gives it.</summary>
+        protected abstract double TimeAxisLength(Size size);
 
         // The areas below run the length of the projection's time axis, rather than the canvas's, so a page's areas run the
         // length of the page.
@@ -370,7 +373,7 @@ namespace ChartBuilder.Controls.Editing
         /// Where the time axis and a vocal part's pitch rows are, for a canvas of <paramref name="size"/>; null for a view
         /// that doesn't draw vocals, which only the timeline does.
         /// </summary>
-        protected virtual LaneProjection? ProjectVocals(Size size, LaneSlots slots, EditorViewport viewport, double lookAhead) => null;
+        protected virtual LaneProjection? ProjectVocals(Size size, LaneSlots slots, EditorViewport viewport, HighwayLength length) => null;
 
         /// <summary>Where a vocal part's lyrics are drawn, under its pitch rows.</summary>
         protected virtual Rect LyricsArea(Size size, LaneProjection projection) => default;
@@ -446,6 +449,8 @@ namespace ChartBuilder.Controls.Editing
             if (finalSize != _arranged)
             {
                 _arranged = finalSize;
+                // In pixels per second, how far ahead the lane shows follows how long it is.
+                _lane?.SetExtent(TimeAxisLength(finalSize));
                 UpdatePaging();
                 InvalidateLayers();
             }
@@ -477,7 +482,7 @@ namespace ChartBuilder.Controls.Editing
             var part = session.Chart.PartOf(key.Instrument)!;
             var rows = PhraseRail.RowsOf(part.Kind);
             Extras = ExtrasOf(size, key);
-            var screen = Project(size, slots, session.Viewport, lane.LookAhead, rows.Count);
+            var screen = Project(size, slots, session.Viewport, lane.Length, rows.Count);
             switch (layer.Kind)
             {
                 case LayerKind.Strike:
@@ -1236,7 +1241,7 @@ namespace ChartBuilder.Controls.Editing
             var slots = session.SlotsOf(key.Instrument, View);
             var rows = PhraseRail.RowsOf(ChartInstruments.KindOf(key.Instrument));
             Extras = ExtrasOf(Bounds.Size, key);
-            var projection = Project(Bounds.Size, slots, session.Viewport, _lane.LookAhead, rows.Count);
+            var projection = Project(Bounds.Size, slots, session.Viewport, _lane.Length, rows.Count);
             double seconds = projection.SecondsAt(AlongOf(position));
             double tick = session.TickAt(seconds);
             double tolerance = Math.Max(1, projection.TicksOf(HitPixels, Math.Max(0, tick), session.TempoMap));
@@ -1477,6 +1482,8 @@ namespace ChartBuilder.Controls.Editing
             if (_topLevel is { } top)
                 top.ScalingChanged += OnScalingChanged;
 
+            // Laid out before it had a lane to tell how long it is.
+            lane.SetExtent(TimeAxisLength(_arranged));
             InvalidateLayers();
             RequestFrame();
         }
@@ -1827,13 +1834,13 @@ namespace ChartBuilder.Controls.Editing
             if (Session is not { } session || _lane is null)
                 return null;
             if (_lane.Vocal is { } vocal)
-                return session.VocalsOf(vocal) is { } vocals ? ProjectVocals(Bounds.Size, VocalSlotsOf(vocals), session.Viewport, _lane.LookAhead) : null;
+                return session.VocalsOf(vocal) is { } vocals ? ProjectVocals(Bounds.Size, VocalSlotsOf(vocals), session.Viewport, _lane.Length) : null;
             if (_lane.Track is not { } key || session.TrackOf(key) is null)
                 return null;
             var slots = session.SlotsOf(key.Instrument, View);
             var rows = PhraseRail.RowsOf(ChartInstruments.KindOf(key.Instrument));
             Extras = ExtrasOf(Bounds.Size, key);
-            return Project(Bounds.Size, slots, session.Viewport, _lane.LookAhead, rows.Count);
+            return Project(Bounds.Size, slots, session.Viewport, _lane.Length, rows.Count);
         }
 
         // The sensitivity a proposed beat snaps to the mix's onsets at: the editor's default.

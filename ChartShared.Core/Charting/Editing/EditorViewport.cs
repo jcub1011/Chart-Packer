@@ -44,7 +44,18 @@ public sealed class EditorViewport
     /// </summary>
     public (double Start, double End) SpanOf(double lookAhead)
     {
-        double ahead = ClampLookAhead(lookAhead);
+        return SpanAhead(ClampLookAhead(lookAhead));
+    }
+
+    /// <summary>
+    /// The span a lane shows with <paramref name="secondsAhead"/> beyond its strike line as it is, not kept to a look-ahead's
+    /// range: what a lane in pixels per second mode shows, which is as long as it is tall. It's kept to the shortest a
+    /// highway is drawn showing (<see cref="HighwayLookAhead.ShortestShown"/>), as every highway is; not a positive number
+    /// is the shortest look-ahead.
+    /// </summary>
+    public (double Start, double End) SpanAhead(double secondsAhead)
+    {
+        double ahead = double.IsFinite(secondsAhead) && secondsAhead > 0 ? Math.Max(HighwayLookAhead.ShortestShown, secondsAhead) : MinLookAhead;
         return (Cursor - (ahead * StrikeFraction / (1 - StrikeFraction)), Cursor + ahead);
     }
 

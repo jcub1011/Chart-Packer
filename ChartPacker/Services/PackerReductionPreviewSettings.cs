@@ -1,3 +1,4 @@
+using ChartShared.Core.Charting;
 using ChartShared.UI.ViewModels;
 
 namespace ChartPacker.Services
@@ -15,6 +16,14 @@ namespace ChartPacker.Services
         {
             get => settings.Settings.GenerateDifficultiesLookAhead;
             set => settings.Settings.GenerateDifficultiesLookAhead = value;
+        }
+
+        public HighwayLengthMode LengthMode => settings.Settings.HighwayLengthMode;
+
+        public double PixelsPerSecond
+        {
+            get => settings.Settings.GenerateDifficultiesPixelsPerSecond;
+            set => settings.Settings.GenerateDifficultiesPixelsPerSecond = value;
         }
 
         public ReductionChangeCategories Categories { get; set; } = ReductionChangeCategories.Default;

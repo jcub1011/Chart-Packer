@@ -29,6 +29,9 @@ namespace ChartPacker.Services
         // Qualified: this class's own HighwayLookAhead property would otherwise be what the name means.
         public const double DefaultHighwayLookAhead = ChartShared.Core.Charting.HighwayLookAhead.Default;
         public const double DefaultGenerateDifficultiesLookAhead = ChartShared.UI.ViewModels.ReductionPreviewViewModel.DefaultLookAhead;
+        public const ChartShared.Core.Charting.HighwayLengthMode DefaultHighwayLengthMode = ChartShared.Core.Charting.HighwayLengthMode.PixelsPerSecond;
+        public const double DefaultHighwayPixelsPerSecond = ChartShared.Core.Charting.HighwayPixelsPerSecond.Default;
+        public const double DefaultGenerateDifficultiesPixelsPerSecond = ChartShared.Core.Charting.HighwayPixelsPerSecond.Default;
         public const HighwayPlacement DefaultHighwayPlacement = HighwayPlacement.Background;
         public const WaveformFidelity DefaultWaveformFidelity = WaveformFidelity.High;
         public const ScrubStep DefaultScrubStep = ScrubStep.Quarter;
@@ -135,6 +138,16 @@ namespace ChartPacker.Services
         public double HighwayLookAhead { get; set; } = DefaultHighwayLookAhead;
 
         /// <summary>
+        /// Whether the highways are sized by their look-ahead or by pixels per second, which keeps the distance between notes
+        /// the same at any height. Every highway in Chart Packer follows it.
+        /// </summary>
+        [JsonConverter(typeof(JsonStringEnumConverter<ChartShared.Core.Charting.HighwayLengthMode>))]
+        public ChartShared.Core.Charting.HighwayLengthMode HighwayLengthMode { get; set; } = DefaultHighwayLengthMode;
+
+        /// <summary>How many pixels of the highway a second of the song takes up in pixels per second mode, from <c>HighwayPixelsPerSecond</c>'s range.</summary>
+        public double HighwayPixelsPerSecond { get; set; } = DefaultHighwayPixelsPerSecond;
+
+        /// <summary>
         /// How fast the highway's notes fell, as a multiple of the normal speed, before the highway was set by its
         /// look-ahead. Only read, to carry a file an older Chart Packer saved over to <see cref="HighwayLookAhead"/>
         /// (<see cref="SettingsService"/>); null once it has.
@@ -143,6 +156,9 @@ namespace ChartPacker.Services
 
         /// <summary>How many seconds ahead the Generate lower difficulties window's preview shows, as its slider last left it.</summary>
         public double GenerateDifficultiesLookAhead { get; set; } = DefaultGenerateDifficultiesLookAhead;
+
+        /// <summary>How many pixels a second of the song takes up in the Generate lower difficulties window's preview, in pixels per second mode.</summary>
+        public double GenerateDifficultiesPixelsPerSecond { get; set; } = DefaultGenerateDifficultiesPixelsPerSecond;
 
         /// <summary>How far Ctrl and the wheel move the audio over the seek bar or a lane: a note of this length on the chart's grid.</summary>
         [JsonConverter(typeof(JsonStringEnumConverter<ScrubStep>))]

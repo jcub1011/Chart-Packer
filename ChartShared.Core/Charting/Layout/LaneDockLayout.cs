@@ -52,6 +52,12 @@ public sealed class DockLane : DockNode
     /// </summary>
     public double? LookAhead { get; internal set; }
 
+    /// <summary>
+    /// How many pixels of the lane a second of the song takes up, as the user set it for the pixels per second length
+    /// mode; null for the editor's default.
+    /// </summary>
+    public double? PixelsPerSecond { get; internal set; }
+
     /// <summary>How the lane shows its audio (charter-spec C12–C14).</summary>
     public LaneAudioOptions Audio { get; internal set; } = LaneAudioOptions.Default;
 }
@@ -223,6 +229,16 @@ public sealed class LaneDockLayout
     {
         RequireOpen(lane);
         lane.LookAhead = seconds is { } value && IsWeight(value) ? value : null;
+    }
+
+    /// <summary>
+    /// Sets how many pixels a second of the song takes up in <paramref name="lane"/>, or null for the default. Kept with
+    /// the layout like <see cref="SetLookAhead"/>, and raises no <see cref="Changed"/>.
+    /// </summary>
+    public void SetPixelsPerSecond(DockLane lane, double? pixelsPerSecond)
+    {
+        RequireOpen(lane);
+        lane.PixelsPerSecond = pixelsPerSecond is { } value && IsWeight(value) ? value : null;
     }
 
     /// <summary>
@@ -445,6 +461,7 @@ public sealed class LaneDockLayout
                 Difficulty = lane.Part.Track?.Difficulty.ToString(),
                 Vocal = lane.Part.Vocal?.ToString(),
                 LookAhead = lane.LookAhead,
+                PixelsPerSecond = lane.PixelsPerSecond,
                 Audio = lane.Audio == LaneAudioOptions.Default ? null : LaneAudioState.Of(lane.Audio),
             };
         }
@@ -466,6 +483,7 @@ public sealed class LaneDockLayout
                 return null;
             var lane = NewLane(part);
             lane.LookAhead = state.LookAhead is { } seconds && IsWeight(seconds) ? seconds : null;
+            lane.PixelsPerSecond = state.PixelsPerSecond is { } pixels && IsWeight(pixels) ? pixels : null;
             lane.Audio = state.Audio?.ToOptions() ?? LaneAudioOptions.Default;
             return lane;
         }

@@ -287,6 +287,29 @@ public sealed class SettingEditTests
     }
 
     [TestMethod]
+    public void APixelsPerSecondSettingIsHeldToTheSharedRangeAndGrain()
+    {
+        double live = 300;
+        var definition = new PixelsPerSecondSetting
+        {
+            Id = "pixelsPerSecond",
+            Category = Category,
+            Label = "Pixels per second",
+            DefaultValue = 300,
+            Get = () => live,
+            Set = v => live = v,
+        };
+
+        Assert.AreEqual(25, definition.Coerce(1), 1e-9, "Never below twenty-five.");
+        Assert.AreEqual(1000, definition.Coerce(99999), 1e-9, "Never above a thousand.");
+        Assert.AreEqual(35, definition.Coerce(33), 1e-9, "Kept to its grain.");
+        Assert.AreEqual(300, definition.Coerce(double.NaN), 1e-9, "Not a number is the default.");
+
+        definition.Write(342);
+        Assert.AreEqual(340, live, 1e-9);
+    }
+
+    [TestMethod]
     public void ChoiceRaisesSelectedIndex()
     {
         var edit = (SettingEdit<char>)Choice().BeginEdit();

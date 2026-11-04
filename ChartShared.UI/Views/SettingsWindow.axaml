@@ -73,6 +73,16 @@
                 <TextBlock Text="{Binding ValueText}" MinWidth="40" TextAlignment="Right" VerticalAlignment="Center" />
             </StackPanel>
         </DataTemplate>
+        <DataTemplate DataType="svm:PixelsPerSecondSettingViewModel">
+            <StackPanel Orientation="Horizontal" Spacing="10">
+                <ctl:HighwayLengthSlider Mode="PixelsPerSecond"
+                        PixelsPerSecond="{Binding Value}"
+                        Width="180"
+                        VerticalAlignment="Center"
+                        AutomationProperties.Name="{Binding Label}" />
+                <TextBlock Text="{Binding ValueText}" MinWidth="40" TextAlignment="Right" VerticalAlignment="Center" />
+            </StackPanel>
+        </DataTemplate>
         <DataTemplate DataType="svm:ChoiceSettingViewModel">
             <ComboBox ItemsSource="{Binding Choices}"
                       SelectedIndex="{Binding SelectedIndex}"

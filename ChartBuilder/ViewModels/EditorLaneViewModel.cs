@@ -39,6 +39,8 @@ namespace ChartBuilder.ViewModels
             Lane = lane;
             View = dock.Editor?.DefaultView ?? LaneView.Highway;
             LookAhead = EditorViewport.ClampLookAhead(lane.LookAhead ?? dock.Editor?.DefaultLookAhead ?? 2);
+            PixelsPerSecond = HighwayPixelsPerSecond.Clamp(lane.PixelsPerSecond ?? dock.Editor?.DefaultPixelsPerSecond ?? HighwayPixelsPerSecond.Default);
+            LengthMode = dock.Editor?.LengthMode ?? HighwayLengthMode.PixelsPerSecond;
             Audio = new LaneAudioViewModel(this, lane.Audio, options =>
             {
                 if (_dock.Layout.Find(Lane.Id) is not null)
@@ -90,14 +92,96 @@ namespace ChartBuilder.ViewModels
         /// The header's control sets it, as do Ctrl+wheel, + and − over the lane. It's kept with the lanes' layout.
         /// </summary>
         [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(LookAheadText))]
+        [NotifyPropertyChangedFor(nameof(LookAheadText), nameof(LengthText), nameof(Length))]
         public partial double LookAhead { get; set; }
+
+        /// <summary>
+        /// How many pixels of the lane a second of the song takes up, in <see cref="HighwayLengthMode.PixelsPerSecond"/>: the
+        /// notes keep their distance when the lane is resized, and a taller one shows further ahead. Kept with the lanes' layout.
+        /// </summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(LengthText), nameof(Length))]
+        public partial double PixelsPerSecond { get; set; }
+
+        /// <summary>Whether the lane is sized by its <see cref="LookAhead"/> or its <see cref="PixelsPerSecond"/>: the setting's, for every lane.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(IsPixelsPerSecond), nameof(LengthText), nameof(Length))]
+        public partial HighwayLengthMode LengthMode { get; set; }
+
+        public bool IsPixelsPerSecond => LengthMode == HighwayLengthMode.PixelsPerSecond;
+
+        /// <summary>How long the lane is, as it's set: what its canvas draws by.</summary>
+        public HighwayLength Length => new(LengthMode, LookAhead, PixelsPerSecond);
 
         /// <summary>The look-ahead as the header shows it, e.g. "2.0 s".</summary>
         public string LookAheadText => string.Format(CultureInfo.CurrentCulture, SharedStrings.LookAheadFormat, LookAhead);
 
-        /// <summary>Looks further ahead by a notch (<see cref="HighwayLookAhead.Stepped"/>) per <paramref name="steps"/>, or nearer when negative.</summary>
-        public void StepLookAhead(int steps) => LookAhead = HighwayLookAhead.Stepped(LookAhead, steps);
+        /// <summary>The lane's length as the header shows it, in the mode in use: e.g. "2.0 s" or "150 px/s".</summary>
+        public string LengthText => HighwayLengthText.Of(Length);
+
+        // How long the lane's time axis is, in pixels, as its canvas last laid it out; in pixels per second it decides how far ahead the lane shows.
+        private double _extentPixels;
+
+        /// <summary>
+        /// How far ahead of its strike line the lane shows now, in seconds: its <see cref="LookAhead"/>, or in pixels per second what
+        /// the lane's length in pixels makes of its <see cref="PixelsPerSecond"/>.
+        /// </summary>
+        public double ShownLookAhead => Length.LookAheadFor(_extentPixels * (1 - EditorViewport.StrikeFraction));
+
+        /// <summary>
+        /// Says how long the lane's time axis is, in pixels, as its canvas is laid out. In pixels per second that changes how far ahead
+        /// it shows, so the span marked on the timeline along the bottom is worked out again.
+        /// </summary>
+        public void SetExtent(double pixels)
+        {
+            if (Math.Abs(pixels - _extentPixels) < 0.5)
+                return;
+            _extentPixels = pixels;
+            if (_isMade && IsPixelsPerSecond)
+                Editor?.RefreshVisibleSpan();
+        }
+
+        /// <summary>
+        /// Takes the editor's settings again after they've been changed: the length mode, and the look-ahead and speed of
+        /// a lane that hasn't had its own set, which are the settings'. A lane that has keeps them.
+        /// </summary>
+        internal void ReloadDefaults()
+        {
+            if (Editor is not { } editor)
+                return;
+
+            var layoutLane = _dock.Layout.Find(Lane.Id) ?? Lane;
+
+            // Not kept as the lane's own, as it's the default being followed, not a choice; as when it's made.
+            _isMade = false;
+            try
+            {
+                if (layoutLane.LookAhead is null)
+                    LookAhead = EditorViewport.ClampLookAhead(editor.DefaultLookAhead);
+                if (layoutLane.PixelsPerSecond is null)
+                    PixelsPerSecond = editor.DefaultPixelsPerSecond;
+                LengthMode = editor.LengthMode;
+            }
+            finally
+            {
+                _isMade = true;
+            }
+
+            editor.RefreshVisibleSpan();
+        }
+
+        /// <summary>
+        /// Looks further ahead by a notch per <paramref name="steps"/>, or nearer when negative: of the look-ahead
+        /// (<see cref="HighwayLookAhead.Stepped"/>), or, in pixels per second, of the speed the other way round, as a longer look-ahead
+        /// is a slower one.
+        /// </summary>
+        public void StepLookAhead(int steps)
+        {
+            if (IsPixelsPerSecond)
+                PixelsPerSecond = HighwayPixelsPerSecond.Stepped(PixelsPerSecond, -steps);
+            else
+                LookAhead = HighwayLookAhead.Stepped(LookAhead, steps);
+        }
 
         /// <summary>Another difficulty of the part, drawn faintly behind the lane's own; null for none.</summary>
         [ObservableProperty]
@@ -347,6 +431,28 @@ namespace ChartBuilder.ViewModels
             if (_dock.Layout.Find(Lane.Id) is not null)
                 _dock.Layout.SetLookAhead(Lane, clamped);
             Editor?.RefreshVisibleSpan();
+        }
+
+        partial void OnPixelsPerSecondChanged(double value)
+        {
+            double clamped = HighwayPixelsPerSecond.Clamp(value);
+            if (clamped != value)
+            {
+                PixelsPerSecond = clamped;
+                return;
+            }
+
+            if (!_isMade)
+                return;
+            if (_dock.Layout.Find(Lane.Id) is not null)
+                _dock.Layout.SetPixelsPerSecond(Lane, clamped);
+            Editor?.RefreshVisibleSpan();
+        }
+
+        partial void OnLengthModeChanged(HighwayLengthMode value)
+        {
+            if (_isMade)
+                Editor?.RefreshVisibleSpan();
         }
     }
 

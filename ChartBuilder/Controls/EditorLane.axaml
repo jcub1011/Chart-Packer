@@ -305,15 +305,17 @@
                     <Button Classes="lane-part"
                             ToolTip.Tip="{x:Static res:Strings.LaneLookAheadToolTip}"
                             AutomationProperties.Name="{x:Static res:Strings.LaneLookAheadLabel}">
-                        <TextBlock FontSize="12" VerticalAlignment="Center" Text="{Binding LookAheadText}" />
+                        <TextBlock FontSize="12" VerticalAlignment="Center" Text="{Binding LengthText}" />
                         <Button.Flyout>
                             <Flyout Placement="BottomEdgeAlignedRight">
                                 <StackPanel Spacing="4" Width="220">
                                     <Grid ColumnDefinitions="*,Auto">
                                         <TextBlock Grid.Column="0" Text="{x:Static res:Strings.LaneLookAheadLabel}" />
-                                        <TextBlock Grid.Column="1" Classes="muted" Text="{Binding LookAheadText}" />
+                                        <TextBlock Grid.Column="1" Classes="muted" Text="{Binding LengthText}" />
                                     </Grid>
-                                    <ctl:LookAheadSlider LookAhead="{Binding LookAhead}"
+                                    <ctl:HighwayLengthSlider Mode="{Binding LengthMode}"
+                                            LookAhead="{Binding LookAhead}"
+                                            PixelsPerSecond="{Binding PixelsPerSecond}"
                                             AutomationProperties.Name="{x:Static res:Strings.LaneLookAheadLabel}" />
                                 </StackPanel>
                             </Flyout>

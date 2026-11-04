@@ -176,11 +176,24 @@ namespace ChartBuilder.ViewModels
         /// <summary>The look-ahead of a lane that hasn't had its own set: the highway speed setting's.</summary>
         public double DefaultLookAhead => HighwayLookAhead.Clamp(BuilderSettings.LookAheadAtSpeedOne / _settings.Settings.EditorHighwaySpeed);
 
+        /// <summary>How the lanes' length is chosen, by look-ahead or by pixels per second: the setting's.</summary>
+        public HighwayLengthMode LengthMode => _settings.Settings.HighwayLengthMode;
+
+        /// <summary>The pixels per second of a lane that hasn't had its own set: the setting's.</summary>
+        public double DefaultPixelsPerSecond => HighwayPixelsPerSecond.Clamp(_settings.Settings.EditorPixelsPerSecond, HighwayPixelsPerSecond.Default);
+
         /// <summary>How many seconds ahead the Generate fills and star power window's highway shows, as it was last left; kept with the settings.</summary>
         public double GeneratePhrasesLookAhead
         {
             get => _settings.Settings.GeneratePhrasesLookAhead;
             set => _settings.Settings.GeneratePhrasesLookAhead = value;
+        }
+
+        /// <summary>How many pixels a second of the song takes up in that highway in pixels per second mode, as it was last left; kept with the settings.</summary>
+        public double GeneratePhrasesPixelsPerSecond
+        {
+            get => _settings.Settings.GeneratePhrasesPixelsPerSecond;
+            set => _settings.Settings.GeneratePhrasesPixelsPerSecond = value;
         }
 
         /// <summary>
@@ -208,7 +221,8 @@ namespace ChartBuilder.ViewModels
             }
 
             var lane = focused ?? first ?? firstVocal;
-            var (start, end) = Session.Viewport.SpanOf(lane?.LookAhead ?? DefaultLookAhead);
+            // A lane's shown look-ahead is already its own, and in pixels per second not one the look-ahead's range keeps.
+            var (start, end) = lane is null ? Session.Viewport.SpanOf(DefaultLookAhead) : Session.Viewport.SpanAhead(lane.ShownLookAhead);
             VisibleStart = start;
             VisibleEnd = end;
         }
@@ -512,7 +526,11 @@ namespace ChartBuilder.ViewModels
             WheelUpIsLater = IsWheelUpLater(_settings.Settings);
             Audio.ReloadSettings(_settings.Settings);
             foreach (var lane in Lanes.All)
+            {
                 lane.Audio.Refresh();
+                lane.ReloadDefaults();
+            }
+
             Playtest.ReloadSettings();
         }
 
