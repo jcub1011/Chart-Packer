@@ -66,6 +66,24 @@ namespace ChartShared.UI.Controls.Highway
             return released < ReleaseSeconds ? SustainEndLevel * (1 - (released / ReleaseSeconds)) : 0;
         }
 
+        /// <summary>
+        /// Lights <paramref name="column"/> of the first <paramref name="count"/> in <paramref name="hits"/> as brightly as
+        /// <paramref name="glow"/> says, unless it's already lit more. A note with no column of its own (an open note, a
+        /// kick: <paramref name="column"/> below zero) lights every one, by <see cref="SpreadLevel"/> of its glow.
+        /// </summary>
+        public static void Light(double[] hits, int count, int column, double glow)
+        {
+            if (column < 0)
+            {
+                for (int c = 0; c < count; c++)
+                    hits[c] = Math.Max(hits[c], glow * SpreadLevel);
+            }
+            else
+            {
+                hits[column] = Math.Max(hits[column], glow);
+            }
+        }
+
         /// <summary>The fill of a lit column's target, drawn as opaque as the column is lit.</summary>
         public static Color TargetFill(Color color) => HighwayPalette.WithAlpha(color, 0xFF);
 

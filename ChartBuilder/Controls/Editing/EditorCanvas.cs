@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq;
+using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -71,12 +72,9 @@ namespace ChartBuilder.Controls.Editing
         private static readonly IBrush LanesBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xF0, 0x08, 0x08, 0x0F));
         private static readonly IBrush RailBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xFF, 0x12, 0x13, 0x1B));
         private static readonly IBrush AlternateRowBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x0A, 0xFF, 0xFF, 0xFF));
-        private static readonly IPen DividerPen = new ImmutablePen(Color.FromArgb(0x1C, 0xFF, 0xFF, 0xFF).ToUInt32(), 1);
-        private static readonly IPen BeatPen = new ImmutablePen(Color.FromArgb(0x2A, 0xFF, 0xFF, 0xFF).ToUInt32(), 1);
         // Solid and fainter rather than dashed: drawn once a grid step across every lane, every frame, and a dashed line is
         // dashed afresh each time it's drawn.
         private static readonly IPen GridPen = new ImmutablePen(Color.FromArgb(0x0C, 0xFF, 0xFF, 0xFF).ToUInt32(), 1);
-        private static readonly IPen MeasurePen = new ImmutablePen(Color.FromArgb(0x70, 0xFF, 0xFF, 0xFF).ToUInt32(), 2);
         private static readonly IPen TempoPen = new ImmutablePen(Color.FromArgb(0xB0, 0xFF, 0xB0, 0x40).ToUInt32(), 1.5);
         private static readonly IBrush TempoBrush = new ImmutableSolidColorBrush(Color.FromRgb(0xFF, 0xB0, 0x40));
         private static readonly IBrush SpanBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x26, 0x6E, 0x9C, 0xFF));
@@ -149,22 +147,13 @@ namespace ChartBuilder.Controls.Editing
         private static readonly IBrush DefaultLabelBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xC0, 0xFF, 0xFF, 0xFF));
         private static readonly IBrush DefaultAccentBrush = new ImmutableSolidColorBrush(Color.FromRgb(0x7C, 0xB4, 0xFF));
         private static readonly IBrush StrikeBandBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x90, 0x00, 0x00, 0x00));
-        private static readonly IPen StrikeEdgePen = new ImmutablePen(Color.FromArgb(0x8C, 0xFF, 0xFF, 0xFF).ToUInt32(), 1);
         private static readonly Color SoloColor = PhraseColors.Solo;
         private static readonly IBrush SoloLabelBrush = new ImmutableSolidColorBrush(SoloColor);
 
-        // How opaque the range indicator over every phrase and disco flip is, and the lines marking where each begins
-        // and ends.
-        private const byte PhraseRangeAlpha = 0x16;
-
-        // A solo's tint is a shade stronger than the other kinds', as it was before they were tinted too.
-        private const byte SoloTintAlpha = 0x1A;
-        private const byte PhraseRangeEdgeAlpha = 0xA0;
         private static readonly Color DiscoFlipColor = PhraseColors.DiscoFlip;
         private static readonly Color SectionColor = Color.FromRgb(0x5E, 0xEA, 0xD4);
         private static readonly IPen SectionPen = new ImmutablePen(HighwayPalette.WithAlpha(SectionColor, 0x70).ToUInt32(), 1.5);
         private static readonly IBrush SectionBrush = new ImmutableSolidColorBrush(SectionColor);
-        private static readonly Typeface LabelFace = new(FontFamily.Default, FontStyle.Normal, FontWeight.SemiBold);
 
         // What a click of the erase tool would take away, in red over it.
         private static readonly Color EraseColor = Color.FromRgb(0xF8, 0x71, 0x71);
@@ -172,7 +161,12 @@ namespace ChartBuilder.Controls.Editing
         private static readonly IPen ErasePen = new ImmutablePen(EraseColor.ToUInt32(), 1.5);
 
         private readonly GemPainter _gems = new();
-        private readonly Dictionary<(string Text, double Size, IBrush Brush, double? MaxWidth), TextLayout> _labels = [];
+        private readonly NotePainter _notePainter;
+        private readonly NoteDecorations _decorations;
+        private readonly List<NoteGlyph> _glyphs = [];
+        private readonly List<BandGlyph> _bands = [];
+        private readonly List<EditableNote> _glyphNotes = [];
+        private readonly LabelCache _labels = new();
         private readonly List<string> _measureNumbers = [];
 
         // How brightly each column is lit as the song plays through the strike line.
@@ -197,11 +191,9 @@ namespace ChartBuilder.Controls.Editing
         private int? _proposalDrag;
         private Point? _hover;
 
-        // The wheel's turn not yet taken as a step, as a touchpad turns it a fraction of a notch at a time.
-        private double _wheel;
-
-        // The Ctrl+wheel turn not yet taken as a look-ahead step, as a touchpad turns it a fraction of a notch at a time.
-        private double _zoomWheel;
+        // The gestures that move through the song and zoom into it, which a highway shares with the editor's lanes: the wheel,
+        // and a drag with Shift and the middle button, as the left and the others are the tools'.
+        private readonly ViewportGestures _gestures;
         private Point? _boxFrom;
         private Point _boxTo;
         // The box's press anchor in audio seconds, so the box tracks the song when the view scrolls or zooms mid-drag.
@@ -284,6 +276,9 @@ namespace ChartBuilder.Controls.Editing
 
         protected EditorCanvas()
         {
+            _notePainter = new NotePainter(_gems);
+            _gestures = new ViewportGestures(this, new ViewportHost(this), new ScrubBinding(MouseButton.Middle, KeyModifiers.Shift), WatchesKeys);
+            _decorations = new NoteDecorations(this);
             _song = new Layer(this, LayerKind.Song);
             _strike = new Layer(this, LayerKind.Strike);
             _notes = new Layer(this, LayerKind.Notes);
@@ -919,7 +914,7 @@ namespace ChartBuilder.Controls.Editing
             var current = e.GetCurrentPoint(this);
             if (Session is not { } session)
                 return;
-            if (_isPressed || _proposalDrag is not null)
+            if (_isPressed || _proposalDrag is not null || _gestures.IsScrubbing)
             {
                 e.Handled = true;
                 return;
@@ -934,6 +929,16 @@ namespace ChartBuilder.Controls.Editing
             };
             if (button == MouseButton.None)
                 return;
+
+            // Shift and the middle button scrub the song, in a vocal lane as well, before they're the tools'.
+            if (_gestures.IsScrubPress(e))
+            {
+                Focus();
+                ShowTip(null);
+                _gestures.Press(e, current.Position);
+                return;
+            }
+
             _pressButton = button;
             _pressedAt = current.Position;
             _pressDragged = false;
@@ -1010,6 +1015,8 @@ namespace ChartBuilder.Controls.Editing
             var position = e.GetPosition(this);
             _hover = position;
             _keys = e.KeyModifiers;
+            if (_gestures.Move(e))
+                return;
 
             // Keys pressed while the window was in the background reach the toolbar's place options here.
             _editor?.HoldModifiers(ModifiersOf(e.KeyModifiers));
@@ -1061,6 +1068,8 @@ namespace ChartBuilder.Controls.Editing
         protected override void OnPointerReleased(PointerReleasedEventArgs e)
         {
             base.OnPointerReleased(e);
+            if (_gestures.Release(e))
+                return;
             if (_proposalDrag is not null)
             {
                 _proposalDrag = null;
@@ -1106,6 +1115,7 @@ namespace ChartBuilder.Controls.Editing
         protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
         {
             base.OnPointerCaptureLost(e);
+            _gestures.CaptureLost();
             _proposalDrag = null;
             if (!_isPressed)
                 return;
@@ -1133,29 +1143,50 @@ namespace ChartBuilder.Controls.Editing
             if (Session is not { } session || _lane is not { HasCanvas: true } lane)
                 return;
 
-            double delta = e.Delta.Y;
-            if ((e.KeyModifiers & KeyModifiers.Control) != 0)
+            // The song moves past the strike line a grid step a notch, through the tempo map, so the strike line stays on the
+            // grid across tempo and time-signature changes; Ctrl zooms, turned up the lane looking less far ahead. A turn of none
+            // isn't taken, so a sideways touchpad swipe still reaches what's above.
+            _gestures.Wheel(e);
+        }
+
+        // Ctrl is watched, to make a scrub fine, while one goes on.
+        private bool WatchesKeys() => _gestures.IsScrubbing;
+
+        /// <summary>What the shared gestures move in an editor lane: the cursor, as the keys and the tools do.</summary>
+        private sealed class ViewportHost(EditorCanvas canvas) : IViewportGestureHost
+        {
+            public double Now => canvas.Session?.Viewport.Cursor ?? 0;
+
+            public double SecondsPerPixel => canvas.CurrentProjection() is { } projection && projection.PixelsPerSecond > 0 ? 1 / projection.PixelsPerSecond : 0;
+
+            public bool IsTimeAxisVertical => canvas.View == LaneView.Highway;
+
+            public bool WheelUpIsLater => canvas.WheelUpIsLater;
+
+            public double FineFactor => LaneScrub.DefaultFineFactor;
+
+            public void ScrubStarted()
             {
-                // Turned up, the lane looks less far ahead, so the notes are further apart: half a second a notch, at most one notch per wheel event.
-                int zoomStep = WheelSteps.TakeZoomStep(ref _zoomWheel, delta);
-                if (zoomStep != 0)
-                    lane.StepLookAhead(-zoomStep);
-            }
-            else
-            {
-                // The song moves past the strike line a grid step a notch, through the tempo map, so the strike line stays
-                // on the grid across tempo and time-signature changes. Which way is later is the setting's, the same in
-                // either view and on the timeline. At most one notch per wheel event, so a mouse reporting several units
-                // per physical notch still moves a single step; with Shift held, a notch moves four grid steps instead.
-                // Some platforms report Shift+wheel as a sideways scroll, so that counts too.
-                bool fast = (e.KeyModifiers & KeyModifiers.Shift) != 0;
-                double raw = delta != 0 ? delta : (fast ? e.Delta.X : 0);
-                int steps = WheelSteps.TakeScrollStep(ref _wheel, WheelSteps.TowardLater(raw, WheelUpIsLater), fast);
-                if (steps != 0)
-                    session.Tools.StepCursor(steps);
             }
 
-            e.Handled = true;
+            public void ScrubEnded()
+            {
+            }
+
+            // The cursor moves, and playback seeks there, as it does for every move of it by hand.
+            public void ScrubTo(double seconds)
+            {
+                if (canvas.Session is not { } session)
+                    return;
+                double length = canvas._editor?.Playback.LengthSeconds ?? 0;
+                session.Viewport.MoveCursor(length > 0 ? Math.Clamp(seconds, 0, length) : Math.Max(0, seconds));
+            }
+
+            public void Scroll(int steps) => canvas.Session?.Tools.StepCursor(steps);
+
+            public void Zoom(int steps) => canvas._lane?.StepLookAhead(-steps);
+
+            public double? OverviewTimeAt(Point at) => null;
         }
 
         // The canvas's keys are the window's key dispatcher's, which finds the canvas with focus and runs the key's action on it
@@ -1595,19 +1626,8 @@ namespace ChartBuilder.Controls.Editing
 
         private void DrawLaneDividers(DrawingContext context, LaneProjection projection, LaneSlots slots)
         {
-            double from = projection.TimeFrom, to = projection.TimeFrom + projection.TimeLength;
-            for (int i = 0; i < slots.Slots.Count; i++)
-            {
-                double edge = projection.LaneFrom + (i * projection.LaneSize);
-                if (View == LaneView.Timeline && i % 2 == 1)
-                    context.FillRectangle(AlternateRowBrush, Box(from, to, edge, edge + projection.LaneSize));
-                if (i > 0)
-                    context.DrawLine(DividerPen, At(from, edge), At(to, edge));
-
-                // A shared column's halves, which a click picks between: GHL's black fret, then its white.
-                if (slots.SharedOf(i) is not null)
-                    context.DrawLine(GridPen, At(from, edge + (projection.LaneSize / 2)), At(to, edge + (projection.LaneSize / 2)));
-            }
+            // A shared column's halves, which a click picks between: GHL's black fret, then its white.
+            HighwayChrome.DrawLaneDividers(context, projection, projection.TimeFrom, projection.TimeFrom + projection.TimeLength, View == LaneView.Timeline ? AlternateRowBrush : null, GridPen);
         }
 
         /// <summary>
@@ -1958,24 +1978,19 @@ namespace ChartBuilder.Controls.Editing
         }
 
         /// <summary>
-        /// A range's tint, where it starts and ends along the time axis, and whether it has an end to mark: at least two
-        /// pixels long, so one with no length shows.
-        /// </summary>
-        private readonly record struct PhraseRange(double Start, double End, Color Color, byte Alpha, bool HasEnd = true);
-
-        /// <summary>
         /// A faint tint across the lanes, behind the notes, over every phrase and the difficulty's disco flip ranges
         /// (charter-spec C8), each in its kind's colour, with its start, and its end where it has one, marked by a
         /// stronger line of that colour. Overlapping tints show through each other.
         /// </summary>
         private void DrawPhraseRanges(DrawingContext context, EditorSession session, ChartTrackKey key, LaneProjection projection, double fromTick, double toTick)
         {
-            var ranges = new List<PhraseRange>(_phrasesShown.Count);
+            var ranges = _bands;
+            ranges.Clear();
             foreach (var phrase in _phrasesShown)
             {
                 double start = projection.AlongOf(session.AudioAt(phrase.Tick));
                 double end = projection.AlongOf(session.AudioAt(phrase.CoverEnd));
-                ranges.Add(RangeOf(start, end, PhraseColors.Of(phrase.Kind), PhraseTintAlpha(phrase.Kind), projection.View));
+                ranges.Add(RangeOf(start, end, PhraseColors.Of(phrase.Kind), PhraseColors.TintOf(phrase.Kind), projection.View));
             }
 
             double farEnd = projection.AlongOf(projection.End);
@@ -1985,39 +2000,23 @@ namespace ChartBuilder.Controls.Editing
                     continue;
                 double start = projection.AlongOf(session.AudioAt(range.Tick));
                 double end = range.EndTick is { } endTick ? projection.AlongOf(session.AudioAt(endTick)) : farEnd;
-                ranges.Add(RangeOf(start, end, PhraseColors.DiscoFlip, PhraseRangeAlpha, projection.View, hasEnd: range.EndTick is not null));
+                ranges.Add(RangeOf(start, end, PhraseColors.DiscoFlip, PhraseColors.TintAlpha, projection.View, hasEnd: range.EndTick is not null));
             }
 
             if (ranges.Count == 0)
                 return;
 
+            // Cut to the page, like the tints, so a range reaching far past it doesn't make its picture bigger than the page.
             double across1 = projection.LaneFrom, across2 = projection.LaneFrom + (projection.LaneSize * projection.Slots.Slots.Count);
-            foreach (var range in ranges)
-            {
-                var tint = HighwayPalette.WithAlpha(range.Color, range.Alpha);
-                context.FillRectangle(_gems.Brush(tint), Box(Math.Min(range.Start, range.End), Math.Max(range.Start, range.End), across1, across2));
-            }
-
-            // The edges go over every tint, so none of them is hidden where ranges overlap. Like the tints, they're cut
-            // to the page, so a range reaching far past it doesn't make its picture bigger than the page.
-            foreach (var range in ranges)
-            {
-                var pen = _gems.Pen(HighwayPalette.WithAlpha(range.Color, PhraseRangeEdgeAlpha), 1);
-                context.DrawLine(pen, At(Limited(range.Start), across1), At(Limited(range.Start), across2));
-                if (range.HasEnd)
-                    context.DrawLine(pen, At(Limited(range.End), across1), At(Limited(range.End), across2));
-            }
+            HighwayChrome.DrawBands(context, _gems, projection.View, CollectionsMarshal.AsSpan(ranges), across1, across2, _alongLimit.From, _alongLimit.To);
         }
 
-        /// <summary>How opaque a phrase of <paramref name="kind"/> is tinted.</summary>
-        private static byte PhraseTintAlpha(PhraseKind kind) => kind == PhraseKind.Solo ? SoloTintAlpha : PhraseRangeAlpha;
-
         /// <summary>A range's start and end along the time axis, in the order it runs: at least two pixels long, so one with no length shows.</summary>
-        private static PhraseRange RangeOf(double start, double end, Color color, byte alpha, LaneView view, bool hasEnd = true)
+        private static BandGlyph RangeOf(double start, double end, Color color, byte alpha, LaneView view, bool hasEnd = true)
         {
             if (Math.Abs(end - start) < 2)
                 end = start + (view == LaneView.Highway ? -2 : 2);
-            return new PhraseRange(start, end, color, alpha, hasEnd);
+            return new BandGlyph { Start = start, End = end, Color = color, TintAlpha = alpha, HasEnd = hasEnd };
         }
 
         /// <summary>
@@ -2168,7 +2167,7 @@ namespace ChartBuilder.Controls.Editing
             foreach (var line in map.BeatLines(first, last))
             {
                 double along = projection.AlongOf(session.AudioAt(line.Tick));
-                context.DrawLine(line.IsMeasure ? MeasurePen : BeatPen, At(along, across1), At(along, across2));
+                HighwayChrome.DrawBeatLine(context, View, along, across1, across2, line.IsMeasure);
                 if (!line.IsMeasure)
                     continue;
 
@@ -2282,117 +2281,137 @@ namespace ChartBuilder.Controls.Editing
             int laneCount = drums ? slots.Slots.Count - (slots.Across is null ? 1 : 0) : 5;
             var game = isGhost ? null : session.GameTrack(key).Notes;
             var notes = track.Notes.Between((long)Math.Max(0, Math.Floor(fromTick) - longest), (long)Math.Ceiling(toTick) + 1);
-            var selectedPen = AccentPens().Selected;
             double size = GemSize(projection);
-            double across1 = projection.LaneFrom, across2 = projection.LaneFrom + (projection.LaneSize * slots.Slots.Count);
 
-            // Tails at the back, an open note's across the lanes behind the frets', then the bars across, then the gems;
-            // within each, the latest first. A kick has no sustain.
-            foreach (bool wide in (ReadOnlySpan<bool>)[true, false])
+            // The notes as the shared painter draws them, in the order they're drawn from the back.
+            var glyphs = _glyphs;
+            glyphs.Clear();
+            _glyphNotes.Clear();
+            for (int i = 0; i < notes.Length; i++)
             {
-                for (int i = notes.Length - 1; i >= 0; i--)
-                {
-                    var note = notes[i];
-                    bool across = slots.Across == note.Lane;
-                    if (note.Length <= EditableNote.PlainLength || across != wide || (across && drums))
-                        continue;
-                    int lane = session.ShownLane(key, note);
-                    var shown = Shown(game, note, drums, lane);
-                    int column = slots.IndexOf(lane);
-                    if (column < 0 && !across)
-                        continue;
-                    double start = projection.AlongOf(session.AudioAt(note.Tick));
-                    double end = projection.AlongOf(session.AudioAt(note.Tick + note.Length));
-                    Rect tail;
-                    if (across)
-                    {
-                        tail = Box(start, end, across1 + 4, across2 - 4);
-                    }
-                    else
-                    {
-                        double width = Math.Max(3, projection.LaneSize * 0.2);
-                        double center = projection.AcrossOf(column);
-                        tail = Box(start, end, center - (width / 2), center + (width / 2));
-                    }
-
-                    var color = HighwayPalette.NoteColor(kind, laneCount, shown);
-                    if (!isGhost && shown.Length == 0)
-                    {
-                        // Shorter than the sustain cutoff: the games read a plain note, so the tail is only dashed (C5 item 3).
-                        DashedOutline.DrawRectangle(context, ShortTailPen(color), tail.Deflate(0.5), 0, ShortTailDash, ShortTailDash);
-                    }
-                    else if (across)
-                    {
-                        _gems.DrawWideTail(context, color, tail, outlined: false);
-                    }
-                    else
-                    {
-                        _gems.DrawTail(context, kind, shown, color, tail, outlined: false);
-                    }
-                }
-            }
-
-            var flagged = _flagged;
-            flagged.Clear();
-            foreach (bool bars in (ReadOnlySpan<bool>)[true, false])
-            {
-                for (int i = notes.Length - 1; i >= 0; i--)
-                {
-                    var note = notes[i];
-                    if (note.Tick > toTick + 1 || note.Tick < fromTick - 1)
-                        continue;
-                    bool across = slots.Across == note.Lane;
-                    if (across != bars)
-                        continue;
-
-                    // A GHL barre: the black fret covers the top half of its column's white one, as in the game, so it's
-                    // drawn just after it.
-                    if (slots.IsShared(note.Lane) && slots.PartnerOf(note.Lane) is { } white && track.TryGetNote(note.Tick, white, false, out _))
-                        continue;
-                    DrawNote(note, across, barre: false);
-                    if (!across && slots.SharedOf(slots.IndexOf(note.Lane)) is { } black && black != note.Lane && track.TryGetNote(note.Tick, black, false, out var shared))
-                        DrawNote(shared, across: false, barre: true);
-                }
-            }
-
-            void DrawNote(EditableNote note, bool across, bool barre)
-            {
-                // Inside a disco flip section, on the pad the player hits (charter-spec C6 item 7).
+                var note = notes[i];
+                bool across = slots.Across == note.Lane;
                 int lane = session.ShownLane(key, note);
+                int column = across ? -1 : slots.IndexOf(lane);
+                if (column < 0 && !across)
+                    continue;
+
+                var parts = NoteGlyphParts.None;
+
+                // A kick has no sustain.
+                if (note.Length > EditableNote.PlainLength && !(across && drums))
+                    parts |= NoteGlyphParts.Tail;
+
+                // A GHL barre: the black fret covers the top half of its column's white one, as in the game, so it's
+                // drawn just after it, in its place, and not as a note of its own.
+                bool inView = note.Tick <= toTick + 1 && note.Tick >= fromTick - 1;
+                bool coveredByBarre = slots.IsShared(note.Lane) && slots.PartnerOf(note.Lane) is { } white && track.TryGetNote(note.Tick, white, false, out _);
+                if (inView && !coveredByBarre)
+                    parts |= NoteGlyphParts.Note;
+                if (parts == NoteGlyphParts.None)
+                    continue;
+
                 var shown = Shown(game, note, drums, lane);
                 var color = HighwayPalette.NoteColor(kind, laneCount, shown);
                 double along = projection.AlongOf(session.AudioAt(note.Tick));
-                Rect rect;
                 if (across)
-                {
-                    double thickness = Math.Max(4, size * 0.45);
-                    rect = Box(along - (thickness / 2), along + (thickness / 2), across1 + 4, across2 - 4);
-                    _gems.DrawBar(context, kind, shown, color, rect, outlined: isGhost);
-                }
-                else
-                {
-                    int column = slots.IndexOf(lane);
-                    if (column < 0)
-                        return;
-                    rect = GemRect(projection, column, along, size);
-                    if (column == slots.Slots.Count - 1 && slots.Across is null && note.Lane == EditorTools.ApartLane(slots))
-                    {
-                        _gems.DrawBar(context, kind, shown, color, rect, outlined: isGhost);
-                    }
-                    else
-                    {
-                        if (barre)
-                            rect = rect.WithHeight(rect.Height / 2);
-                        _gems.DrawGem(context, kind, shown, color, rect, outlined: isGhost);
-                    }
-                }
-
+                    parts |= NoteGlyphParts.Across;
+                else if (column == slots.Slots.Count - 1 && slots.Across is null && note.Lane == EditorTools.ApartLane(slots))
+                    parts |= NoteGlyphParts.Bar;
                 if (isGhost)
+                    parts |= NoteGlyphParts.Outlined;
+
+                // Shorter than the sustain cutoff: the games read a plain note, so the tail is only dashed (C5 item 3).
+                if (!isGhost && shown.Length == 0)
+                    parts |= NoteGlyphParts.DashedTail;
+
+                // Its black fret, if it has one, is drawn over it, so it comes after this one's glyph from the back.
+                if ((parts & NoteGlyphParts.Note) != 0 && !across && slots.SharedOf(slots.IndexOf(note.Lane)) is { } black && black != note.Lane && track.TryGetNote(note.Tick, black, false, out var shared))
+                    AddBarre(shared);
+
+                _glyphNotes.Add(note);
+                glyphs.Add(new NoteGlyph
+                {
+                    Index = _glyphNotes.Count - 1,
+                    Note = shown,
+                    Color = color,
+                    Column = column,
+                    Along = along,
+                    TailFrom = along,
+                    TailTo = projection.AlongOf(session.AudioAt(note.Tick + note.Length)),
+                    Opacity = 1,
+                    Parts = parts,
+                });
+            }
+
+            void AddBarre(EditableNote barre)
+            {
+                // Inside a disco flip section, on the pad the player hits (charter-spec C6 item 7).
+                int lane = session.ShownLane(key, barre);
+                int column = slots.IndexOf(lane);
+                if (column < 0)
                     return;
-                if (session.Selection.IsMarked(key, note))
-                    context.DrawRectangle(null, selectedPen, rect.Inflate(2), 3, 3);
-                if (!across && kind != ChartInstrumentKind.Drums && flagged.Add(note.Tick) && track.FlagsAt(note.Tick) is var flags and not ChordFlags.None)
-                    DrawForcing(context, projection, slots, along, flags);
+                var shown = Shown(game, barre, drums, lane);
+                _glyphNotes.Add(barre);
+                glyphs.Add(new NoteGlyph
+                {
+                    Index = _glyphNotes.Count - 1,
+                    Note = shown,
+                    Color = HighwayPalette.NoteColor(kind, laneCount, shown),
+                    Column = column,
+                    Along = projection.AlongOf(session.AudioAt(barre.Tick)),
+                    Opacity = 1,
+                    Parts = NoteGlyphParts.Note | NoteGlyphParts.Barre | (isGhost ? NoteGlyphParts.Outlined : NoteGlyphParts.None),
+                });
+            }
+
+            _flagged.Clear();
+            _decorations.Begin(session, key, track, projection, slots, AccentPens().Selected, isGhost);
+            _notePainter.Draw(context, projection, kind, CollectionsMarshal.AsSpan(glyphs), size, _decorations, _alongLimit.From, _alongLimit.To);
+        }
+
+        /// <summary>What the editor draws over its notes, and in place of a short sustain's tail: its selection rings and forcing marks.</summary>
+        private sealed class NoteDecorations : INoteDecorator
+        {
+            private readonly EditorCanvas _canvas;
+            private EditorSession? _session;
+            private ChartTrackKey _key;
+            private EditableTrack? _track;
+            private LaneProjection? _projection;
+            private LaneSlots? _slots;
+            private IPen? _selectedPen;
+            private bool _isGhost;
+
+            public NoteDecorations(EditorCanvas canvas)
+            {
+                _canvas = canvas;
+            }
+
+            public void Begin(EditorSession session, ChartTrackKey key, EditableTrack track, LaneProjection projection, LaneSlots slots, IPen selectedPen, bool isGhost)
+            {
+                _session = session;
+                _key = key;
+                _track = track;
+                _projection = projection;
+                _slots = slots;
+                _selectedPen = selectedPen;
+                _isGhost = isGhost;
+            }
+
+            public void DrawDashedTail(DrawingContext context, in NoteGlyph glyph, Rect tail) =>
+                DashedOutline.DrawRectangle(context, _canvas.ShortTailPen(glyph.Color), tail.Deflate(0.5), 0, ShortTailDash, ShortTailDash);
+
+            public void AfterNote(DrawingContext context, in NoteGlyph glyph, Rect rect)
+            {
+                if (_isGhost)
+                    return;
+
+                var note = _canvas._glyphNotes[glyph.Index];
+                bool across = glyph.Has(NoteGlyphParts.Across);
+                if (_session!.Selection.IsMarked(_key, note))
+                    context.DrawRectangle(null, _selectedPen, rect.Inflate(2), 3, 3);
+                if (!across && _track!.Kind != ChartInstrumentKind.Drums && _canvas._flagged.Add(note.Tick) && _track.FlagsAt(note.Tick) is var flags and not ChordFlags.None)
+                    _canvas.DrawForcing(context, _projection!, _slots!, glyph.Along, flags);
             }
         }
 
@@ -2744,9 +2763,7 @@ namespace ChartBuilder.Controls.Editing
             double along = projection.AlongOf(session.Viewport.Cursor);
             double across1 = projection.LaneFrom, across2 = projection.LaneFrom + (projection.LaneSize * projection.Slots.Slots.Count);
             double half = Math.Max(3, GemSize(projection) * 0.6);
-            context.FillRectangle(StrikeBandBrush, Box(along - half, along + half, across1, across2));
-            context.DrawLine(StrikeEdgePen, At(along - half, across1), At(along - half, across2));
-            context.DrawLine(StrikeEdgePen, At(along + half, across1), At(along + half, across2));
+            HighwayChrome.DrawStrikeBand(context, View, Box(along - half, along + half, across1, across2), StrikeBandBrush);
         }
 
         /// <summary>
@@ -2774,14 +2791,10 @@ namespace ChartBuilder.Controls.Editing
                     ? (drums ? HighwayPalette.Kick : HighwayPalette.Open)
                     : HighwayPalette.HitColor(kind, laneCount, column);
                 double edge = projection.LaneFrom + (column * projection.LaneSize);
-                using (context.PushOpacity(hit * StrikeGlow.BeamOpacity))
-                    StrikeGlow.DrawBeam(context, color, View == LaneView.Highway, Box(strike, strike + reach, edge, edge + projection.LaneSize));
+                HighwayChrome.DrawLitBeam(context, View, color, hit, Box(strike, strike + reach, edge, edge + projection.LaneSize));
 
                 // The target, as opaque as the column is lit.
-                var rect = GemRect(projection, column, strike, size);
-                double radius = GemPainter.CornerOf(rect);
-                using (context.PushOpacity(hit))
-                    context.DrawRectangle(_gems.Brush(StrikeGlow.TargetFill(color)), _gems.Pen(StrikeGlow.TargetEdge(color), 2), rect.Deflate(1), radius, radius);
+                HighwayChrome.DrawLitTarget(context, _gems, GemRect(projection, column, strike, size), color, hit);
             }
         }
 
@@ -2813,14 +2826,9 @@ namespace ChartBuilder.Controls.Editing
 
                 // An open note or kick across the highway lights every column; a pad, the column it's drawn in.
                 if (slots.Across == note.Lane)
-                {
-                    for (int c = 0; c < count; c++)
-                        hits[c] = Math.Max(hits[c], glow * StrikeGlow.SpreadLevel);
-                }
+                    StrikeGlow.Light(hits, count, -1, glow);
                 else if (slots.IndexOf(lane) is var column and >= 0)
-                {
-                    hits[column] = Math.Max(hits[column], glow);
-                }
+                    StrikeGlow.Light(hits, count, column, glow);
             }
 
             return hits;
@@ -2836,13 +2844,8 @@ namespace ChartBuilder.Controls.Editing
         }
 
         /// <summary>A gem in <paramref name="column"/> at <paramref name="along"/>.</summary>
-        private Rect GemRect(LaneProjection projection, int column, double along, double size)
-        {
-            double center = projection.AcrossOf(column);
-            return View == LaneView.Highway
-                ? Box(along - (size / 2), along + (size / 2), center - (projection.LaneSize * 0.43), center + (projection.LaneSize * 0.43))
-                : Box(along - (size / 2), along + (size / 2), center - (projection.LaneSize * 0.35), center + (projection.LaneSize * 0.35));
-        }
+        private Rect GemRect(LaneProjection projection, int column, double along, double size) =>
+            NotePainter.GemRect(projection, column, along, size, _alongLimit.From, _alongLimit.To);
 
         private double GemSize(LaneProjection projection) => View == LaneView.Highway
             ? Math.Clamp(projection.LaneSize * 0.32, 8, 18)
@@ -2952,26 +2955,7 @@ namespace ChartBuilder.Controls.Editing
         /// or measured, which, for the measure numbers alone, was most of the time a frame took to draw. Drawn in an
         /// immutable copy of <paramref name="brush"/>, so it isn't one of the frame's resources.
         /// </remarks>
-        private TextLayout Label(string text, double size, IBrush brush, double? maxWidth = null)
-        {
-            var key = (text, size, brush, maxWidth);
-            if (!_labels.TryGetValue(key, out var label))
-            {
-                if (_labels.Count > 512)
-                {
-                    foreach (var old in _labels.Values)
-                        old.Dispose();
-                    _labels.Clear();
-                }
-
-                label = maxWidth is { } width
-                    ? new TextLayout(text, LabelFace, size, brush.ToImmutable(), textTrimming: TextTrimming.CharacterEllipsis, maxWidth: width, maxLines: 1)
-                    : new TextLayout(text, LabelFace, size, brush.ToImmutable());
-                _labels[key] = label;
-            }
-
-            return label;
-        }
+        private TextLayout Label(string text, double size, IBrush brush, double? maxWidth = null) => _labels.Get(text, size, brush, maxWidth);
 
         /// <summary>Measure <paramref name="index"/>'s number, counting from one, made once.</summary>
         private string MeasureNumber(int index)

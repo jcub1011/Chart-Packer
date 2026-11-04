@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
+using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -10,6 +10,7 @@ using Avalonia.Media;
 using Avalonia.Media.Immutable;
 using ChartShared.Audio.Waveforms;
 using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charts;
 using ChartShared.UI.Controls;
 
@@ -36,10 +37,60 @@ namespace ChartShared.UI.Controls.Highway
 
         /// <summary>A proposed fill of Generate fills, in the proposal amber.</summary>
         Proposal,
+
+        /// <summary>A solo.</summary>
+        Solo,
+
+        /// <summary>A drum fill, or star-power activation lane.</summary>
+        DrumFill,
+
+        /// <summary>A drum roll.</summary>
+        Roll,
+
+        /// <summary>A drum trill.</summary>
+        Trill,
+
+        /// <summary>A big rock ending.</summary>
+        BigRockEnding,
+
+        /// <summary>A section the drums flip in, as the games flip them in disco.</summary>
+        DiscoFlip,
     }
 
     /// <summary>A phrase drawn behind a highway's notes, in song seconds.</summary>
-    public readonly record struct HighwayBand(double Start, double End, HighwayBandKind Kind = HighwayBandKind.StarPower);
+    /// <param name="HasEnd">Whether it ends where <paramref name="End"/> says; one still going on is drawn to the far end of the highway.</param>
+    public readonly record struct HighwayBand(double Start, double End, HighwayBandKind Kind = HighwayBandKind.StarPower, bool HasEnd = true)
+    {
+        /// <summary>The band a phrase of the chart makes, with its ticks timed by <paramref name="tempo"/> and <paramref name="delay"/> as the notes' are.</summary>
+        public static HighwayBand Of(PhraseSpan span, TempoMap tempo, TimeSpan delay)
+        {
+            var kind = span.Kind switch
+            {
+                null => HighwayBandKind.DiscoFlip,
+                PhraseKind.StarPower => HighwayBandKind.StarPower,
+                PhraseKind.Solo => HighwayBandKind.Solo,
+                PhraseKind.DrumFill => HighwayBandKind.DrumFill,
+                PhraseKind.Roll => HighwayBandKind.Roll,
+                PhraseKind.Trill => HighwayBandKind.Trill,
+                _ => HighwayBandKind.BigRockEnding,
+            };
+            double start = tempo.SecondsAt(span.Tick) + delay.TotalSeconds;
+            return new HighwayBand(start, span.HasEnd ? tempo.SecondsAt(span.EndTick) + delay.TotalSeconds : start, kind, span.HasEnd);
+        }
+
+        /// <summary>The colour of the band and how opaque its tint is.</summary>
+        internal (Color Color, byte Alpha) Look => Kind switch
+        {
+            HighwayBandKind.Proposal => (HighwayPalette.Proposal, HighwayChrome.BandTintAlpha),
+            HighwayBandKind.StarPower => (HighwayPalette.StarPower, HighwayChrome.BandTintAlpha),
+            HighwayBandKind.Solo => (PhraseColors.Solo, PhraseColors.SoloTintAlpha),
+            HighwayBandKind.DrumFill => (PhraseColors.DrumFill, PhraseColors.TintAlpha),
+            HighwayBandKind.Roll => (PhraseColors.Roll, PhraseColors.TintAlpha),
+            HighwayBandKind.Trill => (PhraseColors.Trill, PhraseColors.TintAlpha),
+            HighwayBandKind.BigRockEnding => (PhraseColors.BigRockEnding, PhraseColors.TintAlpha),
+            _ => (PhraseColors.DiscoFlip, PhraseColors.TintAlpha),
+        };
+    }
 
     /// <summary>One highway: an instrument difficulty's notes with their song times worked out.</summary>
     public sealed class HighwayLane
@@ -47,17 +98,19 @@ namespace ChartShared.UI.Controls.Highway
         /// <param name="delay">How much later than its ticks say the chart plays against the audio.</param>
         /// <param name="marks">How each of <paramref name="notes"/> is marked out, in their order, or null for none.</param>
         /// <param name="bands">The phrases to draw behind the notes, in song time, earliest first.</param>
-        public HighwayLane(ChartInstrumentKind kind, int laneCount, string label, IReadOnlyList<ChartNote> notes, TempoMap tempo, TimeSpan delay, IReadOnlyList<HighwayNoteMark>? marks = null, IReadOnlyList<HighwayBand>? bands = null)
+        /// <param name="phrases">The chart's phrases, and drum disco flip sections, to draw behind the notes too, after <paramref name="bands"/>; in ticks, timed as the notes are.</param>
+        public HighwayLane(ChartInstrumentKind kind, int laneCount, string label, IReadOnlyList<ChartNote> notes, TempoMap tempo, TimeSpan delay, IReadOnlyList<HighwayNoteMark>? marks = null, IReadOnlyList<HighwayBand>? bands = null, IReadOnlyList<PhraseSpan>? phrases = null)
         {
             if (marks is not null && marks.Count != notes.Count)
                 throw new ArgumentException("There must be a mark for each note.", nameof(marks));
 
             Kind = kind;
             LaneCount = laneCount;
+            Slots = LaneSlots.Of(kind, LaneView.Highway, kind == ChartInstrumentKind.Drums && laneCount == 5);
             Label = label;
             Notes = [.. notes];
             Marks = marks is null ? null : [.. marks];
-            Bands = bands is null ? [] : [.. bands];
+            Bands = [.. bands ?? [], .. (phrases ?? []).Select(p => HighwayBand.Of(p, tempo, delay))];
             Starts = new double[Notes.Length];
             Ends = new double[Notes.Length];
             for (int i = 0; i < Notes.Length; i++)
@@ -86,6 +139,9 @@ namespace ChartShared.UI.Controls.Highway
 
         /// <summary>How many lanes the highway has: five frets, four or five pads, or three six-fret columns.</summary>
         public int LaneCount { get; }
+
+        /// <summary>The lanes in their columns, as the editor's highway has them.</summary>
+        public LaneSlots Slots { get; }
 
         /// <summary>The instrument and difficulty, shown at the top of the highway.</summary>
         public string Label { get; }
@@ -162,13 +218,13 @@ namespace ChartShared.UI.Controls.Highway
             AvaloniaProperty.Register<NoteHighwayView, Func<TimeSpan>?>(nameof(Clock));
 
         public static readonly StyledProperty<double> LookAheadProperty =
-            AvaloniaProperty.Register<NoteHighwayView, double>(nameof(LookAhead), 1.4);
+            AvaloniaProperty.Register<NoteHighwayView, double>(nameof(LookAhead), 1.4, defaultBindingMode: Avalonia.Data.BindingMode.TwoWay);
 
         public static readonly StyledProperty<HighwayLengthMode> LengthModeProperty =
             AvaloniaProperty.Register<NoteHighwayView, HighwayLengthMode>(nameof(LengthMode));
 
         public static readonly StyledProperty<double> PixelsPerSecondProperty =
-            AvaloniaProperty.Register<NoteHighwayView, double>(nameof(PixelsPerSecond), HighwayPixelsPerSecond.Default);
+            AvaloniaProperty.Register<NoteHighwayView, double>(nameof(PixelsPerSecond), HighwayPixelsPerSecond.Default, defaultBindingMode: Avalonia.Data.BindingMode.TwoWay);
 
         public static readonly StyledProperty<double> ShownLookAheadProperty =
             AvaloniaProperty.Register<NoteHighwayView, double>(nameof(ShownLookAhead), 0, defaultBindingMode: Avalonia.Data.BindingMode.OneWayToSource);
@@ -191,6 +247,9 @@ namespace ChartShared.UI.Controls.Highway
         // Where the strike line sits, as a fraction of the height from the top; the instrument's name sits below it.
         private const double StrikeFraction = 0.87;
 
+        // The same line, as the shared mapping measures it: from the bottom, which is where the song starts to show.
+        private const double StrikeFromEnd = 1 - StrikeFraction;
+
         // The top of the highway fades out over this fraction of its height, so notes come in rather than pop in.
         private const double FadeFraction = 0.2;
 
@@ -211,19 +270,7 @@ namespace ChartShared.UI.Controls.Highway
         private static readonly IBrush OverviewBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xE6, 0x06, 0x06, 0x0C));
         private static readonly IPen OverviewEdgePen = new ImmutablePen(Color.FromArgb(0x50, 0xC8, 0xD2, 0xFF).ToUInt32(), 1);
 
-        private static readonly IPen LaneDividerPen =new ImmutablePen(Color.FromArgb(0x1C, 0xFF, 0xFF, 0xFF).ToUInt32(), 1);
-        private static readonly IPen BeatPen = new ImmutablePen(Color.FromArgb(0x2A, 0xFF, 0xFF, 0xFF).ToUInt32(), 1);
-        private static readonly IPen MeasurePen = new ImmutablePen(Color.FromArgb(0x70, 0xFF, 0xFF, 0xFF).ToUInt32(), 2);
-        private static readonly IBrush StrikeBandBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xC0, 0x00, 0x00, 0x00));
-        private static readonly IPen StrikeEdgePen = new ImmutablePen(Color.FromArgb(0x8C, 0xFF, 0xFF, 0xFF).ToUInt32(), 1);
         private static readonly IBrush LabelBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xD0, 0xFF, 0xFF, 0xFF));
-
-        // Bands behind the notes, the selected one outlined: star power in its cyan, a proposed fill in the proposal amber.
-        private static readonly IBrush StarPowerBandBrush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(HighwayPalette.StarPower, 0x22));
-        private static readonly IPen StarPowerBandPen = new ImmutablePen(HighwayPalette.WithAlpha(HighwayPalette.StarPower, 0xA0).ToUInt32(), 1);
-        private static readonly IBrush ProposalBandBrush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(HighwayPalette.Proposal, 0x22));
-        private static readonly IPen ProposalBandPen = new ImmutablePen(HighwayPalette.WithAlpha(HighwayPalette.Proposal, 0xA0).ToUInt32(), 1);
-        private static readonly IPen BandSelectedPen = new ImmutablePen(Colors.White.ToUInt32(), 2);
 
         // How opaque a faded note is (HighwayNoteMark.Faded), on the highway and in its whole chart.
         private const double FadedOpacity = 0.28;
@@ -234,7 +281,10 @@ namespace ChartShared.UI.Controls.Highway
         private static readonly IBrush WaveformLoudBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x48, 0xC8, 0xD2, 0xFF));
 
         private readonly GemPainter _gems = new();
-        private readonly Dictionary<string, FormattedText> _labels = [];
+        private readonly NotePainter _notes;
+        private readonly List<NoteGlyph> _glyphs = [];
+        private readonly List<BandGlyph> _bands = [];
+        private readonly LabelCache _labels = new();
         private bool _isFrameRequested;
         private Rect? _viewport;
         private TimeSpan _drawnAt = TimeSpan.MinValue;
@@ -246,10 +296,9 @@ namespace ChartShared.UI.Controls.Highway
         // -1 and NaN for none. While scrubbing it stays the highway the press was on.
         private int _hoveredLane = -1;
         private double _hoverY = double.NaN;
-        private bool _isScrubbing;
 
         // Whether Ctrl is held over a highway, or while scrubbing, making a drag fine, or Shift, showing its whole chart.
-        private readonly LaneScrubMode _mode;
+        private readonly ViewportGestures _gestures;
 
         // How far each highway, by its index, has faded to its whole chart; one fading out as another fades in, both are drawn.
         private readonly List<OverviewFade> _fades = [];
@@ -379,9 +428,13 @@ namespace ChartShared.UI.Controls.Highway
 
         public NoteHighwayView()
         {
-            _mode = new LaneScrubMode(this, () => _hoveredLane >= 0 || _isScrubbing);
+            _notes = new NotePainter(_gems);
+            _gestures = new ViewportGestures(this, new GestureHost(this), new ScrubBinding(MouseButton.Left, KeyModifiers.None, AllowsOverview: true), WatchesKeys);
             EffectiveViewportChanged += OnEffectiveViewportChanged;
         }
+
+        // Ctrl and Shift are watched while the pointer is over a highway, or one is being scrubbed.
+        private bool WatchesKeys() => _hoveredLane >= 0 || _gestures.IsScrubbing;
 
         protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
         {
@@ -397,7 +450,7 @@ namespace ChartShared.UI.Controls.Highway
                 ShareShownLookAhead();
 
             // Shown again, it shows the notes falling until the pointer is over a highway again.
-            if (change.Property == IsVisibleProperty && !IsVisible && !_isScrubbing)
+            if (change.Property == IsVisibleProperty && !IsVisible && !_gestures.IsScrubbing)
                 SetHover(-1, double.NaN);
         }
 
@@ -421,13 +474,13 @@ namespace ChartShared.UI.Controls.Highway
             RequestFrame();
 
             // Shift pressed or let go with the pointer over a highway, or while scrubbing, shows the whole chart or the notes falling.
-            _mode.Attach();
+            _gestures.Mode.Attach();
         }
 
         protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
         {
             base.OnDetachedFromVisualTree(e);
-            _mode.Detach();
+            _gestures.Mode.Detach();
         }
 
         public override void Render(DrawingContext context)
@@ -440,13 +493,8 @@ namespace ChartShared.UI.Controls.Highway
             double lookAhead = EffectiveLookAhead;
             double height = Bounds.Height;
             double strike = height * StrikeFraction;
-            double Y(double time) => strike - ((time - now) / lookAhead * strike);
 
             int count = scene.Lanes.Count;
-
-            // What's past the strike line shows for as long as it takes to fall off the bottom.
-            double from = now - ((height - strike) / strike * lookAhead);
-            double to = now + lookAhead;
 
             // One gem size for every highway, from the narrowest lanes, leaving room for the names below the strike bar.
             double narrowest = HighwayRect(scene, 0).Width / scene.MaxLaneCount;
@@ -466,8 +514,12 @@ namespace ChartShared.UI.Controls.Highway
                 if (overview < 1)
                 {
                     var waveform = waveforms is not null && i < waveforms.Count ? waveforms[i] : null;
+
+                    // Where the song is drawn down this highway, with what's past the strike line shown for as long as it takes to fall off the bottom.
+                    var lane = scene.Lanes[i];
+                    var projection = LaneProjection.AtCursor(LaneView.Highway, 0, height, bounds.X, bounds.Width / lane.LaneCount, lane.Slots, now, StrikeFromEnd, lookAhead);
                     using (context.PushOpacity(1 - overview))
-                        DrawHighway(context, scene, scene.Lanes[i], waveform, bounds, strike, gem, now, from, to, Y, i == 0 ? SelectedPhrase : null);
+                        DrawHighway(context, scene, lane, waveform, bounds, strike, gem, now, projection, i == 0 ? SelectedPhrase : null);
                 }
 
                 if (overview > 0)
@@ -479,7 +531,7 @@ namespace ChartShared.UI.Controls.Highway
         }
 
         /// <summary>Whether the <paramref name="index"/>th highway is to show its whole chart: Shift is held over it, or while it's scrubbed.</summary>
-        private bool IsOverviewShown(int index) => index == _hoveredLane && _mode.IsOverview;
+        private bool IsOverviewShown(int index) => index == _hoveredLane && _gestures.Mode.IsOverview;
 
         /// <summary>How far the <paramref name="index"/>th highway has faded to its whole chart.</summary>
         private OverviewFade FadeOf(int index)
@@ -538,7 +590,7 @@ namespace ChartShared.UI.Controls.Highway
                 for (int i = 1; i < lane.LaneCount; i++)
                 {
                     double x = bounds.X + (i * laneWidth);
-                    context.DrawLine(LaneDividerPen, new Point(x, bounds.Top), new Point(x, bounds.Bottom));
+                    context.DrawLine(HighwayChrome.LaneDividerPen, new Point(x, bounds.Top), new Point(x, bounds.Bottom));
                 }
 
                 using (context.PushTransform(Matrix.CreateTranslation(bounds.X, bounds.Y)))
@@ -651,11 +703,11 @@ namespace ChartShared.UI.Controls.Highway
         {
             base.OnPointerMoved(e);
             var point = e.GetPosition(this);
-            _mode.Set(e.KeyModifiers);
-            if (_isScrubbing)
+            _gestures.Mode.Set(e.KeyModifiers);
+            if (_gestures.IsScrubbing)
             {
                 SetHover(_hoveredLane, point.Y);
-                Scrubbed?.Invoke(this, new ScrubEventArgs(ScrubTimeAt(point)));
+                _gestures.Move(e);
                 return;
             }
 
@@ -664,46 +716,62 @@ namespace ChartShared.UI.Controls.Highway
 
         /// <summary>
         /// The wheel scrolls the highway through the song, a quarter of its look-ahead a notch, so the preview can be moved
-        /// without leaving it. The window hears <see cref="Scrubbed"/> and seeks.
+        /// without leaving it; with Ctrl held it zooms. The window hears <see cref="Scrubbed"/> and seeks.
         /// </summary>
         protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
         {
             base.OnPointerWheelChanged(e);
-            if (Scene is not { } scene)
-                return;
-
-            double now = (Clock?.Invoke() ?? TimeSpan.Zero).TotalSeconds;
-            double step = Math.Clamp(EffectiveLookAhead * 0.25, 0.1, 2);
-            double target = Math.Clamp(now + (e.Delta.Y * step), 0, TimelineOf(scene));
-            Scrubbed?.Invoke(this, new ScrubEventArgs(target));
-            e.Handled = true;
-        }
-
-        /// <summary>
-        /// Where a drag to <paramref name="point"/> moves the audio: with the whole chart shown, the time there up it; otherwise
-        /// on from where the audio is by how far down the pointer has gone since it last moved, as far as the notes falling
-        /// move for it, or while it's fine, <see cref="FineScrubFactor"/> times less far; either way holding the pointer still.
-        /// </summary>
-        private double ScrubTimeAt(Point point)
-        {
-            if (_mode.IsOverview || Scene is not { } scene)
-            {
-                _mode.Stop();
-                return TimeAt(point.Y);
-            }
-
-            double now = (Clock?.Invoke() ?? TimeSpan.Zero).TotalSeconds;
-            double perPixel = _mode.IsFine ? GrabSecondsPerPixel / Math.Max(1, FineScrubFactor) : GrabSecondsPerPixel;
-            return Math.Clamp(now + (_mode.Move(point).Y * perPixel), 0, TimelineOf(scene));
+            if (Scene is not null)
+                _gestures.Wheel(e);
         }
 
         /// <summary>How far the notes falling move in a pixel, in seconds, so a drag moves the notes as far as the pointer goes.</summary>
         private double GrabSecondsPerPixel => Bounds.Height > 0 ? EffectiveLookAhead / (Bounds.Height * StrikeFraction) : 0;
 
+        /// <summary>Zooms by <paramref name="steps"/>, in when positive: the highway shows less of the song, as its length setting is kept.</summary>
+        private void ZoomBy(int steps)
+        {
+            if (LengthMode == HighwayLengthMode.PixelsPerSecond)
+                SetCurrentValue(PixelsPerSecondProperty, HighwayPixelsPerSecond.Stepped(PixelsPerSecond, steps));
+            else
+                SetCurrentValue(LookAheadProperty, HighwayLookAhead.Stepped(LookAhead, -steps));
+        }
+
+        /// <summary>What the shared gestures move: the highway's clock is the owner's to set, which it's told of by <see cref="Scrubbed"/>.</summary>
+        private sealed class GestureHost(NoteHighwayView view) : IViewportGestureHost
+        {
+            public double Now => (view.Clock?.Invoke() ?? TimeSpan.Zero).TotalSeconds;
+
+            public double SecondsPerPixel => view.GrabSecondsPerPixel;
+
+            public bool IsTimeAxisVertical => true;
+
+            public bool WheelUpIsLater => true;
+
+            public double FineFactor => view.FineScrubFactor;
+
+            public void ScrubStarted() => view.ScrubStarted?.Invoke(view, EventArgs.Empty);
+
+            public void ScrubTo(double seconds)
+            {
+                if (view.Scene is { } scene)
+                    view.Scrubbed?.Invoke(view, new ScrubEventArgs(Math.Clamp(seconds, 0, view.TimelineOf(scene))));
+            }
+
+            public void ScrubEnded() => view.ScrubEnded?.Invoke(view, EventArgs.Empty);
+
+            // A quarter of the look-ahead a notch, so the preview can be moved without leaving it.
+            public void Scroll(int steps) => ScrubTo(Now + (steps * Math.Clamp(view.EffectiveLookAhead * 0.25, 0.1, 2)));
+
+            public void Zoom(int steps) => view.ZoomBy(steps);
+
+            public double? OverviewTimeAt(Point at) => view.Scene is null ? null : view.TimeAt(at.Y);
+        }
+
         protected override void OnPointerExited(PointerEventArgs e)
         {
             base.OnPointerExited(e);
-            if (!_isScrubbing)
+            if (!_gestures.IsScrubbing)
                 SetHover(-1, double.NaN);
         }
 
@@ -712,54 +780,28 @@ namespace ChartShared.UI.Controls.Highway
             base.OnPointerPressed(e);
             var point = e.GetPosition(this);
             int lane = HighwayAt(point);
-            if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed || lane < 0)
+            if (lane < 0 || !_gestures.IsScrubPress(e))
                 return;
 
             SetHover(lane, point.Y);
-            _mode.Set(e.KeyModifiers);
-            _isScrubbing = true;
-            e.Pointer.Capture(this);
-            ScrubStarted?.Invoke(this, EventArgs.Empty);
-
-            // A press on the whole chart moves the audio there; otherwise it starts a drag from where the audio is.
-            if (_mode.IsOverview)
-                Scrubbed?.Invoke(this, new ScrubEventArgs(TimeAt(point.Y)));
-            else
-                _mode.Start(point);
-            e.Handled = true;
+            _gestures.Press(e, point);
         }
 
         protected override void OnPointerReleased(PointerReleasedEventArgs e)
         {
             base.OnPointerReleased(e);
-            if (!_isScrubbing)
+            if (!_gestures.Release(e))
                 return;
 
-            var point = e.GetPosition(this);
-            _mode.Set(e.KeyModifiers);
-            Scrubbed?.Invoke(this, new ScrubEventArgs(ScrubTimeAt(point)));
-            e.Pointer.Capture(null);
-            EndScrub();
-
             // Let go off the highway, it stops showing the whole chart.
+            var point = e.GetPosition(this);
             SetHover(HighwayAt(point), point.Y);
-            e.Handled = true;
         }
 
         protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
         {
             base.OnPointerCaptureLost(e);
-            EndScrub();
-        }
-
-        private void EndScrub()
-        {
-            if (!_isScrubbing)
-                return;
-
-            _isScrubbing = false;
-            _mode.Stop();
-            ScrubEnded?.Invoke(this, EventArgs.Empty);
+            _gestures.CaptureLost();
         }
 
         /// <summary>
@@ -782,8 +824,10 @@ namespace ChartShared.UI.Controls.Highway
             InvalidateVisual();
         }
 
-        private void DrawHighway(DrawingContext context, HighwayScene scene, HighwayLane lane, Waveform? waveform, Rect bounds, double strike, double gem, double now, double from, double to, Func<double, double> y, int? selectedBand)
+        private void DrawHighway(DrawingContext context, HighwayScene scene, HighwayLane lane, Waveform? waveform, Rect bounds, double strike, double gem, double now, LaneProjection projection, int? selectedBand)
         {
+            double from = projection.Start, to = projection.End;
+            Func<double, double> y = projection.AlongOf;
             double laneWidth = bounds.Width / lane.LaneCount;
             var hits = HitsAt(lane, now);
 
@@ -793,18 +837,29 @@ namespace ChartShared.UI.Controls.Highway
                 context.FillRectangle(HighwayBrush, bounds);
 
                 // Star power phrases and proposed fills, behind the notes they charge.
+                var bands = _bands;
+                bands.Clear();
                 for (int i = 0; i < lane.Bands.Length; i++)
                 {
                     var band = lane.Bands[i];
-                    double top = y(band.End), bottom = y(band.Start);
-                    var rect = new Rect(bounds.X, Math.Min(top, bottom), bounds.Width, Math.Max(1, Math.Abs(bottom - top)));
-                    var (brush, pen) = band.Kind == HighwayBandKind.Proposal ? (ProposalBandBrush, ProposalBandPen) : (StarPowerBandBrush, StarPowerBandPen);
-                    context.FillRectangle(brush, rect);
-                    context.DrawLine(pen, new Point(bounds.X, rect.Top), new Point(bounds.Right, rect.Top));
-                    context.DrawLine(pen, new Point(bounds.X, rect.Bottom), new Point(bounds.Right, rect.Bottom));
-                    if (i == selectedBand)
-                        context.DrawRectangle(null, BandSelectedPen, rect.Deflate(1));
+                    if (band.Start > to || (band.HasEnd && band.End < from))
+                        continue;
+
+                    // One still going on reaches the far end.
+                    double top = y(band.HasEnd ? band.End : to), bottom = y(band.Start);
+                    double start = Math.Min(top, bottom);
+                    bands.Add(new BandGlyph
+                    {
+                        Start = start,
+                        End = start + Math.Max(1, Math.Abs(bottom - top)),
+                        Color = band.Look.Color,
+                        TintAlpha = band.Look.Alpha,
+                        HasEnd = band.HasEnd,
+                        IsSelected = i == selectedBand,
+                    });
                 }
+
+                HighwayChrome.DrawBands(context, _gems, LaneView.Highway, CollectionsMarshal.AsSpan(bands), bounds.X, bounds.Right);
 
                 // The track as it's heard, inside the rails, so a note can be lined up with the sound it's played to. Scaled
                 // so its loudest peak fills the highway, so a quiet track's beats show as clearly as a loud one's.
@@ -817,24 +872,17 @@ namespace ChartShared.UI.Controls.Highway
                 // A beam of light rises from a lane as it's struck.
                 for (int column = 0; column < lane.LaneCount; column++)
                 {
-                    if (hits[column] > 0)
-                    {
-                        using (context.PushOpacity(hits[column] * StrikeGlow.BeamOpacity))
-                            StrikeGlow.DrawBeam(context, HitColor(lane, column), isVertical: true, new Rect(bounds.X + (column * laneWidth), strike * (1 - StrikeGlow.BeamReach), laneWidth, strike * StrikeGlow.BeamReach));
-                    }
+                    HighwayChrome.DrawLitBeam(context, LaneView.Highway, HitColor(lane, column), hits[column],
+                        new Rect(bounds.X + (column * laneWidth), strike * (1 - StrikeGlow.BeamReach), laneWidth, strike * StrikeGlow.BeamReach));
                 }
 
-                for (int i = 1; i < lane.LaneCount; i++)
-                {
-                    double x = bounds.X + (i * laneWidth);
-                    context.DrawLine(LaneDividerPen, new Point(x, 0), new Point(x, strike));
-                }
+                HighwayChrome.DrawLaneDividers(context, projection, 0, strike);
 
                 for (int i = LowerBound(scene.BeatTimes, from); i < scene.BeatTimes.Length && scene.BeatTimes[i] <= to; i++)
                 {
                     double at = y(scene.BeatTimes[i]);
                     if (at < strike)
-                        context.DrawLine(scene.IsMeasure[i] ? MeasurePen : BeatPen, new Point(bounds.X, at), new Point(bounds.Right, at));
+                        HighwayChrome.DrawBeatLine(context, LaneView.Highway, at, bounds.X, bounds.Right, scene.IsMeasure[i]);
                 }
 
                 // The rails down each side, as far as the strike bar.
@@ -842,8 +890,8 @@ namespace ChartShared.UI.Controls.Highway
                 context.FillRectangle(RailBrush, new Rect(bounds.X, 0, 2, railEnd));
                 context.FillRectangle(RailBrush, new Rect(bounds.Right - 2, 0, 2, railEnd));
 
-                DrawStrikeBar(context, lane, bounds, laneWidth, strike, gem, hits);
-                DrawNotes(context, lane, bounds, laneWidth, gem, now, from, to, y, AreNotesOutlined);
+                DrawStrikeBar(context, lane, projection, bounds, strike, gem, hits);
+                DrawNotes(context, lane, projection, gem, now, from, to, AreNotesOutlined);
             }
 
             DrawLabel(context, lane.Label, bounds, strike + (gem * 0.9));
@@ -864,158 +912,98 @@ namespace ChartShared.UI.Controls.Highway
                     continue;
 
                 // An open note or kick lights every lane.
-                if (note.Lane == ChartNote.OpenLane)
-                {
-                    for (int c = 0; c < lane.LaneCount; c++)
-                        hits[c] = Math.Max(hits[c], glow * StrikeGlow.SpreadLevel);
-                }
-                else
-                {
-                    int column = Column(lane, note.Lane);
-                    hits[column] = Math.Max(hits[column], glow);
-                }
+                StrikeGlow.Light(hits, lane.LaneCount, note.Lane == ChartNote.OpenLane ? -1 : Column(lane, note.Lane), glow);
             }
 
             return hits;
         }
 
         /// <summary>The dark bar across the strike line, with a target per lane that lights as it's struck.</summary>
-        private void DrawStrikeBar(DrawingContext context, HighwayLane lane, Rect bounds, double laneWidth, double strike, double gem, double[] hits)
+        private void DrawStrikeBar(DrawingContext context, HighwayLane lane, LaneProjection projection, Rect bounds, double strike, double gem, double[] hits)
         {
             var band = new Rect(bounds.X, strike - (gem * 0.85), bounds.Width, gem * 1.7);
-            context.FillRectangle(StrikeBandBrush, band);
-            context.DrawLine(StrikeEdgePen, band.TopLeft, band.TopRight);
-            context.DrawLine(StrikeEdgePen, band.BottomLeft, band.BottomRight);
+            HighwayChrome.DrawStrikeBand(context, LaneView.Highway, band, HighwayChrome.StrikeBandBrush);
 
             for (int column = 0; column < lane.LaneCount; column++)
             {
                 var color = TargetColor(lane, column);
-                var rect = GemRect(bounds, laneWidth, column, strike, gem);
-                double radius = GemPainter.CornerOf(rect);
-                double hit = hits[column];
+                var rect = NotePainter.GemRect(projection, column, strike, gem);
 
                 // Dark until struck, then filled in the lane's colour, which fades back to dark.
-                context.DrawRectangle(Brush(HighwayPalette.WithAlpha(HighwayPalette.Darken(color, 0.72), 0xC8)), Pen(color, 2), rect.Deflate(1), radius, radius);
-                if (hit > 0)
-                {
-                    using (context.PushOpacity(hit))
-                        context.DrawRectangle(Brush(StrikeGlow.TargetFill(color)), Pen(StrikeGlow.TargetEdge(color), 2), rect.Deflate(1), radius, radius);
-                }
+                HighwayChrome.DrawTarget(context, _gems, rect, color);
+                HighwayChrome.DrawLitTarget(context, _gems, rect, color, hits[column]);
             }
         }
 
         /// <param name="outlined">Whether each note is drawn as its outline only, so what's behind it shows through.</param>
-        private void DrawNotes(DrawingContext context, HighwayLane lane, Rect bounds, double laneWidth, double gem, double now, double from, double to, Func<double, double> y, bool outlined)
+        private void DrawNotes(DrawingContext context, HighwayLane lane, LaneProjection projection, double gem, double now, double from, double to, bool outlined)
         {
             int first = LowerBound(lane.Starts, from - lane.MaxLength);
             int last = LowerBound(lane.Starts, to + 0.001);
 
-            // In layers: tails at the back, an open note's across the lanes behind the frets', then kick and open bars, then
-            // the gems in front of them. Within a layer, latest first, so an earlier note is drawn over a later one.
-            foreach (bool wide in (ReadOnlySpan<bool>)[true, false])
+            var glyphs = _glyphs;
+            glyphs.Clear();
+            for (int i = first; i < last; i++)
             {
-                for (int i = last - 1; i >= first; i--)
+                var note = lane.Notes[i];
+                bool open = note.Lane == ChartNote.OpenLane;
+                var parts = NoteGlyphParts.None;
+                double tailFrom = 0, tailTo = 0;
+
+                // A sustain's tail is eaten from the strike line as it's held. A kick has none.
+                if (lane.Ends[i] > lane.Starts[i] && lane.Ends[i] > now && !(open && lane.Kind == ChartInstrumentKind.Drums))
                 {
-                    // A sustain's tail is eaten from the strike line as it's held. A kick has none.
-                    var note = lane.Notes[i];
-                    bool open = note.Lane == ChartNote.OpenLane;
-                    if (open != wide || lane.Ends[i] <= lane.Starts[i] || lane.Ends[i] <= now || (open && lane.Kind == ChartInstrumentKind.Drums))
-                        continue;
-                    double top = y(Math.Min(lane.Ends[i], to)), bottom = y(Math.Max(lane.Starts[i], now));
-                    using (PushFaded(context, lane, i))
-                    {
-                        if (!open)
-                            DrawTail(context, lane, note, NoteColor(lane, note), bounds, laneWidth, top, bottom, outlined);
-                        else if (bottom > top)
-                            _gems.DrawWideTail(context, NoteColor(lane, note), new Rect(bounds.X + 4, top, bounds.Width - 8, bottom - top), outlined);
-                    }
+                    tailTo = projection.AlongOf(Math.Min(lane.Ends[i], to));
+                    tailFrom = projection.AlongOf(Math.Max(lane.Starts[i], now));
+                    if (tailFrom > tailTo)
+                        parts |= NoteGlyphParts.Tail;
                 }
+
+                // A note is struck, and goes, as it reaches the line.
+                if (lane.Starts[i] >= now)
+                    parts |= NoteGlyphParts.Note;
+                if (parts == NoteGlyphParts.None)
+                    continue;
+
+                var mark = MarkOf(lane, i);
+                if (open)
+                    parts |= NoteGlyphParts.Across;
+
+                // Six-fret: a black fret played with a white one covers its top half.
+                else if (IsBlackFret(lane, note) && lane.SharesColumn.Contains((note.Tick, note.Lane % 3)))
+                    parts |= NoteGlyphParts.Barre;
+                if (outlined)
+                    parts |= NoteGlyphParts.Outlined | NoteGlyphParts.OutlinedTail;
+                if ((mark & HighwayNoteMark.Flagged) != 0)
+                    parts |= NoteGlyphParts.Flagged;
+
+                glyphs.Add(new NoteGlyph
+                {
+                    Index = i,
+                    Note = note,
+                    Color = NoteColor(lane, note),
+                    Column = open ? -1 : Column(lane, note.Lane),
+                    Along = projection.AlongOf(lane.Starts[i]),
+                    TailFrom = tailFrom,
+                    TailTo = tailTo,
+                    Opacity = (mark & HighwayNoteMark.Faded) != 0 ? FadedOpacity : 1,
+                    Parts = parts,
+                });
             }
 
-            foreach (bool bars in (ReadOnlySpan<bool>)[true, false])
-            {
-                for (int i = last - 1; i >= first; i--)
-                {
-                    // A note is struck, and goes, as it reaches the line.
-                    var note = lane.Notes[i];
-                    if (lane.Starts[i] < now || (note.Lane == ChartNote.OpenLane) != bars)
-                        continue;
-
-                    Rect rect;
-                    using (PushFaded(context, lane, i))
-                        rect = DrawGem(context, lane, note, NoteColor(lane, note), bounds, laneWidth, y(lane.Starts[i]), gem, outlined);
-                    if ((MarkOf(lane, i) & HighwayNoteMark.Flagged) != 0)
-                        _gems.DrawRing(context, note, rect, HighwayPalette.ChangeMark);
-                }
-            }
+            _notes.Draw(context, projection, lane.Kind, CollectionsMarshal.AsSpan(glyphs), gem);
         }
 
         private static HighwayNoteMark MarkOf(HighwayLane lane, int index) => lane.Marks is { } marks ? marks[index] : HighwayNoteMark.None;
 
-        // Draws what follows faint when the note is faded.
-        private static DrawingContext.PushedState? PushFaded(DrawingContext context, HighwayLane lane, int index) =>
-            (MarkOf(lane, index) & HighwayNoteMark.Faded) != 0 ? context.PushOpacity(FadedOpacity) : null;
-
-        private void DrawTail(DrawingContext context, HighwayLane lane, ChartNote note, Color color, Rect bounds, double laneWidth, double top, double bottom, bool outlined)
-        {
-            if (bottom <= top)
-                return;
-
-            double center = bounds.X + ((Column(lane, note.Lane) + 0.5) * laneWidth);
-            double width = Math.Max(3, laneWidth * 0.2);
-            _gems.DrawTail(context, lane.Kind, note, color, new Rect(center - (width / 2), top, width, bottom - top), outlined);
-        }
-
-        /// <returns>Where the gem was drawn.</returns>
-        private Rect DrawGem(DrawingContext context, HighwayLane lane, ChartNote note, Color color, Rect bounds, double laneWidth, double at, double gem, bool outlined)
-        {
-            if (note.Lane == ChartNote.OpenLane)
-            {
-                // An open note or a kick: a flat bar across the highway.
-                double barHeight = Math.Max(4, gem * 0.45);
-                var bar = new Rect(bounds.X + 4, at - (barHeight / 2), bounds.Width - 8, barHeight);
-                _gems.DrawBar(context, lane.Kind, note, color, bar, outlined);
-                return bar;
-            }
-
-            var rect = GemRect(bounds, laneWidth, Column(lane, note.Lane), at, gem);
-
-            // Six-fret: a black fret played with a white one covers its top half.
-            if (IsBlackFret(lane, note) && lane.SharesColumn.Contains((note.Tick, note.Lane % 3)))
-                rect = rect.WithHeight(rect.Height / 2);
-
-            _gems.DrawGem(context, lane.Kind, note, color, rect, outlined);
-            return rect;
-        }
-
         private void DrawLabel(DrawingContext context, string label, Rect bounds, double top)
         {
-            double width = Math.Max(1, bounds.Width - 4);
-            if (!_labels.TryGetValue(label, out var text))
-            {
-                text = new FormattedText(label, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, new Typeface(FontFamily.Default, FontStyle.Normal, FontWeight.SemiBold), 10.5, LabelBrush)
-                {
-                    MaxTextWidth = width,
-                    MaxLineCount = 1,
-                    Trimming = TextTrimming.CharacterEllipsis,
-                };
-                _labels[label] = text;
-            }
-            else if (text.MaxTextWidth != width)
-            {
-                // The highway is as wide as the view and the number of lanes allow, which both change.
-                text.MaxTextWidth = width;
-            }
+            // The highway is as wide as the view and the number of lanes allow, which both change.
+            var text = _labels.Get(label, 10.5, LabelBrush, Math.Max(1, bounds.Width - 4));
 
             // Below the strike bar when there's room, otherwise at the top.
             double y = top + 2 + text.Height <= bounds.Bottom ? top + 1 : 4;
-            context.DrawText(text, new Point(bounds.X + ((bounds.Width - Math.Min(text.Width, bounds.Width)) / 2), y));
-        }
-
-        private static Rect GemRect(Rect bounds, double laneWidth, int column, double at, double gem)
-        {
-            double width = laneWidth * 0.86;
-            return new Rect(bounds.X + (column * laneWidth) + ((laneWidth - width) / 2), at - (gem / 2), width, gem);
+            text.Draw(context, new Point(bounds.X + ((bounds.Width - Math.Min(text.Width, bounds.Width)) / 2), y));
         }
 
         /// <summary>The column a lane is drawn in: six-fret's black and white frets share three.</summary>

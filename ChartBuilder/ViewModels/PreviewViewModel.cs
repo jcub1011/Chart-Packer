@@ -392,7 +392,7 @@ namespace ChartBuilder.ViewModels
             var kind = ChartInstruments.KindOf(key.Instrument);
             var tempo = session.TempoMap;
             string label = string.Format(CultureInfo.CurrentCulture, Strings.LaneTitleFormat, ChartLabels.InstrumentName(key.Instrument), ChartLabels.DifficultyName(key.Difficulty));
-            var lane = new HighwayLane(kind, HighwayLane.LaneCountOf(kind, session.IsFiveLaneDrums), label, session.GameTrack(key).Notes, tempo, session.Delay);
+            var lane = new HighwayLane(kind, HighwayLane.LaneCountOf(kind, session.IsFiveLaneDrums), label, session.GameTrack(key).Notes, tempo, session.Delay, phrases: PhraseSpans.Of(session.Chart, key));
             return new HighwayScene([lane], tempo, session.Delay);
         }
     }

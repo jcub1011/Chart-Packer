@@ -102,8 +102,21 @@ public sealed record LaneSlots(IReadOnlyList<int> Slots, int? Across, IReadOnlyL
 /// <param name="Slots">The lanes in their columns or rows.</param>
 /// <param name="Start">The audio time at the strike end: the bottom of a highway, the left of a timeline.</param>
 /// <param name="SecondsOnScreen">How much audio time the time axis spans.</param>
-public sealed record LaneProjection(LaneView View, double TimeFrom, double TimeLength, double LaneFrom, double LaneSize, LaneSlots Slots, double Start, double SecondsOnScreen)
+/// <param name="StrikeFraction">How far from the strike end the strike line is, as a fraction of the time axis.</param>
+public sealed record LaneProjection(LaneView View, double TimeFrom, double TimeLength, double LaneFrom, double LaneSize, LaneSlots Slots, double Start, double SecondsOnScreen, double StrikeFraction = EditorViewport.StrikeFraction)
 {
+    /// <summary>
+    /// A lane laid out as given with its strike line on <paramref name="cursor"/>, <paramref name="strikeFraction"/> of the
+    /// way from its strike end, showing <paramref name="secondsAhead"/> beyond it as they are (see <see cref="EditorViewport.SpanAhead(double, double, double)"/>).
+    /// How a lane that isn't the editor's, such as the note highway's, is placed in the song.
+    /// </summary>
+    public static LaneProjection AtCursor(LaneView view, double timeFrom, double timeLength, double laneFrom, double laneSize, LaneSlots slots, double cursor, double strikeFraction, double secondsAhead)
+    {
+        strikeFraction = EditorViewport.ClampStrikeFraction(strikeFraction);
+        var (start, end) = EditorViewport.SpanAhead(cursor, secondsAhead, strikeFraction);
+        return new LaneProjection(view, timeFrom, timeLength, laneFrom, laneSize, slots, start, end - start, strikeFraction);
+    }
+
     /// <summary>The audio time at the far end of the time axis.</summary>
     public double End => Start + SecondsOnScreen;
 
@@ -158,7 +171,7 @@ public sealed record LaneProjection(LaneView View, double TimeFrom, double TimeL
     }
 
     /// <summary>Where the strike line is drawn along the time axis, in pixels.</summary>
-    public double StrikeAlong => AlongOf(Start + (SecondsOnScreen * EditorViewport.StrikeFraction));
+    public double StrikeAlong => AlongOf(Start + (SecondsOnScreen * StrikeFraction));
 
     /// <summary>Where along the time axis <paramref name="seconds"/> of audio time is drawn, in pixels.</summary>
     public double AlongOf(double seconds)
