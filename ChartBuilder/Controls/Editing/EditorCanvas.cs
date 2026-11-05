@@ -621,11 +621,13 @@ namespace ChartBuilder.Controls.Editing
             var lanes = LanesOf(screen, slots);
             using (context.PushClip(lanes))
             {
-                DrawHover(context, session, key, track, screen, slots);
-                DrawSyncNotes(context, session, key, track, screen, slots);
+                // On a perspective highway the place tool's ghost and the notes marked stand up, in the layer above (PaintGemMarks).
+                if (_camera is null)
+                    DrawHover(context, session, key, track, screen, slots, _gems);
+                DrawSyncNotes(context, session, key, track, screen, slots, upright: false);
             }
 
-            DrawEraseHover(context, session, key, track, part, rows, screen, slots);
+            DrawEraseHover(context, session, key, track, part, rows, screen, slots, upright: false);
             DrawPhraseHover(context, session, key, part, rows, screen, slots);
             DrawTempoHover(context, session, screen, slots);
             DrawLoopLine(context, session, screen, slots);
@@ -789,7 +791,7 @@ namespace ChartBuilder.Controls.Editing
                         moving.Tools.Drag(vocalPoint, ModifiersOf(_keys));
                     }
                 }
-                else if (PointAt(_boxTo) is { } scrolled)
+                else if (PointAt(_boxTo + _pressOffset, onGems: false) is { } scrolled)
                 {
                     _lastPoint = scrolled;
                     moving.Tools.Drag(scrolled, ModifiersOf(_keys));
@@ -855,6 +857,8 @@ namespace ChartBuilder.Controls.Editing
                 _painter.InvalidateVisual();
                 if (Kind == LayerKind.Notes)
                     _owner.RedrawGems();
+                else if (Kind == LayerKind.Overlay)
+                    _owner.RedrawGemMarks();
             }
 
             /// <summary>Drawn on <paramref name="page"/>, moved to show what <paramref name="screen"/> shows.</summary>
@@ -991,7 +995,11 @@ namespace ChartBuilder.Controls.Editing
                 return;
             }
 
-            if (PointAt(current.Position) is not { } point)
+            // A gem standing up on a perspective highway is pressed where its floor is, and the drag that follows keeps the
+            // pointer's distance from there, so the note doesn't jump as it starts to move.
+            var pressedOn = OnGem(current.Position);
+            _pressOffset = pressedOn - current.Position;
+            if (PointAt(pressedOn, onGems: false) is not { } point)
                 return;
 
             Focus();
@@ -1064,7 +1072,7 @@ namespace ChartBuilder.Controls.Editing
                     session.Tools.Drag(vocalPoint, ModifiersOf(e.KeyModifiers));
                 }
             }
-            else if (_isPressed && Session is { } highway && PointAt(position) is { } point)
+            else if (_isPressed && Session is { } highway && PointAt(position + _pressOffset, onGems: false) is { } point)
             {
                 _lastPoint = point;
                 _boxTo = position;
@@ -1118,7 +1126,7 @@ namespace ChartBuilder.Controls.Editing
             }
             else
             {
-                session.Tools.Release(PointAt(e.GetPosition(this)) ?? _lastPoint);
+                session.Tools.Release(PointAt(e.GetPosition(this) + _pressOffset, onGems: false) ?? _lastPoint);
             }
 
             e.Handled = true;
@@ -1287,17 +1295,20 @@ namespace ChartBuilder.Controls.Editing
         /// The chart point under <paramref name="position"/>, or null when there's no part to edit: in the lanes, or in the
         /// phrase rail's row there.
         /// </summary>
-        private ChartPoint? PointAt(Point position)
+        /// <param name="onGems">Whether a gem standing up on a perspective highway is taken to be where its floor is, wherever it is pointed at.</param>
+        private ChartPoint? PointAt(Point position, bool onGems = true)
         {
             if (Session is not { } session || _lane?.Track is not { } key || session.TrackOf(key) is null)
                 return null;
+            if (onGems)
+                position = OnGem(position);
             var slots = session.SlotsOf(key.Instrument, View);
             var rows = PhraseRail.RowsOf(ChartInstruments.KindOf(key.Instrument));
             Extras = ExtrasOf(Bounds.Size, key);
             var projection = Project(Bounds.Size, slots, session.Viewport, _lane.Length, rows.Count);
             double seconds = projection.SecondsAt(AlongOf(position));
             double tick = session.TickAt(seconds);
-            double tolerance = Math.Max(1, projection.TicksOf(HitPixels, Math.Max(0, tick), session.TempoMap));
+            double tolerance = Math.Max(1, projection.TicksOf(HitPixelsAt(position), Math.Max(0, tick), session.TempoMap));
             double across = AcrossOf(position);
             var rail = PhraseRowAt(projection, rows, across);
             return new ChartPoint(key, tick, rail is null ? projection.LaneAt(across) : null, tolerance, slots, rail);
@@ -2468,7 +2479,7 @@ namespace ChartBuilder.Controls.Editing
         /// Alt held, or a fret while it places open notes, and made as the toolbar's place options have it. None with
         /// Shift held, which lends the place tool the select tool's press.
         /// </summary>
-        private void DrawHover(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, LaneProjection projection, LaneSlots slots)
+        private void DrawHover(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, LaneProjection projection, LaneSlots slots, IGemPainter gems)
         {
             if (_hover is not { } hover || _isPressed || session.Tool != EditorTool.Place || (_keys & KeyModifiers.Shift) != 0 || PointAt(hover) is not { Rail: null } point)
                 return;
@@ -2516,7 +2527,7 @@ namespace ChartBuilder.Controls.Editing
                     ? Box(along - (thickness / 2), along + (thickness / 2), projection.LaneFrom + 4, projection.LaneFrom + (projection.LaneSize * slots.Slots.Count) - 4)
                     : GemRect(projection, column, along, size);
                 using (context.PushOpacity(0.45))
-                    _gems.DrawBar(context, track.Kind, placed, color, bar, outlined: true);
+                    gems.DrawBar(context, track.Kind, placed, color, bar, outlined: true);
                 return;
             }
 
@@ -2526,7 +2537,7 @@ namespace ChartBuilder.Controls.Editing
             if (slots.IsShared(lane) && slots.PartnerOf(lane) is { } white && track.TryGetNote(tick, white, false, out _))
                 rect = rect.WithHeight(rect.Height / 2);
             using (context.PushOpacity(0.45))
-                _gems.DrawGem(context, track.Kind, placed, color, rect, outlined: true);
+                gems.DrawGem(context, track.Kind, placed, color, rect, outlined: true);
         }
 
         /// <summary>
@@ -2534,7 +2545,8 @@ namespace ChartBuilder.Controls.Editing
         /// in the phrase rail a phrase's bar or a disco flip section's. None with Shift held, which lends the erase tool the
         /// select tool's press.
         /// </summary>
-        private void DrawEraseHover(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, EditablePart part, IReadOnlyList<RailKind> rows, LaneProjection projection, LaneSlots slots)
+        /// <param name="upright">Whether to draw what stands up from a perspective highway's plane, which is a note's gem, and nothing else.</param>
+        private void DrawEraseHover(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, EditablePart part, IReadOnlyList<RailKind> rows, LaneProjection projection, LaneSlots slots, bool upright)
         {
             if (_hover is not { } hover || _isPressed || session.Tool != EditorTool.Erase || (_keys & KeyModifiers.Shift) != 0 || PointAt(hover) is not { } point)
                 return;
@@ -2542,16 +2554,22 @@ namespace ChartBuilder.Controls.Editing
             switch (session.Tools.EraseTargetAt(point))
             {
                 case { Note: { } note }:
+                    if (upright)
+                    {
+                        DrawNoteMark(context, session, key, track, note, projection, slots, EraseBrush, ErasePen, NoteMarkPart.Gem, upright: true);
+                        break;
+                    }
+
                     using (context.PushClip(LanesOf(projection, slots)))
-                        DrawNoteMark(context, session, key, track, note, projection, slots, EraseBrush, ErasePen);
+                        DrawNoteMark(context, session, key, track, note, projection, slots, EraseBrush, ErasePen, _camera is null ? NoteMarkPart.All : NoteMarkPart.Tail, upright: false);
                     break;
-                case { Phrase: { } phrase } when IndexOf(rows, PhraseRail.RowOf(part.Kind, phrase.Kind)) is var row and >= 0:
+                case { Phrase: { } phrase } when !upright && IndexOf(rows, PhraseRail.RowOf(part.Kind, phrase.Kind)) is var row and >= 0:
                 {
                     var (across1, across2) = PhraseRowOf(projection, rows.Count, row);
                     context.DrawRectangle(EraseBrush, ErasePen, BoxOf(projection, session, phrase, across1, across2).Inflate(1), 2, 2);
                     break;
                 }
-                case { DiscoFlip: { } flip } when IndexOf(rows, RailKind.DiscoFlip) is var row and >= 0:
+                case { DiscoFlip: { } flip } when !upright && IndexOf(rows, RailKind.DiscoFlip) is var row and >= 0:
                 {
                     var (across1, across2) = PhraseRowOf(projection, rows.Count, row);
                     double start = projection.AlongOf(session.AudioAt(flip.Range.Tick));
@@ -2564,8 +2582,26 @@ namespace ChartBuilder.Controls.Editing
             }
         }
 
-        /// <summary>A note marked over, where DrawNotes draws its gem or bar and its sustain's tail: what the erase tool takes away in red, or the notes a synchronized region syncs in orange.</summary>
-        private void DrawNoteMark(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, EditableNote note, LaneProjection projection, LaneSlots slots, IBrush? brush, IPen pen)
+        /// <summary>The parts of a note that is marked over.</summary>
+        [Flags]
+        private enum NoteMarkPart
+        {
+            /// <summary>The sustain's tail, which lies on the plane.</summary>
+            Tail = 1,
+
+            /// <summary>The gem or bar, which stands up from the plane on a perspective highway.</summary>
+            Gem = 2,
+
+            All = Tail | Gem,
+        }
+
+        /// <summary>
+        /// A note marked over, where DrawNotes draws its gem or bar and its sustain's tail: what the erase tool takes away in red, or the
+        /// notes a synchronized region syncs in orange.
+        /// </summary>
+        /// <param name="parts">Which of its parts to mark here: on a perspective highway the tail is marked on the plane and the gem above it.</param>
+        /// <param name="upright">Whether the gem's mark is drawn standing up, in the host's layer, rather than flat.</param>
+        private void DrawNoteMark(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, EditableNote note, LaneProjection projection, LaneSlots slots, IBrush? brush, IPen pen, NoteMarkPart parts, bool upright)
         {
             bool across = slots.Across == note.Lane;
             int column = slots.IndexOf(session.ShownLane(key, note));
@@ -2574,7 +2610,7 @@ namespace ChartBuilder.Controls.Editing
             double size = GemSize(projection);
             double across1 = projection.LaneFrom + 4, across2 = projection.LaneFrom + (projection.LaneSize * slots.Slots.Count) - 4;
             double along = projection.AlongOf(session.AudioAt(note.Tick));
-            if (note.Length > EditableNote.PlainLength && track.Kind != ChartInstrumentKind.Drums)
+            if ((parts & NoteMarkPart.Tail) != 0 && note.Length > EditableNote.PlainLength && track.Kind != ChartInstrumentKind.Drums)
             {
                 double end = projection.AlongOf(session.AudioAt(note.Tick + note.Length));
                 double width = Math.Max(3, projection.LaneSize * 0.2);
@@ -2582,9 +2618,15 @@ namespace ChartBuilder.Controls.Editing
                 context.DrawRectangle(brush, pen, tail);
             }
 
+            if ((parts & NoteMarkPart.Gem) == 0)
+                return;
+
             double thickness = Math.Max(4, size * 0.45);
             var gem = across ? Box(along - (thickness / 2), along + (thickness / 2), across1, across2) : GemRect(projection, column, along, size);
-            context.DrawRectangle(brush, pen, gem.Inflate(1), 3, 3);
+            if (upright)
+                _upright.DrawMark(context, gem, brush, pen);
+            else
+                context.DrawRectangle(brush, pen, gem.Inflate(1), 3, 3);
         }
 
         /// <summary>
@@ -2653,7 +2695,7 @@ namespace ChartBuilder.Controls.Editing
         /// The notes the synchronized region holds, and each passage synced with it holds, marked over in orange while the
         /// Sync tool is active: just which notes are synced.
         /// </summary>
-        private void DrawSyncNotes(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, LaneProjection projection, LaneSlots slots)
+        private void DrawSyncNotes(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, LaneProjection projection, LaneSlots slots, bool upright)
         {
             if (session.Sync is not { IsActive: true } sync || sync.Track != key || sync.Span is not var (from, to))
                 return;
@@ -2663,7 +2705,7 @@ namespace ChartBuilder.Controls.Editing
             foreach (long start in sync.Matches.Prepend(from))
             {
                 foreach (var note in track.Notes.Between(start, start + length - 1))
-                    DrawNoteMark(context, session, key, track, note, projection, slots, SyncedBrush, SyncRegionPen);
+                    DrawNoteMark(context, session, key, track, note, projection, slots, SyncedBrush, SyncRegionPen, upright ? NoteMarkPart.Gem : _camera is null ? NoteMarkPart.All : NoteMarkPart.Tail, upright);
             }
         }
 

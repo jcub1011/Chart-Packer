@@ -39,6 +39,9 @@ namespace ChartShared.UI.Controls.Highway
         private readonly GemPainter _flat;
         private readonly Dictionary<(int, int), StreamGeometry> _hexagons = [];
 
+        // What was drawn last, in the order it was, from the back: where each note stands on the screen, and where on the plane.
+        private readonly List<(Rect Silhouette, Point Floor)> _scene = [];
+
         /// <param name="flat">The flat painter, whose brushes and pens are shared and which draws the tails.</param>
         public UprightGemPainter(GemPainter flat)
         {
@@ -47,6 +50,25 @@ namespace ChartShared.UI.Controls.Highway
 
         /// <summary>The camera the notes are placed by. With none, the notes are drawn flat.</summary>
         public PerspectiveCamera? Camera { get; set; }
+
+        /// <summary>Forgets the notes drawn so far, as a host does before it draws its notes again.</summary>
+        public void BeginScene() => _scene.Clear();
+
+        /// <summary>
+        /// The centre of the floor, on the plane, of the note standing at <paramref name="host"/> on the screen, as of the last drawing:
+        /// the nearest one when they overlap, as the eye sees it. A note's box rises above its floor, so the pointer over its top is
+        /// not over its floor. Null when there is no note there. Only the notes drawn whole are held, not outlines or marks.
+        /// </summary>
+        public Point? PlaneAt(Point host)
+        {
+            for (int i = _scene.Count - 1; i >= 0; i--)
+            {
+                if (_scene[i].Silhouette.Contains(host))
+                    return _scene[i].Floor;
+            }
+
+            return null;
+        }
 
         /// <summary>Where a note stands: its footprint, as it is on the screen, and how tall it is and how round its corners.</summary>
         private readonly struct Stand
@@ -85,6 +107,8 @@ namespace ChartShared.UI.Controls.Highway
             var stand = StandOf(rect, GemRise);
             if (!IsShown(stand))
                 return;
+            if (!outlined)
+                _scene.Add((stand.Silhouette, rect.Center));
 
             // A ghost: faded, with a dashed edge in its colour.
             if (!outlined && (note.Flags & NoteFlags.Ghost) != 0)
@@ -116,13 +140,15 @@ namespace ChartShared.UI.Controls.Highway
             var stand = StandOf(bar, BarRise);
             if (!IsShown(stand))
                 return;
+            if (!outlined)
+                _scene.Add((stand.Silhouette, bar.Center));
 
             var top = stand.Top;
             bool hopo = (note.Flags & NoteFlags.Hopo) != 0;
             if (outlined)
             {
                 var edge = hopo ? HighwayPalette.Lighten(color, GemPainter.HopoOpenLighten) : color;
-                context.DrawRectangle(null, _flat.Pen(edge, 1.5), top.Deflate(0.75), stand.RadiusX, stand.RadiusY);
+                DrawOutlinedBox(context, stand, _flat.Pen(edge, 1.5));
             }
             else if (!hopo)
             {
@@ -184,6 +210,23 @@ namespace ChartShared.UI.Controls.Highway
         }
 
         /// <summary>
+        /// Marks over the note that stands in <paramref name="rect"/>, in <paramref name="brush"/> and <paramref name="pen"/>: what the
+        /// erase tool would take away, in red, or the notes a synchronized region syncs, in orange. It covers all of the note, box and floor.
+        /// </summary>
+        public void DrawMark(DrawingContext context, Rect rect, IBrush? brush, IPen? pen)
+        {
+            if (Camera is null)
+            {
+                context.DrawRectangle(brush, pen, rect.Inflate(1), 3, 3);
+                return;
+            }
+
+            var stand = StandOf(rect, RiseOf(rect));
+            if (IsShown(stand))
+                context.DrawRectangle(brush, pen, stand.Silhouette.Inflate(1), stand.RadiusX, stand.RadiusY);
+        }
+
+        /// <summary>
         /// Where on the screen the note drawn in <paramref name="rect"/> is, from the top of its box to the near edge of its floor,
         /// or null with no camera or when it is off the screen.
         /// </summary>
@@ -240,7 +283,7 @@ namespace ChartShared.UI.Controls.Highway
                 // A tap: dark, with the lane's colour as its border and a mark in the middle.
                 if (outlined)
                 {
-                    context.DrawRectangle(null, _flat.Pen(edge, 2), top.Deflate(1), stand.RadiusX, stand.RadiusY);
+                    DrawOutlinedBox(context, stand, _flat.Pen(edge, 1.5));
                     context.DrawRectangle(null, _flat.Pen(edge, 1), GemPainter.Mark(top).Deflate(0.5), 1, 1);
                 }
                 else
@@ -255,7 +298,7 @@ namespace ChartShared.UI.Controls.Highway
 
             if (outlined)
             {
-                context.DrawRectangle(null, _flat.Pen(edge, 1.5), top.Deflate(0.75), stand.RadiusX, stand.RadiusY);
+                DrawOutlinedBox(context, stand, _flat.Pen(edge, 1.5));
             }
             else
             {
@@ -271,6 +314,16 @@ namespace ChartShared.UI.Controls.Highway
                 else
                     context.FillRectangle(GemPainter.HopoMarkBrush, GemPainter.Mark(top), 1f);
             }
+        }
+
+        /// <summary>
+        /// Only the box's edges, so what's behind shows through: round all it covers, from its top to the near edge of its floor, and
+        /// round its top face, which together show it is a box and where it stands.
+        /// </summary>
+        private static void DrawOutlinedBox(DrawingContext context, Stand stand, IPen pen)
+        {
+            context.DrawRectangle(null, pen, stand.Silhouette.Deflate(0.75), stand.RadiusX, stand.RadiusY);
+            context.DrawRectangle(null, pen, stand.Top.Deflate(0.75), stand.RadiusX, stand.RadiusY);
         }
 
         /// <summary>The box's shadow on the plane, then its sides: its floor's rounded rectangle stacked up to its top, darker at the base.</summary>
