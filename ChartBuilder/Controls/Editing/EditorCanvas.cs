@@ -228,6 +228,7 @@ namespace ChartBuilder.Controls.Editing
         private const double PageBehind = 0.25;
         private const double PageAhead = 0.75;
 
+
         // How near a page's end the screen may come, in pixels, before it's drawn again around the screen: room for what's
         // drawn around a moment rather than at it, a gem or a measure's number, whose moment may be past the page's end.
         private const double PageMargin = 32;
@@ -246,6 +247,10 @@ namespace ChartBuilder.Controls.Editing
         // far less to draw each frame, for a picture's worth of memory each. False to compare, or should the pictures look
         // worse than the drawing.
         private const bool CacheLayers = true;
+
+        // The least a tilted plane's depth is taken to be foreshortened to at its near end, for how long its waveform's bars are, so a
+        // steep tilt doesn't make them too coarse to show the beats.
+        private const double MinWaveformDepthScale = 0.25;
 
         // How long a page with pictures still to come waits before it's drawn again with them.
         private static readonly TimeSpan RedrawDelay = TimeSpan.FromMilliseconds(50);
@@ -661,6 +666,10 @@ namespace ChartBuilder.Controls.Editing
         /// </summary>
         private void FillPage(DrawingContext context, LaneProjection projection)
         {
+            // Nothing to keep the size of, on a plane that's drawn again for every move: it is just a screen.
+            if (_camera is not null)
+                return;
+
             double across = View == LaneView.Highway ? Bounds.Width : Bounds.Height;
             context.FillRectangle(Brushes.Transparent, Box(projection.TimeFrom - PagePad, projection.TimeFrom + projection.TimeLength + PagePad, 0, across));
         }
@@ -684,7 +693,8 @@ namespace ChartBuilder.Controls.Editing
             if (_page is { } page && page.Fits(screen))
                 return page;
 
-            _page = LanePage.Of(screen, _isBackwards ? PageAhead : PageBehind, _isBackwards ? PageBehind : PageAhead, MaxPageLength());
+            var (behind, ahead) = PageReach();
+            _page = LanePage.Of(screen, _isBackwards ? ahead : behind, _isBackwards ? behind : ahead, MaxPageLength());
             Dispatcher.UIThread.Post(() =>
             {
                 foreach (var layer in (ReadOnlySpan<Layer>)[_song, _notes])
@@ -696,6 +706,12 @@ namespace ChartBuilder.Controls.Editing
             return _page;
         }
 
+        /// <summary>
+        /// How far a page reaches past the screen, in screens: a little back and most of it ahead, as the view moves. None for a
+        /// tilted plane, whose lane is drawn again for every move, on the screen as it is (see <see cref="UpdatePaging"/>).
+        /// </summary>
+        private (double Behind, double Ahead) PageReach() => _camera is null ? (PageBehind, PageAhead) : (0, 0);
+
         /// <summary>The longest a page may be along the time axis, in the canvas's own pixels.</summary>
         private double MaxPageLength() => MaxPagePixels / (TopLevel.GetTopLevel(this)?.RenderScaling ?? 1);
 
@@ -706,7 +722,12 @@ namespace ChartBuilder.Controls.Editing
         private void UpdatePaging()
         {
             double length = View == LaneView.Highway ? _arranged.Height : _arranged.Width;
-            _isPaged = length > 0 && MaxPageLength() - length >= MinPageReach;
+
+            // Not while the lane is tilted: its layers are drawn again for every move, on the screen as it is, as a lane too long
+            // for pages is. A page is a picture, or a drawing, moved as the song plays; tilted, the tilt draws it again, smaller and
+            // smoothed, so thin lines and the waveform shimmer, and what it holds past the plane's near end is drawn ever larger,
+            // so large towards the camera that the graphics card drops it, and the lane with it, until the next page.
+            _isPaged = _camera is null && length > 0 && MaxPageLength() - length >= MinPageReach;
             bool cached = CacheLayers && _isPaged && IsVisible;
             foreach (var layer in (ReadOnlySpan<Layer>)[_song, _notes])
             {
@@ -1740,6 +1761,11 @@ namespace ChartBuilder.Controls.Editing
 
             // The painter's position is evaluated at two times and must be linear, as the projection is.
             double scaling = 1 / (TopLevel.GetTopLevel(this)?.RenderScaling ?? 1);
+
+            // Tilted, the plane's pixels are foreshortened, even at its near end, where a bar one pixel long is half a pixel on the
+            // screen: its pictures are made with bars as long as the screen shows them, a bar to a pixel there, and as few again to draw.
+            if (_camera is { } camera)
+                scaling /= Math.Max(camera.DepthScaleAt(camera.PlaneHeight), MinWaveformDepthScale);
             using (context.PushClip(area))
             {
                 if (audio.IsStereo && editor.Audio.Waveforms.Stereo(source) is var (left, right))
@@ -1748,8 +1774,8 @@ namespace ChartBuilder.Controls.Editing
                     double gain = LaneWaveformPainter.FullScaleGain(left.Peak >= right.Peak ? left : right) * boost;
                     var first = vertical ? new Rect(area.X, area.Y, area.Width / 2, area.Height) : new Rect(area.X, area.Y, area.Width, area.Height / 2);
                     var second = vertical ? new Rect(area.X + (area.Width / 2), area.Y, area.Width / 2, area.Height) : new Rect(area.X, area.Y + (area.Height / 2), area.Width, area.Height / 2);
-                    bool done = LaneWaveformPainter.Draw(context, left, first, vertical, projection.Start, projection.End, projection.AlongOf, peak, loud, gain, scaling, budgeted: true);
-                    done &= LaneWaveformPainter.Draw(context, right, second, vertical, projection.Start, projection.End, projection.AlongOf, peak, loud, gain, scaling, budgeted: true);
+                    bool done = LaneWaveformPainter.Draw(context, left, first, vertical, projection.Start, projection.End, projection.AlongOf, peak, loud, gain, scaling, budgeted: true, smooth: _camera is not null);
+                    done &= LaneWaveformPainter.Draw(context, right, second, vertical, projection.Start, projection.End, projection.AlongOf, peak, loud, gain, scaling, budgeted: true, smooth: _camera is not null);
                     context.DrawLine(ChannelPen, vertical ? first.TopRight : first.BottomLeft, vertical ? first.BottomRight : first.BottomRight);
                     return done;
                 }
@@ -1757,7 +1783,7 @@ namespace ChartBuilder.Controls.Editing
                 if (editor.Audio.Waveforms.Mono(source) is not { } waveform)
                     return true;
                 return LaneWaveformPainter.Draw(context, waveform, area, vertical, projection.Start, projection.End, projection.AlongOf,
-                    peak, loud, LaneWaveformPainter.FullScaleGain(waveform) * boost, scaling, budgeted: true);
+                    peak, loud, LaneWaveformPainter.FullScaleGain(waveform) * boost, scaling, budgeted: true, smooth: _camera is not null);
             }
         }
 

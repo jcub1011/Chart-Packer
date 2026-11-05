@@ -38,6 +38,10 @@ namespace ChartShared.UI.Controls
         // Pictures drawn pixel for pixel, not smoothed.
         private static readonly RenderOptions Sharp = new() { BitmapInterpolationMode = BitmapInterpolationMode.None, EdgeMode = EdgeMode.Aliased };
 
+        // Pictures drawn at a slant, as a lane tilted back is, bilinearly: the bars shrink smoothly, and don't jump from one to the next
+        // as they move. Not mipmapped, which at a slant picks the picture's smaller copy for the squeezed axis and blurs the other too.
+        private static readonly RenderOptions Smooth = new() { BitmapInterpolationMode = BitmapInterpolationMode.LowQuality, EdgeMode = EdgeMode.Antialias };
+
         // More pictures than this kept, or more pixels than this in them, and the least recently drawn go: several lanes,
         // each drawing its waveform behind and beside, by channel, show many at once.
         private const int MaxTiles = 256;
@@ -66,8 +70,9 @@ namespace ChartShared.UI.Controls
         /// <param name="pixel">How long a pixel of the screen is, in the lane's coordinates: each bar is at least that long, so a slow lane
         /// isn't drawn as thousands of slivers, and a fast one shows as much of the waveform's detail as the screen can.</param>
         /// <param name="budgeted">Draw new pictures only within the <see cref="PaintBudget"/>.</param>
+        /// <param name="smooth">Smooth the pictures as they are drawn, rather than pixel for pixel: for a lane a transform shrinks, as a tilt does.</param>
         /// <returns>Whether all of it was drawn: <see langword="false"/> when the budget ran out, so it should be drawn again soon.</returns>
-        public static bool Draw(DrawingContext context, Waveform waveform, Rect bounds, bool isVertical, double from, double to, Func<double, double> position, IBrush peakBrush, IBrush loudBrush, double gain = 1, double pixel = 1, bool budgeted = false)
+        public static bool Draw(DrawingContext context, Waveform waveform, Rect bounds, bool isVertical, double from, double to, Func<double, double> position, IBrush peakBrush, IBrush loudBrush, double gain = 1, double pixel = 1, bool budgeted = false, bool smooth = false)
         {
             int perSecond = waveform.BucketsPerSecond;
             double origin = position(0);
@@ -97,7 +102,7 @@ namespace ChartShared.UI.Controls
             // right, or upwards, from the centre.
             bool complete = true;
             using (context.PushClip(bounds))
-            using (context.PushRenderOptions(Sharp))
+            using (context.PushRenderOptions(smooth ? Smooth : Sharp))
             {
                 for (int index = first / bucketsPerTile; index <= (end - 1) / bucketsPerTile; index++)
                 {

@@ -55,6 +55,25 @@ namespace ChartShared.UI.Controls.Highway
         public void BeginScene() => _scene.Clear();
 
         /// <summary>
+        /// How far past the plane's near end, which is the host's bottom edge, in pixels of the plane, a note's floor can have its middle
+        /// and still have some of it on the screen: its box stands up from the floor, so it is seen well after the floor has gone. A note
+        /// is culled by when it is, so one drawn only while its middle is on the plane would vanish with most of it still showing.
+        /// </summary>
+        /// <param name="depth">How deep a note is on the plane, as <see cref="GemDepth"/> gives it.</param>
+        /// <returns>0 with no camera.</returns>
+        public double ReachBelow(double depth)
+        {
+            if (Camera is not { } camera)
+                return 0;
+
+            // The tallest box, at the plane's near end, where the scale is 1: it is gone when its top has fallen to the host's bottom.
+            double rise = Math.Max(GemRise, BarRise) * depth;
+            return Camera.Unproject(new Point(camera.HostWidth / 2, camera.HostHeight + rise)) is { } far
+                ? Math.Max(0, far.Y + (depth / 2) - camera.PlaneHeight)
+                : 0;
+        }
+
+        /// <summary>
         /// The centre of the floor, on the plane, of the note standing at <paramref name="host"/> on the screen, as of the last drawing:
         /// the nearest one when they overlap, as the eye sees it. A note's box rises above its floor, so the pointer over its top is
         /// not over its floor. Null when there is no note there. Only the notes drawn whole are held, not outlines or marks.

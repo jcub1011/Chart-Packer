@@ -35,6 +35,10 @@ namespace ChartShared.UI.Controls.Highway
         private readonly BrushWatch _fadeWatch;
         private PerspectiveCamera? _camera;
 
+        // What the fade was last built for.
+        private PerspectiveCamera? _fadeCamera;
+        private Color _fadeColor;
+
         static PerspectiveHost()
         {
             ClipToBoundsProperty.OverrideDefaultValue<PerspectiveHost>(true);
@@ -139,6 +143,15 @@ namespace ChartShared.UI.Controls.Highway
                 return;
             }
 
+            // The same camera and colour make the same gradient: a size that doesn't change doesn't build it, or draw it, again.
+            if (ReferenceEquals(camera, _fadeCamera) && color == _fadeColor && _fade.Background is not null)
+            {
+                _fade.IsVisible = true;
+                return;
+            }
+
+            _fadeCamera = camera;
+            _fadeColor = color;
             var stops = new GradientStops();
             foreach (var (offset, alpha) in camera.FadeStops())
                 stops.Add(new GradientStop(Color.FromArgb((byte)Math.Round(alpha * color.A), color.R, color.G, color.B), offset));

@@ -882,7 +882,7 @@ namespace ChartShared.UI.Controls.Highway
                 if (waveform is not null)
                 {
                     LaneWaveformPainter.Draw(context, waveform, bounds.Deflate(new Thickness(4, 0)), isVertical: true, from, to, y,
-                        WaveformPeakBrush, WaveformLoudBrush, LaneWaveformPainter.FullScaleGain(waveform), 1 / (TopLevel.GetTopLevel(this)?.RenderScaling ?? 1));
+                        WaveformPeakBrush, WaveformLoudBrush, LaneWaveformPainter.FullScaleGain(waveform), 1 / (TopLevel.GetTopLevel(this)?.RenderScaling ?? 1), smooth: _camera is not null);
                 }
 
                 // A beam of light rises from a lane as it's struck.

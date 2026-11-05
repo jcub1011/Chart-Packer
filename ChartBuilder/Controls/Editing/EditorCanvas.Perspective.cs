@@ -49,6 +49,9 @@ namespace ChartBuilder.Controls.Editing
                 _camera = value;
                 _upright.Camera = value;
                 _pressOffset = default;
+
+                // Tilted, the layers are not kept as pictures and their pages have no pixel limit.
+                UpdatePaging();
                 InvalidateLayers();
             }
         }
@@ -101,7 +104,10 @@ namespace ChartBuilder.Controls.Editing
             if (SceneOfGems() is not { } scene)
                 return;
 
-            var (fromTick, toTick) = TicksOf(scene.Session, scene.Screen);
+            // A note is drawn from its start, but stands up from its floor: it's seen until its box has gone below the host's bottom,
+            // well after its start has, so the ticks reach back that far, past the screen's start. (The painter holds the real cull.)
+            double reach = _upright.ReachBelow(GemSize(scene.Screen)) / scene.Screen.PixelsPerSecond;
+            var (fromTick, toTick) = TicksOf(scene.Session, scene.Screen.Widened(reach, 0));
 
             // All the text stands up, to be read: the measures' numbers, the tempo markers and the sections' names in the margin, a
             // proposed tempo map's labels, and the solos' counts. (The forcing marks are drawn with the notes.)
