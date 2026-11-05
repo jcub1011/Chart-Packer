@@ -40,7 +40,8 @@ namespace ChartBuilder.Controls.Editing
             double fixedWidth = RailWidth + onsets + MarkWidth + phrases + Extras.BesideSize;
             double laneSize = LaneSizeFor(size.Width, fixedWidth, count, Camera is not null);
             double left = Math.Max(0, (size.Width - (fixedWidth + (laneSize * count))) / 2);
-            return LaneProjection.Of(LaneView.Highway, 0, Math.Max(1, size.Height), left + RailWidth + onsets, laneSize, slots, viewport, length);
+            return LaneProjection.Of(LaneView.Highway, 0, Math.Max(1, size.Height), left + RailWidth + onsets, laneSize, slots, viewport, length,
+                Camera is null ? EditorViewport.StrikeFraction : EditorViewport.PerspectiveStrikeFraction);
         }
 
         /// <summary>

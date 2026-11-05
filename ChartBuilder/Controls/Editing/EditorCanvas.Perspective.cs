@@ -16,7 +16,7 @@ namespace ChartBuilder.Controls.Editing
     // drawn here (PaintGems, and PaintGemMarks for what follows the pointer) through the camera. Pointers reach the canvas
     // already undone from the tilt, by Avalonia, so the tools need to know nothing of it; only a gem, which stands up from
     // where the pointer finds its floor, is looked for (OnGem).
-    public abstract partial class EditorCanvas
+    public abstract partial class EditorCanvas : IPerspectiveContent
     {
         // How far a hit's tolerance is let grow, as a share of its pixels on the plane, where the tilt crowds the plane's
         // distances together towards its far end.
@@ -41,7 +41,7 @@ namespace ChartBuilder.Controls.Editing
         /// The camera that tilts this canvas back, while it is a perspective highway; null while it is flat. Set by the host that
         /// tilts it, which also draws the notes this canvas stands up (<see cref="PaintGems"/>) over it.
         /// </summary>
-        internal PerspectiveCamera? Camera
+        public PerspectiveCamera? Camera
         {
             get => _camera;
             set
@@ -58,13 +58,10 @@ namespace ChartBuilder.Controls.Editing
         }
 
         /// <summary>Raised when the notes standing up on a perspective highway are to be drawn again.</summary>
-        internal event Action? GemsInvalidated;
+        public event Action? GemsInvalidated;
 
         /// <summary>Raised when what follows the pointer, standing up on a perspective highway, is to be drawn again.</summary>
-        internal event Action? GemMarksInvalidated;
-
-        /// <summary>Raised when the targets at the strike line, standing up on a perspective highway, are to be drawn again.</summary>
-        internal event Action? GemTargetsInvalidated;
+        public event Action? GemMarksInvalidated;
 
         private void RedrawGems()
         {
@@ -76,12 +73,6 @@ namespace ChartBuilder.Controls.Editing
         {
             if (_camera is not null)
                 GemMarksInvalidated?.Invoke();
-        }
-
-        private void RedrawGemTargets()
-        {
-            if (_camera is not null)
-                GemTargetsInvalidated?.Invoke();
         }
 
         /// <summary>What is drawn standing up on a perspective highway: the lane as the canvas has laid it out now.</summary>
@@ -108,7 +99,7 @@ namespace ChartBuilder.Controls.Editing
         /// the canvas's own projection, which is the plane's, and <see cref="Camera"/> puts each where it is on the screen. What
         /// it draws is kept, for <see cref="OnGem"/> to find the pointer's note in.
         /// </summary>
-        internal void PaintGems(DrawingContext context)
+        public void PaintGems(DrawingContext context)
         {
             _upright.BeginScene();
             if (SceneOfGems() is not { } scene)
@@ -132,7 +123,7 @@ namespace ChartBuilder.Controls.Editing
         /// Draws what follows the pointer, as much of it as stands up on a perspective highway: the place tool's ghost, and the gems the
         /// erase tool would take away and a synchronized region syncs, marked over. The rest, a sustain's tail and the rail, is on the plane.
         /// </summary>
-        internal void PaintGemMarks(DrawingContext context)
+        public void PaintGemMarks(DrawingContext context)
         {
             if (SceneOfGems() is not { } scene)
                 return;
@@ -142,42 +133,6 @@ namespace ChartBuilder.Controls.Editing
             DrawSyncNotes(context, scene.Session, scene.Key, scene.Track, scene.Screen, scene.Slots, upright: true);
             if (PlaytestOf(scene.Key) is { } run)
                 DrawPlaytestMarks(context, scene.Session, scene.Key, run, scene.Slots, scene.Screen, upright: true);
-        }
-
-        /// <summary>
-        /// Draws what stands up at the strike line while the song plays, under the notes that go by it: the targets lit as notes reach
-        /// them, and in a playtest the frets and pads pressed and the bursts of the notes hit. The beams of light are on the plane.
-        /// </summary>
-        internal void PaintGemTargets(DrawingContext context)
-        {
-            if (_editor?.Playback.IsPlaying != true || SceneOfGems() is not { } scene)
-                return;
-
-            var playing = PlayingOf(scene.Key);
-            if (playing is not null)
-                DrawPresses(context, scene.Session, scene.Key, scene.Screen, scene.Slots, upright: true);
-            DrawGlow(context, scene.Session, scene.Key, scene.Track, scene.Screen, scene.Slots, upright: true);
-            if (playing is not null)
-                DrawHitBursts(context, scene.Session, scene.Key, playing, scene.Screen, scene.Slots, upright: true);
-        }
-
-        /// <summary>A target-shaped mark in <paramref name="rect"/>: a rounded rectangle on the plane, or what it would be if a note stood in it.</summary>
-        private void DrawTargetShape(DrawingContext context, Rect rect, IBrush? brush, IPen? pen, double radius, bool upright)
-        {
-            if (upright)
-                _upright.DrawMark(context, rect, brush, pen);
-            else
-                context.DrawRectangle(brush, pen, rect, radius, radius);
-        }
-
-        /// <summary>A lane's target at the strike line, filled in <paramref name="color"/> as brightly as <paramref name="lit"/> says, standing up as a note would.</summary>
-        private void DrawLitTargetUpright(DrawingContext context, Rect rect, Color color, double lit)
-        {
-            if (lit <= 0)
-                return;
-
-            using (context.PushOpacity(lit))
-                _upright.DrawMark(context, rect.Deflate(1), _gems.Brush(StrikeGlow.TargetFill(color)), _gems.Pen(StrikeGlow.TargetEdge(color), 2));
         }
 
         /// <summary>

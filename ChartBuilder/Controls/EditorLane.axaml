@@ -7,6 +7,7 @@
              xmlns:ctl="using:ChartShared.UI.Controls"
              xmlns:bctl="using:ChartBuilder.Controls"
              xmlns:edit="using:ChartBuilder.Controls.Editing"
+             xmlns:hw="using:ChartShared.UI.Controls.Highway"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d" d:DesignWidth="320" d:DesignHeight="480"
@@ -419,14 +420,14 @@
 
         <Panel>
             <!-- The highway, flat or tilted back in perspective, which fades into the lane's background. -->
-            <edit:PerspectiveHost IsVisible="{Binding ShowsHighway}"
+            <hw:PerspectiveHost IsVisible="{Binding ShowsHighway}"
                                   IsPerspective="{Binding IsPerspective}"
                                   FadeBrush="{DynamicResource SurfaceBrush}">
                 <edit:HighwayEditorCanvas IsVisible="{Binding ShowsHighway}"
                                           WheelUpIsLater="{Binding Editor.WheelUpIsLater}"
                                           AccentBrush="{DynamicResource AccentTextBrush}"
                                           LabelBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
-            </edit:PerspectiveHost>
+            </hw:PerspectiveHost>
             <edit:TimelineEditorCanvas IsVisible="{Binding ShowsTimeline}"
                                        WheelUpIsLater="{Binding Editor.WheelUpIsLater}"
                                        AccentBrush="{DynamicResource AccentTextBrush}"

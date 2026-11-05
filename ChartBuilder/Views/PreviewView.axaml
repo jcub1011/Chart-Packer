@@ -113,13 +113,16 @@
 
                 <bctl:PanelSection Key="highway" Header="{x:Static res:Strings.PreviewHighwaySection}" Fills="True" FillMinHeight="260">
                     <Panel>
-                        <hw:NoteHighwayView x:Name="Highway"
-                                            Scene="{Binding Scene}"
-                                            Clock="{Binding Clock}"
-                                            LookAhead="{Binding LookAhead}"
-                                            LengthMode="{Binding LengthMode}"
-                                            PixelsPerSecond="{Binding PixelsPerSecond}"
-                                            LengthSeconds="{Binding Playback.LengthSeconds}" />
+                        <!-- Flat, or tilted back in perspective with the notes standing up on it; it fades itself, so the host adds no fade. -->
+                        <hw:PerspectiveHost IsPerspective="{Binding IsPerspective}">
+                            <hw:NoteHighwayView x:Name="Highway"
+                                                Scene="{Binding Scene}"
+                                                Clock="{Binding Clock}"
+                                                LookAhead="{Binding LookAhead}"
+                                                LengthMode="{Binding LengthMode}"
+                                                PixelsPerSecond="{Binding PixelsPerSecond}"
+                                                LengthSeconds="{Binding Playback.LengthSeconds}" />
+                        </hw:PerspectiveHost>
                         <TextBlock Classes="muted centered"
                                    VerticalAlignment="Center"
                                    TextWrapping="Wrap"

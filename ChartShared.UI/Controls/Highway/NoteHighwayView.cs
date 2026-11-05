@@ -209,7 +209,7 @@ namespace ChartShared.UI.Controls.Highway
     /// pointer up it.</para>
     /// </summary>
     /// <example><c>&lt;ctl:NoteHighwayView Scene="{Binding Highway.Scene}" Clock="{Binding Highway.Clock}" LookAhead="{Binding Highway.LookAhead}" Waveforms="{Binding Highway.LaneWaveforms}" /&gt;</c></example>
-    public sealed class NoteHighwayView : Control
+    public sealed class NoteHighwayView : Control, IPerspectiveContent
     {
         public static readonly StyledProperty<HighwayScene?> SceneProperty =
             AvaloniaProperty.Register<NoteHighwayView, HighwayScene?>(nameof(Scene));
@@ -244,11 +244,19 @@ namespace ChartShared.UI.Controls.Highway
         public static readonly StyledProperty<int?> SelectedPhraseProperty =
             AvaloniaProperty.Register<NoteHighwayView, int?>(nameof(SelectedPhrase));
 
-        // Where the strike line sits, as a fraction of the height from the top; the instrument's name sits below it.
-        private const double StrikeFraction = 0.87;
+        // Where the strike line sits, as a fraction of the height from the top; the instrument's name sits below it. In perspective
+        // the name stands up beside the plane, and the line is lower, for the plane is long and nothing is drawn below it.
+        private const double FlatStrikeFraction = 0.87;
+        private const double PerspectiveStrikeFraction = 1 - EditorViewport.PerspectiveStrikeFraction;
+
+        // In perspective, how wide a highway gets at the most, in pixels of the plane, and how deep a gem, as in the editor's.
+        private const double MaxPerspectiveHighway = 480;
+        private const double MaxPerspectiveGem = 34;
+
+        private double StrikeFraction => _camera is null ? FlatStrikeFraction : PerspectiveStrikeFraction;
 
         // The same line, as the shared mapping measures it: from the bottom, which is where the song starts to show.
-        private const double StrikeFromEnd = 1 - StrikeFraction;
+        private double StrikeFromEnd => 1 - StrikeFraction;
 
         // The top of the highway fades out over this fraction of its height, so notes come in rather than pop in.
         private const double FadeFraction = 0.2;
@@ -282,6 +290,9 @@ namespace ChartShared.UI.Controls.Highway
 
         private readonly GemPainter _gems = new();
         private readonly NotePainter _notes;
+        private readonly UprightGemPainter _upright;
+        private readonly NotePainter _uprightNotes;
+        private PerspectiveCamera? _camera;
         private readonly List<NoteGlyph> _glyphs = [];
         private readonly List<BandGlyph> _bands = [];
         private readonly LabelCache _labels = new();
@@ -429,6 +440,8 @@ namespace ChartShared.UI.Controls.Highway
         public NoteHighwayView()
         {
             _notes = new NotePainter(_gems);
+            _upright = new UprightGemPainter(_gems);
+            _uprightNotes = new NotePainter(_upright);
             _gestures = new ViewportGestures(this, new GestureHost(this), new ScrubBinding(MouseButton.Left, KeyModifiers.None, AllowsOverview: true), WatchesKeys);
             EffectiveViewportChanged += OnEffectiveViewportChanged;
         }
@@ -449,6 +462,13 @@ namespace ChartShared.UI.Controls.Highway
             if (change.Property == BoundsProperty || change.Property == LookAheadProperty || change.Property == LengthModeProperty || change.Property == PixelsPerSecondProperty)
                 ShareShownLookAhead();
 
+            // What makes the highway draw again makes what stands up on it draw again.
+            if (change.Property == SceneProperty || change.Property == LookAheadProperty || change.Property == LengthModeProperty || change.Property == PixelsPerSecondProperty
+                || change.Property == WaveformsProperty || change.Property == AreNotesOutlinedProperty || change.Property == LengthSecondsProperty || change.Property == SelectedPhraseProperty)
+            {
+                RaiseStanding();
+            }
+
             // Shown again, it shows the notes falling until the pointer is over a highway again.
             if (change.Property == IsVisibleProperty && !IsVisible && !_gestures.IsScrubbing)
                 SetHover(-1, double.NaN);
@@ -464,7 +484,7 @@ namespace ChartShared.UI.Controls.Highway
             bool wasInViewport = IsInViewport;
             _viewport = e.EffectiveViewport;
             if (IsInViewport && !wasInViewport)
-                InvalidateVisual();
+                Redraw();
         }
 
 
@@ -489,16 +509,13 @@ namespace ChartShared.UI.Controls.Highway
                 return;
 
             // The time read for this frame, rather than reading the clock again.
-            double now = (_drawnAt != TimeSpan.MinValue ? _drawnAt : Clock?.Invoke() ?? TimeSpan.Zero).TotalSeconds;
+            double now = NowSeconds;
             double lookAhead = EffectiveLookAhead;
             double height = Bounds.Height;
             double strike = height * StrikeFraction;
 
             int count = scene.Lanes.Count;
-
-            // One gem size for every highway, from the narrowest lanes, leaving room for the names below the strike bar.
-            double narrowest = HighwayRect(scene, 0).Width / scene.MaxLaneCount;
-            double gem = Math.Clamp(narrowest * 0.42, 5, Math.Max(5, Math.Min(18, (height - strike - 13) / 0.9)));
+            double gem = GemSizeOf(scene, strike);
 
             var waveforms = Waveforms;
             for (int i = 0; i < count; i++)
@@ -517,7 +534,7 @@ namespace ChartShared.UI.Controls.Highway
 
                     // Where the song is drawn down this highway, with what's past the strike line shown for as long as it takes to fall off the bottom.
                     var lane = scene.Lanes[i];
-                    var projection = LaneProjection.AtCursor(LaneView.Highway, 0, height, bounds.X, bounds.Width / lane.LaneCount, lane.Slots, now, StrikeFromEnd, lookAhead);
+                    var projection = ProjectionOf(lane, bounds, now, lookAhead);
                     using (context.PushOpacity(1 - overview))
                         DrawHighway(context, scene, lane, waveform, bounds, strike, gem, now, projection, i == 0 ? SelectedPhrase : null);
                 }
@@ -549,7 +566,7 @@ namespace ChartShared.UI.Controls.Highway
         {
             const double GapFraction = 0.1;
             int count = scene.Lanes.Count;
-            double width = Math.Min(Bounds.Height * 0.45, Bounds.Width * 0.96 / (count + ((count - 1) * GapFraction)));
+            double width = Math.Min(_camera is null ? Bounds.Height * 0.45 : MaxPerspectiveHighway, Bounds.Width * 0.96 / (count + ((count - 1) * GapFraction)));
             double gap = width * GapFraction;
             double left = (Bounds.Width - ((count * width) + ((count - 1) * gap))) / 2;
             return new Rect(left + (index * (width + gap)), 0, width, Bounds.Height);
@@ -821,7 +838,7 @@ namespace ChartShared.UI.Controls.Highway
             _hoverY = y;
             if (lane >= 0)
                 FadeOf(lane).PointerAt = y;
-            InvalidateVisual();
+            Redraw();
         }
 
         private void DrawHighway(DrawingContext context, HighwayScene scene, HighwayLane lane, Waveform? waveform, Rect bounds, double strike, double gem, double now, LaneProjection projection, int? selectedBand)
@@ -891,10 +908,12 @@ namespace ChartShared.UI.Controls.Highway
                 context.FillRectangle(RailBrush, new Rect(bounds.Right - 2, 0, 2, railEnd));
 
                 DrawStrikeBar(context, lane, projection, bounds, strike, gem, hits);
-                DrawNotes(context, lane, projection, gem, now, from, to, AreNotesOutlined);
+                // In perspective the notes stand up, in a layer of the host's (PaintGems); only their tails lie on the plane.
+                DrawNotes(context, lane, projection, gem, now, from, to, AreNotesOutlined, _notes, _camera is null ? NotePass.All : NotePass.Tails, 0);
             }
 
-            DrawLabel(context, lane.Label, bounds, strike + (gem * 0.9));
+            if (_camera is null)
+                DrawLabel(context, lane.Label, bounds, strike + (gem * 0.9));
         }
 
         /// <summary>How brightly each column is lit, from 0 to 1: just struck, or held.</summary>
@@ -936,7 +955,10 @@ namespace ChartShared.UI.Controls.Highway
         }
 
         /// <param name="outlined">Whether each note is drawn as its outline only, so what's behind it shows through.</param>
-        private void DrawNotes(DrawingContext context, HighwayLane lane, LaneProjection projection, double gem, double now, double from, double to, bool outlined)
+        /// <param name="painter">What draws the notes: flat, or standing up on a perspective highway.</param>
+        /// <param name="pass">Which of the notes' tails and the notes themselves to draw.</param>
+        /// <param name="fadeLength">How far along the plane, from its far end, the notes fade in over, as the plane does; none for none.</param>
+        private void DrawNotes(DrawingContext context, HighwayLane lane, LaneProjection projection, double gem, double now, double from, double to, bool outlined, NotePainter painter, NotePass pass, double fadeLength)
         {
             int first = LowerBound(lane.Starts, from - lane.MaxLength);
             int last = LowerBound(lane.Starts, to + 0.001);
@@ -977,21 +999,27 @@ namespace ChartShared.UI.Controls.Highway
                 if ((mark & HighwayNoteMark.Flagged) != 0)
                     parts |= NoteGlyphParts.Flagged;
 
+                // Standing up, a note fades in at the plane's far end as the plane does, which fades its own.
+                double along = projection.AlongOf(lane.Starts[i]);
+                double fade = fadeLength > 0 ? Math.Clamp(along / fadeLength, 0, 1) : 1;
+                if (fade <= 0.02)
+                    continue;
+
                 glyphs.Add(new NoteGlyph
                 {
                     Index = i,
                     Note = note,
                     Color = NoteColor(lane, note),
                     Column = open ? -1 : Column(lane, note.Lane),
-                    Along = projection.AlongOf(lane.Starts[i]),
+                    Along = along,
                     TailFrom = tailFrom,
                     TailTo = tailTo,
-                    Opacity = (mark & HighwayNoteMark.Faded) != 0 ? FadedOpacity : 1,
+                    Opacity = ((mark & HighwayNoteMark.Faded) != 0 ? FadedOpacity : 1) * fade,
                     Parts = parts,
                 });
             }
 
-            _notes.Draw(context, projection, lane.Kind, CollectionsMarshal.AsSpan(glyphs), gem);
+            painter.Draw(context, projection, lane.Kind, CollectionsMarshal.AsSpan(glyphs), gem, pass: pass);
         }
 
         private static HighwayNoteMark MarkOf(HighwayLane lane, int index) => lane.Marks is { } marks ? marks[index] : HighwayNoteMark.None;
@@ -1004,6 +1032,110 @@ namespace ChartShared.UI.Controls.Highway
             // Below the strike bar when there's room, otherwise at the top.
             double y = top + 2 + text.Height <= bounds.Bottom ? top + 1 : 4;
             text.Draw(context, new Point(bounds.X + ((bounds.Width - Math.Min(text.Width, bounds.Width)) / 2), y));
+        }
+
+        /// <summary>The time the highway is drawn at this frame, in seconds: the clock as it was read for it, not read again.</summary>
+        private double NowSeconds => (_drawnAt != TimeSpan.MinValue ? _drawnAt : Clock?.Invoke() ?? TimeSpan.Zero).TotalSeconds;
+
+        /// <summary>One gem size for every highway, from the narrowest lanes, leaving room for the names below the strike bar.</summary>
+        private double GemSizeOf(HighwayScene scene, double strike)
+        {
+            double narrowest = HighwayRect(scene, 0).Width / scene.MaxLaneCount;
+            return Math.Clamp(narrowest * 0.42, 5, Math.Max(5, Math.Min(_camera is null ? 18 : MaxPerspectiveGem, (Bounds.Height - strike - 13) / 0.9)));
+        }
+
+        /// <summary>Where the song is drawn down <paramref name="lane"/>, with what's past the strike line shown for as long as it takes to fall off the bottom.</summary>
+        private LaneProjection ProjectionOf(HighwayLane lane, Rect bounds, double now, double lookAhead) =>
+            LaneProjection.AtCursor(LaneView.Highway, 0, Bounds.Height, bounds.X, bounds.Width / lane.LaneCount, lane.Slots, now, StrikeFromEnd, lookAhead);
+
+        /// <inheritdoc />
+        public PerspectiveCamera? Camera
+        {
+            get => _camera;
+            set
+            {
+                if (ReferenceEquals(_camera, value))
+                    return;
+
+                // The strike line moves with it, and so does what the highway shows ahead of it.
+                _camera = value;
+                _upright.Camera = value;
+                ShareShownLookAhead();
+                InvalidateVisual();
+                RaiseStanding();
+            }
+        }
+
+        /// <inheritdoc />
+        public event Action? GemsInvalidated;
+
+        // The preview has nothing that follows the pointer to stand up.
+        /// <inheritdoc />
+        public event Action? GemMarksInvalidated
+        {
+            add { }
+            remove { }
+        }
+
+        /// <summary>Has the highway drawn again, and what stands up on it.</summary>
+        private void Redraw()
+        {
+            InvalidateVisual();
+            RaiseStanding();
+        }
+
+        private void RaiseStanding()
+        {
+            if (_camera is null)
+                return;
+
+            GemsInvalidated?.Invoke();
+        }
+
+        /// <inheritdoc />
+        public void PaintGems(DrawingContext context)
+        {
+            if (_camera is null || Scene is not { Lanes.Count: > 0 } scene || Bounds.Width <= 0 || Bounds.Height <= 0)
+                return;
+
+            double now = NowSeconds;
+            double lookAhead = EffectiveLookAhead;
+            double strike = Bounds.Height * StrikeFraction;
+            double gem = GemSizeOf(scene, strike);
+            for (int i = 0; i < scene.Lanes.Count; i++)
+            {
+                double overview = FadeOf(i).Opacity;
+                if (overview >= 1)
+                    continue;
+
+                var bounds = HighwayRect(scene, i);
+                var lane = scene.Lanes[i];
+                var projection = ProjectionOf(lane, bounds, now, lookAhead);
+                using (context.PushOpacity(1 - overview))
+                {
+                    DrawNotes(context, lane, projection, gem, now, projection.Start, projection.End, AreNotesOutlined, _uprightNotes, NotePass.Notes, Bounds.Height * FadeFraction);
+                    DrawStandingLabel(context, lane.Label, bounds);
+                }
+            }
+        }
+
+        /// <inheritdoc />
+        public void PaintGemMarks(DrawingContext context)
+        {
+        }
+
+        /// <summary>The highway's name, standing up at the near end of its plane, as large as the plane is there, to be read.</summary>
+        private void DrawStandingLabel(DrawingContext context, string label, Rect bounds)
+        {
+            if (_camera is not { } camera)
+                return;
+
+            var text = _labels.Get(label, 10.5, LabelBrush, Math.Max(1, bounds.Width - 4));
+            var foot = new Point(bounds.X + (bounds.Width / 2), Bounds.Height - 2);
+            var at = camera.Project(foot);
+            double scale = camera.ScaleAt(foot.Y);
+            using (context.PushTransform(Matrix.CreateScale(scale, scale) * Matrix.CreateTranslation(at.X, at.Y)))
+                text.Draw(context, new Point(-Math.Min(text.Width, bounds.Width) / 2, -text.Height));
         }
 
         /// <summary>The column a lane is drawn in: six-fret's black and white frets share three.</summary>
@@ -1077,7 +1209,7 @@ namespace ChartShared.UI.Controls.Highway
             if (clock != _drawnAt || isFading)
             {
                 _drawnAt = clock;
-                InvalidateVisual();
+                Redraw();
             }
 
             RequestFrame();

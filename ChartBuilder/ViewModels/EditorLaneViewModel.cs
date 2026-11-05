@@ -142,7 +142,10 @@ namespace ChartBuilder.ViewModels
         /// How far ahead of its strike line the lane shows now, in seconds: its <see cref="LookAhead"/>, or in pixels per second what
         /// the lane's length in pixels makes of its <see cref="PixelsPerSecond"/>.
         /// </summary>
-        public double ShownLookAhead => Length.LookAheadFor(_extentPixels * (1 - EditorViewport.StrikeFraction));
+        public double ShownLookAhead => Length.LookAheadFor(_extentPixels * (1 - StrikeFraction));
+
+        /// <summary>How far from its strike end the lane's strike line is, as a fraction of its length: a quarter of the way, or in perspective close to the bottom.</summary>
+        public double StrikeFraction => IsPerspective ? EditorViewport.PerspectiveStrikeFraction : EditorViewport.StrikeFraction;
 
         /// <summary>
         /// Says how long the lane's time axis is, in pixels, as its canvas is laid out. In pixels per second that changes how far ahead
@@ -449,12 +452,21 @@ namespace ChartBuilder.ViewModels
         partial void OnGhostChanged(ChartDifficulty? value) => RefreshDifficulties();
 
         // The edit menu's shortcut keys follow the view: the arrows that shift a lane across differ between a highway and a timeline.
-        partial void OnViewChanged(LaneView value) => RefreshDifficulties();
+        partial void OnViewChanged(LaneView value)
+        {
+            RefreshDifficulties();
+            if (_isMade)
+                Editor?.RefreshVisibleSpan();
+        }
 
         partial void OnPerspectiveChanged(bool value)
         {
             if (_isMade && _dock.Layout.Find(Lane.Id) is not null)
                 _dock.Layout.SetPerspective(Lane, value);
+
+            // The strike line moves, so what the lane shows ahead of it does too.
+            if (_isMade)
+                Editor?.RefreshVisibleSpan();
         }
 
         partial void OnLookAheadChanged(double value)

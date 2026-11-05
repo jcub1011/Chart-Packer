@@ -1009,7 +1009,7 @@ Open it anyway?</value>
     <comment>A setting: whether a highway lane opens tilted back in perspective, as the games show it.</comment>
   </data>
   <data name="DefaultEditorPerspectiveDescription" xml:space="preserve">
-    <value>Whether a highway lane opens in perspective, tilted back with the notes standing up on it as in YARG and Clone Hero, rather than flat. V steps the focused lane through a flat highway, perspective and a timeline.</value>
+    <value>Whether the editor's highway lanes and the preview open in perspective, tilted back with the notes standing up on it as in YARG and Clone Hero, rather than flat. V steps the focused lane through a flat highway, perspective and a timeline.</value>
     <comment>The perspective highways setting's description.</comment>
   </data>
   <data name="DefaultEditorPerspectiveKeywords" xml:space="preserve">

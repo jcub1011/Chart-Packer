@@ -560,14 +560,14 @@ namespace ChartBuilder.Controls.Editing
                 return;
             using (context.PushClip(LanesOf(screen, slots)))
             {
-                // On a perspective highway the targets, the frets pressed and the bursts stand up, in a layer of the host's under the notes
-                // (PaintGemTargets); the beams of light stay on the plane.
+                // What lights at the strike line, a target as a note is hit or a fret pressed, lies on the plane, as a glow on the highway's
+                // surface, on a perspective highway too: standing up, it would look like a note that isn't there.
                 var playing = PlayingOf(key);
                 if (playing is not null)
-                    DrawPresses(context, session, key, screen, slots, upright: false);
-                DrawGlow(context, session, key, track, screen, slots, upright: false);
+                    DrawPresses(context, session, key, screen, slots);
+                DrawGlow(context, session, key, track, screen, slots);
                 if (playing is not null)
-                    DrawHitBursts(context, session, key, playing, screen, slots, upright: false);
+                    DrawHitBursts(context, session, key, playing, screen, slots);
             }
         }
 
@@ -862,8 +862,6 @@ namespace ChartBuilder.Controls.Editing
                     _owner.RedrawGems();
                 else if (Kind is LayerKind.Overlay or LayerKind.Playtest)
                     _owner.RedrawGemMarks();
-                else if (Kind == LayerKind.Strike)
-                    _owner.RedrawGemTargets();
             }
 
             /// <summary>Drawn on <paramref name="page"/>, moved to show what <paramref name="screen"/> shows.</summary>
@@ -2921,8 +2919,7 @@ namespace ChartBuilder.Controls.Editing
         /// The columns the song is playing through, lit as the inspector's highway lights them: a beam rising from the
         /// strike line and the column's target filled in, as each note reaches it, fading, and slowly over a sustain.
         /// </summary>
-        /// <param name="upright">Whether to draw what stands up on a perspective highway, the target, rather than what lies on the plane, the beam; on a flat highway all is drawn with the plane's.</param>
-        private void DrawGlow(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, LaneProjection projection, LaneSlots slots, bool upright)
+        private void DrawGlow(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, LaneProjection projection, LaneSlots slots)
         {
             var kind = track.Kind;
             bool drums = kind == ChartInstrumentKind.Drums;
@@ -2943,17 +2940,10 @@ namespace ChartBuilder.Controls.Editing
                     ? (drums ? HighwayPalette.Kick : HighwayPalette.Open)
                     : HighwayPalette.HitColor(kind, laneCount, column);
                 double edge = projection.LaneFrom + (column * projection.LaneSize);
-                if (!upright)
-                    HighwayChrome.DrawLitBeam(context, View, color, hit, Box(strike, strike + reach, edge, edge + projection.LaneSize));
+                HighwayChrome.DrawLitBeam(context, View, color, hit, Box(strike, strike + reach, edge, edge + projection.LaneSize));
 
                 // The target, as opaque as the column is lit.
-                if (upright != (_camera is null))
-                {
-                    if (upright)
-                        DrawLitTargetUpright(context, GemRect(projection, column, strike, size), color, hit);
-                    else
-                        HighwayChrome.DrawLitTarget(context, _gems, GemRect(projection, column, strike, size), color, hit);
-                }
+                HighwayChrome.DrawLitTarget(context, _gems, GemRect(projection, column, strike, size), color, hit);
             }
         }
 
