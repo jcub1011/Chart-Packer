@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Avalonia;
 using Avalonia.Media;
+using Avalonia.Media.TextFormatting;
 using ChartBuilder.ViewModels;
 using ChartShared.Core.Charting;
 using ChartShared.Core.Charting.Editing;
@@ -20,6 +21,13 @@ namespace ChartBuilder.Controls.Editing
         // How far a hit's tolerance is let grow, as a share of its pixels on the plane, where the tilt crowds the plane's
         // distances together towards its far end.
         private const double MinDepthScaleForHits = 0.35;
+
+        // The smallest a label standing up beside the plane is drawn, as a share of its size, so the far ones can still be read.
+        private const double MinLabelScale = 0.75;
+
+        // The most a gem is deep along a perspective highway, in pixels of the plane: its lanes may be wider than a flat highway's,
+        // and the gems should be as deep in proportion.
+        private const double MaxPerspectiveGemSize = 34;
 
         private readonly UprightGemPainter _upright;
         private readonly NotePainter _uprightNotes;
@@ -55,6 +63,9 @@ namespace ChartBuilder.Controls.Editing
         /// <summary>Raised when what follows the pointer, standing up on a perspective highway, is to be drawn again.</summary>
         internal event Action? GemMarksInvalidated;
 
+        /// <summary>Raised when the targets at the strike line, standing up on a perspective highway, are to be drawn again.</summary>
+        internal event Action? GemTargetsInvalidated;
+
         private void RedrawGems()
         {
             if (_camera is not null)
@@ -65,6 +76,12 @@ namespace ChartBuilder.Controls.Editing
         {
             if (_camera is not null)
                 GemMarksInvalidated?.Invoke();
+        }
+
+        private void RedrawGemTargets()
+        {
+            if (_camera is not null)
+                GemTargetsInvalidated?.Invoke();
         }
 
         /// <summary>What is drawn standing up on a perspective highway: the lane as the canvas has laid it out now.</summary>
@@ -98,6 +115,16 @@ namespace ChartBuilder.Controls.Editing
                 return;
 
             var (fromTick, toTick) = TicksOf(scene.Session, scene.Screen);
+
+            // All the text stands up, to be read: the measures' numbers, the tempo markers and the sections' names in the margin, a
+            // proposed tempo map's labels, and the solos' counts. (The forcing marks are drawn with the notes.)
+            var size = Bounds.Size;
+            DrawBeats(context, scene.Session, scene.Session.TempoMap, scene.Screen, fromTick, toTick, size, RailPass.Text);
+            DrawTempoMarkers(context, scene.Session, scene.Screen, fromTick, toTick, size, RailPass.Text);
+            DrawTempoProposal(context, scene.Session, scene.Screen, size, RailPass.Text);
+            DrawSections(context, scene.Session, scene.Screen, fromTick, toTick, size, RailPass.Text);
+            FindPhrasesShown(scene.Part, fromTick, toTick);
+            DrawSoloCounts(context, scene.Session, scene.Track, scene.Screen, fromTick, toTick, upright: true);
             DrawNoteSets(context, scene.Session, scene.Lane, scene.Key, scene.Track, scene.Part, scene.Screen, scene.Slots, fromTick, toTick, _uprightNotes, NotePass.Notes);
         }
 
@@ -113,6 +140,44 @@ namespace ChartBuilder.Controls.Editing
             DrawHover(context, scene.Session, scene.Key, scene.Track, scene.Screen, scene.Slots, _upright);
             DrawEraseHover(context, scene.Session, scene.Key, scene.Track, scene.Part, scene.Rows, scene.Screen, scene.Slots, upright: true);
             DrawSyncNotes(context, scene.Session, scene.Key, scene.Track, scene.Screen, scene.Slots, upright: true);
+            if (PlaytestOf(scene.Key) is { } run)
+                DrawPlaytestMarks(context, scene.Session, scene.Key, run, scene.Slots, scene.Screen, upright: true);
+        }
+
+        /// <summary>
+        /// Draws what stands up at the strike line while the song plays, under the notes that go by it: the targets lit as notes reach
+        /// them, and in a playtest the frets and pads pressed and the bursts of the notes hit. The beams of light are on the plane.
+        /// </summary>
+        internal void PaintGemTargets(DrawingContext context)
+        {
+            if (_editor?.Playback.IsPlaying != true || SceneOfGems() is not { } scene)
+                return;
+
+            var playing = PlayingOf(scene.Key);
+            if (playing is not null)
+                DrawPresses(context, scene.Session, scene.Key, scene.Screen, scene.Slots, upright: true);
+            DrawGlow(context, scene.Session, scene.Key, scene.Track, scene.Screen, scene.Slots, upright: true);
+            if (playing is not null)
+                DrawHitBursts(context, scene.Session, scene.Key, playing, scene.Screen, scene.Slots, upright: true);
+        }
+
+        /// <summary>A target-shaped mark in <paramref name="rect"/>: a rounded rectangle on the plane, or what it would be if a note stood in it.</summary>
+        private void DrawTargetShape(DrawingContext context, Rect rect, IBrush? brush, IPen? pen, double radius, bool upright)
+        {
+            if (upright)
+                _upright.DrawMark(context, rect, brush, pen);
+            else
+                context.DrawRectangle(brush, pen, rect, radius, radius);
+        }
+
+        /// <summary>A lane's target at the strike line, filled in <paramref name="color"/> as brightly as <paramref name="lit"/> says, standing up as a note would.</summary>
+        private void DrawLitTargetUpright(DrawingContext context, Rect rect, Color color, double lit)
+        {
+            if (lit <= 0)
+                return;
+
+            using (context.PushOpacity(lit))
+                _upright.DrawMark(context, rect.Deflate(1), _gems.Brush(StrikeGlow.TargetFill(color)), _gems.Pen(StrikeGlow.TargetEdge(color), 2));
         }
 
         /// <summary>
@@ -129,6 +194,32 @@ namespace ChartBuilder.Controls.Editing
         /// </summary>
         private double HitPixelsAt(Point position) =>
             _camera is { } camera ? HitPixels / Math.Clamp(camera.DepthScaleAt(position.Y), MinDepthScaleForHits, 1) : HitPixels;
+
+        /// <summary>
+        /// Draws <paramref name="text"/> standing up beside a perspective highway, its bottom on the plane point <paramref name="foot"/>, as
+        /// large as the plane is there but no smaller than <see cref="MinLabelScale"/>, so it can be read.
+        /// </summary>
+        /// <param name="rightAligned">Whether the text ends at <paramref name="foot"/>, rather than starts there.</param>
+        /// <param name="raise">How far above the foot, in pixels of the text, its bottom is.</param>
+        /// <param name="badge">What to fill behind it with, to set it off; none for none.</param>
+        private void DrawStandingLabel(DrawingContext context, TextLayout text, Point foot, bool rightAligned, double raise = 0, IBrush? badge = null)
+        {
+            if (_camera is not { } camera)
+                return;
+
+            var at = camera.Project(foot);
+            if (at.Y < -text.Height * 2 || at.Y > camera.HostHeight + (text.Height * 2))
+                return;
+
+            double scale = Math.Max(camera.ScaleAt(foot.Y), MinLabelScale);
+            using (context.PushTransform(Matrix.CreateScale(scale, scale) * Matrix.CreateTranslation(at.X, at.Y)))
+            {
+                var corner = new Point(rightAligned ? -text.Width : 0, -text.Height - raise);
+                if (badge is not null)
+                    context.FillRectangle(badge, new Rect(corner, new Size(text.Width, text.Height)).Inflate(1));
+                text.Draw(context, corner);
+            }
+        }
 
         /// <summary>The marks of a forced or tapped chord, beside it, as <see cref="DrawForcing"/> draws them but standing up: H, S and T, the smaller the further they are.</summary>
         private void DrawForcingUpright(DrawingContext context, LaneProjection projection, LaneSlots slots, double along, ChordFlags flags)

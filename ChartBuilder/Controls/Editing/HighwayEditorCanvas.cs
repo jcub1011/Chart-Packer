@@ -19,8 +19,12 @@ namespace ChartBuilder.Controls.Editing
         private const double RailWidth = 56;
         private const double MarkWidth = 18;
 
-        // The widest a column gets, in pixels.
+        // The widest a column gets, in pixels, on a flat highway.
         private const double MaxLaneSize = 64;
+
+        // The widest a perspective highway's columns get together, in pixels of the plane: as wide as the room allows, to this, for
+        // the plane narrows towards its far end and the notes are best large near the strike line.
+        private const double MaxPerspectiveWidth = 480;
 
         protected override LaneView View => LaneView.Highway;
 
@@ -34,10 +38,18 @@ namespace ChartBuilder.Controls.Editing
             double phrases = PhraseRailSize(phraseRows);
             double onsets = OnsetStripSize;
             double fixedWidth = RailWidth + onsets + MarkWidth + phrases + Extras.BesideSize;
-            double laneSize = Math.Min(MaxLaneSize, Math.Max(1, size.Width - fixedWidth) / count);
+            double laneSize = LaneSizeFor(size.Width, fixedWidth, count, Camera is not null);
             double left = Math.Max(0, (size.Width - (fixedWidth + (laneSize * count))) / 2);
             return LaneProjection.Of(LaneView.Highway, 0, Math.Max(1, size.Height), left + RailWidth + onsets, laneSize, slots, viewport, length);
         }
+
+        /// <summary>
+        /// How wide each of <paramref name="count"/> columns is in a highway <paramref name="width"/> wide, of which <paramref name="fixedWidth"/>
+        /// is the margins and rails: as wide as the room allows, but no more than 64 pixels flat, and in perspective no more than 480
+        /// pixels across all of them.
+        /// </summary>
+        internal static double LaneSizeFor(double width, double fixedWidth, int count, bool perspective) =>
+            Math.Min(perspective ? MaxPerspectiveWidth / count : MaxLaneSize, Math.Max(1, width - fixedWidth) / count);
 
         protected override Rect LabelsArea(Size size, LaneProjection projection) =>
             new(projection.LaneFrom - OnsetStripSize - RailWidth, projection.TimeFrom, RailWidth, projection.TimeLength);

@@ -538,11 +538,11 @@ namespace ChartBuilder.Controls.Editing
             DrawPhraseRanges(context, session, key, projection, fromTick, toTick);
             DrawSpans(context, session, projection);
             DrawSyncBands(context, session, key, projection);
-            DrawBeats(context, session, session.TempoMap, projection, fromTick, toTick, size);
+            DrawBeats(context, session, session.TempoMap, projection, fromTick, toTick, size, RailOnPlane);
             DrawOnsets(context, size, projection, key);
-            DrawTempoMarkers(context, session, projection, fromTick, toTick, size);
-            DrawTempoProposal(context, session, projection, size);
-            DrawSections(context, session, projection, fromTick, toTick, size);
+            DrawTempoMarkers(context, session, projection, fromTick, toTick, size, RailOnPlane);
+            DrawTempoProposal(context, session, projection, size, RailOnPlane);
+            DrawSections(context, session, projection, fromTick, toTick, size, RailOnPlane);
 
             // The phrase rail is beside the lanes, clear of the strike line's band, which is drawn over this.
             DrawPhraseRail(context, session, part, rows, projection);
@@ -560,12 +560,14 @@ namespace ChartBuilder.Controls.Editing
                 return;
             using (context.PushClip(LanesOf(screen, slots)))
             {
+                // On a perspective highway the targets, the frets pressed and the bursts stand up, in a layer of the host's under the notes
+                // (PaintGemTargets); the beams of light stay on the plane.
                 var playing = PlayingOf(key);
                 if (playing is not null)
-                    DrawPresses(context, session, key, screen, slots);
-                DrawGlow(context, session, key, track, screen, slots);
+                    DrawPresses(context, session, key, screen, slots, upright: false);
+                DrawGlow(context, session, key, track, screen, slots, upright: false);
                 if (playing is not null)
-                    DrawHitBursts(context, session, key, playing, screen, slots);
+                    DrawHitBursts(context, session, key, playing, screen, slots, upright: false);
             }
         }
 
@@ -579,7 +581,8 @@ namespace ChartBuilder.Controls.Editing
                 // On a perspective highway the notes stand up in a layer of their own (see PaintGems): only their tails lie here.
                 DrawNoteSets(context, session, lane, key, track, part, projection, slots, fromTick, toTick, _notePainter, _camera is null ? NotePass.All : NotePass.Tails);
                 FindPhrasesShown(part, fromTick, toTick);
-                DrawSoloCounts(context, session, track, projection, fromTick, toTick);
+                if (_camera is null)
+                    DrawSoloCounts(context, session, track, projection, fromTick, toTick, upright: false);
             }
         }
 
@@ -855,10 +858,12 @@ namespace ChartBuilder.Controls.Editing
             public void Redraw()
             {
                 _painter.InvalidateVisual();
-                if (Kind == LayerKind.Notes)
+                if (Kind is LayerKind.Notes or LayerKind.Song)
                     _owner.RedrawGems();
-                else if (Kind == LayerKind.Overlay)
+                else if (Kind is LayerKind.Overlay or LayerKind.Playtest)
                     _owner.RedrawGemMarks();
+                else if (Kind == LayerKind.Strike)
+                    _owner.RedrawGemTargets();
             }
 
             /// <summary>Drawn on <paramref name="page"/>, moved to show what <paramref name="screen"/> shows.</summary>
@@ -1806,8 +1811,9 @@ namespace ChartBuilder.Controls.Editing
         /// The proposed tempo map being reviewed, as a ghost over the real one (charter-spec C14 item 4), and Find first
         /// downbeat's guess (C14 item 5).
         /// </summary>
-        private void DrawTempoProposal(DrawingContext context, EditorSession session, LaneProjection projection, Size size)
+        private void DrawTempoProposal(DrawingContext context, EditorSession session, LaneProjection projection, Size size, RailPass pass)
         {
+            bool lines = (pass & RailPass.Lines) != 0, texts = (pass & RailPass.Text) != 0;
             var labels = LabelsArea(size, projection);
             bool highway = View == LaneView.Highway;
             double across1 = projection.LaneFrom, across2 = projection.LaneFrom + (projection.LaneSize * projection.Slots.Slots.Count);
@@ -1822,14 +1828,21 @@ namespace ChartBuilder.Controls.Editing
                     if (beats[last] < from || beats[first] > to)
                         continue;
                     double a = projection.AlongOf(beats[first]), b = projection.AlongOf(beats[last]);
-                    context.FillRectangle(UnsureBrush, Box(a, b, across1, across2));
+                    if (lines)
+                        context.FillRectangle(UnsureBrush, Box(a, b, across1, across2));
+                    if (!texts)
+                        continue;
+
                     var text = Label(Strings.ProposalUnsureLabel, 10, UnsureLabelBrush, highway ? Math.Max(1, labels.Width - 4) : null);
-                    text.Draw(context, highway ? new Point(labels.X + 2, Math.Max(a, b) - text.Height) : new Point(Math.Min(a, b) + 3, labels.Bottom - text.Height));
+                    if (!lines)
+                        DrawStandingLabel(context, text, new Point(labels.X + 2, Math.Max(a, b)), rightAligned: false);
+                    else
+                        text.Draw(context, highway ? new Point(labels.X + 2, Math.Max(a, b) - text.Height) : new Point(Math.Min(a, b) + 3, labels.Bottom - text.Height));
                 }
 
                 int perMeasure = Math.Max(1, proposal.BeatsPerMeasure);
                 int start = Math.Max(0, BeatMath.NearestIndex(beats, from, double.PositiveInfinity) - 1);
-                for (int i = start; i < beats.Count && beats[i] <= to + 1; i++)
+                for (int i = start; lines && i < beats.Count && beats[i] <= to + 1; i++)
                 {
                     double along = projection.AlongOf(beats[i]);
                     bool measure = ((i - proposal.Downbeat) % perMeasure + perMeasure) % perMeasure == 0;
@@ -1845,9 +1858,16 @@ namespace ChartBuilder.Controls.Editing
             if (_editor?.AudioAssist.Downbeat is { } downbeat && downbeat >= from && downbeat <= to)
             {
                 double along = projection.AlongOf(downbeat);
-                context.DrawLine(DownbeatPen, At(along, highway ? labels.Left : labels.Top), At(along, across2));
+                if (lines)
+                    context.DrawLine(DownbeatPen, At(along, highway ? labels.Left : labels.Top), At(along, across2));
+                if (!texts)
+                    return;
+
                 var text = Label(Strings.DownbeatGhostLabel, 10, DownbeatLabelBrush);
-                text.Draw(context, highway ? new Point(labels.X + 2, along - text.Height - 2) : new Point(along + 3, labels.Y));
+                if (!lines)
+                    DrawStandingLabel(context, text, new Point(labels.X + 2, along), rightAligned: false, raise: 2);
+                else
+                    text.Draw(context, highway ? new Point(labels.X + 2, along - text.Height - 2) : new Point(along + 3, labels.Y));
             }
         }
 
@@ -2121,7 +2141,8 @@ namespace ChartBuilder.Controls.Editing
         /// A solo's note count on the difficulty shown, at its start (charter-spec C8 item 2): only for the solos that start
         /// on screen, as the others' counts aren't seen.
         /// </summary>
-        private void DrawSoloCounts(DrawingContext context, EditorSession session, EditableTrack track, LaneProjection projection, double fromTick, double toTick)
+        /// <param name="upright">Whether the counts stand up beside a perspective highway's plane, to be read, rather than lie on it.</param>
+        private void DrawSoloCounts(DrawingContext context, EditorSession session, EditableTrack track, LaneProjection projection, double fromTick, double toTick, bool upright)
         {
             long from = (long)Math.Floor(fromTick) - 1, to = (long)Math.Ceiling(toTick);
             foreach (var phrase in _phrasesShown)
@@ -2130,6 +2151,12 @@ namespace ChartBuilder.Controls.Editing
                     continue;
                 var text = Label(PhraseRail.NoteCount(track, phrase).ToString(CultureInfo.CurrentCulture), 9, SoloLabelBrush);
                 double along = projection.AlongOf(session.AudioAt(phrase.Tick));
+                if (upright)
+                {
+                    DrawStandingLabel(context, text, new Point(projection.LaneFrom + 3, along), rightAligned: false, raise: 2, badge: BadgeBrush);
+                    continue;
+                }
+
                 var at = View == LaneView.Highway
                     ? new Point(projection.LaneFrom + 3, along - text.Height - 2)
                     : new Point(along + 3, projection.LaneFrom + 2);
@@ -2175,16 +2202,32 @@ namespace ChartBuilder.Controls.Editing
         /// <summary>The colour of a kind of phrase in the rail: star power as its notes are drawn, the others each their own.</summary>
         private static Color PhraseColor(PhraseKind kind) => PhraseColors.Of(kind);
 
-        /// <summary>The grid's steps faintly, then the beat and measure lines, with the measures' numbers in the labels' margin.</summary>
-        private void DrawBeats(DrawingContext context, EditorSession session, TempoMap map, LaneProjection projection, double fromTick, double toTick, Size size)
+        /// <summary>
+        /// What the labels' margin and the lines across the lanes are made of, which a perspective highway draws apart: the lines lie on
+        /// the plane, and the text beside them stands up, to be read.
+        /// </summary>
+        [Flags]
+        private enum RailPass
         {
+            Lines = 1,
+            Text = 2,
+            Both = Lines | Text,
+        }
+
+        /// <summary>What the song layer draws of the rail: all of it on a flat highway, the lines alone on a perspective one.</summary>
+        private RailPass RailOnPlane => _camera is null ? RailPass.Both : RailPass.Lines;
+
+        /// <summary>The grid's steps faintly, then the beat and measure lines, with the measures' numbers in the labels' margin.</summary>
+        private void DrawBeats(DrawingContext context, EditorSession session, TempoMap map, LaneProjection projection, double fromTick, double toTick, Size size, RailPass pass)
+        {
+            bool lines = (pass & RailPass.Lines) != 0, text = (pass & RailPass.Text) != 0;
             double across1 = projection.LaneFrom, across2 = projection.LaneFrom + (projection.LaneSize * projection.Slots.Slots.Count);
             long first = (long)Math.Floor(fromTick), last = (long)Math.Ceiling(toTick);
 
             // The snap's steps, when they're far enough apart to see.
             var snap = session.Snap;
             double step = snap.StepTicks(map.Resolution);
-            if (step > 0 && Math.Abs(projection.AlongOf(session.AudioAt(first + step)) - projection.AlongOf(session.AudioAt(first))) >= 6)
+            if (lines && step > 0 && Math.Abs(projection.AlongOf(session.AudioAt(first + step)) - projection.AlongOf(session.AudioAt(first))) >= 6)
             {
                 long tick = snap.Step(Math.Max(0, first - 1), 1, map);
                 for (int guard = 0; tick <= last && guard < 4000; guard++)
@@ -2200,24 +2243,32 @@ namespace ChartBuilder.Controls.Editing
             foreach (var line in map.BeatLines(first, last))
             {
                 double along = projection.AlongOf(session.AudioAt(line.Tick));
-                HighwayChrome.DrawBeatLine(context, View, along, across1, across2, line.IsMeasure);
-                if (!line.IsMeasure)
+                if (lines)
+                    HighwayChrome.DrawBeatLine(context, View, along, across1, across2, line.IsMeasure);
+                if (!text || !line.IsMeasure)
                     continue;
 
                 int number = _measures.BinarySearch(line.Tick);
                 if (number < 0)
                     continue;
-                var text = Label(MeasureNumber(number), 10, LabelBrush ?? DefaultLabelBrush);
+                var numberText = Label(MeasureNumber(number), 10, LabelBrush ?? DefaultLabelBrush);
+                if (!lines)
+                {
+                    DrawStandingLabel(context, numberText, new Point(labels.Right - 4, along), rightAligned: true);
+                    continue;
+                }
+
                 var at = View == LaneView.Highway
-                    ? new Point(labels.Right - text.Width - 4, along - text.Height)
-                    : new Point(along + 3, labels.Bottom - text.Height - 1);
-                text.Draw(context, at);
+                    ? new Point(labels.Right - numberText.Width - 4, along - numberText.Height)
+                    : new Point(along + 3, labels.Bottom - numberText.Height - 1);
+                numberText.Draw(context, at);
             }
         }
 
         /// <summary>The tempo markers: a line across the lanes, the tempo and any time signature in the labels' margin, and whether each is anchored.</summary>
-        private void DrawTempoMarkers(DrawingContext context, EditorSession session, LaneProjection projection, double fromTick, double toTick, Size size)
+        private void DrawTempoMarkers(DrawingContext context, EditorSession session, LaneProjection projection, double fromTick, double toTick, Size size, RailPass pass)
         {
+            bool lines = (pass & RailPass.Lines) != 0, texts = (pass & RailPass.Text) != 0;
             var tempoMap = session.Chart.TempoMap;
             var labels = LabelsArea(size, projection);
             double across1 = projection.LaneFrom, across2 = projection.LaneFrom + (projection.LaneSize * projection.Slots.Slots.Count);
@@ -2226,9 +2277,18 @@ namespace ChartBuilder.Controls.Editing
             {
                 double along = projection.AlongOf(session.AudioAt(marker.Tick));
                 bool selected = session.Selection.TempoTicks.Contains(marker.Tick);
-                context.DrawLine(TempoPen, At(along, across1), At(along, across2));
+                if (lines)
+                    context.DrawLine(TempoPen, At(along, across1), At(along, across2));
+                if (!texts)
+                    continue;
 
                 var text = Label(TempoText(tempoMap, marker), 10, selected ? accent : TempoBrush);
+                if (!lines)
+                {
+                    DrawStandingLabel(context, text, new Point(labels.X + 2, along), rightAligned: false, badge: selected ? BadgeBrush : null);
+                    continue;
+                }
+
                 var at = View == LaneView.Highway
                     ? new Point(labels.X + 2, along + 1)
                     : new Point(along + 3, labels.Y + 1);
@@ -2243,9 +2303,16 @@ namespace ChartBuilder.Controls.Editing
                 if (!tempoMap.Tempos.At(signature.Tick).IsEmpty)
                     continue;
                 double along = projection.AlongOf(session.AudioAt(signature.Tick));
-                context.DrawLine(TempoPen, At(along, across1), At(along, across2));
+                if (lines)
+                    context.DrawLine(TempoPen, At(along, across1), At(along, across2));
+                if (!texts)
+                    continue;
+
                 var text = Label(SignatureText(signature), 10, TempoBrush);
-                text.Draw(context, View == LaneView.Highway ? new Point(labels.X + 2, along + 1) : new Point(along + 3, labels.Y + 1));
+                if (!lines)
+                    DrawStandingLabel(context, text, new Point(labels.X + 2, along), rightAligned: false);
+                else
+                    text.Draw(context, View == LaneView.Highway ? new Point(labels.X + 2, along + 1) : new Point(along + 3, labels.Y + 1));
             }
         }
 
@@ -2268,8 +2335,9 @@ namespace ChartBuilder.Controls.Editing
         /// and its name in the margin. A highway's name is above the measure number, cut short to the rail's width; a
         /// timeline's is in the ruler, after the measure number and any tempo there.
         /// </summary>
-        private void DrawSections(DrawingContext context, EditorSession session, LaneProjection projection, double fromTick, double toTick, Size size)
+        private void DrawSections(DrawingContext context, EditorSession session, LaneProjection projection, double fromTick, double toTick, Size size, RailPass pass)
         {
+            bool lines = (pass & RailPass.Lines) != 0, texts = (pass & RailPass.Text) != 0;
             var labels = LabelsArea(size, projection);
             bool highway = View == LaneView.Highway;
             double across1 = highway ? labels.Left : labels.Top;
@@ -2280,7 +2348,10 @@ namespace ChartBuilder.Controls.Editing
                 if (SectionEvents.NameOf(e.Text) is not { } name)
                     continue;
                 double along = projection.AlongOf(session.AudioAt(e.Tick));
-                context.DrawLine(SectionPen, At(along, across1), At(along, across2));
+                if (lines)
+                    context.DrawLine(SectionPen, At(along, across1), At(along, across2));
+                if (!texts)
+                    continue;
 
                 // The measure number drawn at its tick, when it starts a measure.
                 int measure = _measures.BinarySearch(e.Tick);
@@ -2288,7 +2359,10 @@ namespace ChartBuilder.Controls.Editing
                 if (highway)
                 {
                     var text = Label(name, 10, SectionBrush, Math.Max(1, labels.Width - 4));
-                    text.Draw(context, new Point(labels.X + 2, along - (number?.Height ?? 0) - text.Height));
+                    if (!lines)
+                        DrawStandingLabel(context, text, new Point(labels.X + 2, along), rightAligned: false, raise: number?.Height ?? 0);
+                    else
+                        text.Draw(context, new Point(labels.X + 2, along - (number?.Height ?? 0) - text.Height));
                     continue;
                 }
 
@@ -2847,7 +2921,8 @@ namespace ChartBuilder.Controls.Editing
         /// The columns the song is playing through, lit as the inspector's highway lights them: a beam rising from the
         /// strike line and the column's target filled in, as each note reaches it, fading, and slowly over a sustain.
         /// </summary>
-        private void DrawGlow(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, LaneProjection projection, LaneSlots slots)
+        /// <param name="upright">Whether to draw what stands up on a perspective highway, the target, rather than what lies on the plane, the beam; on a flat highway all is drawn with the plane's.</param>
+        private void DrawGlow(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, LaneProjection projection, LaneSlots slots, bool upright)
         {
             var kind = track.Kind;
             bool drums = kind == ChartInstrumentKind.Drums;
@@ -2868,10 +2943,17 @@ namespace ChartBuilder.Controls.Editing
                     ? (drums ? HighwayPalette.Kick : HighwayPalette.Open)
                     : HighwayPalette.HitColor(kind, laneCount, column);
                 double edge = projection.LaneFrom + (column * projection.LaneSize);
-                HighwayChrome.DrawLitBeam(context, View, color, hit, Box(strike, strike + reach, edge, edge + projection.LaneSize));
+                if (!upright)
+                    HighwayChrome.DrawLitBeam(context, View, color, hit, Box(strike, strike + reach, edge, edge + projection.LaneSize));
 
                 // The target, as opaque as the column is lit.
-                HighwayChrome.DrawLitTarget(context, _gems, GemRect(projection, column, strike, size), color, hit);
+                if (upright != (_camera is null))
+                {
+                    if (upright)
+                        DrawLitTargetUpright(context, GemRect(projection, column, strike, size), color, hit);
+                    else
+                        HighwayChrome.DrawLitTarget(context, _gems, GemRect(projection, column, strike, size), color, hit);
+                }
             }
         }
 
@@ -2925,7 +3007,7 @@ namespace ChartBuilder.Controls.Editing
             NotePainter.GemRect(projection, column, along, size, _alongLimit.From, _alongLimit.To);
 
         private double GemSize(LaneProjection projection) => View == LaneView.Highway
-            ? Math.Clamp(projection.LaneSize * 0.32, 8, 18)
+            ? Math.Clamp(projection.LaneSize * 0.32, 8, _camera is null ? 18 : MaxPerspectiveGemSize)
             : Math.Clamp(projection.LaneSize * 0.9, 8, 16);
 
         /// <summary>

@@ -24,10 +24,12 @@ namespace ChartBuilder.Controls.Editing
         public static readonly StyledProperty<IBrush?> FadeBrushProperty =
             AvaloniaProperty.Register<PerspectiveHost, IBrush?>(nameof(FadeBrush));
 
-        // The notes, and above them what follows the pointer, so the pointer's moving doesn't draw every note again.
-        private readonly GemOverlay _overlay = new(GemLayer.Notes) { ZIndex = 1 };
-        private readonly GemOverlay _marks = new(GemLayer.Marks) { ZIndex = 2 };
-        private readonly Border _fade = new() { ZIndex = 3, IsHitTestVisible = false, IsVisible = false };
+        // What stands up at the strike line, under the notes that go by it; the notes; and above them what follows the pointer, so
+        // the pointer's moving doesn't draw every note again.
+        private readonly GemOverlay _targets = new(GemLayer.Targets) { ZIndex = 1 };
+        private readonly GemOverlay _overlay = new(GemLayer.Notes) { ZIndex = 2 };
+        private readonly GemOverlay _marks = new(GemLayer.Marks) { ZIndex = 3 };
+        private readonly Border _fade = new() { ZIndex = 4, IsHitTestVisible = false, IsVisible = false };
 
         // A brush recoloured in place, as a themed one fades, leaves the fade in its old colour: build it again.
         private readonly BrushWatch _fadeWatch;
@@ -43,6 +45,7 @@ namespace ChartBuilder.Controls.Editing
         public PerspectiveHost()
         {
             _fadeWatch = new BrushWatch(InvalidateArrange);
+            Children.Add(_targets);
             Children.Add(_overlay);
             Children.Add(_marks);
             Children.Add(_fade);
@@ -87,6 +90,7 @@ namespace ChartBuilder.Controls.Editing
             if (Canvas is { } canvas)
             {
                 canvas.Camera = camera;
+                _targets.Canvas = canvas;
                 _overlay.Canvas = canvas;
                 _marks.Canvas = canvas;
                 if (camera is null)
@@ -104,6 +108,8 @@ namespace ChartBuilder.Controls.Editing
                 }
             }
 
+            _targets.IsVisible = camera is not null;
+            _targets.Arrange(new Rect(finalSize));
             _overlay.IsVisible = camera is not null;
             _overlay.Arrange(new Rect(finalSize));
             _marks.IsVisible = camera is not null;
@@ -147,6 +153,9 @@ namespace ChartBuilder.Controls.Editing
         /// <summary>What a layer above the tilted canvas draws.</summary>
         private enum GemLayer
         {
+            /// <summary>The targets at the strike line, lit and pressed, which the notes go by.</summary>
+            Targets,
+
             /// <summary>The notes the canvas stands up.</summary>
             Notes,
 
@@ -176,6 +185,7 @@ namespace ChartBuilder.Controls.Editing
 
                     if (_canvas is not null)
                     {
+                        _canvas.GemTargetsInvalidated -= InvalidateVisual;
                         _canvas.GemsInvalidated -= InvalidateVisual;
                         _canvas.GemMarksInvalidated -= InvalidateVisual;
                     }
@@ -184,7 +194,9 @@ namespace ChartBuilder.Controls.Editing
                     if (_canvas is not null)
                     {
                         // Each layer follows its own: the notes are drawn again as they change, the marks as the pointer does.
-                        if (_layer == GemLayer.Notes)
+                        if (_layer == GemLayer.Targets)
+                            _canvas.GemTargetsInvalidated += InvalidateVisual;
+                        else if (_layer == GemLayer.Notes)
                             _canvas.GemsInvalidated += InvalidateVisual;
                         else
                             _canvas.GemMarksInvalidated += InvalidateVisual;
@@ -196,7 +208,9 @@ namespace ChartBuilder.Controls.Editing
 
             public override void Render(DrawingContext context)
             {
-                if (_layer == GemLayer.Notes)
+                if (_layer == GemLayer.Targets)
+                    _canvas?.PaintGemTargets(context);
+                else if (_layer == GemLayer.Notes)
                     _canvas?.PaintGems(context);
                 else
                     _canvas?.PaintGemMarks(context);

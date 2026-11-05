@@ -45,22 +45,13 @@ namespace ChartBuilder.Controls.Editing
             if (PlaytestOf(key) is not { } run)
                 return;
             bool drums = ChartInstruments.KindOf(key.Instrument) == ChartInstrumentKind.Drums;
-            var (fromTick, toTick) = TicksOf(session, screen);
             double size = GemSize(screen);
             var lanes = LanesOf(screen, slots);
             using (context.PushClip(lanes))
             {
-                foreach (var ((tick, lane), mark) in run.Marks)
-                {
-                    if (mark.Kind == JudgeKind.Hit || tick < fromTick - 1 || tick > toTick + 1)
-                        continue;
-                    if (MarkRect(screen, slots, ShownOf(lane, drums), screen.AlongOf(session.AudioAt(tick)), size) is not { } rect)
-                        continue;
-                    if (mark.Kind == JudgeKind.Miss)
-                        DrawCross(context, MissPen, rect);
-                    else
-                        context.DrawLine(DropPen, rect.BottomLeft, rect.TopRight);
-                }
+                // On a perspective highway the notes stand over their places on the plane, so their marks stand up too.
+                if (_camera is null)
+                    DrawPlaytestMarks(context, session, key, run, slots, screen, upright: false);
 
                 foreach (var stray in run.Strays)
                 {
@@ -75,6 +66,37 @@ namespace ChartBuilder.Controls.Editing
             }
 
             DrawTimingMeter(context, session, run, screen, lanes);
+        }
+
+        /// <summary>A mark on each note missed or sustain dropped, which stays until the note is played again or the playtest is cleared.</summary>
+        /// <param name="upright">Whether the marks are drawn standing up on the notes of a perspective highway, rather than flat.</param>
+        private void DrawPlaytestMarks(DrawingContext context, EditorSession session, ChartTrackKey key, PlaytestRun run, LaneSlots slots, LaneProjection screen, bool upright)
+        {
+            bool drums = ChartInstruments.KindOf(key.Instrument) == ChartInstrumentKind.Drums;
+            var (fromTick, toTick) = TicksOf(session, screen);
+            double size = GemSize(screen);
+            foreach (var ((tick, lane), mark) in run.Marks)
+            {
+                if (mark.Kind == JudgeKind.Hit || tick < fromTick - 1 || tick > toTick + 1)
+                    continue;
+                if (MarkRect(screen, slots, ShownOf(lane, drums), screen.AlongOf(session.AudioAt(tick)), size) is not { } rect)
+                    continue;
+                if (mark.Kind == JudgeKind.Miss)
+                {
+                    if (upright)
+                        _upright.DrawCross(context, rect, MissPen);
+                    else
+                        DrawCross(context, MissPen, rect);
+                }
+                else if (upright)
+                {
+                    _upright.DrawSlash(context, rect, DropPen);
+                }
+                else
+                {
+                    context.DrawLine(DropPen, rect.BottomLeft, rect.TopRight);
+                }
+            }
         }
 
         /// <summary>
@@ -120,8 +142,11 @@ namespace ChartBuilder.Controls.Editing
         /// The frets and pads pressed, on their targets at the strike line, as the games show theirs: a fret while it's held,
         /// a pad or the kick as it's hit, and the strum across the lanes.
         /// </summary>
-        private void DrawPresses(DrawingContext context, EditorSession session, ChartTrackKey key, LaneProjection projection, LaneSlots slots)
+        /// <param name="upright">Whether this is the pass that draws what stands up on a perspective highway; a flat highway's only pass is the plane's.</param>
+        private void DrawPresses(DrawingContext context, EditorSession session, ChartTrackKey key, LaneProjection projection, LaneSlots slots, bool upright)
         {
+            if (upright != (_camera is not null))
+                return;
             var playtest = _editor!.Playtest;
             var kind = ChartInstruments.KindOf(key.Instrument);
             bool drums = kind == ChartInstrumentKind.Drums;
@@ -139,7 +164,7 @@ namespace ChartBuilder.Controls.Editing
                 var rect = GemRect(projection, column, strike, size).Inflate(2);
                 double radius = GemPainter.CornerOf(rect);
                 using (context.PushOpacity(pressed))
-                    context.DrawRectangle(_gems.Brush(HighwayPalette.WithAlpha(color, 0x70)), _gems.Pen(HighwayPalette.Lighten(color, 0.55), 2.5), rect, radius, radius);
+                    DrawTargetShape(context, rect, _gems.Brush(HighwayPalette.WithAlpha(color, 0x70)), _gems.Pen(HighwayPalette.Lighten(color, 0.55), 2.5), radius, upright);
             }
 
             // The kick, or the strum, across a highway's lanes.
@@ -148,13 +173,16 @@ namespace ChartBuilder.Controls.Editing
                 var color = drums ? HighwayPalette.Kick : HighwayPalette.Open;
                 var rect = AcrossBar(projection, slots, strike, size);
                 using (context.PushOpacity(bar * 0.8))
-                    context.DrawRectangle(_gems.Brush(HighwayPalette.WithAlpha(color, 0xB0)), null, rect, rect.Height / 2, rect.Height / 2);
+                    DrawTargetShape(context, rect, _gems.Brush(HighwayPalette.WithAlpha(color, 0xB0)), null, rect.Height / 2, upright);
             }
         }
 
         /// <summary>A ring bursting out of each target a note was just hit on, brighter than the column's glow.</summary>
-        private void DrawHitBursts(DrawingContext context, EditorSession session, ChartTrackKey key, PlaytestRun run, LaneProjection projection, LaneSlots slots)
+        /// <param name="upright">Whether this is the pass that draws what stands up on a perspective highway; a flat highway's only pass is the plane's.</param>
+        private void DrawHitBursts(DrawingContext context, EditorSession session, ChartTrackKey key, PlaytestRun run, LaneProjection projection, LaneSlots slots, bool upright)
         {
+            if (upright != (_camera is not null))
+                return;
             var kind = ChartInstruments.KindOf(key.Instrument);
             bool drums = kind == ChartInstrumentKind.Drums;
             int laneCount = drums ? slots.Slots.Count - (slots.Across is null ? 1 : 0) : 5;
@@ -195,7 +223,7 @@ namespace ChartBuilder.Controls.Editing
                     double radius = GemPainter.CornerOf(ring);
                     var fill = HighwayPalette.WithAlpha(HighwayPalette.Lighten(color, 0.8), (byte)(0x90 * (1 - grown)));
                     using (context.PushOpacity(1 - grown))
-                        context.DrawRectangle(_gems.Brush(fill), _gems.Pen(HighwayPalette.Lighten(color, 0.6), (3 * (1 - grown)) + 1), ring, radius, radius);
+                        DrawTargetShape(context, ring, _gems.Brush(fill), _gems.Pen(HighwayPalette.Lighten(color, 0.6), (3 * (1 - grown)) + 1), radius, upright);
                 }
             }
         }

@@ -226,6 +226,38 @@ namespace ChartShared.UI.Controls.Highway
                 context.DrawRectangle(brush, pen, stand.Silhouette.Inflate(1), stand.RadiusX, stand.RadiusY);
         }
 
+        /// <summary>An X across the face of the note standing in <paramref name="rect"/>: a playtest's missed note.</summary>
+        public void DrawCross(DrawingContext context, Rect rect, IPen pen)
+        {
+            if (FaceOf(rect) is not { } face)
+                return;
+
+            context.DrawLine(pen, face.TopLeft, face.BottomRight);
+            context.DrawLine(pen, face.TopRight, face.BottomLeft);
+        }
+
+        /// <summary>A slash across the face of the note standing in <paramref name="rect"/>: a playtest's dropped sustain.</summary>
+        public void DrawSlash(DrawingContext context, Rect rect, IPen pen)
+        {
+            if (FaceOf(rect) is { } face)
+                context.DrawLine(pen, face.BottomLeft, face.TopRight);
+        }
+
+        /// <summary>The square, on the screen, a mark is drawn in across the note standing in <paramref name="rect"/>: as wide as its box is tall, for it is seen from the front and above.</summary>
+        private Rect? FaceOf(Rect rect)
+        {
+            if (Camera is null)
+                return null;
+
+            var stand = StandOf(rect, RiseOf(rect));
+            if (!IsShown(stand))
+                return null;
+
+            var seen = stand.Silhouette;
+            double side = Math.Min(seen.Width, seen.Height);
+            return new Rect(seen.Center.X - (side / 2), seen.Center.Y - (side / 2), side, side).Deflate(1);
+        }
+
         /// <summary>
         /// Where on the screen the note drawn in <paramref name="rect"/> is, from the top of its box to the near edge of its floor,
         /// or null with no camera or when it is off the screen.
