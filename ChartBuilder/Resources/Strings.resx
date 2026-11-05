@@ -1004,6 +1004,18 @@ Open it anyway?</value>
     <value>view highway timeline horizontal vertical lane</value>
     <comment>Search words for the default view setting, separated by spaces.</comment>
   </data>
+  <data name="DefaultEditorPerspectiveLabel" xml:space="preserve">
+    <value>Perspective Highways</value>
+    <comment>A setting: whether a highway lane opens tilted back in perspective, as the games show it.</comment>
+  </data>
+  <data name="DefaultEditorPerspectiveDescription" xml:space="preserve">
+    <value>Whether a highway lane opens in perspective, tilted back with the notes standing up on it as in YARG and Clone Hero, rather than flat. V steps the focused lane through a flat highway, perspective and a timeline.</value>
+    <comment>The perspective highways setting's description.</comment>
+  </data>
+  <data name="DefaultEditorPerspectiveKeywords" xml:space="preserve">
+    <value>perspective highway 3d tilt tilted yarg clone hero view lane</value>
+    <comment>Search words for the perspective highways setting, separated by spaces.</comment>
+  </data>
   <data name="EditorViewHighway" xml:space="preserve">
     <value>Highway</value>
     <comment>A lane's view: vertical, time running upwards.</comment>
@@ -1135,6 +1147,10 @@ Open it anyway?</value>
   <data name="LaneShowHighwayToolTip" xml:space="preserve">
     <value>Show as a highway</value>
     <comment>A lane's button tooltip: switch the lane to the vertical highway view.</comment>
+  </data>
+  <data name="LaneShowPerspectiveToolTip" xml:space="preserve">
+    <value>Show as a highway in perspective</value>
+    <comment>A lane's button tooltip: switch the lane to the highway tilted back in perspective, with the notes standing up.</comment>
   </data>
   <data name="LaneShowTimelineToolTip" xml:space="preserve">
     <value>Show as a timeline</value>
@@ -4505,8 +4521,8 @@ Saving also changes song.ini:
     <comment>Name of the Nudge to onsets shortcut, in the keyboard shortcuts list.</comment>
   </data>
   <data name="KeyActionToggleView" xml:space="preserve">
-    <value>Highway or Timeline</value>
-    <comment>Name of the Highway or timeline shortcut, in the keyboard shortcuts list.</comment>
+    <value>Highway, Perspective or Timeline</value>
+    <comment>Name of the shortcut that steps a lane through the flat highway, the highway in perspective and the timeline, in the keyboard shortcuts list.</comment>
   </data>
   <data name="KeyActionTapTempo" xml:space="preserve">
     <value>Tap Tempo</value>

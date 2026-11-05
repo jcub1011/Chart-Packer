@@ -277,6 +277,8 @@ namespace ChartBuilder.Controls.Editing
         protected EditorCanvas()
         {
             _notePainter = new NotePainter(_gems);
+            _upright = new UprightGemPainter(_gems);
+            _uprightNotes = new NotePainter(_upright);
             _gestures = new ViewportGestures(this, new ViewportHost(this), new ScrubBinding(MouseButton.Middle, KeyModifiers.Shift), WatchesKeys);
             _decorations = new NoteDecorations(this);
             _song = new Layer(this, LayerKind.Song);
@@ -574,28 +576,36 @@ namespace ChartBuilder.Controls.Editing
             FillPage(context, projection);
             using (context.PushClip(LanesOf(projection, slots)))
             {
-                if (lane.Ghost is { } ghost)
-                {
-                    var ghostKey = new ChartTrackKey(key.Instrument, ghost);
-                    using (context.PushOpacity(0.28))
-                        DrawNotes(context, session, ghostKey, part[ghost], projection, slots, fromTick, toTick, LongestOf(ref _ghostLongest, ghostKey, part[ghost]), isGhost: true);
-                }
-
-                // A draft not yet added (Reduce, record mode) over the notes it would replace, which fade behind it.
-                long longest = LongestOf(ref _longest, key, track);
-                if (session.GhostTrack(key) is { } draft)
-                {
-                    using (context.PushOpacity(0.3))
-                        DrawNotes(context, session, key, track, projection, slots, fromTick, toTick, longest, isGhost: false);
-                    DrawNotes(context, session, key, draft, projection, slots, fromTick, toTick, LongestIn(draft), isGhost: true);
-                }
-                else
-                {
-                    DrawNotes(context, session, key, track, projection, slots, fromTick, toTick, longest, isGhost: false);
-                }
-
+                // On a perspective highway the notes stand up in a layer of their own (see PaintGems): only their tails lie here.
+                DrawNoteSets(context, session, lane, key, track, part, projection, slots, fromTick, toTick, _notePainter, _camera is null ? NotePass.All : NotePass.Tails);
                 FindPhrasesShown(part, fromTick, toTick);
                 DrawSoloCounts(context, session, track, projection, fromTick, toTick);
+            }
+        }
+
+        /// <summary>
+        /// The notes <paramref name="painter"/> draws, in <paramref name="pass"/>: the ghost difficulty's, and the track's own,
+        /// or a draft not yet added (Reduce, record mode) over the notes it would replace, which fade behind it.
+        /// </summary>
+        private void DrawNoteSets(DrawingContext context, EditorSession session, EditorLaneViewModel lane, ChartTrackKey key, EditableTrack track, EditablePart part, LaneProjection projection, LaneSlots slots, double fromTick, double toTick, NotePainter painter, NotePass pass)
+        {
+            if (lane.Ghost is { } ghost)
+            {
+                var ghostKey = new ChartTrackKey(key.Instrument, ghost);
+                using (context.PushOpacity(0.28))
+                    DrawNotes(context, session, ghostKey, part[ghost], projection, slots, fromTick, toTick, LongestOf(ref _ghostLongest, ghostKey, part[ghost]), isGhost: true, painter, pass);
+            }
+
+            long longest = LongestOf(ref _longest, key, track);
+            if (session.GhostTrack(key) is { } draft)
+            {
+                using (context.PushOpacity(0.3))
+                    DrawNotes(context, session, key, track, projection, slots, fromTick, toTick, longest, isGhost: false, painter, pass);
+                DrawNotes(context, session, key, draft, projection, slots, fromTick, toTick, LongestIn(draft), isGhost: true, painter, pass);
+            }
+            else
+            {
+                DrawNotes(context, session, key, track, projection, slots, fromTick, toTick, longest, isGhost: false, painter, pass);
             }
         }
 
@@ -754,6 +764,9 @@ namespace ChartBuilder.Controls.Editing
                 _notes.Redraw();
             }
 
+            // The notes standing up on a perspective highway aren't on the page, so they are drawn again for every move.
+            RedrawGems();
+
             // A vocal part lights the note and the phrase on the strike line wherever the cursor stops, not only as it plays.
             bool vocal = _lane is { Vocal: not null };
             if (_editor?.Playback.IsPlaying == true || vocal)
@@ -814,8 +827,11 @@ namespace ChartBuilder.Controls.Editing
         {
             private readonly Painter _painter;
 
+            private readonly EditorCanvas _owner;
+
             public Layer(EditorCanvas owner, LayerKind kind)
             {
+                _owner = owner;
                 Kind = kind;
                 IsHitTestVisible = false;
                 _painter = new Painter(owner, this);
@@ -833,8 +849,13 @@ namespace ChartBuilder.Controls.Editing
                 return finalSize;
             }
 
-            /// <summary>Has this drawn again.</summary>
-            public void Redraw() => _painter.InvalidateVisual();
+            /// <summary>Has this drawn again; and the notes standing up on a perspective highway, with the layer that draws their tails.</summary>
+            public void Redraw()
+            {
+                _painter.InvalidateVisual();
+                if (Kind == LayerKind.Notes)
+                    _owner.RedrawGems();
+            }
 
             /// <summary>Drawn on <paramref name="page"/>, moved to show what <paramref name="screen"/> shows.</summary>
             public void Show(LanePage page, LaneProjection screen)
@@ -1251,7 +1272,8 @@ namespace ChartBuilder.Controls.Editing
         {
             Dispatcher.UIThread.Post(() =>
             {
-                if ((this.GetVisualParent() as Panel)?.Children.OfType<EditorCanvas>().FirstOrDefault(c => c.IsVisible) is { } shown)
+                // The highway's canvas may be inside a perspective host, so look through the whole lane.
+                if (this.FindAncestorOfType<EditorLane>()?.GetVisualDescendants().OfType<EditorCanvas>().FirstOrDefault(c => c.IsVisible) is { } shown)
                     shown.Focus();
             });
         }
@@ -2274,7 +2296,7 @@ namespace ChartBuilder.Controls.Editing
         }
 
         /// <param name="longest">The longest note's length in <paramref name="track"/>, so a sustain begun before the view is drawn.</param>
-        private void DrawNotes(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, LaneProjection projection, LaneSlots slots, double fromTick, double toTick, long longest, bool isGhost)
+        private void DrawNotes(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, LaneProjection projection, LaneSlots slots, double fromTick, double toTick, long longest, bool isGhost, NotePainter painter, NotePass pass)
         {
             var kind = track.Kind;
             bool drums = kind == ChartInstrumentKind.Drums;
@@ -2366,8 +2388,8 @@ namespace ChartBuilder.Controls.Editing
             }
 
             _flagged.Clear();
-            _decorations.Begin(session, key, track, projection, slots, AccentPens().Selected, isGhost);
-            _notePainter.Draw(context, projection, kind, CollectionsMarshal.AsSpan(glyphs), size, _decorations, _alongLimit.From, _alongLimit.To);
+            _decorations.Begin(session, key, track, projection, slots, AccentPens().Selected, isGhost, upright: ReferenceEquals(painter, _uprightNotes));
+            painter.Draw(context, projection, kind, CollectionsMarshal.AsSpan(glyphs), size, _decorations, _alongLimit.From, _alongLimit.To, pass);
         }
 
         /// <summary>What the editor draws over its notes, and in place of a short sustain's tail: its selection rings and forcing marks.</summary>
@@ -2381,13 +2403,14 @@ namespace ChartBuilder.Controls.Editing
             private LaneSlots? _slots;
             private IPen? _selectedPen;
             private bool _isGhost;
+            private bool _isUpright;
 
             public NoteDecorations(EditorCanvas canvas)
             {
                 _canvas = canvas;
             }
 
-            public void Begin(EditorSession session, ChartTrackKey key, EditableTrack track, LaneProjection projection, LaneSlots slots, IPen selectedPen, bool isGhost)
+            public void Begin(EditorSession session, ChartTrackKey key, EditableTrack track, LaneProjection projection, LaneSlots slots, IPen selectedPen, bool isGhost, bool upright)
             {
                 _session = session;
                 _key = key;
@@ -2396,6 +2419,7 @@ namespace ChartBuilder.Controls.Editing
                 _slots = slots;
                 _selectedPen = selectedPen;
                 _isGhost = isGhost;
+                _isUpright = upright;
             }
 
             public void DrawDashedTail(DrawingContext context, in NoteGlyph glyph, Rect tail) =>
@@ -2409,9 +2433,20 @@ namespace ChartBuilder.Controls.Editing
                 var note = _canvas._glyphNotes[glyph.Index];
                 bool across = glyph.Has(NoteGlyphParts.Across);
                 if (_session!.Selection.IsMarked(_key, note))
-                    context.DrawRectangle(null, _selectedPen, rect.Inflate(2), 3, 3);
+                {
+                    if (_isUpright)
+                        _canvas._upright.DrawSelection(context, rect, _selectedPen!);
+                    else
+                        context.DrawRectangle(null, _selectedPen, rect.Inflate(2), 3, 3);
+                }
+
                 if (!across && _track!.Kind != ChartInstrumentKind.Drums && _canvas._flagged.Add(note.Tick) && _track.FlagsAt(note.Tick) is var flags and not ChordFlags.None)
-                    _canvas.DrawForcing(context, _projection!, _slots!, glyph.Along, flags);
+                {
+                    if (_isUpright)
+                        _canvas.DrawForcingUpright(context, _projection!, _slots!, glyph.Along, flags);
+                    else
+                        _canvas.DrawForcing(context, _projection!, _slots!, glyph.Along, flags);
+                }
             }
         }
 

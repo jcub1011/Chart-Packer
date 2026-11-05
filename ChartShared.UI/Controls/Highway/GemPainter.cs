@@ -11,20 +11,20 @@ namespace ChartShared.UI.Controls.Highway
     /// Draws notes as the games show them: two-tone gems, HOPO and tap marks, cymbals, open-note and kick bars, and
     /// sustain tails. Each control that draws notes keeps one, for its brushes, pens and cymbal shapes.
     /// </summary>
-    public sealed class GemPainter
+    public sealed class GemPainter : IGemPainter
     {
-        private static readonly IPen OutlinePen = new ImmutablePen(Color.FromArgb(0xA0, 0x00, 0x00, 0x00).ToUInt32(), 1);
-        private static readonly IBrush HopoMarkBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xF2, 0xFF, 0xFF, 0xFF));
-        private static readonly IBrush TapBodyBrush = new ImmutableSolidColorBrush(Color.FromRgb(0x16, 0x16, 0x1B));
-        private static readonly IPen RingShadowPen = new ImmutablePen(Color.FromArgb(0xC0, 0x00, 0x00, 0x00).ToUInt32(), 4);
+        internal static readonly IPen OutlinePen = new ImmutablePen(Color.FromArgb(0xA0, 0x00, 0x00, 0x00).ToUInt32(), 1);
+        internal static readonly IBrush HopoMarkBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xF2, 0xFF, 0xFF, 0xFF));
+        internal static readonly IBrush TapBodyBrush = new ImmutableSolidColorBrush(Color.FromRgb(0x16, 0x16, 0x1B));
+        internal static readonly IPen RingShadowPen = new ImmutablePen(Color.FromArgb(0xC0, 0x00, 0x00, 0x00).ToUInt32(), 4);
 
         // How opaque a ghost note's face is, and its edge's dashes and the gaps between them, in pixels.
-        private const double GhostOpacity = 0.45;
-        private const double GhostDash = 2;
-        private const double GhostGap = 1.5;
+        internal const double GhostOpacity = 0.45;
+        internal const double GhostDash = 2;
+        internal const double GhostGap = 1.5;
 
         // How far a HOPO open's bar is lightened toward white, all over, instead of a white strip.
-        private const double HopoOpenLighten = 0.9;
+        internal const double HopoOpenLighten = 0.9;
 
         private readonly Dictionary<Color, IBrush> _brushes = [];
         private readonly Dictionary<(Color, double), IPen> _pens = [];

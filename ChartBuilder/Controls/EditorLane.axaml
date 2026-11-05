@@ -356,8 +356,10 @@
                                 Command="{Binding ToggleViewCommand}"
                                 kb:Shortcut.Tip="{Binding ViewToolTip}" kb:Shortcut.Action="{x:Static svc:BuilderKeys.ToggleView}"
                                 AutomationProperties.Name="{Binding ViewToolTip}">
+                            <!-- The button shows the view it switches to: a flat highway goes to perspective, which goes to the timeline, which goes back. -->
                             <Panel>
-                                <PathIcon Width="14" Height="14" Data="{StaticResource WaveformIconGeometry}" IsVisible="{Binding !IsTimeline}" />
+                                <PathIcon Width="14" Height="14" Data="{StaticResource PerspectiveIconGeometry}" IsVisible="{Binding IsFlatHighway}" />
+                                <PathIcon Width="14" Height="14" Data="{StaticResource WaveformIconGeometry}" IsVisible="{Binding IsPerspective}" />
                                 <PathIcon Width="14" Height="14" Data="{StaticResource HighwayIconGeometry}" IsVisible="{Binding IsTimeline}" />
                             </Panel>
                         </Button>
@@ -378,7 +380,8 @@
                                     <MenuItem Header="{Binding ViewToolTip}" Command="{Binding ToggleViewCommand}">
                                         <MenuItem.Icon>
                                             <Panel>
-                                                <PathIcon Width="14" Height="14" Data="{StaticResource WaveformIconGeometry}" IsVisible="{Binding !IsTimeline}" />
+                                                <PathIcon Width="14" Height="14" Data="{StaticResource PerspectiveIconGeometry}" IsVisible="{Binding IsFlatHighway}" />
+                                                <PathIcon Width="14" Height="14" Data="{StaticResource WaveformIconGeometry}" IsVisible="{Binding IsPerspective}" />
                                                 <PathIcon Width="14" Height="14" Data="{StaticResource HighwayIconGeometry}" IsVisible="{Binding IsTimeline}" />
                                             </Panel>
                                         </MenuItem.Icon>
@@ -415,10 +418,15 @@
         </Border>
 
         <Panel>
-            <edit:HighwayEditorCanvas IsVisible="{Binding ShowsHighway}"
-                                      WheelUpIsLater="{Binding Editor.WheelUpIsLater}"
-                                      AccentBrush="{DynamicResource AccentTextBrush}"
-                                      LabelBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
+            <!-- The highway, flat or tilted back in perspective, which fades into the lane's background. -->
+            <edit:PerspectiveHost IsVisible="{Binding ShowsHighway}"
+                                  IsPerspective="{Binding IsPerspective}"
+                                  FadeBrush="{DynamicResource SurfaceBrush}">
+                <edit:HighwayEditorCanvas IsVisible="{Binding ShowsHighway}"
+                                          WheelUpIsLater="{Binding Editor.WheelUpIsLater}"
+                                          AccentBrush="{DynamicResource AccentTextBrush}"
+                                          LabelBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
+            </edit:PerspectiveHost>
             <edit:TimelineEditorCanvas IsVisible="{Binding ShowsTimeline}"
                                        WheelUpIsLater="{Binding Editor.WheelUpIsLater}"
                                        AccentBrush="{DynamicResource AccentTextBrush}"

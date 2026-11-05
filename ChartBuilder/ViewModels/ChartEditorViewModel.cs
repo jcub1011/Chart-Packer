@@ -173,6 +173,9 @@ namespace ChartBuilder.ViewModels
         /// <summary>The view a lane opens in.</summary>
         public LaneView DefaultView => _settings.Settings.DefaultEditorView;
 
+        /// <summary>Whether a highway lane opens in perspective: the setting's.</summary>
+        public bool DefaultPerspective => _settings.Settings.DefaultEditorPerspective;
+
         /// <summary>The look-ahead of a lane that hasn't had its own set: the highway speed setting's.</summary>
         public double DefaultLookAhead => HighwayLookAhead.Clamp(BuilderSettings.LookAheadAtSpeedOne / _settings.Settings.EditorHighwaySpeed);
 
