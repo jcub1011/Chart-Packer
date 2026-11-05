@@ -2996,8 +2996,10 @@ namespace ChartBuilder.Controls.Editing
         private Rect GemRect(LaneProjection projection, int column, double along, double size) =>
             NotePainter.GemRect(projection, column, along, size, _alongLimit.From, _alongLimit.To);
 
+        // A highway's gem is as deep as its lane is long, not as wide as its lane is: measured on the canvas, not the projection, which
+        // a page widens. In perspective the lane is as tall as the host, not the plane, which reaches up past it.
         private double GemSize(LaneProjection projection) => View == LaneView.Highway
-            ? Math.Clamp(projection.LaneSize * 0.32, 8, _camera is null ? 18 : MaxPerspectiveGemSize)
+            ? GemDepth.For(_camera is { } camera ? camera.HostHeight : Bounds.Height, perspective: _camera is not null)
             : Math.Clamp(projection.LaneSize * 0.9, 8, 16);
 
         /// <summary>

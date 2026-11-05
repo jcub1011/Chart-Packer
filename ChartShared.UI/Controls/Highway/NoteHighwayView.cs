@@ -249,9 +249,8 @@ namespace ChartShared.UI.Controls.Highway
         private const double FlatStrikeFraction = 0.87;
         private const double PerspectiveStrikeFraction = 1 - EditorViewport.PerspectiveStrikeFraction;
 
-        // In perspective, how wide a highway gets at the most, in pixels of the plane, and how deep a gem, as in the editor's.
+        // In perspective, how wide a highway gets at the most, in pixels of the plane, as in the editor's.
         private const double MaxPerspectiveHighway = 480;
-        private const double MaxPerspectiveGem = 34;
 
         private double StrikeFraction => _camera is null ? FlatStrikeFraction : PerspectiveStrikeFraction;
 
@@ -515,7 +514,7 @@ namespace ChartShared.UI.Controls.Highway
             double strike = height * StrikeFraction;
 
             int count = scene.Lanes.Count;
-            double gem = GemSizeOf(scene, strike);
+            double gem = GemSizeOf(strike);
 
             var waveforms = Waveforms;
             for (int i = 0; i < count; i++)
@@ -1037,11 +1036,14 @@ namespace ChartShared.UI.Controls.Highway
         /// <summary>The time the highway is drawn at this frame, in seconds: the clock as it was read for it, not read again.</summary>
         private double NowSeconds => (_drawnAt != TimeSpan.MinValue ? _drawnAt : Clock?.Invoke() ?? TimeSpan.Zero).TotalSeconds;
 
-        /// <summary>One gem size for every highway, from the narrowest lanes, leaving room for the names below the strike bar.</summary>
-        private double GemSizeOf(HighwayScene scene, double strike)
+        /// <summary>
+        /// One gem size for every highway: as deep as the highway is long, as in the editor (<see cref="GemDepth"/>), whatever its width.
+        /// Flat, it is kept to the room the names below the strike bar leave; in perspective the names stand up beside the plane.
+        /// </summary>
+        private double GemSizeOf(double strike)
         {
-            double narrowest = HighwayRect(scene, 0).Width / scene.MaxLaneCount;
-            return Math.Clamp(narrowest * 0.42, 5, Math.Max(5, Math.Min(_camera is null ? 18 : MaxPerspectiveGem, (Bounds.Height - strike - 13) / 0.9)));
+            double depth = GemDepth.For(_camera is { } camera ? camera.HostHeight : Bounds.Height, perspective: _camera is not null);
+            return _camera is null ? Math.Max(5, Math.Min(depth, (Bounds.Height - strike - 13) / 0.9)) : depth;
         }
 
         /// <summary>Where the song is drawn down <paramref name="lane"/>, with what's past the strike line shown for as long as it takes to fall off the bottom.</summary>
@@ -1101,7 +1103,7 @@ namespace ChartShared.UI.Controls.Highway
             double now = NowSeconds;
             double lookAhead = EffectiveLookAhead;
             double strike = Bounds.Height * StrikeFraction;
-            double gem = GemSizeOf(scene, strike);
+            double gem = GemSizeOf(strike);
             for (int i = 0; i < scene.Lanes.Count; i++)
             {
                 double overview = FadeOf(i).Opacity;

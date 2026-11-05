@@ -25,10 +25,6 @@ namespace ChartBuilder.Controls.Editing
         // The smallest a label standing up beside the plane is drawn, as a share of its size, so the far ones can still be read.
         private const double MinLabelScale = 0.75;
 
-        // The most a gem is deep along a perspective highway, in pixels of the plane: its lanes may be wider than a flat highway's,
-        // and the gems should be as deep in proportion.
-        private const double MaxPerspectiveGemSize = 34;
-
         private readonly UprightGemPainter _upright;
         private readonly NotePainter _uprightNotes;
         private PerspectiveCamera? _camera;
