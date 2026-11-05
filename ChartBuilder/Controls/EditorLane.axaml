@@ -7,6 +7,7 @@
              xmlns:ctl="using:ChartShared.UI.Controls"
              xmlns:bctl="using:ChartBuilder.Controls"
              xmlns:edit="using:ChartBuilder.Controls.Editing"
+             xmlns:hw="using:ChartShared.UI.Controls.Highway"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d" d:DesignWidth="320" d:DesignHeight="480"
@@ -356,8 +357,10 @@
                                 Command="{Binding ToggleViewCommand}"
                                 kb:Shortcut.Tip="{Binding ViewToolTip}" kb:Shortcut.Action="{x:Static svc:BuilderKeys.ToggleView}"
                                 AutomationProperties.Name="{Binding ViewToolTip}">
+                            <!-- The button shows the view it switches to: a flat highway goes to perspective, which goes to the timeline, which goes back. -->
                             <Panel>
-                                <PathIcon Width="14" Height="14" Data="{StaticResource WaveformIconGeometry}" IsVisible="{Binding !IsTimeline}" />
+                                <PathIcon Width="14" Height="14" Data="{StaticResource PerspectiveIconGeometry}" IsVisible="{Binding IsFlatHighway}" />
+                                <PathIcon Width="14" Height="14" Data="{StaticResource WaveformIconGeometry}" IsVisible="{Binding IsPerspective}" />
                                 <PathIcon Width="14" Height="14" Data="{StaticResource HighwayIconGeometry}" IsVisible="{Binding IsTimeline}" />
                             </Panel>
                         </Button>
@@ -378,7 +381,8 @@
                                     <MenuItem Header="{Binding ViewToolTip}" Command="{Binding ToggleViewCommand}">
                                         <MenuItem.Icon>
                                             <Panel>
-                                                <PathIcon Width="14" Height="14" Data="{StaticResource WaveformIconGeometry}" IsVisible="{Binding !IsTimeline}" />
+                                                <PathIcon Width="14" Height="14" Data="{StaticResource PerspectiveIconGeometry}" IsVisible="{Binding IsFlatHighway}" />
+                                                <PathIcon Width="14" Height="14" Data="{StaticResource WaveformIconGeometry}" IsVisible="{Binding IsPerspective}" />
                                                 <PathIcon Width="14" Height="14" Data="{StaticResource HighwayIconGeometry}" IsVisible="{Binding IsTimeline}" />
                                             </Panel>
                                         </MenuItem.Icon>
@@ -415,10 +419,15 @@
         </Border>
 
         <Panel>
-            <edit:HighwayEditorCanvas IsVisible="{Binding ShowsHighway}"
-                                      WheelUpIsLater="{Binding Editor.WheelUpIsLater}"
-                                      AccentBrush="{DynamicResource AccentTextBrush}"
-                                      LabelBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
+            <!-- The highway, flat or tilted back in perspective, which fades into the lane's background. -->
+            <hw:PerspectiveHost IsVisible="{Binding ShowsHighway}"
+                                  IsPerspective="{Binding IsPerspective}"
+                                  FadeBrush="{DynamicResource SurfaceBrush}">
+                <edit:HighwayEditorCanvas IsVisible="{Binding ShowsHighway}"
+                                          WheelUpIsLater="{Binding Editor.WheelUpIsLater}"
+                                          AccentBrush="{DynamicResource AccentTextBrush}"
+                                          LabelBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
+            </hw:PerspectiveHost>
             <edit:TimelineEditorCanvas IsVisible="{Binding ShowsTimeline}"
                                        WheelUpIsLater="{Binding Editor.WheelUpIsLater}"
                                        AccentBrush="{DynamicResource AccentTextBrush}"

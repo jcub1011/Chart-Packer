@@ -40,6 +40,20 @@ namespace ChartShared.UI.Controls.Highway
         DashedTail = 256,
     }
 
+    /// <summary>Which of a <see cref="NotePainter"/>'s two passes to make.</summary>
+    [Flags]
+    public enum NotePass
+    {
+        /// <summary>The tails, at the back.</summary>
+        Tails = 1,
+
+        /// <summary>The notes: the bars across, then the gems, with their rings and what the host's decorator draws over them.</summary>
+        Notes = 2,
+
+        /// <summary>Both, as a flat highway draws them.</summary>
+        All = Tails | Notes,
+    }
+
     /// <summary>
     /// One note, ready to draw: what a <see cref="NotePainter"/> is given in place of a chart's notes, which the highway
     /// keeps one way and the editor another. Its place along the time axis is already worked out, in the pixels of the
@@ -94,9 +108,9 @@ namespace ChartShared.UI.Controls.Highway
         // How far in from the lanes' edges a note across them stops, in pixels.
         private const double AcrossInset = 4;
 
-        private readonly GemPainter _gems;
+        private readonly IGemPainter _gems;
 
-        public NotePainter(GemPainter gems)
+        public NotePainter(IGemPainter gems)
         {
             _gems = gems;
         }
@@ -122,7 +136,16 @@ namespace ChartShared.UI.Controls.Highway
         /// </summary>
         /// <param name="size">How long a gem is, along the time axis, in pixels.</param>
         /// <param name="alongFrom">The nearest along the time axis anything is drawn, in pixels, so something reaching far past what's shown stays within it.</param>
-        public void Draw(DrawingContext context, LaneProjection projection, ChartInstrumentKind kind, ReadOnlySpan<NoteGlyph> glyphs, double size, INoteDecorator? decorator = null, double alongFrom = double.NegativeInfinity, double alongTo = double.PositiveInfinity)
+        /// <param name="pass">Which pass to make. A host that draws its notes apart from their tails, as a perspective highway does, makes each in its own place.</param>
+        public void Draw(DrawingContext context, LaneProjection projection, ChartInstrumentKind kind, ReadOnlySpan<NoteGlyph> glyphs, double size, INoteDecorator? decorator = null, double alongFrom = double.NegativeInfinity, double alongTo = double.PositiveInfinity, NotePass pass = NotePass.All)
+        {
+            if ((pass & NotePass.Tails) != 0)
+                DrawTails(context, projection, kind, glyphs, decorator, alongFrom, alongTo);
+            if ((pass & NotePass.Notes) != 0)
+                DrawNotes(context, projection, kind, glyphs, size, decorator, alongFrom, alongTo);
+        }
+
+        private void DrawTails(DrawingContext context, LaneProjection projection, ChartInstrumentKind kind, ReadOnlySpan<NoteGlyph> glyphs, INoteDecorator? decorator, double alongFrom, double alongTo)
         {
             var view = projection.View;
             double across1 = projection.LaneFrom;
@@ -160,6 +183,13 @@ namespace ChartShared.UI.Controls.Highway
                     }
                 }
             }
+        }
+
+        private void DrawNotes(DrawingContext context, LaneProjection projection, ChartInstrumentKind kind, ReadOnlySpan<NoteGlyph> glyphs, double size, INoteDecorator? decorator, double alongFrom, double alongTo)
+        {
+            var view = projection.View;
+            double across1 = projection.LaneFrom;
+            double across2 = projection.LaneFrom + (projection.LaneSize * projection.Slots.Slots.Count);
 
             foreach (bool bars in (ReadOnlySpan<bool>)[true, false])
             {

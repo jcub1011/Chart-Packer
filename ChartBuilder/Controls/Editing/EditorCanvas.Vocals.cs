@@ -206,10 +206,10 @@ namespace ChartBuilder.Controls.Editing
                     DrawVocalPhrases(context, session, vocals, projection, fromTick, toTick);
                     DrawVocalPhraseStrip(context, session, vocal, projection, fromTick, toTick, size);
                     DrawSpans(context, session, projection);
-                    DrawBeats(context, session, session.TempoMap, projection, fromTick, toTick, size);
-                    DrawTempoMarkers(context, session, projection, fromTick, toTick, size);
-                    DrawTempoProposal(context, session, projection, size);
-                    DrawSections(context, session, projection, fromTick, toTick, size);
+                    DrawBeats(context, session, session.TempoMap, projection, fromTick, toTick, size, RailPass.Both);
+                    DrawTempoMarkers(context, session, projection, fromTick, toTick, size, RailPass.Both);
+                    DrawTempoProposal(context, session, projection, size, RailPass.Both);
+                    DrawSections(context, session, projection, fromTick, toTick, size, RailPass.Both);
                 }
                 else
                 {

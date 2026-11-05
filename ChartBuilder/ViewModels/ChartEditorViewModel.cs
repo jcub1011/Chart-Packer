@@ -173,6 +173,9 @@ namespace ChartBuilder.ViewModels
         /// <summary>The view a lane opens in.</summary>
         public LaneView DefaultView => _settings.Settings.DefaultEditorView;
 
+        /// <summary>Whether a highway lane opens in perspective: the setting's.</summary>
+        public bool DefaultPerspective => _settings.Settings.DefaultEditorPerspective;
+
         /// <summary>The look-ahead of a lane that hasn't had its own set: the highway speed setting's.</summary>
         public double DefaultLookAhead => HighwayLookAhead.Clamp(BuilderSettings.LookAheadAtSpeedOne / _settings.Settings.EditorHighwaySpeed);
 
@@ -222,7 +225,7 @@ namespace ChartBuilder.ViewModels
 
             var lane = focused ?? first ?? firstVocal;
             // A lane's shown look-ahead is already its own, and in pixels per second not one the look-ahead's range keeps.
-            var (start, end) = lane is null ? Session.Viewport.SpanOf(DefaultLookAhead) : Session.Viewport.SpanAhead(lane.ShownLookAhead);
+            var (start, end) = lane is null ? Session.Viewport.SpanOf(DefaultLookAhead) : Session.Viewport.SpanAhead(lane.ShownLookAhead, lane.StrikeFraction);
             VisibleStart = start;
             VisibleEnd = end;
         }

@@ -55,6 +55,7 @@ namespace ChartBuilder.ViewModels
             LookAhead = HighwayLookAhead.Clamp(settings.Settings.PreviewLookAhead, BuilderSettings.DefaultPreviewLookAhead);
             PixelsPerSecond = HighwayPixelsPerSecond.Clamp(settings.Settings.PreviewPixelsPerSecond);
             LengthMode = settings.Settings.HighwayLengthMode;
+            IsPerspective = settings.Settings.DefaultEditorPerspective;
             RefreshChoices();
             SelectedTrack = TrackChoices[0];
             Session.ChartChanged += OnChartChanged;
@@ -256,6 +257,9 @@ namespace ChartBuilder.ViewModels
 
         /// <summary>Whether the highway is sized by its look-ahead or by pixels per second: the setting's, as it was when the preview was made.</summary>
         public HighwayLengthMode LengthMode { get; }
+
+        /// <summary>Whether the highway is tilted back in perspective, as in the games: the Perspective Highways setting's, as it was when the preview was made.</summary>
+        public bool IsPerspective { get; }
 
         /// <summary>The highway's length as its slider's readout shows it, e.g. "1.4 s" or "300 px/s".</summary>
         public string LengthText => HighwayLengthText.Of(new HighwayLength(LengthMode, LookAhead, PixelsPerSecond));

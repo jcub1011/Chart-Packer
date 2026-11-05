@@ -45,22 +45,13 @@ namespace ChartBuilder.Controls.Editing
             if (PlaytestOf(key) is not { } run)
                 return;
             bool drums = ChartInstruments.KindOf(key.Instrument) == ChartInstrumentKind.Drums;
-            var (fromTick, toTick) = TicksOf(session, screen);
             double size = GemSize(screen);
             var lanes = LanesOf(screen, slots);
             using (context.PushClip(lanes))
             {
-                foreach (var ((tick, lane), mark) in run.Marks)
-                {
-                    if (mark.Kind == JudgeKind.Hit || tick < fromTick - 1 || tick > toTick + 1)
-                        continue;
-                    if (MarkRect(screen, slots, ShownOf(lane, drums), screen.AlongOf(session.AudioAt(tick)), size) is not { } rect)
-                        continue;
-                    if (mark.Kind == JudgeKind.Miss)
-                        DrawCross(context, MissPen, rect);
-                    else
-                        context.DrawLine(DropPen, rect.BottomLeft, rect.TopRight);
-                }
+                // On a perspective highway the notes stand over their places on the plane, so their marks stand up too.
+                if (_camera is null)
+                    DrawPlaytestMarks(context, session, key, run, slots, screen, upright: false);
 
                 foreach (var stray in run.Strays)
                 {
@@ -75,6 +66,37 @@ namespace ChartBuilder.Controls.Editing
             }
 
             DrawTimingMeter(context, session, run, screen, lanes);
+        }
+
+        /// <summary>A mark on each note missed or sustain dropped, which stays until the note is played again or the playtest is cleared.</summary>
+        /// <param name="upright">Whether the marks are drawn standing up on the notes of a perspective highway, rather than flat.</param>
+        private void DrawPlaytestMarks(DrawingContext context, EditorSession session, ChartTrackKey key, PlaytestRun run, LaneSlots slots, LaneProjection screen, bool upright)
+        {
+            bool drums = ChartInstruments.KindOf(key.Instrument) == ChartInstrumentKind.Drums;
+            var (fromTick, toTick) = TicksOf(session, screen);
+            double size = GemSize(screen);
+            foreach (var ((tick, lane), mark) in run.Marks)
+            {
+                if (mark.Kind == JudgeKind.Hit || tick < fromTick - 1 || tick > toTick + 1)
+                    continue;
+                if (MarkRect(screen, slots, ShownOf(lane, drums), screen.AlongOf(session.AudioAt(tick)), size) is not { } rect)
+                    continue;
+                if (mark.Kind == JudgeKind.Miss)
+                {
+                    if (upright)
+                        _upright.DrawCross(context, rect, MissPen);
+                    else
+                        DrawCross(context, MissPen, rect);
+                }
+                else if (upright)
+                {
+                    _upright.DrawSlash(context, rect, DropPen);
+                }
+                else
+                {
+                    context.DrawLine(DropPen, rect.BottomLeft, rect.TopRight);
+                }
+            }
         }
 
         /// <summary>

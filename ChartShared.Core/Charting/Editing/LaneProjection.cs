@@ -142,14 +142,16 @@ public sealed record LaneProjection(LaneView View, double TimeFrom, double TimeL
     /// A lane laid out as given whose length is <paramref name="length"/>: its look-ahead as it is, or, in pixels per second,
     /// what the pixels from its strike line to its far end make of it, so the notes keep their distance when it's resized.
     /// </summary>
-    public static LaneProjection Of(LaneView view, double timeFrom, double timeLength, double laneFrom, double laneSize, LaneSlots slots, EditorViewport viewport, HighwayLength length)
+    /// <param name="strikeFraction">How far from the strike end the strike line is, as a fraction of the time axis: the editor's quarter, or a perspective highway's, close to the strike end.</param>
+    public static LaneProjection Of(LaneView view, double timeFrom, double timeLength, double laneFrom, double laneSize, LaneSlots slots, EditorViewport viewport, HighwayLength length, double strikeFraction = EditorViewport.StrikeFraction)
     {
         ArgumentNullException.ThrowIfNull(viewport);
-        double ahead = length.LookAheadFor(timeLength * (1 - EditorViewport.StrikeFraction));
+        strikeFraction = EditorViewport.ClampStrikeFraction(strikeFraction);
+        double ahead = length.LookAheadFor(timeLength * (1 - strikeFraction));
 
         // In pixels per second it's shown as it is, as it's as long as the lane is, not kept to a look-ahead's range.
-        var (start, end) = length.IsPixelsPerSecond ? viewport.SpanAhead(ahead) : viewport.SpanOf(ahead);
-        return new LaneProjection(view, timeFrom, timeLength, laneFrom, laneSize, slots, start, end - start);
+        var (start, end) = length.IsPixelsPerSecond ? viewport.SpanAhead(ahead, strikeFraction) : viewport.SpanOf(ahead, strikeFraction);
+        return new LaneProjection(view, timeFrom, timeLength, laneFrom, laneSize, slots, start, end - start, strikeFraction);
     }
 
     /// <summary>

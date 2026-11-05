@@ -1,3 +1,4 @@
+using ChartShared.Core.Charting;
 using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charts;
 
@@ -32,6 +33,48 @@ public sealed class LaneProjectionStrikeTests
         Assert.AreEqual(EditorViewport.StrikeFraction, projection.StrikeFraction, 1e-9);
         Assert.AreEqual(600, projection.StrikeAlong, 1e-9, "A quarter of the way up from the bottom.");
         Assert.AreEqual(600, projection.AlongOf(10), 1e-9);
+    }
+
+    [TestMethod]
+    public void AHighwayInPerspectiveHasItsStrikeLineCloseToItsBottomWhateverItsLengthMode()
+    {
+        var viewport = new EditorViewport();
+        viewport.Follow(10);
+
+        foreach (var length in new[] { new HighwayLength(HighwayLengthMode.LookAhead, 2, 100), new HighwayLength(HighwayLengthMode.PixelsPerSecond, 2, 100) })
+        {
+            var projection = LaneProjection.Of(LaneView.Highway, 0, 3000, 0, 50, Slots, viewport, length, EditorViewport.PerspectiveStrikeFraction);
+
+            Assert.AreEqual(EditorViewport.PerspectiveStrikeFraction, projection.StrikeFraction, 1e-9, $"{length.Mode}.");
+            Assert.AreEqual(3000 * (1 - EditorViewport.PerspectiveStrikeFraction), projection.AlongOf(10), 1e-6, $"{length.Mode}: the cursor is on the strike line, near the bottom.");
+            Assert.AreEqual(projection.StrikeAlong, projection.AlongOf(10), 1e-6, $"{length.Mode}.");
+        }
+    }
+
+    [TestMethod]
+    public void InPixelsPerSecondAPerspectiveHighwayKeepsItsSpeedAndShowsMoreAheadOfAStrikeLineNearItsBottom()
+    {
+        var viewport = new EditorViewport();
+        viewport.Follow(10);
+        var length = new HighwayLength(HighwayLengthMode.PixelsPerSecond, 2, 100);
+
+        var quarter = LaneProjection.Of(LaneView.Highway, 0, 3000, 0, 50, Slots, viewport, length);
+        var near = LaneProjection.Of(LaneView.Highway, 0, 3000, 0, 50, Slots, viewport, length, EditorViewport.PerspectiveStrikeFraction);
+
+        Assert.AreEqual(100, quarter.PixelsPerSecond, 1e-6);
+        Assert.AreEqual(100, near.PixelsPerSecond, 1e-6, "The notes keep their distance whichever way the strike line is placed.");
+        Assert.IsGreaterThan(quarter.End - 10, near.End - 10, "More of the lane is ahead of a strike line near the bottom.");
+    }
+
+    [TestMethod]
+    public void TheViewportsSpansForAStrikeFractionAgreeWithTheStaticOnes()
+    {
+        var viewport = new EditorViewport();
+        viewport.Follow(10);
+
+        Assert.AreEqual(EditorViewport.SpanAhead(10, 5, 0.05), viewport.SpanAhead(5, 0.05));
+        Assert.AreEqual(EditorViewport.SpanAhead(10, EditorViewport.ClampLookAhead(5), 0.05), viewport.SpanOf(5, 0.05));
+        Assert.AreEqual(viewport.SpanAhead(5), viewport.SpanAhead(5, EditorViewport.StrikeFraction));
     }
 
     [TestMethod]

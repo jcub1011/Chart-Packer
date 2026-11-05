@@ -344,6 +344,44 @@ public sealed class LaneDockLayoutTests
     }
 
     [TestMethod]
+    public void ALanesPerspectiveIsKeptWithoutChangingTheLayout()
+    {
+        var layout = LaneDockLayout.CreateDefault();
+        int changes = 0;
+        layout.Changed += (_, _) => changes++;
+
+        layout.SetPerspective(Lane(layout, Bass), true);
+        layout.SetPerspective(Lane(layout, Drums), false);
+        string json = JsonSerializer.Serialize(layout.ToState(), LaneDockTestJsonContext.Default.LaneDockState);
+        var read = LaneDockLayout.FromState(JsonSerializer.Deserialize(json, LaneDockTestJsonContext.Default.LaneDockState))!;
+
+        Assert.AreEqual(0, changes, "Perspective isn't a change to the layout's shape.");
+        Assert.AreEqual(true, Lane(read, Bass).Perspective);
+        Assert.AreEqual(false, Lane(read, Drums).Perspective, "Flat is a choice, kept as one, not the default.");
+        Assert.IsNull(Lane(read, Guitar).Perspective, "A lane that was never set follows the editor's default.");
+    }
+
+    [TestMethod]
+    public void APerspectiveCanBePutBackToTheDefault()
+    {
+        var layout = LaneDockLayout.CreateDefault();
+        layout.SetPerspective(Lane(layout, Bass), true);
+        layout.SetPerspective(Lane(layout, Bass), null);
+
+        Assert.IsNull(Lane(layout, Bass).Perspective);
+    }
+
+    [TestMethod]
+    public void ALayoutSavedBeforePerspectiveStillLoadsWithTheDefault()
+    {
+        var read = LaneDockLayout.FromState(JsonSerializer.Deserialize("""{"Root":{"Instrument":"Guitar","Difficulty":"Expert","LookAhead":2.5,"PixelsPerSecond":150}}""", LaneDockTestJsonContext.Default.LaneDockState));
+
+        Assert.IsNotNull(read);
+        Assert.IsNull(Lane(read, Guitar).Perspective);
+        Assert.AreEqual(150, Lane(read, Guitar).PixelsPerSecond, "What it did have is kept.");
+    }
+
+    [TestMethod]
     public void ALanesAudioOptionsAreKeptWithoutChangingTheLayout()
     {
         var layout = LaneDockLayout.CreateDefault();

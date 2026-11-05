@@ -295,6 +295,17 @@ namespace ChartBuilder.Services
                         Get = () => settings.Settings.DefaultEditorView,
                         Set = view => settings.Settings.DefaultEditorView = view,
                     },
+                    new ToggleSetting
+                    {
+                        Id = "charter.defaultPerspective",
+                        Category = editing,
+                        Label = Strings.DefaultEditorPerspectiveLabel,
+                        Description = Strings.DefaultEditorPerspectiveDescription,
+                        Keywords = SettingKeywords.Split(Strings.DefaultEditorPerspectiveKeywords),
+                        DefaultValue = false,
+                        Get = () => settings.Settings.DefaultEditorPerspective,
+                        Set = on => settings.Settings.DefaultEditorPerspective = on,
+                    },
                     new IntegerSetting
                     {
                         Id = "charter.autosaveMinutes",
