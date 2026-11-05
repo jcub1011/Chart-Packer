@@ -115,6 +115,70 @@ public sealed class EditorViewportTests
         Assert.AreEqual(EditorViewport.MaxLookAhead, EditorViewport.ClampLookAhead(1000));
     }
 
+    [TestMethod]
+    public void ASpanAheadIsShownAsItIsNotKeptToALookAheadsRange()
+    {
+        var viewport = new EditorViewport();
+        viewport.MoveCursor(100);
+
+        var (start, end) = viewport.SpanAhead(150);
+
+        Assert.AreEqual(250, end, 1e-9, "More than the sixty seconds a look-ahead can be.");
+        Assert.AreEqual(EditorViewport.StrikeFraction, (100 - start) / (end - start), 1e-9);
+        Assert.AreEqual(100 + EditorViewport.MinLookAhead, viewport.SpanAhead(0).End, 1e-9, "Nothing to show is the shortest look-ahead.");
+    }
+
+    [TestMethod]
+    public void InPixelsPerSecondALaneKeepsItsSecondsTheSameSizeWhateverItsHeight()
+    {
+        var session = Of(Guitar());
+        session.Viewport.MoveCursor(10);
+        var length = new HighwayLength(HighwayLengthMode.PixelsPerSecond, 2, 200);
+
+        var shortLane = Project(session, LaneView.Highway, 200, 400, length);
+        var tallLane = Project(session, LaneView.Highway, 200, 1200, length);
+
+        Assert.AreEqual(200, shortLane.PixelsPerSecond, 1e-6);
+        Assert.AreEqual(200, tallLane.PixelsPerSecond, 1e-6, "The same distance between notes.");
+        Assert.IsGreaterThan(shortLane.SecondsOnScreen, tallLane.SecondsOnScreen, "A taller lane shows further ahead.");
+        Assert.AreEqual(EditorViewport.StrikeFraction, (10 - tallLane.Start) / tallLane.SecondsOnScreen, 1e-9, "The strike line stays on the cursor.");
+    }
+
+    [TestMethod]
+    public void InPixelsPerSecondATimelineIsSizedByItsWidth()
+    {
+        var session = Of(Guitar());
+        var length = new HighwayLength(HighwayLengthMode.PixelsPerSecond, 2, 100);
+
+        var narrow = Project(session, LaneView.Timeline, 500, 150, length);
+        var wide = Project(session, LaneView.Timeline, 1500, 150, length);
+
+        Assert.AreEqual(100, narrow.PixelsPerSecond, 1e-6);
+        Assert.AreEqual(100, wide.PixelsPerSecond, 1e-6);
+        Assert.AreEqual(narrow.SecondsOnScreen * 3, wide.SecondsOnScreen, 1e-6);
+    }
+
+    [TestMethod]
+    public void InLookAheadALaneStretchesItsSecondsAcrossItsHeight()
+    {
+        var session = Of(Guitar());
+        var length = new HighwayLength(HighwayLengthMode.LookAhead, LookAhead, 200);
+
+        var shortLane = Project(session, LaneView.Highway, 200, 400, length);
+        var tallLane = Project(session, LaneView.Highway, 200, 1200, length);
+
+        Assert.AreEqual(shortLane.SecondsOnScreen, tallLane.SecondsOnScreen, 1e-9, "The same seconds, stretched.");
+        Assert.AreEqual(3 * shortLane.PixelsPerSecond, tallLane.PixelsPerSecond, 1e-6);
+    }
+
+    private static LaneProjection Project(EditorSession session, LaneView view, double width, double height, HighwayLength length)
+    {
+        var slots = session.SlotsOf(ChartInstrument.Guitar, view);
+        return view == LaneView.Highway
+            ? LaneProjection.Of(view, 0, height, 0, width / slots.Slots.Count, slots, session.Viewport, length)
+            : LaneProjection.Of(view, 0, width, 0, height / slots.Slots.Count, slots, session.Viewport, length);
+    }
+
     private static LaneProjection Project(EditorSession session, LaneView view, double width, double height)
     {
         var slots = session.SlotsOf(ChartInstrument.Guitar, view);

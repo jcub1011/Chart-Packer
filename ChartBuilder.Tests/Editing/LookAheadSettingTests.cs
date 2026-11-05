@@ -1,4 +1,5 @@
 using ChartBuilder.Services;
+using ChartShared.Core.Charting;
 
 namespace ChartBuilder.Tests.Editing;
 
@@ -49,6 +50,50 @@ public sealed class LookAheadSettingTests
         Assert.AreEqual(60, settings.PreviewLookAhead, 1e-9);
         Assert.AreEqual(0.5, settings.ReducePreviewLookAhead, 1e-9);
         Assert.AreEqual(0.5, settings.GeneratePhrasesLookAhead, 1e-9);
+    }
+
+    [TestMethod]
+    public void AFileWithoutAHighwayLengthModeSizesByPixelsPerSecond()
+    {
+        File.WriteAllText(_path, """{ "PreviewLookAhead": 6 }""");
+        var settings = BuilderSettingsService.Load(_path).Settings;
+
+        Assert.AreEqual(HighwayLengthMode.PixelsPerSecond, settings.HighwayLengthMode);
+        Assert.AreEqual(HighwayPixelsPerSecond.Default, settings.EditorPixelsPerSecond, 1e-9);
+        Assert.AreEqual(HighwayPixelsPerSecond.Default, settings.PreviewPixelsPerSecond, 1e-9);
+        Assert.AreEqual(HighwayPixelsPerSecond.Default, settings.GeneratePhrasesPixelsPerSecond, 1e-9);
+        Assert.AreEqual(HighwayPixelsPerSecond.Default, settings.ReducePreviewPixelsPerSecond, 1e-9);
+    }
+
+    [TestMethod]
+    public void EveryHighwaysPixelsPerSecondAndTheModeReadBack()
+    {
+        var service = BuilderSettingsService.Load(_path);
+        service.Settings.HighwayLengthMode = HighwayLengthMode.PixelsPerSecond;
+        service.Settings.EditorPixelsPerSecond = 150;
+        service.Settings.PreviewPixelsPerSecond = 400;
+        service.Settings.GeneratePhrasesPixelsPerSecond = 75;
+        service.Settings.ReducePreviewPixelsPerSecond = 600;
+        service.Save();
+
+        var settings = BuilderSettingsService.Load(_path).Settings;
+        Assert.AreEqual(HighwayLengthMode.PixelsPerSecond, settings.HighwayLengthMode);
+        Assert.AreEqual(150, settings.EditorPixelsPerSecond, 1e-9);
+        Assert.AreEqual(400, settings.PreviewPixelsPerSecond, 1e-9);
+        Assert.AreEqual(75, settings.GeneratePhrasesPixelsPerSecond, 1e-9);
+        Assert.AreEqual(600, settings.ReducePreviewPixelsPerSecond, 1e-9);
+    }
+
+    [TestMethod]
+    public void APixelsPerSecondOutsideTheRangeOrAnUnknownModeIsPutRight()
+    {
+        File.WriteAllText(_path, """{ "HighwayLengthMode": 7, "EditorPixelsPerSecond": 5, "PreviewPixelsPerSecond": 99999, "GeneratePhrasesPixelsPerSecond": -1 }""");
+        var settings = BuilderSettingsService.Load(_path).Settings;
+
+        Assert.AreEqual(HighwayLengthMode.PixelsPerSecond, settings.HighwayLengthMode);
+        Assert.AreEqual(25, settings.EditorPixelsPerSecond, 1e-9);
+        Assert.AreEqual(1000, settings.PreviewPixelsPerSecond, 1e-9);
+        Assert.AreEqual(25, settings.GeneratePhrasesPixelsPerSecond, 1e-9);
     }
 
     [TestMethod]

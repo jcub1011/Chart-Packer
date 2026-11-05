@@ -9,7 +9,7 @@ Proposes star power phrases or drum fills for you to review before applying. App
 - Options for spacing (fills also have a fill length and what they end on), and what to do with existing phrases (replace them or add alongside).
 - **Regenerate** to propose again.
 - A list of proposals, each with a checkbox to keep it, plus **Keep All** and **Drop All**.
-- A highway preview with a play button and look-ahead slider, and a whole-song timeline.
+- A highway preview with a play button and a look-ahead slider (pixels per second, if **Highway length** is set to that in Settings), and a whole-song timeline.
 - **Apply** (Ctrl+Enter) and **Cancel**. The keys `[` and `]` step through proposals.
 
 [Back to Home](Home.md)

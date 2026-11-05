@@ -1,15 +1,14 @@
 using Avalonia.Media;
 using ChartShared.Core.Charting;
 using ChartShared.Core.Charting.Editing;
-using ChartShared.UI.Controls.Highway;
 
-namespace ChartBuilder.Controls.Editing
+namespace ChartShared.UI.Controls.Highway
 {
     /// <summary>
     /// The colour of each kind of phrase, as the lanes' phrase rail and the bottom timeline both draw it, and of the amber
     /// a generator's proposals are drawn in (charter-spec C3 item 2).
     /// </summary>
-    internal static class PhraseColors
+    public static class PhraseColors
     {
         public static readonly Color Solo = Color.FromRgb(0xC3, 0x8E, 0xFF);
         public static readonly Color DrumFill = Color.FromRgb(0x7C, 0xDB, 0x8A);
@@ -23,6 +22,15 @@ namespace ChartBuilder.Controls.Editing
         /// the phrases there already.
         /// </summary>
         public static readonly Color Proposal = HighwayPalette.Proposal;
+
+        /// <summary>How opaque the tint over a phrase or disco flip section is, out of 255.</summary>
+        public const byte TintAlpha = 0x16;
+
+        /// <summary>A solo's tint is a shade stronger than the other kinds', as it was before they were tinted too.</summary>
+        public const byte SoloTintAlpha = 0x1A;
+
+        /// <summary>How opaque the tint over a phrase of <paramref name="kind"/> is, out of 255.</summary>
+        public static byte TintOf(PhraseKind kind) => kind == PhraseKind.Solo ? SoloTintAlpha : TintAlpha;
 
         /// <summary>The colour of a phrase of <paramref name="kind"/>.</summary>
         public static Color Of(PhraseKind kind) => kind switch

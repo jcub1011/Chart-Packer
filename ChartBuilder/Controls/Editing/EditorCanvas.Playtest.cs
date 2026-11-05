@@ -107,14 +107,9 @@ namespace ChartBuilder.Controls.Editing
                 {
                     int shown = ShownOf(lane, drums);
                     if (slots.Across == shown)
-                    {
-                        for (int c = 0; c < count; c++)
-                            hits[c] = Math.Max(hits[c], glow * StrikeGlow.SpreadLevel);
-                    }
+                        StrikeGlow.Light(hits, count, -1, glow);
                     else if (slots.IndexOf(shown) is var column and >= 0)
-                    {
-                        hits[column] = Math.Max(hits[column], glow);
-                    }
+                        StrikeGlow.Light(hits, count, column, glow);
                 }
             }
 

@@ -70,7 +70,7 @@ namespace ChartBuilder.Controls.Editing
             if (Session is not { } session || _lane is not { Vocal: { } vocal } lane || session.VocalsOf(vocal) is not { } vocals)
                 return null;
             var size = Bounds.Size;
-            if (ProjectVocals(size, VocalSlotsOf(vocals), session.Viewport, lane.LookAhead) is not { } projection)
+            if (ProjectVocals(size, VocalSlotsOf(vocals), session.Viewport, lane.Length) is not { } projection)
                 return null;
             double seconds = projection.SecondsAt(AlongOf(position));
             double tick = session.TickAt(seconds);
@@ -177,7 +177,7 @@ namespace ChartBuilder.Controls.Editing
         {
             var size = Bounds.Size;
             Extras = default;
-            if (ProjectVocals(size, VocalSlotsOf(vocals), session.Viewport, lane.LookAhead) is not { } screen)
+            if (ProjectVocals(size, VocalSlotsOf(vocals), session.Viewport, lane.Length) is not { } screen)
                 return;
 
             switch (layer.Kind)

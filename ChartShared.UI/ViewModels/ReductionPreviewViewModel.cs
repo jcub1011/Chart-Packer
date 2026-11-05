@@ -88,6 +88,11 @@ namespace ChartShared.UI.ViewModels
 
         double LookAhead { get; set; }
 
+        /// <summary>Whether the highways are sized by <see cref="LookAhead"/> or by <see cref="PixelsPerSecond"/>: the app's setting.</summary>
+        HighwayLengthMode LengthMode { get; }
+
+        double PixelsPerSecond { get; set; }
+
         ReductionChangeCategories Categories { get; set; }
     }
 
@@ -97,6 +102,10 @@ namespace ChartShared.UI.ViewModels
         public bool IsShown { get; set; } = true;
 
         public double LookAhead { get; set; } = ReductionPreviewViewModel.DefaultLookAhead;
+
+        public HighwayLengthMode LengthMode { get; set; }
+
+        public double PixelsPerSecond { get; set; } = HighwayPixelsPerSecond.Default;
 
         public ReductionChangeCategories Categories { get; set; } = ReductionChangeCategories.Default;
     }
@@ -200,6 +209,8 @@ namespace ChartShared.UI.ViewModels
             _lease = lease;
             WheelUpIsLater = wheelUpIsLater;
             LookAhead = HighwayLookAhead.Clamp(settings.LookAhead, DefaultLookAhead);
+            LengthMode = settings.LengthMode;
+            PixelsPerSecond = HighwayPixelsPerSecond.Clamp(settings.PixelsPerSecond);
             IsExpanded = settings.IsShown;
 
             var shown = settings.Categories;
@@ -222,14 +233,39 @@ namespace ChartShared.UI.ViewModels
 
         /// <summary>How many seconds ahead of the strike line the highways show (<see cref="HighwayLookAhead"/>); remembered for the next run.</summary>
         [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(Lead), nameof(LookAheadText))]
+        [NotifyPropertyChangedFor(nameof(Lead), nameof(LengthText))]
         public partial double LookAhead { get; set; }
 
-        /// <summary>The look-ahead in seconds, as the slider's readout shows it, e.g. "1.5 s".</summary>
-        public string LookAheadText => string.Format(CultureInfo.CurrentCulture, SharedStrings.LookAheadFormat, LookAhead);
+        /// <summary>
+        /// How the highways are sized: by <see cref="LookAhead"/>, or by <see cref="PixelsPerSecond"/>, which the view then
+        /// turns into the seconds it shows (<see cref="ViewLookAhead"/>). The app's setting, as it was when the preview was made.
+        /// </summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(IsPixelsPerSecond), nameof(Lead), nameof(LengthText))]
+        public partial HighwayLengthMode LengthMode { get; private set; }
+
+        /// <summary>Whether the highways are sized by pixels per second.</summary>
+        public bool IsPixelsPerSecond => LengthMode == HighwayLengthMode.PixelsPerSecond;
+
+        /// <summary>How many pixels of the highways a second of the song takes up, in pixels per second mode; remembered for the next run.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(Lead), nameof(LengthText))]
+        public partial double PixelsPerSecond { get; set; }
+
+        /// <summary>
+        /// How many seconds ahead of the strike line the highways show as drawn, which in pixels per second mode depends on how
+        /// tall they are: the highway says, bound to it, as it's resized. Zero until it has a size, and kept at what it last
+        /// was while it has none.
+        /// </summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(Lead))]
+        public partial double ViewLookAhead { get; set; }
+
+        /// <summary>The highways' length as the slider's readout shows it: the look-ahead, e.g. "1.5 s", or the speed, e.g. "300 px/s".</summary>
+        public string LengthText => HighwayLengthText.Of(new HighwayLength(LengthMode, LookAhead, PixelsPerSecond));
 
         /// <summary>How far before a change going to it puts the playhead, in seconds, so it's seen coming down the highway.</summary>
-        public double Lead => LookAhead * LeadShare;
+        public double Lead => (IsPixelsPerSecond && ViewLookAhead > 0 ? ViewLookAhead : LookAhead) * LeadShare;
 
         /// <summary>The source and the drafts, highest difficulty first, or null when there's nothing to show.</summary>
         [ObservableProperty]
@@ -438,6 +474,8 @@ namespace ChartShared.UI.ViewModels
 
         // Already snapped by whatever sets it: the slider and the constructor.
         partial void OnLookAheadChanged(double value) => _settings.LookAhead = value;
+
+        partial void OnPixelsPerSecondChanged(double value) => _settings.PixelsPerSecond = value;
 
         private void OnFilterChanged(object? sender, PropertyChangedEventArgs e)
         {

@@ -1165,6 +1165,36 @@
     <value>{0:0.0} s</value>
     <comment>A highway's look-ahead, as its slider's readout shows it: how many seconds it shows beyond the strike line, e.g. "1.5 s".</comment>
   </data>
+  <data name="PixelsPerSecondFormat" xml:space="preserve">
+    <value>{0:0} px/s</value>
+    <comment>A highway's speed in pixels per second mode, as its slider's readout shows it: how many pixels of the highway a second of the song takes up, e.g. "300 px/s".</comment>
+  </data>
+  <data name="HighwayLengthModeLabel" xml:space="preserve">
+    <value>Highway length</value>
+  </data>
+  <data name="HighwayLengthModeDescription" xml:space="preserve">
+    <value>How a highway's length is chosen. "Look-ahead" stretches a number of seconds across the highway, so resizing it changes the distance between notes. "Pixels per second" keeps the distance between notes the same at any height, and a taller highway shows further ahead.</value>
+  </data>
+  <data name="HighwayLengthModeKeywords" xml:space="preserve">
+    <value>highway length scale scaling height agnostic pixels per second px look ahead lookahead zoom resize</value>
+    <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
+  </data>
+  <data name="HighwayLengthModeLookAhead" xml:space="preserve">
+    <value>Look-ahead (seconds)</value>
+  </data>
+  <data name="HighwayLengthModePixelsPerSecond" xml:space="preserve">
+    <value>Pixels per second</value>
+  </data>
+  <data name="HighwayPixelsPerSecondLabel" xml:space="preserve">
+    <value>Highway pixels per second</value>
+  </data>
+  <data name="HighwayPixelsPerSecondDescription" xml:space="preserve">
+    <value>How many pixels of the highway a second of the song takes up, when the highway's length is set by pixels per second.</value>
+  </data>
+  <data name="HighwayPixelsPerSecondKeywords" xml:space="preserve">
+    <value>highway pixels per second px speed scroll zoom scale height agnostic notes chart falling</value>
+    <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
+  </data>
   <data name="ReductionPreviewWorking" xml:space="preserve">
     <value>Comparing the draft with what it's reduced from…</value>
   </data>

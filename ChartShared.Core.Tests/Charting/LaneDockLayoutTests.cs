@@ -315,6 +315,35 @@ public sealed class LaneDockLayoutTests
     }
 
     [TestMethod]
+    public void ALanesPixelsPerSecondIsKeptBesideItsLookAheadWithoutChangingTheLayout()
+    {
+        var layout = LaneDockLayout.CreateDefault();
+        int changes = 0;
+        layout.Changed += (_, _) => changes++;
+
+        layout.SetLookAhead(Lane(layout, Bass), 3.5);
+        layout.SetPixelsPerSecond(Lane(layout, Bass), 240);
+        layout.SetPixelsPerSecond(Lane(layout, Drums), -1);
+        string json = JsonSerializer.Serialize(layout.ToState(), LaneDockTestJsonContext.Default.LaneDockState);
+        var read = LaneDockLayout.FromState(JsonSerializer.Deserialize(json, LaneDockTestJsonContext.Default.LaneDockState))!;
+
+        Assert.AreEqual(0, changes, "A speed isn't a change to the layout's shape.");
+        Assert.AreEqual(240, Lane(read, Bass).PixelsPerSecond);
+        Assert.AreEqual(3.5, Lane(read, Bass).LookAhead, "Each is kept, so changing the mode loses neither.");
+        Assert.IsNull(Lane(read, Drums).PixelsPerSecond, "A speed that isn't a positive number is the default.");
+        Assert.IsNull(Lane(read, Guitar).PixelsPerSecond);
+    }
+
+    [TestMethod]
+    public void ALayoutSavedBeforePixelsPerSecondStillLoadsWithTheDefault()
+    {
+        var read = LaneDockLayout.FromState(JsonSerializer.Deserialize("""{"Root":{"Instrument":"Guitar","Difficulty":"Expert","LookAhead":2.5}}""", LaneDockTestJsonContext.Default.LaneDockState));
+
+        Assert.IsNotNull(read);
+        Assert.IsNull(Lane(read, Guitar).PixelsPerSecond);
+    }
+
+    [TestMethod]
     public void ALanesAudioOptionsAreKeptWithoutChangingTheLayout()
     {
         var layout = LaneDockLayout.CreateDefault();

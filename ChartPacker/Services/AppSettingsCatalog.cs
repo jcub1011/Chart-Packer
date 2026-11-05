@@ -314,6 +314,33 @@ namespace ChartPacker.Services
                         Get = () => highway.LookAhead,
                         Set = seconds => highway.LookAhead = seconds,
                     },
+                    new ChoiceSetting<HighwayLengthMode>
+                    {
+                        Id = "playback.highwayLengthMode",
+                        Category = visualizers,
+                        Label = SharedStrings.HighwayLengthModeLabel,
+                        Description = SharedStrings.HighwayLengthModeDescription,
+                        Keywords = SettingKeywords.Split(SharedStrings.HighwayLengthModeKeywords),
+                        DefaultValue = AppSettings.DefaultHighwayLengthMode,
+                        Choices =
+                        [
+                            new SettingChoice<HighwayLengthMode>(HighwayLengthMode.LookAhead, SharedStrings.HighwayLengthModeLookAhead),
+                            new SettingChoice<HighwayLengthMode>(HighwayLengthMode.PixelsPerSecond, SharedStrings.HighwayLengthModePixelsPerSecond),
+                        ],
+                        Get = () => highway.LengthMode,
+                        Set = mode => highway.LengthMode = mode,
+                    },
+                    new PixelsPerSecondSetting
+                    {
+                        Id = "playback.highwayPixelsPerSecond",
+                        Category = visualizers,
+                        Label = SharedStrings.HighwayPixelsPerSecondLabel,
+                        Description = SharedStrings.HighwayPixelsPerSecondDescription,
+                        Keywords = SettingKeywords.Split(SharedStrings.HighwayPixelsPerSecondKeywords),
+                        DefaultValue = AppSettings.DefaultHighwayPixelsPerSecond,
+                        Get = () => highway.PixelsPerSecond,
+                        Set = pixels => highway.PixelsPerSecond = pixels,
+                    },
                     new ChoiceSetting<ScrubStep>
                     {
                         Id = "playback.scrubStep",

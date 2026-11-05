@@ -13,6 +13,7 @@ using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charting.Lint;
 using ChartShared.Core.Charts;
 using ChartShared.UI.Controls.Highway;
+using ChartShared.UI.Resources;
 using ChartShared.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -52,6 +53,8 @@ namespace ChartBuilder.ViewModels
             _editor = editor;
             _settings = settings;
             LookAhead = HighwayLookAhead.Clamp(settings.Settings.PreviewLookAhead, BuilderSettings.DefaultPreviewLookAhead);
+            PixelsPerSecond = HighwayPixelsPerSecond.Clamp(settings.Settings.PreviewPixelsPerSecond);
+            LengthMode = settings.Settings.HighwayLengthMode;
             RefreshChoices();
             SelectedTrack = TrackChoices[0];
             Session.ChartChanged += OnChartChanged;
@@ -243,7 +246,19 @@ namespace ChartBuilder.ViewModels
 
         /// <summary>How many seconds ahead of the strike line the highway shows: the further, the slower notes fall.</summary>
         [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(LengthText))]
         public partial double LookAhead { get; set; }
+
+        /// <summary>How many pixels of the highway a second of the song takes up, in pixels per second mode.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(LengthText))]
+        public partial double PixelsPerSecond { get; set; }
+
+        /// <summary>Whether the highway is sized by its look-ahead or by pixels per second: the setting's, as it was when the preview was made.</summary>
+        public HighwayLengthMode LengthMode { get; }
+
+        /// <summary>The highway's length as its slider's readout shows it, e.g. "1.4 s" or "300 px/s".</summary>
+        public string LengthText => HighwayLengthText.Of(new HighwayLength(LengthMode, LookAhead, PixelsPerSecond));
 
         /// <summary>Whether practice plays the loop region over and over (charter-spec C18 item 2).</summary>
         [ObservableProperty]
@@ -268,6 +283,8 @@ namespace ChartBuilder.ViewModels
 
         // Already snapped by whatever sets it: the slider and the constructor.
         partial void OnLookAheadChanged(double value) => _settings.Settings.PreviewLookAhead = value;
+
+        partial void OnPixelsPerSecondChanged(double value) => _settings.Settings.PreviewPixelsPerSecond = value;
 
         partial void OnIsPracticeChanged(bool value)
         {
@@ -375,7 +392,7 @@ namespace ChartBuilder.ViewModels
             var kind = ChartInstruments.KindOf(key.Instrument);
             var tempo = session.TempoMap;
             string label = string.Format(CultureInfo.CurrentCulture, Strings.LaneTitleFormat, ChartLabels.InstrumentName(key.Instrument), ChartLabels.DifficultyName(key.Difficulty));
-            var lane = new HighwayLane(kind, HighwayLane.LaneCountOf(kind, session.IsFiveLaneDrums), label, session.GameTrack(key).Notes, tempo, session.Delay);
+            var lane = new HighwayLane(kind, HighwayLane.LaneCountOf(kind, session.IsFiveLaneDrums), label, session.GameTrack(key).Notes, tempo, session.Delay, phrases: PhraseSpans.Of(session.Chart, key));
             return new HighwayScene([lane], tempo, session.Delay);
         }
     }

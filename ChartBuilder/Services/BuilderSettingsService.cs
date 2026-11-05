@@ -107,6 +107,12 @@ namespace ChartBuilder.Services
             settings.HitSoundVolume = Math.Clamp(settings.HitSoundVolume, 0, 100);
             settings.PreviewLookAhead = HighwayLookAhead.Clamp(settings.PreviewLookAhead, BuilderSettings.DefaultPreviewLookAhead);
             settings.GeneratePhrasesLookAhead = HighwayLookAhead.Clamp(settings.GeneratePhrasesLookAhead, BuilderSettings.DefaultGeneratePhrasesLookAhead);
+            if (!Enum.IsDefined(settings.HighwayLengthMode))
+                settings.HighwayLengthMode = HighwayLengthMode.PixelsPerSecond;
+            settings.EditorPixelsPerSecond = HighwayPixelsPerSecond.Clamp(settings.EditorPixelsPerSecond, HighwayPixelsPerSecond.Default);
+            settings.PreviewPixelsPerSecond = HighwayPixelsPerSecond.Clamp(settings.PreviewPixelsPerSecond);
+            settings.GeneratePhrasesPixelsPerSecond = HighwayPixelsPerSecond.Clamp(settings.GeneratePhrasesPixelsPerSecond);
+            settings.ReducePreviewPixelsPerSecond = HighwayPixelsPerSecond.Clamp(settings.ReducePreviewPixelsPerSecond);
             settings.ReducePreviewCategories &= ReductionChangeCategories.All;
             settings.ReducePreviewLookAhead = HighwayLookAhead.Clamp(settings.ReducePreviewLookAhead, ReductionPreviewViewModel.DefaultLookAhead);
             settings.PlaytestEarlyMs = Math.Clamp(settings.PlaytestEarlyMs, (int)HitWindow.MinMs, (int)HitWindow.MaxMs);

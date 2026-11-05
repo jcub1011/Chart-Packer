@@ -20,6 +20,6 @@ Library (scanning, duplicates), output (pack and unpack, downloads), playback (a
 
 ## Chart Builder's Settings
 
-Playback (audio latency and visualizers), input (including the playback countdown, and a link to [Input Devices](Input-Devices.md)), charter (new charts and editing, including the pack folder and the default reduction rules, which open [Reduce](Reduce.md)), and general (what opens on startup, logging, updates).
+Playback (audio latency and visualizers, including **Highway length**: how far ahead a highway shows, by a look-ahead in seconds or by pixels per second, which keeps the distance between notes the same at any height), input (including the playback countdown, and a link to [Input Devices](Input-Devices.md)), charter (new charts and editing, including the pack folder and the default reduction rules, which open [Reduce](Reduce.md)), and general (what opens on startup, logging, updates).
 
 [Back to Home](Home.md)

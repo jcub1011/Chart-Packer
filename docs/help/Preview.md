@@ -8,4 +8,6 @@ A note highway preview of the focused lane, or a part and difficulty you choose.
 
 A track selector, playback options (speed, practice, look-ahead) and highway options.
 
+The length slider sets how far ahead of the strike line the highway shows. By default the slider sets how many pixels a second of the song takes up (150 px/s): the distance between notes stays the same at any height, and a taller highway shows further ahead. In Settings, set **Highway length** to **Look-ahead (seconds)** and the slider sets a look-ahead in seconds, stretched across the highway, so making the highway taller or shorter changes the distance between notes. Each mode keeps its own value, so switching back loses nothing.
+
 [Back to Home](Home.md)
