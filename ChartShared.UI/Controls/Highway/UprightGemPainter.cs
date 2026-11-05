@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Avalonia;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
 using ChartShared.Core.Charts;
 
 namespace ChartShared.UI.Controls.Highway
@@ -23,8 +24,10 @@ namespace ChartShared.UI.Controls.Highway
         private const double GemRise = 0.72;
         private const double BarRise = 1.0;
 
-        // How many rounded rectangles make up a box's sides, from its base to its top.
+        // How many rounded rectangles make up a box's sides, from its base to its top, at most, and the least height in pixels each is of.
+        // Far notes are small, and every layer is a drawing the graphics card does each frame, for each note.
         private const int SideLayers = 4;
+        private const int MaxSideLayers = 12;
 
         // How far a box's sides are darkened at its base and at its top, and how far its top is lightened.
         private const double BaseDarken = 0.62;
@@ -39,6 +42,30 @@ namespace ChartShared.UI.Controls.Highway
         private readonly GemPainter _flat;
         private readonly Dictionary<(int, int), StreamGeometry> _hexagons = [];
 
+        // Each look a note has, drawn once as a picture, kept to be drawn again: a note that is its sides' layers, its shadow and its top is
+        // half a dozen drawings for the graphics card to take in each frame, each with a cost of its own however small, and a busy
+        // lane has hundreds in view. A picture of it is one.
+        //
+        // The notes of a colour are all alike but for their size, which changes continuously as one comes down the highway, so there is
+        // one picture, a master, of each look, drawn once at a near note's size and in a few pixels more than the screen has, and each
+        // note is that stretched to its own width and height, at the place it is to a fraction of a pixel. A picture made for each size
+        // to the pixel, or to a half, was swapped for the next as a note came down, and the edges moved a little each time.
+        // How a box's floor is shaped against its height, and how round its corners are, change with how far it is, and not by much:
+        // the masters come in a few steps of them, which move only what is inside the outline, a step at a time.
+        private const int MaxSprites = 400;
+        private const double MasterRise = 18;
+        private const double MasterDetail = 3;
+        private const double MasterPad = 2;
+        private const double ShapeStep = 32;
+        private const NoteFlags LookFlags = NoteFlags.Cymbal | NoteFlags.Tap | NoteFlags.Hopo;
+        private readonly Dictionary<SpriteKey, RenderTargetBitmap> _sprites = [];
+
+        /// <summary>How a note's picture is drawn, which a host sets for the notes it draws: smoothly, and smaller by averaging, not by picking.</summary>
+        public static readonly RenderOptions SpriteOptions = new() { BitmapInterpolationMode = BitmapInterpolationMode.MediumQuality };
+
+        /// <summary>What makes two notes' master the same: the colour, the flags that change it, and the shape of its box in 32nds of its height.</summary>
+        private readonly record struct SpriteKey(uint Color, bool Black, NoteFlags Flags, int Depth, int Width, int RadiusX, int RadiusY);
+
         // What was drawn last, in the order it was, from the back: where each note stands on the screen, and where on the plane.
         private readonly List<(Rect Silhouette, Point Floor)> _scene = [];
 
@@ -50,6 +77,9 @@ namespace ChartShared.UI.Controls.Highway
 
         /// <summary>The camera the notes are placed by. With none, the notes are drawn flat.</summary>
         public PerspectiveCamera? Camera { get; set; }
+
+        /// <summary>Whether a note is drawn from a picture of its look, kept; false to draw each as the shapes it is.</summary>
+        public bool UsesSprites { get; set; } = true;
 
         /// <summary>Forgets the notes drawn so far, as a host does before it draws its notes again.</summary>
         public void BeginScene() => _scene.Clear();
@@ -314,8 +344,70 @@ namespace ChartShared.UI.Controls.Highway
             return seen.Right > 0 && seen.X < camera.HostWidth && seen.Bottom > 0 && seen.Y < camera.HostHeight;
         }
 
-        /// <summary>Draws the gem as its flags say: a cymbal, a tap, or a box with a HOPO's mark.</summary>
+        /// <summary>Draws the gem as its flags say: a cymbal, a tap, or a box with a HOPO's mark; from its kept picture when it is drawn whole.</summary>
         private void DrawBody(DrawingContext context, ChartInstrumentKind kind, ChartNote note, Color color, Stand stand, bool outlined)
+        {
+            if (outlined || !UsesSprites)
+                DrawBodyShapes(context, kind, note, color, stand, outlined);
+            else
+                DrawSprite(context, kind, note, color, stand);
+        }
+
+        /// <summary>
+        /// Draws the gem from the master of its look, made when it is first needed, stretched to the note's own width and height and set
+        /// with the bottom of its floor and the middle of it where the note's are, to a fraction of a pixel.
+        /// </summary>
+        private void DrawSprite(DrawingContext context, ChartInstrumentKind kind, ChartNote note, Color color, Stand stand)
+        {
+            double rise = Math.Max(stand.Rise, 0.01);
+            var key = new SpriteKey(
+                color.ToUInt32(),
+                HighwayPalette.IsBlackFret(kind, note.Lane),
+                note.Flags & LookFlags,
+                Math.Max(1, (int)Math.Round(stand.Floor.Height / rise * ShapeStep)),
+                Math.Max(1, (int)Math.Round(stand.Floor.Width / rise * 8)),
+                (int)Math.Round(stand.RadiusX / rise * ShapeStep),
+                (int)Math.Round(stand.RadiusY / rise * ShapeStep));
+
+            // The box in the master, in the host's units: as high as it is for a near note, and the shape the key says.
+            double depth = key.Depth / ShapeStep * MasterRise, across = key.Width / 8.0 * MasterRise;
+            if (!_sprites.TryGetValue(key, out var master))
+            {
+                if (_sprites.Count >= MaxSprites)
+                {
+                    foreach (var old in _sprites.Values)
+                        old.Dispose();
+                    _sprites.Clear();
+                }
+
+                _sprites[key] = master = MakeMaster(kind, note, color, key, depth, across);
+            }
+
+            double stretchX = across > 0 ? stand.Floor.Width / across : 1;
+            double stretchY = stand.Floor.Height + stand.Rise > 0 ? (stand.Floor.Height + stand.Rise) / (depth + MasterRise) : 1;
+            double width = master.PixelSize.Width / MasterDetail, height = master.PixelSize.Height / MasterDetail;
+            double padBelow = (height - (depth + MasterRise)) / 2;
+            double x = stand.Floor.Center.X - (width * stretchX / 2);
+            double y = stand.Floor.Bottom + (padBelow * stretchY) - (height * stretchY);
+            context.DrawImage(master, new Rect(0, 0, master.PixelSize.Width, master.PixelSize.Height), new Rect(x, y, width * stretchX, height * stretchY));
+        }
+
+        private RenderTargetBitmap MakeMaster(ChartInstrumentKind kind, ChartNote note, Color color, SpriteKey key, double depth, double across)
+        {
+            // Drawn in the host's units, as a near note is, so a pen a unit wide is as it is on one, and kept at more pixels than that.
+            int pixelsWide = (int)Math.Ceiling((across + (2 * MasterPad)) * MasterDetail);
+            int pixelsHigh = (int)Math.Ceiling((depth + MasterRise + (2 * MasterPad)) * MasterDetail);
+            double padX = ((pixelsWide / MasterDetail) - across) / 2, padY = ((pixelsHigh / MasterDetail) - (depth + MasterRise)) / 2;
+            var stand = new Stand(new Rect(padX, padY + MasterRise, across, depth), MasterRise, key.RadiusX / ShapeStep * MasterRise, key.RadiusY / ShapeStep * MasterRise);
+
+            var master = new RenderTargetBitmap(new PixelSize(pixelsWide, pixelsHigh), new Vector(96 * MasterDetail, 96 * MasterDetail));
+            using (var picture = master.CreateDrawingContext())
+                DrawBodyShapes(picture, kind, note, color, stand, outlined: false);
+            return master;
+        }
+
+        /// <summary>Draws the gem as its flags say, as the shapes it is made of.</summary>
+        private void DrawBodyShapes(DrawingContext context, ChartInstrumentKind kind, ChartNote note, Color color, Stand stand, bool outlined)
         {
             bool black = HighwayPalette.IsBlackFret(kind, note.Lane);
 
@@ -384,13 +476,20 @@ namespace ChartShared.UI.Controls.Highway
 
             var dark = HighwayPalette.Darken(color, BaseDarken);
             var light = HighwayPalette.Darken(color, TopDarken);
-            for (int i = 0; i < SideLayers; i++)
+            int layers = LayersOf(stand);
+            for (int i = 0; i < layers; i++)
             {
-                var layer = stand.Floor.Translate(new Vector(0, -stand.Rise * i / SideLayers));
-                var brush = _flat.Brush(Blend(dark, light, i / (double)(SideLayers - 1)));
+                var layer = stand.Floor.Translate(new Vector(0, -stand.Rise * i / layers));
+                var brush = _flat.Brush(Blend(dark, light, layers == 1 ? 0.5 : i / (double)(layers - 1)));
                 context.DrawRectangle(brush, i == 0 ? GemPainter.OutlinePen : null, layer, stand.RadiusX, stand.RadiusY);
             }
         }
+
+        /// <summary>
+        /// How many rounded rectangles make a box's sides: <see cref="SideLayers"/>, or more where its floor is shallower than a layer's step,
+        /// as a far note's is, so each overlaps the next and the sides are whole, without a gap for the highway to show through.
+        /// </summary>
+        private static int LayersOf(Stand stand) => Math.Clamp((int)Math.Ceiling(stand.Rise / Math.Max(stand.Floor.Height, 1)), SideLayers, MaxSideLayers);
 
         /// <summary>The box's top face, filled in <paramref name="fill"/>, edged in <paramref name="edge"/> darkened, or in <paramref name="outline"/> when there is one.</summary>
         private void DrawTop(DrawingContext context, Stand stand, Color fill, Color edge, Color? outline) =>
@@ -410,11 +509,12 @@ namespace ChartShared.UI.Controls.Highway
             var light = HighwayPalette.Darken(color, TopDarken);
             using (context.PushTransform(Matrix.CreateTranslation(stand.Floor.X, stand.Floor.Y)))
                 context.DrawGeometry(ShadowBrush, null, hexagon);
-            for (int i = 0; i < SideLayers; i++)
+            int layers = LayersOf(stand);
+            for (int i = 0; i < layers; i++)
             {
-                var layer = stand.Floor.Translate(new Vector(0, -stand.Rise * i / SideLayers));
+                var layer = stand.Floor.Translate(new Vector(0, -stand.Rise * i / layers));
                 using (context.PushTransform(Matrix.CreateTranslation(layer.X, layer.Y)))
-                    context.DrawGeometry(_flat.Brush(Blend(dark, light, i / (double)(SideLayers - 1))), i == 0 ? GemPainter.OutlinePen : null, hexagon);
+                    context.DrawGeometry(_flat.Brush(Blend(dark, light, layers == 1 ? 0.5 : i / (double)(layers - 1))), i == 0 ? GemPainter.OutlinePen : null, hexagon);
             }
 
             using (context.PushTransform(Matrix.CreateTranslation(stand.Top.X, stand.Top.Y)))

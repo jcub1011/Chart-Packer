@@ -271,6 +271,7 @@ namespace ChartBuilder.Controls.Editing
         private Size _arranged;
         private (double From, double To) _alongLimit = (double.NegativeInfinity, double.PositiveInfinity);
         private TopLevel? _topLevel;
+        private readonly FramePerf? _perf;
         private DispatcherTimer? _redrawTimer;
 
         static EditorCanvas()
@@ -294,6 +295,12 @@ namespace ChartBuilder.Controls.Editing
             _layers = [_song, _strike, _notes, _playtest, _overlay];
             foreach (var layer in _layers)
                 VisualChildren.Add(layer);
+
+            if (FramePerf.IsEnabled)
+            {
+                _perf = new FramePerf(() => $"{(_camera is null ? "flat" : "persp")} {Bounds.Width:F0}x{Bounds.Height:F0} @{TopLevel.GetTopLevel(this)?.RenderScaling ?? 1:F2}  {(_lane?.Track is { } track ? $"{track.Instrument} {track.Difficulty}" : "-")}");
+                _perf.Rolled += () => _overlay.Redraw();
+            }
         }
 
         /// <summary>The cursor, the selection and the place tool's ghost.</summary>
@@ -416,6 +423,7 @@ namespace ChartBuilder.Controls.Editing
         protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
         {
             base.OnAttachedToVisualTree(e);
+            _perf?.Probe(ElementComposition.GetElementVisual(this)?.Compositor);
             Attach(DataContext as EditorLaneViewModel);
         }
 
@@ -533,17 +541,30 @@ namespace ChartBuilder.Controls.Editing
         {
             var (fromTick, toTick) = TicksOf(session, projection);
             FillPage(context, projection);
-            context.FillRectangle(LanesBrush, LanesOf(projection, slots));
-            DrawLaneDividers(context, projection, slots);
-            DrawBackdrop(context, size, projection, rows.Count);
+            if (!FramePerf.IsOff(FramePerf.Part.LaneFill))
+            {
+                context.FillRectangle(LanesBrush, LanesOf(projection, slots));
+                DrawLaneDividers(context, projection, slots);
+            }
+
+            if (!FramePerf.IsOff(FramePerf.Part.Audio))
+                DrawBackdrop(context, size, projection, rows.Count);
 
             // The rail's rows are tinted under whatever is marked across them, such as a timeline's section lines.
-            DrawPhraseRailBackground(context, rows, projection);
             FindPhrasesShown(part, fromTick, toTick);
+            if (FramePerf.IsOff(FramePerf.Part.Markings))
+            {
+                if (!FramePerf.IsOff(FramePerf.Part.BeatLines))
+                    DrawBeats(context, session, session.TempoMap, projection, fromTick, toTick, size, RailOnPlane);
+                return;
+            }
+
+            DrawPhraseRailBackground(context, rows, projection);
             DrawPhraseRanges(context, session, key, projection, fromTick, toTick);
             DrawSpans(context, session, projection);
             DrawSyncBands(context, session, key, projection);
-            DrawBeats(context, session, session.TempoMap, projection, fromTick, toTick, size, RailOnPlane);
+            if (!FramePerf.IsOff(FramePerf.Part.BeatLines))
+                DrawBeats(context, session, session.TempoMap, projection, fromTick, toTick, size, RailOnPlane);
             DrawOnsets(context, size, projection, key);
             DrawTempoMarkers(context, session, projection, fromTick, toTick, size, RailOnPlane);
             DrawTempoProposal(context, session, projection, size, RailOnPlane);
@@ -560,10 +581,13 @@ namespace ChartBuilder.Controls.Editing
         /// </summary>
         private void RenderStrike(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, LaneSlots slots, LaneProjection screen)
         {
-            DrawStrikeBand(context, session, screen);
-            if (_editor?.Playback.IsPlaying != true)
+            if (FramePerf.IsOff(FramePerf.Part.Strike))
                 return;
-            using (context.PushClip(LanesOf(screen, slots)))
+
+            DrawStrikeBand(context, session, screen);
+            if (_editor?.Playback.IsPlaying != true && !FramePerf.SimulatesPlaying)
+                return;
+            using (new OptionalClip(context, LanesOf(screen, slots), !FramePerf.IsOff(FramePerf.Part.PlaneClips)))
             {
                 // What lights at the strike line, a target as a note is hit or a fret pressed, lies on the plane, as a glow on the highway's
                 // surface, on a perspective highway too: standing up, it would look like a note that isn't there.
@@ -579,9 +603,12 @@ namespace ChartBuilder.Controls.Editing
         /// <summary>The notes across a page, within the lanes: the ghost difficulty's, a draft over the notes it would replace, and the solos' counts.</summary>
         private void RenderNotes(DrawingContext context, EditorSession session, EditorLaneViewModel lane, ChartTrackKey key, EditableTrack track, EditablePart part, LaneSlots slots, LaneProjection projection)
         {
+            if (FramePerf.IsOff(FramePerf.Part.Tails))
+                return;
+
             var (fromTick, toTick) = TicksOf(session, projection);
             FillPage(context, projection);
-            using (context.PushClip(LanesOf(projection, slots)))
+            using (new OptionalClip(context, LanesOf(projection, slots), !FramePerf.IsOff(FramePerf.Part.PlaneClips)))
             {
                 // On a perspective highway the notes stand up in a layer of their own (see PaintGems): only their tails lie here.
                 DrawNoteSets(context, session, lane, key, track, part, projection, slots, fromTick, toTick, _notePainter, _camera is null ? NotePass.All : NotePass.Tails);
@@ -626,6 +653,9 @@ namespace ChartBuilder.Controls.Editing
         /// </summary>
         private void RenderOverlay(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, EditablePart part, IReadOnlyList<RailKind> rows, LaneSlots slots, LaneProjection screen)
         {
+            if (_camera is null)
+                _perf?.Draw(context, new Point(4, 4));
+
             var lanes = LanesOf(screen, slots);
             using (context.PushClip(lanes))
             {
@@ -795,7 +825,7 @@ namespace ChartBuilder.Controls.Editing
 
             // A vocal part lights the note and the phrase on the strike line wherever the cursor stops, not only as it plays.
             bool vocal = _lane is { Vocal: not null };
-            if (_editor?.Playback.IsPlaying == true || vocal)
+            if (_editor?.Playback.IsPlaying == true || vocal || FramePerf.SimulatesPlaying)
                 _strike.Redraw();
             if (_editor?.Playtest.HasFeedback == true)
                 _playtest.Redraw();
@@ -925,7 +955,13 @@ namespace ChartBuilder.Controls.Editing
                 IsHitTestVisible = false;
             }
 
-            public override void Render(DrawingContext context) => _owner.RenderLayer(context, _layer);
+            public override void Render(DrawingContext context)
+            {
+                var perf = _owner._perf;
+                long start = FramePerf.Now(perf);
+                _owner.RenderLayer(context, _layer);
+                perf?.Add((FramePerf.Slot)(int)_layer.Kind, start);
+            }
         }
 
         protected override void OnGotFocus(FocusChangedEventArgs e)
@@ -1246,8 +1282,33 @@ namespace ChartBuilder.Controls.Editing
         // (EditorKeys); here, only the modifiers held are taken in.
         protected override void OnKeyDown(KeyEventArgs e)
         {
+            // The frame-time readout's switches for parts of the drawing, to see what they cost.
+            if (_perf is not null && e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift))
+            {
+                if (e.Key == Key.F12 && _editor is { Playback.IsPlaying: false } && Session is { } session && TopLevel.GetTopLevel(this) is { } top)
+                {
+                    e.Handled = true;
+                    _perf.Benchmark(top, session.Viewport.Cursor, seconds => { session.Viewport.Follow(seconds); _strike.Redraw(); }, ApplyPerfSwitches);
+                    return;
+                }
+
+                if (FramePerf.Toggle(e.Key))
+                {
+                    e.Handled = true;
+                    ApplyPerfSwitches();
+                    return;
+                }
+            }
+
             base.OnKeyDown(e);
             TakeKeys(e.KeyModifiers);
+        }
+
+        /// <summary>Takes up the frame-time readout's switches: the canvas's clip, and every layer drawn again.</summary>
+        private void ApplyPerfSwitches()
+        {
+            ClipToBounds = _camera is null || FramePerf.IsOff(FramePerf.Part.CanvasClip);
+            InvalidateLayers();
         }
 
         protected override void OnKeyUp(KeyEventArgs e)
@@ -1677,7 +1738,10 @@ namespace ChartBuilder.Controls.Editing
                 return;
 
             // The view moves with the cursor, which moves the lane's pages (OnViewportChanged).
+            _perf?.Frame();
+            long start = FramePerf.Now(_perf);
             editor.FollowPlayback(time);
+            _perf?.Follow(start);
             RequestFrame();
         }
 
@@ -1766,7 +1830,7 @@ namespace ChartBuilder.Controls.Editing
             // screen: its pictures are made with bars as long as the screen shows them, a bar to a pixel there, and as few again to draw.
             if (_camera is { } camera)
                 scaling /= Math.Max(camera.DepthScaleAt(camera.PlaneHeight), MinWaveformDepthScale);
-            using (context.PushClip(area))
+            using (new OptionalClip(context, area, !FramePerf.IsOff(FramePerf.Part.PlaneClips)))
             {
                 if (audio.IsStereo && editor.Audio.Waveforms.Stereo(source) is var (left, right))
                 {
@@ -1774,8 +1838,8 @@ namespace ChartBuilder.Controls.Editing
                     double gain = LaneWaveformPainter.FullScaleGain(left.Peak >= right.Peak ? left : right) * boost;
                     var first = vertical ? new Rect(area.X, area.Y, area.Width / 2, area.Height) : new Rect(area.X, area.Y, area.Width, area.Height / 2);
                     var second = vertical ? new Rect(area.X + (area.Width / 2), area.Y, area.Width / 2, area.Height) : new Rect(area.X, area.Y + (area.Height / 2), area.Width, area.Height / 2);
-                    bool done = LaneWaveformPainter.Draw(context, left, first, vertical, projection.Start, projection.End, projection.AlongOf, peak, loud, gain, scaling, budgeted: true, smooth: _camera is not null);
-                    done &= LaneWaveformPainter.Draw(context, right, second, vertical, projection.Start, projection.End, projection.AlongOf, peak, loud, gain, scaling, budgeted: true, smooth: _camera is not null);
+                    bool done = LaneWaveformPainter.Draw(context, left, first, vertical, projection.Start, projection.End, projection.AlongOf, peak, loud, gain, scaling, budgeted: true, smooth: _camera is not null, clip: !FramePerf.IsOff(FramePerf.Part.PlaneClips));
+                    done &= LaneWaveformPainter.Draw(context, right, second, vertical, projection.Start, projection.End, projection.AlongOf, peak, loud, gain, scaling, budgeted: true, smooth: _camera is not null, clip: !FramePerf.IsOff(FramePerf.Part.PlaneClips));
                     context.DrawLine(ChannelPen, vertical ? first.TopRight : first.BottomLeft, vertical ? first.BottomRight : first.BottomRight);
                     return done;
                 }
@@ -1783,7 +1847,7 @@ namespace ChartBuilder.Controls.Editing
                 if (editor.Audio.Waveforms.Mono(source) is not { } waveform)
                     return true;
                 return LaneWaveformPainter.Draw(context, waveform, area, vertical, projection.Start, projection.End, projection.AlongOf,
-                    peak, loud, LaneWaveformPainter.FullScaleGain(waveform) * boost, scaling, budgeted: true, smooth: _camera is not null);
+                    peak, loud, LaneWaveformPainter.FullScaleGain(waveform) * boost, scaling, budgeted: true, smooth: _camera is not null, clip: !FramePerf.IsOff(FramePerf.Part.PlaneClips));
             }
         }
 
@@ -2531,8 +2595,15 @@ namespace ChartBuilder.Controls.Editing
                 _isUpright = upright;
             }
 
-            public void DrawDashedTail(DrawingContext context, in NoteGlyph glyph, Rect tail) =>
-                DashedOutline.DrawRectangle(context, _canvas.ShortTailPen(glyph.Color), tail.Deflate(0.5), 0, ShortTailDash, ShortTailDash);
+            public void DrawDashedTail(DrawingContext context, in NoteGlyph glyph, Rect tail)
+            {
+                // Tilted, a dashed outline is a path of many dashes for the graphics card to work out each frame, for each short note: a
+                // plain faint fill stands for it, as it still shows the tail is there and is too short to be one.
+                if (_canvas._camera is not null)
+                    context.FillRectangle(_canvas._gems.Brush(HighwayPalette.WithAlpha(glyph.Color, 0x60)), tail);
+                else
+                    DashedOutline.DrawRectangle(context, _canvas.ShortTailPen(glyph.Color), tail.Deflate(0.5), 0, ShortTailDash, ShortTailDash);
+            }
 
             public void AfterNote(DrawingContext context, in NoteGlyph glyph, Rect rect)
             {

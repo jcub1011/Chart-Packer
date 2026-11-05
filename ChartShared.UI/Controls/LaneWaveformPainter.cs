@@ -49,6 +49,11 @@ namespace ChartShared.UI.Controls
 
         private static readonly Dictionary<TileKey, Tile> Tiles = [];
         private static long s_drawn;
+
+        /// <summary>How many pictures have been drawn since the program began, and how many are kept now: for a readout of what a lane costs.</summary>
+        public static long TilesBuilt { get; private set; }
+
+        public static int TileCount => Tiles.Count;
         private static long s_pixels;
 
         /// <summary>Drops every picture kept, as when the audio they're of is closed.</summary>
@@ -72,7 +77,7 @@ namespace ChartShared.UI.Controls
         /// <param name="budgeted">Draw new pictures only within the <see cref="PaintBudget"/>.</param>
         /// <param name="smooth">Smooth the pictures as they are drawn, rather than pixel for pixel: for a lane a transform shrinks, as a tilt does.</param>
         /// <returns>Whether all of it was drawn: <see langword="false"/> when the budget ran out, so it should be drawn again soon.</returns>
-        public static bool Draw(DrawingContext context, Waveform waveform, Rect bounds, bool isVertical, double from, double to, Func<double, double> position, IBrush peakBrush, IBrush loudBrush, double gain = 1, double pixel = 1, bool budgeted = false, bool smooth = false)
+        public static bool Draw(DrawingContext context, Waveform waveform, Rect bounds, bool isVertical, double from, double to, Func<double, double> position, IBrush peakBrush, IBrush loudBrush, double gain = 1, double pixel = 1, bool budgeted = false, bool smooth = false, bool clip = true)
         {
             int perSecond = waveform.BucketsPerSecond;
             double origin = position(0);
@@ -101,7 +106,7 @@ namespace ChartShared.UI.Controls
             // A picture spans its buckets along the lane, from its start, and levels from -1 to 1 across it: to the
             // right, or upwards, from the centre.
             bool complete = true;
-            using (context.PushClip(bounds))
+            using (new OptionalClip(context, bounds, clip))
             using (context.PushRenderOptions(smooth ? Smooth : Sharp))
             {
                 for (int index = first / bucketsPerTile; index <= (end - 1) / bucketsPerTile; index++)
@@ -179,6 +184,7 @@ namespace ChartShared.UI.Controls
                 tile = new Tile(Build(key), pixels);
                 PaintBudget.Spend(started);
                 Tiles[key] = tile;
+                TilesBuilt++;
                 s_pixels += pixels;
             }
 

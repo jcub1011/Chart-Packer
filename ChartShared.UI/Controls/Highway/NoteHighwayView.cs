@@ -1062,6 +1062,7 @@ namespace ChartShared.UI.Controls.Highway
                 // The strike line moves with it, and so does what the highway shows ahead of it.
                 _camera = value;
                 _upright.Camera = value;
+                _gems.PlainTails = value is not null;
                 ShareShownLookAhead();
                 InvalidateVisual();
                 RaiseStanding();
@@ -1100,6 +1101,7 @@ namespace ChartShared.UI.Controls.Highway
             if (_camera is null || Scene is not { Lanes.Count: > 0 } scene || Bounds.Width <= 0 || Bounds.Height <= 0)
                 return;
 
+            using var options = context.PushRenderOptions(UprightGemPainter.SpriteOptions);
             double now = NowSeconds;
             double lookAhead = EffectiveLookAhead;
             double strike = Bounds.Height * StrikeFraction;

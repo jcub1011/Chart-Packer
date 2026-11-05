@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Avalonia;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
 using Avalonia.Media.TextFormatting;
 using ChartBuilder.ViewModels;
 using ChartShared.Core.Charting;
@@ -24,6 +25,20 @@ namespace ChartBuilder.Controls.Editing
 
         // The smallest a label standing up beside the plane is drawn, as a share of its size, so the far ones can still be read.
         private const double MinLabelScale = 0.75;
+
+        // How a forcing mark is kept as a picture: the badge and its letters, drawn once for each, in units of the host's and at this many
+        // pixels to each. A text drawn is a costly drawing for the graphics card, each frame, and a stretch of the song that is all forced
+        // notes has dozens in view; a picture is as costly as any other.
+        private const double ForcingDetail = 3;
+        private const int MaxForcingPictures = 64;
+        private readonly Dictionary<(string Marks, uint Color), RenderTargetBitmap> _forcingPictures = [];
+
+        // The same for the labels that stand up beside the plane: the measures' numbers, the tempo markers, the sections' names, the solos'
+        // counts. Each is a text, as costly to draw as the forcing marks are, and a label is the same each frame it is in view; it is told
+        // by its text as the label cache made it, and the colour of its badge, if it has one.
+        private const double LabelDetail = 2;
+        private const int MaxLabelPictures = 400;
+        private readonly Dictionary<(TextLayout Text, uint Badge), RenderTargetBitmap> _labelPictures = [];
 
         private readonly UprightGemPainter _upright;
         private readonly NotePainter _uprightNotes;
@@ -48,10 +63,16 @@ namespace ChartBuilder.Controls.Editing
                 // The notes are drawn in the layer on the plane, with their tails, or only the tails: both again.
                 _camera = value;
                 _upright.Camera = value;
+                _gems.PlainTails = value is not null;
                 _pressOffset = default;
 
                 // Tilted, the layers are not kept as pictures and their pages have no pixel limit.
                 UpdatePaging();
+
+                // And the canvas does not clip to its bounds: a tilt makes that a clip to a slanted quadrilateral, which costs the graphics
+                // card a great deal each frame whatever is drawn. The host clips to its own rectangle, and what is drawn past the plane's
+                // ends, by a few pixels, is under the fade or off the host.
+                ClipToBounds = value is null;
                 InvalidateLayers();
             }
         }
@@ -100,7 +121,25 @@ namespace ChartBuilder.Controls.Editing
         /// </summary>
         public void PaintGems(DrawingContext context)
         {
+            long start = FramePerf.Now(_perf);
+            try
+            {
+                PaintGemsCore(context);
+            }
+            finally
+            {
+                _perf?.Add(FramePerf.Slot.Gems, start);
+            }
+        }
+
+        private void PaintGemsCore(DrawingContext context)
+        {
             _upright.BeginScene();
+            if (FramePerf.IsOff(FramePerf.Part.StandingNotes))
+                return;
+
+            using var options = context.PushRenderOptions(UprightGemPainter.SpriteOptions);
+
             if (SceneOfGems() is not { } scene)
                 return;
 
@@ -126,6 +165,22 @@ namespace ChartBuilder.Controls.Editing
         /// erase tool would take away and a synchronized region syncs, marked over. The rest, a sustain's tail and the rail, is on the plane.
         /// </summary>
         public void PaintGemMarks(DrawingContext context)
+        {
+            long start = FramePerf.Now(_perf);
+            try
+            {
+                // The frame-time readout, if it is asked for, is at the bottom, not tilted with the plane: the far end fades over the top.
+                if (_camera is { } camera)
+                    _perf?.Draw(context, new Point(6, camera.HostHeight - 6), upwards: true);
+                PaintGemMarksCore(context);
+            }
+            finally
+            {
+                _perf?.Add(FramePerf.Slot.Marks, start);
+            }
+        }
+
+        private void PaintGemMarksCore(DrawingContext context)
         {
             if (SceneOfGems() is not { } scene)
                 return;
@@ -169,13 +224,49 @@ namespace ChartBuilder.Controls.Editing
                 return;
 
             double scale = Math.Max(camera.ScaleAt(foot.Y), MinLabelScale);
+            var corner = new Point(rightAligned ? -text.Width : 0, -text.Height - raise);
+
+            // From its picture, which is the text with a unit round it, where its badge reaches: drawn as the text is, from its corner,
+            // in the units of the plane's scale there.
+            if (badge is null || badge is ISolidColorBrush)
+            {
+                var picture = LabelPicture(text, badge as ISolidColorBrush);
+                double width = picture.PixelSize.Width / LabelDetail, height = picture.PixelSize.Height / LabelDetail;
+                context.DrawImage(picture, new Rect(0, 0, picture.PixelSize.Width, picture.PixelSize.Height), new Rect(at.X + ((corner.X - 1) * scale), at.Y + ((corner.Y - 1) * scale), width * scale, height * scale));
+                return;
+            }
+
             using (context.PushTransform(Matrix.CreateScale(scale, scale) * Matrix.CreateTranslation(at.X, at.Y)))
             {
-                var corner = new Point(rightAligned ? -text.Width : 0, -text.Height - raise);
-                if (badge is not null)
-                    context.FillRectangle(badge, new Rect(corner, new Size(text.Width, text.Height)).Inflate(1));
+                context.FillRectangle(badge, new Rect(corner, new Size(text.Width, text.Height)).Inflate(1));
                 text.Draw(context, corner);
             }
+        }
+
+        /// <summary>The picture of a label: its text, on its badge when it has one, with a unit all round; made once.</summary>
+        private RenderTargetBitmap LabelPicture(TextLayout text, ISolidColorBrush? badge)
+        {
+            var key = (text, badge is null ? 0u : badge.Color.ToUInt32());
+            if (_labelPictures.TryGetValue(key, out var picture))
+                return picture;
+
+            if (_labelPictures.Count >= MaxLabelPictures)
+            {
+                foreach (var old in _labelPictures.Values)
+                    old.Dispose();
+                _labelPictures.Clear();
+            }
+
+            int width = (int)Math.Ceiling((text.Width + 2) * LabelDetail), height = (int)Math.Ceiling((text.Height + 2) * LabelDetail);
+            picture = new RenderTargetBitmap(new PixelSize(width, height), new Vector(96 * LabelDetail, 96 * LabelDetail));
+            using (var drawing = picture.CreateDrawingContext())
+            {
+                if (badge is not null)
+                    drawing.FillRectangle(badge, new Rect(0, 0, text.Width + 2, text.Height + 2));
+                text.Draw(drawing, new Point(1, 1));
+            }
+
+            return _labelPictures[key] = picture;
         }
 
         /// <summary>The marks of a forced or tapped chord, beside it, as <see cref="DrawForcing"/> draws them but standing up: H, S and T, the smaller the further they are.</summary>
@@ -185,18 +276,42 @@ namespace ChartBuilder.Controls.Editing
                 return;
 
             string marks = (flags.HasFlag(ChordFlags.ForceHopo) ? "H" : "") + (flags.HasFlag(ChordFlags.ForceStrum) ? "S" : "") + (flags.HasFlag(ChordFlags.Tap) ? "T" : "");
-            var text = Label(marks, 9, AccentBrush ?? DefaultAccentBrush);
+            var brush = AccentBrush ?? DefaultAccentBrush;
+            var text = Label(marks, 9, brush);
             double edge = projection.LaneFrom + (projection.LaneSize * slots.Slots.Count);
             var at = camera.Project(new Point(edge + 2, along));
             double scale = camera.ScaleAt(along);
 
-            // Drawn at the size of the lanes there, from the point the lane's edge is at, raised to about a gem's height.
-            using (context.PushTransform(Matrix.CreateScale(scale, scale) * Matrix.CreateTranslation(at.X, at.Y)))
+            // Drawn at the size of the lanes there, from the point the lane's edge is at, raised to about a gem's height: from its picture,
+            // which is the badge, a unit beyond the letters all round, as they were drawn with the origin at the letters' bottom left.
+            var picture = ForcingPicture(marks, text, brush);
+            double width = picture.PixelSize.Width / ForcingDetail, height = picture.PixelSize.Height / ForcingDetail;
+            context.DrawImage(picture, new Rect(0, 0, picture.PixelSize.Width, picture.PixelSize.Height), new Rect(at.X - scale, at.Y - ((text.Height + 1) * scale), width * scale, height * scale));
+        }
+
+        /// <summary>The badge and letters of a forcing mark, made once for each, and each colour the accent comes in.</summary>
+        private RenderTargetBitmap ForcingPicture(string marks, TextLayout text, IBrush brush)
+        {
+            uint color = brush is ISolidColorBrush solid ? solid.Color.ToUInt32() : 0;
+            if (_forcingPictures.TryGetValue((marks, color), out var picture))
+                return picture;
+
+            if (_forcingPictures.Count >= MaxForcingPictures)
             {
-                var corner = new Point(0, -text.Height);
-                context.FillRectangle(BadgeBrush, new Rect(corner, new Size(text.Width, text.Height)).Inflate(1));
-                text.Draw(context, corner);
+                foreach (var old in _forcingPictures.Values)
+                    old.Dispose();
+                _forcingPictures.Clear();
             }
+
+            int width = (int)Math.Ceiling((text.Width + 2) * ForcingDetail), height = (int)Math.Ceiling((text.Height + 2) * ForcingDetail);
+            picture = new RenderTargetBitmap(new PixelSize(width, height), new Vector(96 * ForcingDetail, 96 * ForcingDetail));
+            using (var drawing = picture.CreateDrawingContext())
+            {
+                drawing.FillRectangle(BadgeBrush, new Rect(0, 0, text.Width + 2, text.Height + 2));
+                text.Draw(drawing, new Point(1, 1));
+            }
+
+            return _forcingPictures[(marks, color)] = picture;
         }
     }
 }
