@@ -28,11 +28,26 @@ namespace ChartBuilder.Controls.Editing
 
         protected override LaneView View => LaneView.Highway;
 
+        // The projection last worked out, and what it was for: every layer of the lane, the notes standing up and the pointer ask for
+        // it each frame, and a lane laid out the same with the cursor in the same place is projected the same.
+        private (Size Size, LaneSlots Slots, EditorViewport Viewport, double Cursor, HighwayLength Length, int PhraseRows, LaneExtras Extras, bool Tilted) _projectedFor;
+        private LaneProjection? _projected;
+
         protected override double BesideSizeFor(Size size) => Math.Clamp(size.Width * 0.2, 48, 140);
 
         protected override double TimeAxisLength(Size size) => Math.Max(1, size.Height);
 
         protected override LaneProjection Project(Size size, LaneSlots slots, EditorViewport viewport, HighwayLength length, int phraseRows)
+        {
+            var key = (size, slots, viewport, viewport.Cursor, length, phraseRows, Extras, Camera is not null);
+            if (_projected is { } known && key.Equals(_projectedFor))
+                return known;
+
+            _projectedFor = key;
+            return _projected = ProjectNow(size, slots, viewport, length, phraseRows);
+        }
+
+        private LaneProjection ProjectNow(Size size, LaneSlots slots, EditorViewport viewport, HighwayLength length, int phraseRows)
         {
             int count = slots.Slots.Count;
             double phrases = PhraseRailSize(phraseRows);

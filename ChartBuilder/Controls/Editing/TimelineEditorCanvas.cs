@@ -30,11 +30,21 @@ namespace ChartBuilder.Controls.Editing
 
         protected override double TimeAxisLength(Size size) => Math.Max(1, size.Width);
 
+        // The projection last worked out, and what it was for: every layer of the lane, the notes standing up and the pointer ask for
+        // it each frame, and a lane laid out the same with the cursor in the same place is projected the same.
+        private (Size Size, LaneSlots Slots, EditorViewport Viewport, double Cursor, HighwayLength Length, int PhraseRows, LaneExtras Extras) _projectedFor;
+        private LaneProjection? _projected;
+
         protected override LaneProjection Project(Size size, LaneSlots slots, EditorViewport viewport, HighwayLength length, int phraseRows)
         {
+            var key = (size, slots, viewport, viewport.Cursor, length, phraseRows, Extras);
+            if (_projected is { } known && key.Equals(_projectedFor))
+                return known;
+
+            _projectedFor = key;
             double top = RulerHeight + StripHeight(size) + PhraseRailSize(phraseRows) + MarkHeight;
             double height = Math.Max(1, size.Height - top - 4 - OnsetStripSize);
-            return LaneProjection.Of(LaneView.Timeline, 0, Math.Max(1, size.Width), top, height / slots.Slots.Count, slots, viewport, length);
+            return _projected = LaneProjection.Of(LaneView.Timeline, 0, Math.Max(1, size.Width), top, height / slots.Slots.Count, slots, viewport, length);
         }
 
         protected override Rect LabelsArea(Size size, LaneProjection projection) => new(projection.TimeFrom, 0, projection.TimeLength, RulerHeight);

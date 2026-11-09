@@ -8,6 +8,7 @@ using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Immutable;
+using Avalonia.Threading;
 using ChartShared.Audio.Waveforms;
 using ChartShared.Core.Charting;
 using ChartShared.Core.Charting.Editing;
@@ -296,8 +297,26 @@ namespace ChartShared.UI.Controls.Highway
         private readonly List<BandGlyph> _bands = [];
         private readonly LabelCache _labels = new();
         private bool _isFrameRequested;
+
+        // The callback for each frame, made once rather than each time one is asked for.
+        private readonly Action<TimeSpan> _onFrame;
+
+        // Where a second is down the highway being drawn: one delegate, of whichever projection is set, rather than one for each drawn.
+        private readonly Func<double, double> _alongOf;
+        private LaneProjection? _alongOfProjection;
         private Rect? _viewport;
         private TimeSpan _drawnAt = TimeSpan.MinValue;
+
+        // Out of sight (a panel collapsed or flown in, a section folded, the window minimized), the highway stops asking for a frame
+        // each time the screen is drawn, and looks again now and then instead: Avalonia doesn't say when a control's ancestors show it
+        // again, only when its own size or place in view changes, which wake it at once.
+        private static readonly TimeSpan ParkedPoll = TimeSpan.FromMilliseconds(250);
+        private DispatcherTimer? _parked;
+
+        // A count of the highway's drawings, for the frame-time readout (CHARTBUILDER_PERF=1), written to its log once a second.
+        private static readonly bool LogsRedraws = Environment.GetEnvironmentVariable("CHARTBUILDER_PERF") is "1" or "true";
+        private int _redraws;
+        private long _redrawsSince;
 
         // How brightly each column of the highway being drawn is lit; one for them all, as they're drawn one at a time.
         private double[] _hits = [];
@@ -438,6 +457,8 @@ namespace ChartShared.UI.Controls.Highway
 
         public NoteHighwayView()
         {
+            _onFrame = OnFrame;
+            _alongOf = seconds => _alongOfProjection!.AlongOf(seconds);
             _notes = new NotePainter(_gems);
             _upright = new UprightGemPainter(_gems);
             _uprightNotes = new NotePainter(_upright);
@@ -458,6 +479,10 @@ namespace ChartShared.UI.Controls.Highway
             }
             if (change.Property == SceneProperty || change.Property == IsVisibleProperty)
                 RequestFrame();
+
+            // Laid out from nothing, as a panel opened, it's drawn now, and goes on being drawn if it's in sight.
+            if (change.Property == BoundsProperty && change.GetOldValue<Rect>().Size != change.GetNewValue<Rect>().Size)
+                Wake(redraw: change.GetOldValue<Rect>().Width < 1 || change.GetOldValue<Rect>().Height < 1);
             if (change.Property == BoundsProperty || change.Property == LookAheadProperty || change.Property == LengthModeProperty || change.Property == PixelsPerSecondProperty)
                 ShareShownLookAhead();
 
@@ -484,6 +509,67 @@ namespace ChartShared.UI.Controls.Highway
             _viewport = e.EffectiveViewport;
             if (IsInViewport && !wasInViewport)
                 Redraw();
+            Wake(redraw: false);
+        }
+
+        /// <summary>
+        /// Whether the highway can't be seen, so nothing is drawn as the clock moves: hidden, it or what holds it; with no size, as in a
+        /// panel collapsed to nothing; scrolled out of view; or in a window that's minimized.
+        /// </summary>
+        private bool IsOutOfSight =>
+            !IsEffectivelyVisible || Bounds.Width < 1 || Bounds.Height < 1 || !IsInViewport
+            || TopLevel.GetTopLevel(this) is Window { WindowState: WindowState.Minimized };
+
+        /// <summary>Stops asking for frames while out of sight, and looks again every <see cref="ParkedPoll"/>.</summary>
+        private void Park()
+        {
+            if (_parked is null)
+            {
+                _parked = new DispatcherTimer { Interval = ParkedPoll };
+                _parked.Tick += (_, _) => Wake(redraw: true);
+            }
+
+            _parked.Start();
+        }
+
+        /// <summary>Back in sight after being parked: asks for frames again, and is drawn now when <paramref name="redraw"/>, as it may be stale.</summary>
+        private void Wake(bool redraw)
+        {
+            LogRedraws();
+            if (_parked is not { IsEnabled: true } parked || IsOutOfSight)
+                return;
+
+            parked.Stop();
+            if (redraw)
+                Redraw();
+            RequestFrame();
+        }
+
+        /// <summary>Writes how often the highway was drawn in the last second to the frame-time readout's log, when that's asked for.</summary>
+        private void LogRedraws()
+        {
+            if (!LogsRedraws)
+                return;
+
+            long now = System.Diagnostics.Stopwatch.GetTimestamp();
+            if (_redrawsSince == 0)
+                _redrawsSince = now;
+            double seconds = (now - _redrawsSince) / (double)System.Diagnostics.Stopwatch.Frequency;
+            if (seconds < 1)
+                return;
+
+            string line = string.Create(System.Globalization.CultureInfo.InvariantCulture,
+                $"{DateTime.Now:HH:mm:ss.fff} preview {(_camera is null ? "flat" : "persp")} {Bounds.Width:F0}x{Bounds.Height:F0} drawn {_redraws / seconds:F1}/s  {(IsOutOfSight ? "out of sight" : "in sight")}{(_parked is { IsEnabled: true } ? ", parked" : "")}{Environment.NewLine}");
+            _redraws = 0;
+            _redrawsSince = now;
+            try
+            {
+                System.IO.File.AppendAllText(System.IO.Path.Combine(System.IO.Path.GetTempPath(), "chartbuilder-perf.log"), line);
+            }
+            catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
+            {
+                // A readout that can't be kept is no loss.
+            }
         }
 
 
@@ -491,6 +577,7 @@ namespace ChartShared.UI.Controls.Highway
         {
             base.OnAttachedToVisualTree(e);
             RequestFrame();
+            Wake(redraw: true);
 
             // Shift pressed or let go with the pointer over a highway, or while scrubbing, shows the whole chart or the notes falling.
             _gestures.Mode.Attach();
@@ -500,12 +587,15 @@ namespace ChartShared.UI.Controls.Highway
         {
             base.OnDetachedFromVisualTree(e);
             _gestures.Mode.Detach();
+            _parked?.Stop();
         }
 
         public override void Render(DrawingContext context)
         {
             if (Scene is not { Lanes.Count: > 0 } scene || Bounds.Width <= 0 || Bounds.Height <= 0)
                 return;
+
+            _redraws++;
 
             // The time read for this frame, rather than reading the clock again.
             double now = NowSeconds;
@@ -606,7 +696,7 @@ namespace ChartShared.UI.Controls.Highway
                 for (int i = 1; i < lane.LaneCount; i++)
                 {
                     double x = bounds.X + (i * laneWidth);
-                    context.DrawLine(HighwayChrome.LaneDividerPen, new Point(x, bounds.Top), new Point(x, bounds.Bottom));
+                    HighwayChrome.DrawStraight(context, HighwayChrome.LaneDividerPen, new Point(x, bounds.Top), new Point(x, bounds.Bottom), _camera is not null);
                 }
 
                 using (context.PushTransform(Matrix.CreateTranslation(bounds.X, bounds.Y)))
@@ -617,13 +707,13 @@ namespace ChartShared.UI.Controls.Highway
 
                 double playhead = Math.Clamp(Y(now), bounds.Top, bounds.Bottom);
                 context.FillRectangle(LaneScrub.PlayedBrush, new Rect(bounds.X, playhead, bounds.Width, bounds.Bottom - playhead));
-                context.DrawLine(LaneScrub.PlayheadPen, new Point(bounds.X, playhead), new Point(bounds.Right, playhead));
+                HighwayChrome.DrawStraight(context, LaneScrub.PlayheadPen, new Point(bounds.X, playhead), new Point(bounds.Right, playhead), _camera is not null);
                 context.DrawRectangle(null, OverviewEdgePen, bounds.Deflate(0.5));
 
                 if (!double.IsNaN(pointerAt))
                 {
                     double at = Math.Clamp(pointerAt, bounds.Top, bounds.Bottom);
-                    context.DrawLine(LaneScrub.HoverPen, new Point(bounds.X, at), new Point(bounds.Right, at));
+                    HighwayChrome.DrawStraight(context, LaneScrub.HoverPen, new Point(bounds.X, at), new Point(bounds.Right, at), _camera is not null);
                     LaneScrub.DrawTimeTag(context, TimeAt(at), bounds, at, isAcross: true);
                 }
             }
@@ -843,7 +933,8 @@ namespace ChartShared.UI.Controls.Highway
         private void DrawHighway(DrawingContext context, HighwayScene scene, HighwayLane lane, Waveform? waveform, Rect bounds, double strike, double gem, double now, LaneProjection projection, int? selectedBand)
         {
             double from = projection.Start, to = projection.End;
-            Func<double, double> y = projection.AlongOf;
+            _alongOfProjection = projection;
+            var y = _alongOf;
             double laneWidth = bounds.Width / lane.LaneCount;
             var hits = HitsAt(lane, now);
 
@@ -875,7 +966,7 @@ namespace ChartShared.UI.Controls.Highway
                     });
                 }
 
-                HighwayChrome.DrawBands(context, _gems, LaneView.Highway, CollectionsMarshal.AsSpan(bands), bounds.X, bounds.Right);
+                HighwayChrome.DrawBands(context, _gems, LaneView.Highway, CollectionsMarshal.AsSpan(bands), bounds.X, bounds.Right, asRect: _camera is not null);
 
                 // The track as it's heard, inside the rails, so a note can be lined up with the sound it's played to. Scaled
                 // so its loudest peak fills the highway, so a quiet track's beats show as clearly as a loud one's.
@@ -892,13 +983,13 @@ namespace ChartShared.UI.Controls.Highway
                         new Rect(bounds.X + (column * laneWidth), strike * (1 - StrikeGlow.BeamReach), laneWidth, strike * StrikeGlow.BeamReach));
                 }
 
-                HighwayChrome.DrawLaneDividers(context, projection, 0, strike);
+                HighwayChrome.DrawLaneDividers(context, projection, 0, strike, asRect: _camera is not null);
 
                 for (int i = LowerBound(scene.BeatTimes, from); i < scene.BeatTimes.Length && scene.BeatTimes[i] <= to; i++)
                 {
                     double at = y(scene.BeatTimes[i]);
                     if (at < strike)
-                        HighwayChrome.DrawBeatLine(context, LaneView.Highway, at, bounds.X, bounds.Right, scene.IsMeasure[i]);
+                        HighwayChrome.DrawBeatLine(context, LaneView.Highway, at, bounds.X, bounds.Right, scene.IsMeasure[i], asRect: _camera is not null);
                 }
 
                 // The rails down each side, as far as the strike bar.
@@ -940,7 +1031,7 @@ namespace ChartShared.UI.Controls.Highway
         private void DrawStrikeBar(DrawingContext context, HighwayLane lane, LaneProjection projection, Rect bounds, double strike, double gem, double[] hits)
         {
             var band = new Rect(bounds.X, strike - (gem * 0.85), bounds.Width, gem * 1.7);
-            HighwayChrome.DrawStrikeBand(context, LaneView.Highway, band, HighwayChrome.StrikeBandBrush);
+            HighwayChrome.DrawStrikeBand(context, LaneView.Highway, band, HighwayChrome.StrikeBandBrush, asRect: _camera is not null);
 
             for (int column = 0; column < lane.LaneCount; column++)
             {
@@ -1101,7 +1192,6 @@ namespace ChartShared.UI.Controls.Highway
             if (_camera is null || Scene is not { Lanes.Count: > 0 } scene || Bounds.Width <= 0 || Bounds.Height <= 0)
                 return;
 
-            using var options = context.PushRenderOptions(UprightGemPainter.SpriteOptions);
             double now = NowSeconds;
             double lookAhead = EffectiveLookAhead;
             double strike = Bounds.Height * StrikeFraction;
@@ -1182,11 +1272,11 @@ namespace ChartShared.UI.Controls.Highway
         /// <summary>Asks to be called back when the screen is next drawn, while there's a highway to draw.</summary>
         private void RequestFrame()
         {
-            if (_isFrameRequested || Scene is not { Lanes.Count: > 0 } || !IsVisible || TopLevel.GetTopLevel(this) is not { } topLevel)
+            if (_isFrameRequested || _parked is { IsEnabled: true } || Scene is not { Lanes.Count: > 0 } || !IsVisible || TopLevel.GetTopLevel(this) is not { } topLevel)
                 return;
 
             _isFrameRequested = true;
-            topLevel.RequestAnimationFrame(OnFrame);
+            topLevel.RequestAnimationFrame(_onFrame);
         }
 
         private void OnFrame(TimeSpan frame)
@@ -1195,13 +1285,14 @@ namespace ChartShared.UI.Controls.Highway
             if (TopLevel.GetTopLevel(this) is null)
                 return;
 
-            // Paused, nothing moves, so nothing is redrawn; nor is it while it's scrolled out of view, where a highway fading
-            // to or from its whole chart is put where it's going.
-            if (!IsEffectivelyVisible || !IsInViewport)
+            // Paused, nothing moves, so nothing is redrawn; nor is it while it's out of sight, where a highway fading to or from its
+            // whole chart is put where it's going, and it stops asking for frames until it's in sight again.
+            LogRedraws();
+            if (IsOutOfSight)
             {
                 for (int i = 0; i < _fades.Count; i++)
                     _fades[i].Finish(IsOverviewShown(i));
-                RequestFrame();
+                Park();
                 return;
             }
 

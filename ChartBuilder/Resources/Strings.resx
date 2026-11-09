@@ -3048,6 +3048,14 @@ Saving also changes song.ini:
   <data name="PreviewOpenWindowToolTip" xml:space="preserve">
     <value>Open the preview in a window of its own, which can go full screen</value>
   </data>
+  <data name="PreviewShowPerspectiveToolTip" xml:space="preserve">
+    <value>Show the highway in perspective</value>
+    <comment>The preview's button tooltip: tilt the highway back in perspective, with the notes standing up, as in the games.</comment>
+  </data>
+  <data name="PreviewShowFlatToolTip" xml:space="preserve">
+    <value>Show the highway flat, from above</value>
+    <comment>The preview's button tooltip: lay the highway flat again, seen from straight above.</comment>
+  </data>
   <data name="PreviewPractice" xml:space="preserve">
     <value>Practice</value>
   </data>

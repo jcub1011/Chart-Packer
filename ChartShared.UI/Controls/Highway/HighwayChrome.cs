@@ -75,9 +75,30 @@ namespace ChartShared.UI.Controls.Highway
             return new Rect(At(view, first, Math.Min(across1, across2)), At(view, last, Math.Max(across1, across2)));
         }
 
+        /// <summary>
+        /// A straight line in <paramref name="pen"/> from <paramref name="from"/> to <paramref name="to"/>; with <paramref name="asRect"/>, one
+        /// along either axis, in a plain pen, is filled as the rectangle it covers instead. For a highway tilted back in perspective: the
+        /// graphics card draws a line through the tilt as a path it works out again each frame, and a rectangle as a simple shape, and a
+        /// lane's beat, grid and divider lines are hundreds a frame. Flat, a line is drawn as a line.
+        /// </summary>
+        public static void DrawStraight(DrawingContext context, IPen pen, Point from, Point to, bool asRect)
+        {
+            if (asRect && pen.DashStyle is null && pen.Brush is { } brush && (from.X == to.X || from.Y == to.Y))
+            {
+                double thickness = pen.Thickness, half = thickness / 2;
+                context.FillRectangle(brush, from.X == to.X
+                    ? new Rect(from.X - half, Math.Min(from.Y, to.Y), thickness, Math.Abs(to.Y - from.Y))
+                    : new Rect(Math.Min(from.X, to.X), from.Y - half, Math.Abs(to.X - from.X), thickness));
+                return;
+            }
+
+            context.DrawLine(pen, from, to);
+        }
+
         /// <summary>A beat's line, or a measure's, at <paramref name="along"/> across the lanes from <paramref name="across1"/> to <paramref name="across2"/>.</summary>
-        public static void DrawBeatLine(DrawingContext context, LaneView view, double along, double across1, double across2, bool isMeasure) =>
-            context.DrawLine(isMeasure ? MeasurePen : BeatPen, At(view, along, across1), At(view, along, across2));
+        /// <param name="asRect">Whether it's filled as a rectangle, for a highway tilted back (see <see cref="DrawStraight"/>).</param>
+        public static void DrawBeatLine(DrawingContext context, LaneView view, double along, double across1, double across2, bool isMeasure, bool asRect = false) =>
+            DrawStraight(context, isMeasure ? MeasurePen : BeatPen, At(view, along, across1), At(view, along, across2), asRect);
 
         /// <summary>
         /// The lines between <paramref name="projection"/>'s lanes, from <paramref name="alongFrom"/> to <paramref name="alongTo"/>
@@ -85,7 +106,8 @@ namespace ChartShared.UI.Controls.Highway
         /// </summary>
         /// <param name="alternateRows">A brush to shade every other lane with, for rows of a timeline that are hard to tell apart; null for none.</param>
         /// <param name="halves">A pen for the line down the middle of a lane two share (GHL's white and black frets); null for none.</param>
-        public static void DrawLaneDividers(DrawingContext context, LaneProjection projection, double alongFrom, double alongTo, IBrush? alternateRows = null, IPen? halves = null)
+        /// <param name="asRect">Whether the lines are filled as rectangles, for a highway tilted back (see <see cref="DrawStraight"/>).</param>
+        public static void DrawLaneDividers(DrawingContext context, LaneProjection projection, double alongFrom, double alongTo, IBrush? alternateRows = null, IPen? halves = null, bool asRect = false)
         {
             var view = projection.View;
             for (int i = 0; i < projection.Slots.Slots.Count; i++)
@@ -94,26 +116,27 @@ namespace ChartShared.UI.Controls.Highway
                 if (alternateRows is not null && i % 2 == 1)
                     context.FillRectangle(alternateRows, Box(view, alongFrom, alongTo, edge, edge + projection.LaneSize));
                 if (i > 0)
-                    context.DrawLine(LaneDividerPen, At(view, alongFrom, edge), At(view, alongTo, edge));
+                    DrawStraight(context, LaneDividerPen, At(view, alongFrom, edge), At(view, alongTo, edge), asRect);
 
                 if (halves is not null && projection.Slots.SharedOf(i) is not null)
-                    context.DrawLine(halves, At(view, alongFrom, edge + (projection.LaneSize / 2)), At(view, alongTo, edge + (projection.LaneSize / 2)));
+                    DrawStraight(context, halves, At(view, alongFrom, edge + (projection.LaneSize / 2)), At(view, alongTo, edge + (projection.LaneSize / 2)), asRect);
             }
         }
 
         /// <summary>The strike line's band across the lanes, filled with <paramref name="brush"/>, with a line along each of its edges across them.</summary>
-        public static void DrawStrikeBand(DrawingContext context, LaneView view, Rect band, IBrush brush)
+        /// <param name="asRect">Whether the edges are filled as rectangles, for a highway tilted back (see <see cref="DrawStraight"/>).</param>
+        public static void DrawStrikeBand(DrawingContext context, LaneView view, Rect band, IBrush brush, bool asRect = false)
         {
             context.FillRectangle(brush, band);
             if (view == LaneView.Highway)
             {
-                context.DrawLine(StrikeEdgePen, band.TopLeft, band.TopRight);
-                context.DrawLine(StrikeEdgePen, band.BottomLeft, band.BottomRight);
+                DrawStraight(context, StrikeEdgePen, band.TopLeft, band.TopRight, asRect);
+                DrawStraight(context, StrikeEdgePen, band.BottomLeft, band.BottomRight, asRect);
             }
             else
             {
-                context.DrawLine(StrikeEdgePen, band.TopLeft, band.BottomLeft);
-                context.DrawLine(StrikeEdgePen, band.TopRight, band.BottomRight);
+                DrawStraight(context, StrikeEdgePen, band.TopLeft, band.BottomLeft, asRect);
+                DrawStraight(context, StrikeEdgePen, band.TopRight, band.BottomRight, asRect);
             }
         }
 
@@ -123,7 +146,8 @@ namespace ChartShared.UI.Controls.Highway
         /// tint so none is hidden where bands overlap, then an outline round the selected.
         /// </summary>
         /// <param name="alongFrom">The nearest along the time axis anything is drawn, in pixels; see <see cref="Box"/>.</param>
-        public static void DrawBands(DrawingContext context, GemPainter gems, LaneView view, ReadOnlySpan<BandGlyph> bands, double across1, double across2, double alongFrom = double.NegativeInfinity, double alongTo = double.PositiveInfinity)
+        /// <param name="asRect">Whether the edge lines are filled as rectangles, for a highway tilted back (see <see cref="DrawStraight"/>).</param>
+        public static void DrawBands(DrawingContext context, GemPainter gems, LaneView view, ReadOnlySpan<BandGlyph> bands, double across1, double across2, double alongFrom = double.NegativeInfinity, double alongTo = double.PositiveInfinity, bool asRect = false)
         {
             foreach (var band in bands)
                 context.FillRectangle(gems.Brush(HighwayPalette.WithAlpha(band.Color, band.TintAlpha)), Box(view, band.Start, band.End, across1, across2, alongFrom, alongTo));
@@ -132,11 +156,11 @@ namespace ChartShared.UI.Controls.Highway
             {
                 var pen = gems.Pen(HighwayPalette.WithAlpha(band.Color, BandEdgeAlpha), 1);
                 double start = Math.Clamp(band.Start, alongFrom, alongTo);
-                context.DrawLine(pen, At(view, start, across1), At(view, start, across2));
+                DrawStraight(context, pen, At(view, start, across1), At(view, start, across2), asRect);
                 if (band.HasEnd)
                 {
                     double end = Math.Clamp(band.End, alongFrom, alongTo);
-                    context.DrawLine(pen, At(view, end, across1), At(view, end, across2));
+                    DrawStraight(context, pen, At(view, end, across1), At(view, end, across2), asRect);
                 }
             }
 

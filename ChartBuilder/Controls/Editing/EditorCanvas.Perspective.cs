@@ -30,15 +30,19 @@ namespace ChartBuilder.Controls.Editing
         // pixels to each. A text drawn is a costly drawing for the graphics card, each frame, and a stretch of the song that is all forced
         // notes has dozens in view; a picture is as costly as any other.
         private const double ForcingDetail = 3;
-        private const int MaxForcingPictures = 64;
-        private readonly Dictionary<(string Marks, uint Color), RenderTargetBitmap> _forcingPictures = [];
 
         // The same for the labels that stand up beside the plane: the measures' numbers, the tempo markers, the sections' names, the solos'
         // counts. Each is a text, as costly to draw as the forcing marks are, and a label is the same each frame it is in view; it is told
         // by its text as the label cache made it, and the colour of its badge, if it has one.
         private const double LabelDetail = 2;
-        private const int MaxLabelPictures = 400;
-        private readonly Dictionary<(TextLayout Text, uint Badge), RenderTargetBitmap> _labelPictures = [];
+
+        // Both kept side by side on one page, drawn from their parts of it (PictureAtlas): told by the label's text as the label cache
+        // made it, or a forcing mark's letters, and the colour of the badge or the accent. A page holds a few hundred of them.
+        private static readonly PixelSize PicturePage = new(1024, 512);
+        private readonly PictureAtlas<(object Source, uint Color)> _pictures = new(PicturePage);
+
+        // A forcing mark's letters for each combination of the flags, made once.
+        private static readonly string[] ForcingMarks = ["", "H", "S", "HS", "T", "HT", "ST", "HST"];
 
         private readonly UprightGemPainter _upright;
         private readonly NotePainter _uprightNotes;
@@ -74,6 +78,11 @@ namespace ChartBuilder.Controls.Editing
                 // ends, by a few pixels, is under the fade or off the host.
                 ClipToBounds = value is null;
                 InvalidateLayers();
+
+                // Tilted, the strike line and the notes' tails are drawn with the song, and their own layers are empty; flat, their own.
+                // Asked to draw again, they ask the song (Layer.Redraw), so their own drawings are put right here, once.
+                _strike.RedrawItself();
+                _notes.RedrawItself();
             }
         }
 
@@ -138,15 +147,13 @@ namespace ChartBuilder.Controls.Editing
             if (FramePerf.IsOff(FramePerf.Part.StandingNotes))
                 return;
 
-            using var options = context.PushRenderOptions(UprightGemPainter.SpriteOptions);
-
             if (SceneOfGems() is not { } scene)
                 return;
 
             // A note is drawn from its start, but stands up from its floor: it's seen until its box has gone below the host's bottom,
             // well after its start has, so the ticks reach back that far, past the screen's start. (The painter holds the real cull.)
             double reach = _upright.ReachBelow(GemSize(scene.Screen)) / scene.Screen.PixelsPerSecond;
-            var (fromTick, toTick) = TicksOf(scene.Session, scene.Screen.Widened(reach, 0));
+            var (fromTick, toTick) = TicksOf(scene.Session, scene.Screen.Start - reach, scene.Screen.End);
 
             // All the text stands up, to be read: the measures' numbers, the tempo markers and the sections' names in the margin, a
             // proposed tempo map's labels, and the solos' counts. (The forcing marks are drawn with the notes.)
@@ -228,11 +235,10 @@ namespace ChartBuilder.Controls.Editing
 
             // From its picture, which is the text with a unit round it, where its badge reaches: drawn as the text is, from its corner,
             // in the units of the plane's scale there.
-            if (badge is null || badge is ISolidColorBrush)
+            if ((badge is null || badge is ISolidColorBrush) && LabelPicture(text, badge as ISolidColorBrush) is { } picture)
             {
-                var picture = LabelPicture(text, badge as ISolidColorBrush);
-                double width = picture.PixelSize.Width / LabelDetail, height = picture.PixelSize.Height / LabelDetail;
-                context.DrawImage(picture, new Rect(0, 0, picture.PixelSize.Width, picture.PixelSize.Height), new Rect(at.X + ((corner.X - 1) * scale), at.Y + ((corner.Y - 1) * scale), width * scale, height * scale));
+                double width = picture.Source.Width / LabelDetail, height = picture.Source.Height / LabelDetail;
+                context.DrawImage(picture.Page, picture.Source, new Rect(at.X + ((corner.X - 1) * scale), at.Y + ((corner.Y - 1) * scale), width * scale, height * scale));
                 return;
             }
 
@@ -243,22 +249,18 @@ namespace ChartBuilder.Controls.Editing
             }
         }
 
-        /// <summary>The picture of a label: its text, on its badge when it has one, with a unit all round; made once.</summary>
-        private RenderTargetBitmap LabelPicture(TextLayout text, ISolidColorBrush? badge)
+        /// <summary>
+        /// The picture of a label: its text, on its badge when it has one, with a unit all round, made once: the page it's on and where;
+        /// null when it's too large for one.
+        /// </summary>
+        private (WriteableBitmap Page, Rect Source)? LabelPicture(TextLayout text, ISolidColorBrush? badge)
         {
-            var key = (text, badge is null ? 0u : badge.Color.ToUInt32());
-            if (_labelPictures.TryGetValue(key, out var picture))
-                return picture;
-
-            if (_labelPictures.Count >= MaxLabelPictures)
-            {
-                foreach (var old in _labelPictures.Values)
-                    old.Dispose();
-                _labelPictures.Clear();
-            }
+            var key = ((object)text, badge is null ? 0u : badge.Color.ToUInt32());
+            if (_pictures.TryGet(key, out var page, out var source))
+                return (page, source);
 
             int width = (int)Math.Ceiling((text.Width + 2) * LabelDetail), height = (int)Math.Ceiling((text.Height + 2) * LabelDetail);
-            picture = new RenderTargetBitmap(new PixelSize(width, height), new Vector(96 * LabelDetail, 96 * LabelDetail));
+            using var picture = new RenderTargetBitmap(new PixelSize(width, height), new Vector(96 * LabelDetail, 96 * LabelDetail));
             using (var drawing = picture.CreateDrawingContext())
             {
                 if (badge is not null)
@@ -266,7 +268,7 @@ namespace ChartBuilder.Controls.Editing
                 text.Draw(drawing, new Point(1, 1));
             }
 
-            return _labelPictures[key] = picture;
+            return _pictures.TryAdd(key, picture, out page, out source) ? (page, source) : null;
         }
 
         /// <summary>The marks of a forced or tapped chord, beside it, as <see cref="DrawForcing"/> draws them but standing up: H, S and T, the smaller the further they are.</summary>
@@ -275,7 +277,7 @@ namespace ChartBuilder.Controls.Editing
             if (_camera is not { } camera)
                 return;
 
-            string marks = (flags.HasFlag(ChordFlags.ForceHopo) ? "H" : "") + (flags.HasFlag(ChordFlags.ForceStrum) ? "S" : "") + (flags.HasFlag(ChordFlags.Tap) ? "T" : "");
+            string marks = ForcingMarks[((flags & ChordFlags.ForceHopo) != 0 ? 1 : 0) | ((flags & ChordFlags.ForceStrum) != 0 ? 2 : 0) | ((flags & ChordFlags.Tap) != 0 ? 4 : 0)];
             var brush = AccentBrush ?? DefaultAccentBrush;
             var text = Label(marks, 9, brush);
             double edge = projection.LaneFrom + (projection.LaneSize * slots.Slots.Count);
@@ -284,34 +286,29 @@ namespace ChartBuilder.Controls.Editing
 
             // Drawn at the size of the lanes there, from the point the lane's edge is at, raised to about a gem's height: from its picture,
             // which is the badge, a unit beyond the letters all round, as they were drawn with the origin at the letters' bottom left.
-            var picture = ForcingPicture(marks, text, brush);
-            double width = picture.PixelSize.Width / ForcingDetail, height = picture.PixelSize.Height / ForcingDetail;
-            context.DrawImage(picture, new Rect(0, 0, picture.PixelSize.Width, picture.PixelSize.Height), new Rect(at.X - scale, at.Y - ((text.Height + 1) * scale), width * scale, height * scale));
+            if (ForcingPicture(marks, text, brush) is not { } picture)
+                return;
+
+            double width = picture.Source.Width / ForcingDetail, height = picture.Source.Height / ForcingDetail;
+            context.DrawImage(picture.Page, picture.Source, new Rect(at.X - scale, at.Y - ((text.Height + 1) * scale), width * scale, height * scale));
         }
 
-        /// <summary>The badge and letters of a forcing mark, made once for each, and each colour the accent comes in.</summary>
-        private RenderTargetBitmap ForcingPicture(string marks, TextLayout text, IBrush brush)
+        /// <summary>The badge and letters of a forcing mark, made once for each, and each colour the accent comes in: the page it's on and where.</summary>
+        private (WriteableBitmap Page, Rect Source)? ForcingPicture(string marks, TextLayout text, IBrush brush)
         {
-            uint color = brush is ISolidColorBrush solid ? solid.Color.ToUInt32() : 0;
-            if (_forcingPictures.TryGetValue((marks, color), out var picture))
-                return picture;
-
-            if (_forcingPictures.Count >= MaxForcingPictures)
-            {
-                foreach (var old in _forcingPictures.Values)
-                    old.Dispose();
-                _forcingPictures.Clear();
-            }
+            var key = ((object)marks, brush is ISolidColorBrush solid ? solid.Color.ToUInt32() : 0);
+            if (_pictures.TryGet(key, out var page, out var source))
+                return (page, source);
 
             int width = (int)Math.Ceiling((text.Width + 2) * ForcingDetail), height = (int)Math.Ceiling((text.Height + 2) * ForcingDetail);
-            picture = new RenderTargetBitmap(new PixelSize(width, height), new Vector(96 * ForcingDetail, 96 * ForcingDetail));
+            using var picture = new RenderTargetBitmap(new PixelSize(width, height), new Vector(96 * ForcingDetail, 96 * ForcingDetail));
             using (var drawing = picture.CreateDrawingContext())
             {
                 drawing.FillRectangle(BadgeBrush, new Rect(0, 0, text.Width + 2, text.Height + 2));
                 text.Draw(drawing, new Point(1, 1));
             }
 
-            return _forcingPictures[(marks, color)] = picture;
+            return _pictures.TryAdd(key, picture, out page, out source) ? (page, source) : null;
         }
     }
 }

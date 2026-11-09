@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using Avalonia;
 using Avalonia.Media;
-using Avalonia.Media.Imaging;
+using Avalonia.Media.Immutable;
 using ChartShared.Core.Charts;
 
 namespace ChartShared.UI.Controls.Highway
@@ -14,8 +14,9 @@ namespace ChartShared.UI.Controls.Highway
     /// </summary>
     /// <remarks>
     /// A note is no more than about fifty pixels across and twenty deep, so across it the perspective is a scale, and a gem
-    /// is drawn as rounded rectangles stacked up from its footprint, which allocates nothing: a busy highway draws hundreds
-    /// of them each frame. The tails are not drawn here; they lie flat on the plane, where the <see cref="GemPainter"/> draws them.
+    /// is drawn as a few rounded rectangles over its footprint (its floor, its sides swept up from it, its top), which allocates
+    /// nothing: a busy highway draws hundreds of them each frame. The tails are not drawn here; they lie flat on the plane, where
+    /// the <see cref="GemPainter"/> draws them.
     /// </remarks>
     public sealed class UprightGemPainter : IGemPainter
     {
@@ -24,10 +25,8 @@ namespace ChartShared.UI.Controls.Highway
         private const double GemRise = 0.72;
         private const double BarRise = 1.0;
 
-        // How many rounded rectangles make up a box's sides, from its base to its top, at most, and the least height in pixels each is of.
-        // Far notes are small, and every layer is a drawing the graphics card does each frame, for each note.
+        // How many steps a box's sides are shaded in, from its base to its top.
         private const int SideLayers = 4;
-        private const int MaxSideLayers = 12;
 
         // How far a box's sides are darkened at its base and at its top, and how far its top is lightened.
         private const double BaseDarken = 0.62;
@@ -37,34 +36,42 @@ namespace ChartShared.UI.Controls.Highway
         // A bar's width is more than this many times its depth; nothing else is that wide.
         private const double BarAspect = 6;
 
-        private static readonly IBrush ShadowBrush = new Avalonia.Media.Immutable.ImmutableSolidColorBrush(Color.FromArgb(0x70, 0x00, 0x00, 0x00));
+        private static readonly IBrush ShadowBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x70, 0x00, 0x00, 0x00));
+
+        // How many outlined cymbals' hexagons of a size are kept before they are all let go: sizes change with every depth a note is
+        // at, and a shape is cheap to make again, so the few in view are made again the next frame.
+        private const int MaxShapes = 512;
+
+        // A note is drawn in plain fills alone, a few rounded rectangles over one another, which the graphics card draws as simple shapes
+        // and batches: its outline and edges are each a shape a little larger behind it, not a stroke. A stroke round a rounded rectangle
+        // as small as a far note's, through the tilt, is a path it works out again each frame, and a gradient breaks the batch; drawn
+        // so, a busy highway's notes took 10 ms a frame. (Nor is a note a picture, drawn stretched: as cheap to draw, but each drawn
+        // picture is an object with a finalizer, made each frame for each note, for the collector to clear.)
+        private static readonly IBrush OutlineBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xA0, 0x00, 0x00, 0x00));
+
+        // The least a corner is rounded by, in pixels, to be drawn round; less, and it's drawn square, which is cheaper and looks the same.
+        private const double MinCorner = 0.5;
+
+        // A cymbal's hexagon, filled, is one of a few shapes a unit across and down, stretched to the cymbal: how far in its points
+        // are, and how far down it's slid, in steps of these, so the same few shapes serve every cymbal at every depth.
+        private const int PointSteps = 64;
+        private const int SweepSteps = 32;
+        private const int MaxUnitHexagons = 1024;
+        private readonly LruCache<(int Point, int Sweep), StreamGeometry> _unitHexagons = new(MaxUnitHexagons);
+
+        // The same for a band of a cymbal's sides between two of its steps: the hexagon's lower edge, swept down by the band's height.
+        private readonly LruCache<(int Point, int Thickness), StreamGeometry> _unitBands = new(MaxUnitHexagons);
+
+        // A box's sides are shaded in steps from dark at the floor to light under the top. Each step's colour would be a brush of its own
+        // for each note colour, and Avalonia lists each distinct brush a drawing uses, afresh for each frame's drawing; so the sides
+        // are filled light, and the lower steps darkened by these, the same few for every colour: black, as faint as takes a step from
+        // the one above it to its own shade, laid over it and every step below. Darken is a multiply, so black over a colour at an
+        // opacity is that colour darkened by as much, exactly.
+        private static readonly IBrush FloorShade = Shade(1 - ((1 - BaseDarken) / (1 - TopDarken)));
+        private static readonly IBrush[] StepShades = MakeStepShades();
 
         private readonly GemPainter _flat;
         private readonly Dictionary<(int, int), StreamGeometry> _hexagons = [];
-
-        // Each look a note has, drawn once as a picture, kept to be drawn again: a note that is its sides' layers, its shadow and its top is
-        // half a dozen drawings for the graphics card to take in each frame, each with a cost of its own however small, and a busy
-        // lane has hundreds in view. A picture of it is one.
-        //
-        // The notes of a colour are all alike but for their size, which changes continuously as one comes down the highway, so there is
-        // one picture, a master, of each look, drawn once at a near note's size and in a few pixels more than the screen has, and each
-        // note is that stretched to its own width and height, at the place it is to a fraction of a pixel. A picture made for each size
-        // to the pixel, or to a half, was swapped for the next as a note came down, and the edges moved a little each time.
-        // How a box's floor is shaped against its height, and how round its corners are, change with how far it is, and not by much:
-        // the masters come in a few steps of them, which move only what is inside the outline, a step at a time.
-        private const int MaxSprites = 400;
-        private const double MasterRise = 18;
-        private const double MasterDetail = 3;
-        private const double MasterPad = 2;
-        private const double ShapeStep = 32;
-        private const NoteFlags LookFlags = NoteFlags.Cymbal | NoteFlags.Tap | NoteFlags.Hopo;
-        private readonly Dictionary<SpriteKey, RenderTargetBitmap> _sprites = [];
-
-        /// <summary>How a note's picture is drawn, which a host sets for the notes it draws: smoothly, and smaller by averaging, not by picking.</summary>
-        public static readonly RenderOptions SpriteOptions = new() { BitmapInterpolationMode = BitmapInterpolationMode.MediumQuality };
-
-        /// <summary>What makes two notes' master the same: the colour, the flags that change it, and the shape of its box in 32nds of its height.</summary>
-        private readonly record struct SpriteKey(uint Color, bool Black, NoteFlags Flags, int Depth, int Width, int RadiusX, int RadiusY);
 
         // What was drawn last, in the order it was, from the back: where each note stands on the screen, and where on the plane.
         private readonly List<(Rect Silhouette, Point Floor)> _scene = [];
@@ -77,9 +84,6 @@ namespace ChartShared.UI.Controls.Highway
 
         /// <summary>The camera the notes are placed by. With none, the notes are drawn flat.</summary>
         public PerspectiveCamera? Camera { get; set; }
-
-        /// <summary>Whether a note is drawn from a picture of its look, kept; false to draw each as the shapes it is.</summary>
-        public bool UsesSprites { get; set; } = true;
 
         /// <summary>Forgets the notes drawn so far, as a host does before it draws its notes again.</summary>
         public void BeginScene() => _scene.Clear();
@@ -210,8 +214,7 @@ namespace ChartShared.UI.Controls.Highway
                 var edge = kind == ChartInstrumentKind.Drums ? HighwayPalette.Kick : HighwayPalette.Open;
                 var lightened = HighwayPalette.Lighten(color, GemPainter.HopoOpenLighten);
                 DrawSides(context, stand, lightened);
-                DrawTop(context, stand, lightened, lightened, null);
-                context.DrawRectangle(null, _flat.Pen(edge, 2), top, stand.RadiusX, stand.RadiusY);
+                FillEdged(context, _flat.Brush(lightened), _flat.Brush(edge), 2, top, stand.RadiusX, stand.RadiusY);
             }
 
             if ((note.Flags & NoteFlags.DoubleKick) != 0)
@@ -344,70 +347,8 @@ namespace ChartShared.UI.Controls.Highway
             return seen.Right > 0 && seen.X < camera.HostWidth && seen.Bottom > 0 && seen.Y < camera.HostHeight;
         }
 
-        /// <summary>Draws the gem as its flags say: a cymbal, a tap, or a box with a HOPO's mark; from its kept picture when it is drawn whole.</summary>
+        /// <summary>Draws the gem as its flags say: a cymbal, a tap, or a box with a HOPO's mark.</summary>
         private void DrawBody(DrawingContext context, ChartInstrumentKind kind, ChartNote note, Color color, Stand stand, bool outlined)
-        {
-            if (outlined || !UsesSprites)
-                DrawBodyShapes(context, kind, note, color, stand, outlined);
-            else
-                DrawSprite(context, kind, note, color, stand);
-        }
-
-        /// <summary>
-        /// Draws the gem from the master of its look, made when it is first needed, stretched to the note's own width and height and set
-        /// with the bottom of its floor and the middle of it where the note's are, to a fraction of a pixel.
-        /// </summary>
-        private void DrawSprite(DrawingContext context, ChartInstrumentKind kind, ChartNote note, Color color, Stand stand)
-        {
-            double rise = Math.Max(stand.Rise, 0.01);
-            var key = new SpriteKey(
-                color.ToUInt32(),
-                HighwayPalette.IsBlackFret(kind, note.Lane),
-                note.Flags & LookFlags,
-                Math.Max(1, (int)Math.Round(stand.Floor.Height / rise * ShapeStep)),
-                Math.Max(1, (int)Math.Round(stand.Floor.Width / rise * 8)),
-                (int)Math.Round(stand.RadiusX / rise * ShapeStep),
-                (int)Math.Round(stand.RadiusY / rise * ShapeStep));
-
-            // The box in the master, in the host's units: as high as it is for a near note, and the shape the key says.
-            double depth = key.Depth / ShapeStep * MasterRise, across = key.Width / 8.0 * MasterRise;
-            if (!_sprites.TryGetValue(key, out var master))
-            {
-                if (_sprites.Count >= MaxSprites)
-                {
-                    foreach (var old in _sprites.Values)
-                        old.Dispose();
-                    _sprites.Clear();
-                }
-
-                _sprites[key] = master = MakeMaster(kind, note, color, key, depth, across);
-            }
-
-            double stretchX = across > 0 ? stand.Floor.Width / across : 1;
-            double stretchY = stand.Floor.Height + stand.Rise > 0 ? (stand.Floor.Height + stand.Rise) / (depth + MasterRise) : 1;
-            double width = master.PixelSize.Width / MasterDetail, height = master.PixelSize.Height / MasterDetail;
-            double padBelow = (height - (depth + MasterRise)) / 2;
-            double x = stand.Floor.Center.X - (width * stretchX / 2);
-            double y = stand.Floor.Bottom + (padBelow * stretchY) - (height * stretchY);
-            context.DrawImage(master, new Rect(0, 0, master.PixelSize.Width, master.PixelSize.Height), new Rect(x, y, width * stretchX, height * stretchY));
-        }
-
-        private RenderTargetBitmap MakeMaster(ChartInstrumentKind kind, ChartNote note, Color color, SpriteKey key, double depth, double across)
-        {
-            // Drawn in the host's units, as a near note is, so a pen a unit wide is as it is on one, and kept at more pixels than that.
-            int pixelsWide = (int)Math.Ceiling((across + (2 * MasterPad)) * MasterDetail);
-            int pixelsHigh = (int)Math.Ceiling((depth + MasterRise + (2 * MasterPad)) * MasterDetail);
-            double padX = ((pixelsWide / MasterDetail) - across) / 2, padY = ((pixelsHigh / MasterDetail) - (depth + MasterRise)) / 2;
-            var stand = new Stand(new Rect(padX, padY + MasterRise, across, depth), MasterRise, key.RadiusX / ShapeStep * MasterRise, key.RadiusY / ShapeStep * MasterRise);
-
-            var master = new RenderTargetBitmap(new PixelSize(pixelsWide, pixelsHigh), new Vector(96 * MasterDetail, 96 * MasterDetail));
-            using (var picture = master.CreateDrawingContext())
-                DrawBodyShapes(picture, kind, note, color, stand, outlined: false);
-            return master;
-        }
-
-        /// <summary>Draws the gem as its flags say, as the shapes it is made of.</summary>
-        private void DrawBodyShapes(DrawingContext context, ChartInstrumentKind kind, ChartNote note, Color color, Stand stand, bool outlined)
         {
             bool black = HighwayPalette.IsBlackFret(kind, note.Lane);
 
@@ -432,7 +373,7 @@ namespace ChartShared.UI.Controls.Highway
                 else
                 {
                     DrawSides(context, stand, color);
-                    context.DrawRectangle(GemPainter.TapBodyBrush, _flat.Pen(edge, 2), top.Deflate(1), stand.RadiusX, stand.RadiusY);
+                    FillEdged(context, GemPainter.TapBodyBrush, _flat.Brush(edge), 2, top.Deflate(1), stand.RadiusX, stand.RadiusY);
                     context.FillRectangle(_flat.Brush(color), GemPainter.Mark(top), 1f);
                 }
 
@@ -469,56 +410,183 @@ namespace ChartShared.UI.Controls.Highway
             context.DrawRectangle(null, pen, stand.Top.Deflate(0.75), stand.RadiusX, stand.RadiusY);
         }
 
-        /// <summary>The box's shadow on the plane, then its sides: its floor's rounded rectangle stacked up to its top, darker at the base.</summary>
-        private void DrawSides(DrawingContext context, Stand stand, Color color)
+        /// <summary>The box's top face, filled in <paramref name="fill"/>, edged in <paramref name="edge"/> darkened, or in <paramref name="outline"/> when there is one.</summary>
+        private void DrawTop(DrawingContext context, Stand stand, Color fill, Color edge, Color? outline)
         {
-            context.DrawRectangle(ShadowBrush, null, stand.Floor.Inflate(1), stand.RadiusX, stand.RadiusY);
-
-            var dark = HighwayPalette.Darken(color, BaseDarken);
-            var light = HighwayPalette.Darken(color, TopDarken);
-            int layers = LayersOf(stand);
-            for (int i = 0; i < layers; i++)
-            {
-                var layer = stand.Floor.Translate(new Vector(0, -stand.Rise * i / layers));
-                var brush = _flat.Brush(Blend(dark, light, layers == 1 ? 0.5 : i / (double)(layers - 1)));
-                context.DrawRectangle(brush, i == 0 ? GemPainter.OutlinePen : null, layer, stand.RadiusX, stand.RadiusY);
-            }
+            var rim = outline ?? HighwayPalette.Darken(edge, 0.45);
+            FillEdged(context, _flat.Brush(fill), _flat.Brush(rim), 1, stand.Top, stand.RadiusX, stand.RadiusY);
         }
 
         /// <summary>
-        /// How many rounded rectangles make a box's sides: <see cref="SideLayers"/>, or more where its floor is shallower than a layer's step,
-        /// as a far note's is, so each overlaps the next and the sides are whole, without a gap for the highway to show through.
+        /// The box's shadow on the plane, then its sides: its floor, dark and edged, and over it the sides in
+        /// <see cref="SideLayers"/> steps from dark to light, each the floor's rounded rectangle slid up from where its step starts to the
+        /// top, which sweeps out a rounded rectangle as round, only taller. However shallow the floor, the steps leave no gap.
         /// </summary>
-        private static int LayersOf(Stand stand) => Math.Clamp((int)Math.Ceiling(stand.Rise / Math.Max(stand.Floor.Height, 1)), SideLayers, MaxSideLayers);
+        private void DrawSides(DrawingContext context, Stand stand, Color color)
+        {
+            var floor = stand.Floor;
+            double radiusX = stand.RadiusX, radiusY = stand.RadiusY;
+            FillRounded(context, ShadowBrush, floor.Inflate(1), radiusX + 1, radiusY + 1);
 
-        /// <summary>The box's top face, filled in <paramref name="fill"/>, edged in <paramref name="edge"/> darkened, or in <paramref name="outline"/> when there is one.</summary>
-        private void DrawTop(DrawingContext context, Stand stand, Color fill, Color edge, Color? outline) =>
-            context.DrawRectangle(_flat.Brush(fill), outline is { } light ? _flat.Pen(light, 1) : _flat.Pen(HighwayPalette.Darken(edge, 0.45), 1), stand.Top, stand.RadiusX, stand.RadiusY);
+            // The floor, edged, light, then darkened to the darkest step's shade.
+            var light = _flat.Brush(HighwayPalette.Darken(color, TopDarken));
+            FillEdged(context, light, OutlineBrush, 1, floor, radiusX, radiusY);
+            FillRounded(context, FloorShade, Shrunk(floor, 0.5), Math.Max(0, radiusX - 0.5), Math.Max(0, radiusY - 0.5));
+
+            // The sides above it, all light, from the top down to where the floor's step begins; then each step from the one under the
+            // top downwards darkened, with all those below it, by as much as it is darker than the step above.
+            double top = floor.Y - stand.Rise;
+            double lowest = StepBottom(stand, 1);
+            FillRounded(context, light, new Rect(floor.X, top, floor.Width, Math.Max(0, lowest - top)), radiusX, radiusY);
+            for (int step = SideLayers - 2; step >= 1; step--)
+            {
+                double from = StepBottom(stand, step + 1);
+                FillRounded(context, StepShades[step], new Rect(floor.X, from, floor.Width, Math.Max(0, lowest - from)), radiusX, radiusY);
+            }
+        }
+
+        /// <summary>Where the <paramref name="step"/>th of a box's steps, counted up from its floor, ends at the bottom: the floor's bottom, raised by as many steps.</summary>
+        private static double StepBottom(Stand stand, int step) => stand.Floor.Bottom - (stand.Rise * step / SideLayers);
+
+        /// <summary>Black, as opaque as <paramref name="darken"/>: laid over a colour, that colour darkened by as much.</summary>
+        private static IBrush Shade(double darken) => new ImmutableSolidColorBrush(Color.FromArgb((byte)Math.Round(darken * 255), 0, 0, 0));
+
+        /// <summary>
+        /// For each of a box's steps but the top one and the floor, the black that darkens the step above's shade to its own: the step
+        /// shades run from <see cref="BaseDarken"/> at the floor to <see cref="TopDarken"/> under the top, as <see cref="Blend"/>ed.
+        /// </summary>
+        private static IBrush[] MakeStepShades()
+        {
+            static double DarkenOf(int step) => BaseDarken + ((TopDarken - BaseDarken) * step / (SideLayers - 1));
+            var shades = new IBrush[SideLayers];
+            for (int step = 1; step <= SideLayers - 2; step++)
+                shades[step] = Shade(1 - ((1 - DarkenOf(step)) / (1 - DarkenOf(step + 1))));
+            return shades;
+        }
+
+        /// <summary><paramref name="rect"/> filled, its corners rounded as said unless that's under half a pixel, when they're square.</summary>
+        private static void FillRounded(DrawingContext context, IBrush brush, Rect rect, double radiusX, double radiusY)
+        {
+            if (rect.Width <= 0 || rect.Height <= 0)
+                return;
+
+            if (radiusX < MinCorner || radiusY < MinCorner)
+                context.FillRectangle(brush, rect);
+            else
+                context.DrawRectangle(brush, null, rect, radiusX, radiusY);
+        }
+
+        /// <summary>
+        /// <paramref name="rect"/> filled in <paramref name="fill"/> with an edge <paramref name="thickness"/> wide in <paramref name="edge"/>,
+        /// on its outline, as a pen would draw it: the edge's colour filled out to the edge's outside, then the fill inside it.
+        /// </summary>
+        private static void FillEdged(DrawingContext context, IBrush fill, IBrush edge, double thickness, Rect rect, double radiusX, double radiusY)
+        {
+            double half = thickness / 2;
+            FillRounded(context, edge, rect.Inflate(half), radiusX + half, radiusY + half);
+            var inner = new Rect(rect.X + half, rect.Y + half, Math.Max(0, rect.Width - thickness), Math.Max(0, rect.Height - thickness));
+            FillRounded(context, fill, inner, Math.Max(0, radiusX - half), Math.Max(0, radiusY - half));
+        }
+
+        /// <summary>
+        /// A cymbal, as a box is drawn (see <see cref="DrawSides"/>): its shadow, its floor dark and edged, its sides in
+        /// steps, and its top face, lighter and edged; each hexagon one of the few unit shapes stretched to fit.
+        /// </summary>
+        private void FillCymbal(DrawingContext context, Stand stand, Color color)
+        {
+            var floor = stand.Floor;
+            var top = stand.Top;
+            double point = Math.Min(floor.Height * 0.6, floor.Width * 0.25);
+            var light = _flat.Brush(HighwayPalette.Darken(color, TopDarken));
+
+            // As a box's (see DrawSides): the floor edged, light, darkened; the sides light down to the floor's step; then each band of a
+            // step and those below it darkened, its upper edge the lower edge of the step above, as the hexagon's.
+            FillHexagon(context, ShadowBrush, floor, point, 0);
+            FillHexagon(context, OutlineBrush, floor.Inflate(0.5), point, 0);
+            FillHexagon(context, light, Shrunk(floor, 0.5), point, 0);
+            FillHexagon(context, FloorShade, Shrunk(floor, 0.5), point, 0);
+            double lowest = SweepTo(stand, 1);
+            FillHexagon(context, light, top, point, lowest);
+            for (int step = SideLayers - 2; step >= 1; step--)
+            {
+                double from = SweepTo(stand, step + 1);
+                FillHexagonBand(context, StepShades[step], top.Translate(new Vector(0, from)), point, lowest - from);
+            }
+
+            FillHexagon(context, _flat.Brush(HighwayPalette.Darken(color, 0.45)), top.Inflate(0.5), point, 0);
+            FillHexagon(context, _flat.Brush(HighwayPalette.Lighten(color, TopLighten)), Shrunk(top, 0.5), point, 0);
+        }
+
+        /// <summary>How far down from a cymbal's top its hexagon is when it's at the <paramref name="step"/>th of its steps, counted up from its floor.</summary>
+        private static double SweepTo(Stand stand, int step) => stand.Rise - (stand.Rise * step / SideLayers);
+
+        /// <summary>
+        /// The band under a cymbal's hexagon filling <paramref name="rect"/>, its points <paramref name="point"/> in from its sides: the
+        /// hexagon's lower edge swept down by <paramref name="thickness"/>, all it covers on the way. A unit shape, kept, stretched to it.
+        /// </summary>
+        private void FillHexagonBand(DrawingContext context, IBrush brush, Rect rect, double point, double thickness)
+        {
+            if (rect.Width <= 0 || rect.Height <= 0 || thickness <= 0)
+                return;
+
+            var key = ((int)Math.Round(Math.Min(point / rect.Width, 0.5) * PointSteps), (int)Math.Round(thickness / rect.Height * SweepSteps));
+            if (!_unitBands.TryGetValue(key, out var unit))
+                unit = _unitBands.Add(key, HexagonBand(key.Item1 / (double)PointSteps, key.Item2 / (double)SweepSteps));
+
+            using (context.PushTransform(Matrix.CreateScale(rect.Width, rect.Height) * Matrix.CreateTranslation(rect.X, rect.Y)))
+                context.DrawGeometry(brush, null, unit);
+        }
+
+        /// <summary>A unit hexagon's lower edge, its points <paramref name="point"/> in, swept down by <paramref name="thickness"/>.</summary>
+        private static StreamGeometry HexagonBand(double point, double thickness)
+        {
+            var band = new StreamGeometry();
+            using (var g = band.Open())
+            {
+                g.BeginFigure(new Point(0, 0.5), true);
+                g.LineTo(new Point(point, 1));
+                g.LineTo(new Point(1 - point, 1));
+                g.LineTo(new Point(1, 0.5));
+                g.LineTo(new Point(1, 0.5 + thickness));
+                g.LineTo(new Point(1 - point, 1 + thickness));
+                g.LineTo(new Point(point, 1 + thickness));
+                g.LineTo(new Point(0, 0.5 + thickness));
+                g.EndFigure(true);
+            }
+
+            return band;
+        }
+
+        private static Rect Shrunk(Rect rect, double by) =>
+            new(rect.X + by, rect.Y + by, Math.Max(0, rect.Width - (2 * by)), Math.Max(0, rect.Height - (2 * by)));
+
+        /// <summary>
+        /// A cymbal's hexagon filling <paramref name="rect"/>, its points <paramref name="point"/> in from its sides, slid down by
+        /// <paramref name="sweep"/> with all it covers on the way: a unit shape, kept, stretched to it.
+        /// </summary>
+        private void FillHexagon(DrawingContext context, IBrush brush, Rect rect, double point, double sweep)
+        {
+            if (rect.Width <= 0 || rect.Height <= 0)
+                return;
+
+            var key = ((int)Math.Round(Math.Min(point / rect.Width, 0.5) * PointSteps), (int)Math.Round(sweep / rect.Height * SweepSteps));
+            if (!_unitHexagons.TryGetValue(key, out var unit))
+                unit = _unitHexagons.Add(key, SweptHexagon(1, 1, key.Item2 / (double)SweepSteps, key.Item1 / (double)PointSteps));
+
+            using (context.PushTransform(Matrix.CreateScale(rect.Width, rect.Height) * Matrix.CreateTranslation(rect.X, rect.Y)))
+                context.DrawGeometry(brush, null, unit);
+        }
 
         private void DrawCymbal(DrawingContext context, Stand stand, Color color, Color edge, bool outlined)
         {
-            var hexagon = Hexagon(stand.Floor.Size);
             if (outlined)
             {
                 using (context.PushTransform(Matrix.CreateTranslation(stand.Top.X, stand.Top.Y)))
-                    context.DrawGeometry(null, _flat.Pen(edge, 1.5), hexagon);
+                    context.DrawGeometry(null, _flat.Pen(edge, 1.5), Hexagon(stand.Floor.Size));
                 return;
             }
 
-            var dark = HighwayPalette.Darken(color, BaseDarken);
-            var light = HighwayPalette.Darken(color, TopDarken);
-            using (context.PushTransform(Matrix.CreateTranslation(stand.Floor.X, stand.Floor.Y)))
-                context.DrawGeometry(ShadowBrush, null, hexagon);
-            int layers = LayersOf(stand);
-            for (int i = 0; i < layers; i++)
-            {
-                var layer = stand.Floor.Translate(new Vector(0, -stand.Rise * i / layers));
-                using (context.PushTransform(Matrix.CreateTranslation(layer.X, layer.Y)))
-                    context.DrawGeometry(_flat.Brush(Blend(dark, light, layers == 1 ? 0.5 : i / (double)(layers - 1))), i == 0 ? GemPainter.OutlinePen : null, hexagon);
-            }
-
-            using (context.PushTransform(Matrix.CreateTranslation(stand.Top.X, stand.Top.Y)))
-                context.DrawGeometry(_flat.Brush(HighwayPalette.Lighten(color, TopLighten)), _flat.Pen(HighwayPalette.Darken(color, 0.45), 1), hexagon);
+            FillCymbal(context, stand, color);
         }
 
         /// <summary>The edge of a note's shape in <paramref name="rect"/>: a rounded rectangle, as round as the note's box is.</summary>
@@ -533,25 +601,37 @@ namespace ChartShared.UI.Controls.Highway
                 return hexagon;
 
             // Sizes change with every depth a cymbal is at: those no longer drawn go.
-            if (_hexagons.Count > 128)
+            if (_hexagons.Count > MaxShapes)
                 _hexagons.Clear();
 
             double width = key.Item1 / 2.0;
             double height = key.Item2 / 2.0;
-            double point = Math.Min(height * 0.6, width * 0.25);
-            hexagon = new StreamGeometry();
+            hexagon = SweptHexagon(width, height, 0);
+            _hexagons[key] = hexagon;
+            return hexagon;
+        }
+
+        /// <summary>A cymbal's hexagon of <paramref name="width"/> and <paramref name="height"/> from the origin, slid down by <paramref name="sweep"/>: the hull of where it starts and ends.</summary>
+        /// <param name="point">How far in from the sides its points are; by default as a cymbal's are for its size.</param>
+        private static StreamGeometry SweptHexagon(double width, double height, double sweep, double? point = null)
+        {
+            double inset = point ?? Math.Min(height * 0.6, width * 0.25);
+            var hexagon = new StreamGeometry();
             using (var g = hexagon.Open())
             {
                 g.BeginFigure(new Point(0, height / 2), true);
-                g.LineTo(new Point(point, 0));
-                g.LineTo(new Point(width - point, 0));
+                g.LineTo(new Point(inset, 0));
+                g.LineTo(new Point(width - inset, 0));
                 g.LineTo(new Point(width, height / 2));
-                g.LineTo(new Point(width - point, height));
-                g.LineTo(new Point(point, height));
+                if (sweep > 0)
+                    g.LineTo(new Point(width, (height / 2) + sweep));
+                g.LineTo(new Point(width - inset, height + sweep));
+                g.LineTo(new Point(inset, height + sweep));
+                if (sweep > 0)
+                    g.LineTo(new Point(0, (height / 2) + sweep));
                 g.EndFigure(true);
             }
 
-            _hexagons[key] = hexagon;
             return hexagon;
         }
 

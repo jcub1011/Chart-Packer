@@ -110,6 +110,8 @@ namespace ChartBuilder.Controls.Editing
         private double _followMax;
         private long _holdUntil;
         private int[] _collections = [0, 0, 0];
+        private TimeSpan _paused;
+        private long _allocated;
         private long _tilesBuilt;
         private string _renderer = "renderer ?";
         private bool _benchmarking;
@@ -121,6 +123,8 @@ namespace ChartBuilder.Controls.Editing
         {
             _header = header;
             _collections = [GC.CollectionCount(0), GC.CollectionCount(1), GC.CollectionCount(2)];
+            _paused = GC.GetTotalPauseDuration();
+            _allocated = GC.GetTotalAllocatedBytes();
             _tilesBuilt = LaneWaveformPainter.TilesBuilt;
         }
 
@@ -184,6 +188,12 @@ namespace ChartBuilder.Controls.Editing
             int frames = 0;
             double maxGap = 0, measured = 0;
 
+            // The collector's work over each step's measured stretch, the whole program's: collections, time paused, and allocated.
+            bool gcStarted = false;
+            int[] gcCounts = [0, 0, 0];
+            TimeSpan gcPaused = default;
+            long gcAllocated = 0;
+
             void Finish()
             {
                 s_off = 0;
@@ -203,6 +213,7 @@ namespace ChartBuilder.Controls.Editing
             void Begin(TimeSpan time)
             {
                 s_off = (int)Steps[step].Off;
+                gcStarted = false;
                 stepStart = time;
                 last = default;
                 frames = 0;
@@ -222,6 +233,14 @@ namespace ChartBuilder.Controls.Editing
                 else
                 {
                     double t = (time - stepStart).TotalSeconds;
+                    if (t >= WarmSeconds && !gcStarted)
+                    {
+                        gcStarted = true;
+                        gcCounts = [GC.CollectionCount(0), GC.CollectionCount(1), GC.CollectionCount(2)];
+                        gcPaused = GC.GetTotalPauseDuration();
+                        gcAllocated = GC.GetTotalAllocatedBytes();
+                    }
+
                     if (t >= WarmSeconds && last != default)
                     {
                         double gap = (time - last).TotalMilliseconds;
@@ -232,7 +251,11 @@ namespace ChartBuilder.Controls.Editing
 
                     if (t >= WarmSeconds + MeasureSeconds)
                     {
-                        results.Add(string.Create(CultureInfo.InvariantCulture, $"{Steps[step].Name,-24} {(frames == 0 ? 0 : 1000 * frames / measured),5:F1} fps  every {(frames == 0 ? 0 : measured / frames),5:F1} ms  worst {maxGap,4:F0} ms"));
+                        double seconds = Math.Max(measured / 1000, 1e-3);
+                        string gc = gcStarted
+                            ? string.Create(CultureInfo.InvariantCulture, $"  GC {GC.CollectionCount(0) - gcCounts[0]}/{GC.CollectionCount(1) - gcCounts[1]}/{GC.CollectionCount(2) - gcCounts[2]} paused {(GC.GetTotalPauseDuration() - gcPaused).TotalMilliseconds,5:F1} ms  alloc {(GC.GetTotalAllocatedBytes() - gcAllocated) / (1024.0 * 1024.0) / seconds,5:F1} MB/s")
+                            : "";
+                        results.Add(string.Create(CultureInfo.InvariantCulture, $"{Steps[step].Name,-26} {(frames == 0 ? 0 : 1000 * frames / measured),5:F1} fps  every {(frames == 0 ? 0 : measured / frames),5:F1} ms  worst {maxGap,4:F0} ms{gc}"));
                         step++;
                         if (step >= Steps.Length)
                         {
@@ -350,8 +373,13 @@ namespace ChartBuilder.Controls.Editing
 
             int g0 = GC.CollectionCount(0), g1 = GC.CollectionCount(1), g2 = GC.CollectionCount(2);
             long built = LaneWaveformPainter.TilesBuilt;
-            text.Append(string.Create(culture, $"GC {g0 - _collections[0]}/{g1 - _collections[1]}/{g2 - _collections[2]}  waveform built {built - _tilesBuilt} kept {LaneWaveformPainter.TileCount}"));
+            // What the whole program allocated and how long the collector held every thread, the drawing's too, in the window.
+            var paused = GC.GetTotalPauseDuration();
+            long allocated = GC.GetTotalAllocatedBytes();
+            text.Append(string.Create(culture, $"GC {g0 - _collections[0]}/{g1 - _collections[1]}/{g2 - _collections[2]} paused {(paused - _paused).TotalMilliseconds:F1}ms  alloc {(allocated - _allocated) / (1024.0 * 1024.0) / seconds:F1}MB/s  waveform built {built - _tilesBuilt} kept {LaneWaveformPainter.TileCount}"));
             _collections = [g0, g1, g2];
+            _paused = paused;
+            _allocated = allocated;
             _tilesBuilt = built;
 
             _lines = text.ToString();

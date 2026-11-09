@@ -258,8 +258,23 @@ namespace ChartBuilder.ViewModels
         /// <summary>Whether the highway is sized by its look-ahead or by pixels per second: the setting's, as it was when the preview was made.</summary>
         public HighwayLengthMode LengthMode { get; }
 
-        /// <summary>Whether the highway is tilted back in perspective, as in the games: the Perspective Highways setting's, as it was when the preview was made.</summary>
-        public bool IsPerspective { get; }
+        /// <summary>
+        /// Whether the highway is tilted back in perspective, as in the games: the Perspective Highways setting's when the preview was made,
+        /// then as its button switches it, for as long as the preview is open.
+        /// </summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(IsFlat), nameof(PerspectiveToolTip))]
+        public partial bool IsPerspective { get; set; }
+
+        /// <summary>Whether the highway is drawn flat, top down: the button then shows perspective, which it switches to.</summary>
+        public bool IsFlat => !IsPerspective;
+
+        /// <summary>What the perspective button does: tilts the highway back, or lays it flat again.</summary>
+        public string PerspectiveToolTip => IsPerspective ? Strings.PreviewShowFlatToolTip : Strings.PreviewShowPerspectiveToolTip;
+
+        /// <summary>Tilts the highway back in perspective, or lays it flat again.</summary>
+        [RelayCommand]
+        private void TogglePerspective() => IsPerspective = !IsPerspective;
 
         /// <summary>The highway's length as its slider's readout shows it, e.g. "1.4 s" or "300 px/s".</summary>
         public string LengthText => HighwayLengthText.Of(new HighwayLength(LengthMode, LookAhead, PixelsPerSecond));

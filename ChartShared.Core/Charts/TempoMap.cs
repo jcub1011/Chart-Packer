@@ -137,6 +137,34 @@ public sealed class TempoMap
     /// </summary>
     public const double OnNoteSeconds = 0.001;
 
+    /// <summary>
+    /// Adds the beat lines from <paramref name="fromTick"/> up to and including <paramref name="toTick"/> to <paramref name="into"/>, in
+    /// order: as <see cref="BeatLines(long, long)"/>, for a caller that draws them every frame and keeps the list.
+    /// </summary>
+    public void BeatLines(long fromTick, long toTick, List<BeatLine> into)
+    {
+        ArgumentNullException.ThrowIfNull(into);
+        for (int i = 0; i < _signatures.Length; i++)
+        {
+            var signature = _signatures[i];
+            long end = i + 1 < _signatures.Length ? _signatures[i + 1].Tick : long.MaxValue;
+            if (end <= fromTick)
+                continue;
+            if (signature.Tick > toTick)
+                return;
+
+            long beat = Math.Max(1, Resolution * 4L / signature.Denominator);
+            long first = fromTick <= signature.Tick ? 0 : (fromTick - signature.Tick + beat - 1) / beat;
+            for (long k = first; ; k++)
+            {
+                long tick = signature.Tick + (k * beat);
+                if (tick >= end || tick > toTick)
+                    break;
+                into.Add(new BeatLine(tick, k % signature.Numerator == 0));
+            }
+        }
+    }
+
     /// <summary>The beat lines from <paramref name="fromTick"/> up to and including <paramref name="toTick"/>, in order.</summary>
     public IEnumerable<BeatLine> BeatLines(long fromTick, long toTick)
     {

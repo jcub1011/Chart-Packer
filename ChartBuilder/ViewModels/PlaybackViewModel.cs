@@ -66,6 +66,9 @@ namespace ChartBuilder.ViewModels
         private bool _seeking;
         private bool _disposed;
 
+        // Whether this player, playing, has asked the collector to keep its pauses short (PlayingLatency).
+        private bool _holdsLatency;
+
         // Whether the song was playing when its audio was let go of, which opening it again carries on with.
         private bool _resumeAfterRelease;
 
@@ -126,6 +129,21 @@ namespace ChartBuilder.ViewModels
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(PlayPauseToolTip))]
         public partial bool IsPlaying { get; private set; }
+
+        // While the song plays, the lanes and the preview move every frame: the collector is asked to keep its pauses short.
+        partial void OnIsPlayingChanged(bool value) => HoldLatency(value);
+
+        private void HoldLatency(bool hold)
+        {
+            if (hold == _holdsLatency)
+                return;
+
+            _holdsLatency = hold;
+            if (hold)
+                PlayingLatency.Hold();
+            else
+                PlayingLatency.Release();
+        }
 
         /// <summary>Where the song is, in seconds of audio: followed while playing, and moved by scrubbing.</summary>
         [ObservableProperty]
@@ -615,6 +633,7 @@ namespace ChartBuilder.ViewModels
             _disposed = true;
             _timer.Stop();
             _cancel.Cancel();
+            HoldLatency(false);
             if (_latency is not null)
                 _latency.Changed -= OnLatencyChanged;
             if (_editorAudio is not null)

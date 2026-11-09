@@ -25,9 +25,15 @@ public enum LaneView
 /// </param>
 public sealed record LaneSlots(IReadOnlyList<int> Slots, int? Across, IReadOnlyList<int>? Shared = null)
 {
+    // Each part's slots, made once: they're asked for by every layer of every lane each frame it's drawn.
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<(ChartInstrumentKind Kind, LaneView View, bool FiveLaneDrums), LaneSlots> Made = new();
+
     /// <summary>The slots of a part of <paramref name="kind"/> in <paramref name="view"/>.</summary>
     /// <param name="fiveLaneDrums">Whether drums have five pads rather than four.</param>
-    public static LaneSlots Of(ChartInstrumentKind kind, LaneView view, bool fiveLaneDrums = false)
+    public static LaneSlots Of(ChartInstrumentKind kind, LaneView view, bool fiveLaneDrums = false) =>
+        Made.GetOrAdd((kind, view, fiveLaneDrums), static key => Make(key.Kind, key.View, key.FiveLaneDrums));
+
+    private static LaneSlots Make(ChartInstrumentKind kind, LaneView view, bool fiveLaneDrums)
     {
         IReadOnlyList<int> lanes = kind switch
         {
@@ -161,6 +167,9 @@ public sealed record LaneProjection(LaneView View, double TimeFrom, double TimeL
     /// </summary>
     public LaneProjection Widened(double secondsBefore, double secondsAfter)
     {
+        if (secondsBefore == 0 && secondsAfter == 0)
+            return this;
+
         // The time axis runs from the end on a highway, whose start is at the bottom, and from the start on a timeline.
         double pixels = PixelsPerSecond;
         return this with

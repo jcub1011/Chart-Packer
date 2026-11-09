@@ -169,6 +169,24 @@ namespace ChartBuilder.Controls.Editing
         private readonly LabelCache _labels = new();
         private readonly List<string> _measureNumbers = [];
 
+        // What the rail's text is made of, each worked out once rather than each frame it's drawn: the beat lines in view, the sections'
+        // names by their events' text, and the tempo markers' and time signatures' labels. Let go when there are too many, as after
+        // a long edit session.
+        private const int MaxRailTexts = 4096;
+        private readonly List<BeatLine> _beatLines = [];
+        private readonly Dictionary<string, string?> _sectionNames = [];
+        private readonly Dictionary<(long Tick, long MicrosecondsPerQuarter, bool Anchored, int Numerator, int Denominator), string> _tempoTexts = [];
+        private readonly Dictionary<(int Numerator, int Denominator), string> _signatureTexts = [];
+
+        // The callbacks for each frame while the song plays, and for the pages drawn after one changes: made once, not each time.
+        private readonly Action<TimeSpan> _onFrame;
+        private readonly Action _redrawStalePages;
+
+        // Where a second of audio is along the time axis, for the waveform's and spectrogram's painters, of the projection they're
+        // given: one delegate, of whichever projection is set, rather than one made for each drawn.
+        private readonly Func<double, double> _alongOf;
+        private LaneProjection? _alongOfProjection;
+
         // How brightly each column is lit as the song plays through the strike line.
         private double[] _hits = [];
         private EditorLaneViewModel? _lane;
@@ -282,6 +300,9 @@ namespace ChartBuilder.Controls.Editing
 
         protected EditorCanvas()
         {
+            _onFrame = OnFrame;
+            _redrawStalePages = RedrawStalePages;
+            _alongOf = seconds => _alongOfProjection!.AlongOf(seconds);
             _notePainter = new NotePainter(_gems);
             _upright = new UprightGemPainter(_gems);
             _uprightNotes = new NotePainter(_upright);
@@ -493,6 +514,10 @@ namespace ChartBuilder.Controls.Editing
             var rows = PhraseRail.RowsOf(part.Kind);
             Extras = ExtrasOf(size, key);
             var screen = Project(size, slots, session.Viewport, lane.Length, rows.Count);
+            // Tilted, the strike line and the notes' tails are drawn with the song, in one drawing (DrawsWithSong).
+            if (DrawsWithSong(layer.Kind))
+                return;
+
             switch (layer.Kind)
             {
                 case LayerKind.Strike:
@@ -510,7 +535,11 @@ namespace ChartBuilder.Controls.Editing
             try
             {
                 if (layer.Kind == LayerKind.Song)
+                {
                     RenderSong(context, session, key, part, rows, slots, projection, size);
+                    if (_camera is not null)
+                        RenderStrikeAndNotes(context, layer, session, lane, key, track, part, slots, screen, projection);
+                }
                 else
                     RenderNotes(context, session, lane, key, track, part, slots, projection);
             }
@@ -518,6 +547,30 @@ namespace ChartBuilder.Controls.Editing
             {
                 _alongLimit = (double.NegativeInfinity, double.PositiveInfinity);
             }
+        }
+
+        /// <summary>
+        /// Whether a layer of <paramref name="kind"/> is drawn as part of the song's rather than on its own: the strike line and the notes'
+        /// tails, while the lane is tilted. Then all three are drawn again for every move anyway, and each drawing has a cost of its own
+        /// apart from what's in it, for every frame: what it's made of to keep, and to hand to the thread that puts it on the screen.
+        /// </summary>
+        private bool DrawsWithSong(LayerKind kind) => _camera is not null && kind is LayerKind.Strike or LayerKind.Notes;
+
+        /// <summary>
+        /// The strike line, then the notes' tails, over the song, in the song's drawing (see <see cref="DrawsWithSong"/>): in the order
+        /// their layers are in, the strike line where it is on the screen, though the song's layer is on a page, and the tails on it.
+        /// </summary>
+        private void RenderStrikeAndNotes(DrawingContext context, Layer song, EditorSession session, EditorLaneViewModel lane, ChartTrackKey key, EditableTrack track, EditablePart part, LaneSlots slots, LaneProjection screen, LaneProjection projection)
+        {
+            // The song's layer is moved by its page's shift from the screen (Layer.Show): the strike line is moved back by as much.
+            var limit = _alongLimit;
+            _alongLimit = (double.NegativeInfinity, double.PositiveInfinity);
+            double shift = song.Page?.ShiftOf(screen) ?? 0;
+            using (context.PushTransform(shift == 0 ? Matrix.Identity : View == LaneView.Highway ? Matrix.CreateTranslation(0, -shift) : Matrix.CreateTranslation(-shift, 0)))
+                RenderStrike(context, session, key, track, slots, screen);
+            _alongLimit = limit;
+
+            RenderNotes(context, session, lane, key, track, part, slots, projection);
         }
 
         /// <summary>
@@ -710,7 +763,11 @@ namespace ChartBuilder.Controls.Editing
 
         /// <summary>The ticks at <paramref name="projection"/>'s ends, from 0.</summary>
         private static (double From, double To) TicksOf(EditorSession session, LaneProjection projection) =>
-            (Math.Max(0, session.TickAt(projection.Start)), Math.Max(0, session.TickAt(projection.End)));
+            TicksOf(session, projection.Start, projection.End);
+
+        /// <summary>The ticks at <paramref name="start"/> and <paramref name="end"/>, in seconds of audio, from 0.</summary>
+        private static (double From, double To) TicksOf(EditorSession session, double start, double end) =>
+            (Math.Max(0, session.TickAt(start)), Math.Max(0, session.TickAt(end)));
 
         /// <summary>
         /// The page the song and the notes are drawn as, for the lane <paramref name="screen"/> shows: the one they share, or,
@@ -725,15 +782,22 @@ namespace ChartBuilder.Controls.Editing
 
             var (behind, ahead) = PageReach();
             _page = LanePage.Of(screen, _isBackwards ? ahead : behind, _isBackwards ? behind : ahead, MaxPageLength());
-            Dispatcher.UIThread.Post(() =>
-            {
-                foreach (var layer in (ReadOnlySpan<Layer>)[_song, _notes])
-                {
-                    if (layer.Page is { } drawn && !ReferenceEquals(drawn, _page))
-                        layer.Redraw();
-                }
-            });
+
+            // A lane without pages kept, a tilted one or one too long for them, has both layers drawn again for every move
+            // (OnViewportChanged), each on the page of the moment: there's none left behind to catch up.
+            if (_isPaged)
+                Dispatcher.UIThread.Post(_redrawStalePages);
             return _page;
+        }
+
+        /// <summary>Has the song and the notes drawn again where they're on a page other than the one now shown.</summary>
+        private void RedrawStalePages()
+        {
+            foreach (var layer in (ReadOnlySpan<Layer>)[_song, _notes])
+            {
+                if (layer.Page is { } drawn && !ReferenceEquals(drawn, _page))
+                    layer.Redraw();
+            }
         }
 
         /// <summary>
@@ -908,12 +972,22 @@ namespace ChartBuilder.Controls.Editing
             /// <summary>Has this drawn again; and the notes standing up on a perspective highway, with the layer that draws their tails.</summary>
             public void Redraw()
             {
+                // Drawn with the song while the lane is tilted: the song's drawing is the one to draw again.
+                if (_owner.DrawsWithSong(Kind))
+                {
+                    _owner._song.Redraw();
+                    return;
+                }
+
                 _painter.InvalidateVisual();
                 if (Kind is LayerKind.Notes or LayerKind.Song)
                     _owner.RedrawGems();
                 else if (Kind is LayerKind.Overlay or LayerKind.Playtest)
                     _owner.RedrawGemMarks();
             }
+
+            /// <summary>Has this drawn again, itself, whatever draws it: as when it has just come to be drawn with the song, and is to be empty.</summary>
+            public void RedrawItself() => _painter.InvalidateVisual();
 
             /// <summary>Drawn on <paramref name="page"/>, moved to show what <paramref name="screen"/> shows.</summary>
             public void Show(LanePage page, LaneProjection screen)
@@ -1728,7 +1802,7 @@ namespace ChartBuilder.Controls.Editing
             if (TopLevel.GetTopLevel(this) is not { } top)
                 return;
             _isFrameRequested = true;
-            top.RequestAnimationFrame(OnFrame);
+            top.RequestAnimationFrame(_onFrame);
         }
 
         private void OnFrame(TimeSpan time)
@@ -1748,7 +1822,7 @@ namespace ChartBuilder.Controls.Editing
         private void DrawLaneDividers(DrawingContext context, LaneProjection projection, LaneSlots slots)
         {
             // A shared column's halves, which a click picks between: GHL's black fret, then its white.
-            HighwayChrome.DrawLaneDividers(context, projection, projection.TimeFrom, projection.TimeFrom + projection.TimeLength, View == LaneView.Timeline ? AlternateRowBrush : null, GridPen);
+            HighwayChrome.DrawLaneDividers(context, projection, projection.TimeFrom, projection.TimeFrom + projection.TimeLength, View == LaneView.Timeline ? AlternateRowBrush : null, GridPen, asRect: _camera is not null);
         }
 
         /// <summary>
@@ -1802,13 +1876,20 @@ namespace ChartBuilder.Controls.Editing
                 PostRedraw();
         }
 
+        /// <summary>Where a second of audio is along <paramref name="projection"/>'s time axis, as a painter takes it, which reads it as it begins.</summary>
+        private Func<double, double> AlongOf(LaneProjection projection)
+        {
+            _alongOfProjection = projection;
+            return _alongOf;
+        }
+
         /// <returns>Whether all of it was drawn as it is now.</returns>
         private bool DrawSpectrogram(DrawingContext context, LaneAudioViewModel audio, Spectrogram spectrogram, Rect area, LaneProjection projection)
         {
             if (area.Width <= 1 || area.Height <= 1)
                 return true;
             double scaling = 1 / (TopLevel.GetTopLevel(this)?.RenderScaling ?? 1);
-            return SpectrogramPainter.Draw(context, spectrogram, area, View == LaneView.Highway, projection.Start, projection.End, projection.AlongOf,
+            return SpectrogramPainter.Draw(context, spectrogram, area, View == LaneView.Highway, projection.Start, projection.End, AlongOf(projection),
                 audio.Options.FloorDb, audio.Options.CeilingDb, audio.Options.Band, scaling);
         }
 
@@ -1838,15 +1919,15 @@ namespace ChartBuilder.Controls.Editing
                     double gain = LaneWaveformPainter.FullScaleGain(left.Peak >= right.Peak ? left : right) * boost;
                     var first = vertical ? new Rect(area.X, area.Y, area.Width / 2, area.Height) : new Rect(area.X, area.Y, area.Width, area.Height / 2);
                     var second = vertical ? new Rect(area.X + (area.Width / 2), area.Y, area.Width / 2, area.Height) : new Rect(area.X, area.Y + (area.Height / 2), area.Width, area.Height / 2);
-                    bool done = LaneWaveformPainter.Draw(context, left, first, vertical, projection.Start, projection.End, projection.AlongOf, peak, loud, gain, scaling, budgeted: true, smooth: _camera is not null, clip: !FramePerf.IsOff(FramePerf.Part.PlaneClips));
-                    done &= LaneWaveformPainter.Draw(context, right, second, vertical, projection.Start, projection.End, projection.AlongOf, peak, loud, gain, scaling, budgeted: true, smooth: _camera is not null, clip: !FramePerf.IsOff(FramePerf.Part.PlaneClips));
-                    context.DrawLine(ChannelPen, vertical ? first.TopRight : first.BottomLeft, vertical ? first.BottomRight : first.BottomRight);
+                    bool done = LaneWaveformPainter.Draw(context, left, first, vertical, projection.Start, projection.End, AlongOf(projection), peak, loud, gain, scaling, budgeted: true, smooth: _camera is not null, clip: !FramePerf.IsOff(FramePerf.Part.PlaneClips));
+                    done &= LaneWaveformPainter.Draw(context, right, second, vertical, projection.Start, projection.End, AlongOf(projection), peak, loud, gain, scaling, budgeted: true, smooth: _camera is not null, clip: !FramePerf.IsOff(FramePerf.Part.PlaneClips));
+                    Line(context, ChannelPen, vertical ? first.TopRight : first.BottomLeft, vertical ? first.BottomRight : first.BottomRight);
                     return done;
                 }
 
                 if (editor.Audio.Waveforms.Mono(source) is not { } waveform)
                     return true;
-                return LaneWaveformPainter.Draw(context, waveform, area, vertical, projection.Start, projection.End, projection.AlongOf,
+                return LaneWaveformPainter.Draw(context, waveform, area, vertical, projection.Start, projection.End, AlongOf(projection),
                     peak, loud, LaneWaveformPainter.FullScaleGain(waveform) * boost, scaling, budgeted: true, smooth: _camera is not null, clip: !FramePerf.IsOff(FramePerf.Part.PlaneClips));
             }
         }
@@ -1934,7 +2015,7 @@ namespace ChartBuilder.Controls.Editing
                 {
                     double along = projection.AlongOf(beats[i]);
                     bool measure = ((i - proposal.Downbeat) % perMeasure + perMeasure) % perMeasure == 0;
-                    context.DrawLine(measure ? ProposalMeasurePen : ProposalBeatPen, At(along, across1), At(along, across2));
+                    Line(context, measure ? ProposalMeasurePen : ProposalBeatPen, At(along, across1), At(along, across2));
 
                     // The handle, in the margin beside the lanes, that drags the beat.
                     var handle = highway ? new Point(labels.Right - 7, along) : new Point(along, labels.Bottom - 7);
@@ -1947,7 +2028,7 @@ namespace ChartBuilder.Controls.Editing
             {
                 double along = projection.AlongOf(downbeat);
                 if (lines)
-                    context.DrawLine(DownbeatPen, At(along, highway ? labels.Left : labels.Top), At(along, across2));
+                    Line(context, DownbeatPen, At(along, highway ? labels.Left : labels.Top), At(along, across2));
                 if (!texts)
                     return;
 
@@ -2093,7 +2174,7 @@ namespace ChartBuilder.Controls.Editing
             using (context.PushClip(band))
             {
                 for (double x = band.Left - band.Height; x < band.Right; x += SyncHashGap)
-                    context.DrawLine(SyncHashPen, new Point(x, band.Bottom), new Point(x + band.Height, band.Top));
+                    Line(context, SyncHashPen, new Point(x, band.Bottom), new Point(x + band.Height, band.Top));
             }
         }
 
@@ -2149,7 +2230,7 @@ namespace ChartBuilder.Controls.Editing
 
             // Cut to the page, like the tints, so a range reaching far past it doesn't make its picture bigger than the page.
             double across1 = projection.LaneFrom, across2 = projection.LaneFrom + (projection.LaneSize * projection.Slots.Slots.Count);
-            HighwayChrome.DrawBands(context, _gems, projection.View, CollectionsMarshal.AsSpan(ranges), across1, across2, _alongLimit.From, _alongLimit.To);
+            HighwayChrome.DrawBands(context, _gems, projection.View, CollectionsMarshal.AsSpan(ranges), across1, across2, _alongLimit.From, _alongLimit.To, asRect: _camera is not null);
         }
 
         /// <summary>A range's start and end along the time axis, in the order it runs: at least two pixels long, so one with no length shows.</summary>
@@ -2321,18 +2402,21 @@ namespace ChartBuilder.Controls.Editing
                 for (int guard = 0; tick <= last && guard < 4000; guard++)
                 {
                     double along = projection.AlongOf(session.AudioAt(tick));
-                    context.DrawLine(GridPen, At(along, across1), At(along, across2));
+                    Line(context, GridPen, At(along, across1), At(along, across2));
                     tick = snap.Step(tick, 1, map);
                 }
             }
 
             var labels = LabelsArea(size, projection);
             Measures(map, last);
-            foreach (var line in map.BeatLines(first, last))
+            var beatLines = _beatLines;
+            beatLines.Clear();
+            map.BeatLines(first, last, beatLines);
+            foreach (var line in beatLines)
             {
                 double along = projection.AlongOf(session.AudioAt(line.Tick));
                 if (lines)
-                    HighwayChrome.DrawBeatLine(context, View, along, across1, across2, line.IsMeasure);
+                    HighwayChrome.DrawBeatLine(context, View, along, across1, across2, line.IsMeasure, asRect: _camera is not null);
                 if (!text || !line.IsMeasure)
                     continue;
 
@@ -2366,7 +2450,7 @@ namespace ChartBuilder.Controls.Editing
                 double along = projection.AlongOf(session.AudioAt(marker.Tick));
                 bool selected = session.Selection.TempoTicks.Contains(marker.Tick);
                 if (lines)
-                    context.DrawLine(TempoPen, At(along, across1), At(along, across2));
+                    Line(context, TempoPen, At(along, across1), At(along, across2));
                 if (!texts)
                     continue;
 
@@ -2392,7 +2476,7 @@ namespace ChartBuilder.Controls.Editing
                     continue;
                 double along = projection.AlongOf(session.AudioAt(signature.Tick));
                 if (lines)
-                    context.DrawLine(TempoPen, At(along, across1), At(along, across2));
+                    Line(context, TempoPen, At(along, across1), At(along, across2));
                 if (!texts)
                     continue;
 
@@ -2404,19 +2488,43 @@ namespace ChartBuilder.Controls.Editing
             }
         }
 
-        /// <summary>A tempo marker's label: its tempo, any time signature at its tick, and whether it's anchored.</summary>
-        private static string TempoText(EditableTempoMap tempoMap, TempoChange marker)
+        /// <summary>A tempo marker's label: its tempo, any time signature at its tick, and whether it's anchored; made once for each.</summary>
+        private string TempoText(EditableTempoMap tempoMap, TempoChange marker)
         {
             bool anchored = !tempoMap.Anchors.At(marker.Tick).IsEmpty;
+            var signatures = tempoMap.TimeSignatures.At(marker.Tick);
+            var (numerator, denominator) = signatures.IsEmpty ? (0, 0) : (signatures[^1].Numerator, signatures[^1].Denominator);
+            var key = (marker.Tick, marker.MicrosecondsPerQuarter, anchored, numerator, denominator);
+            if (_tempoTexts.TryGetValue(key, out string? text))
+                return text;
+
             string bpm = EditableTempoMap.BpmOf(marker.MicrosecondsPerQuarter).ToString("0.###", CultureInfo.CurrentCulture);
-            var signature = tempoMap.TimeSignatures.At(marker.Tick);
-            if (!signature.IsEmpty)
-                bpm += " " + SignatureText(signature[^1]);
-            return (anchored ? "⚓ " : "") + bpm;
+            if (!signatures.IsEmpty)
+                bpm += " " + SignatureText(signatures[^1]);
+            text = (anchored ? "⚓ " : "") + bpm;
+            if (_tempoTexts.Count >= MaxRailTexts)
+                _tempoTexts.Clear();
+            return _tempoTexts[key] = text;
         }
 
-        private static string SignatureText(TimeSignatureMarker signature) =>
-            string.Create(CultureInfo.CurrentCulture, $"{signature.Numerator}/{signature.Denominator}");
+        /// <summary>A time signature's label, made once for each.</summary>
+        private string SignatureText(TimeSignatureMarker signature)
+        {
+            var key = (signature.Numerator, signature.Denominator);
+            if (!_signatureTexts.TryGetValue(key, out string? text))
+                _signatureTexts[key] = text = string.Create(CultureInfo.CurrentCulture, $"{signature.Numerator}/{signature.Denominator}");
+            return text;
+        }
+
+        /// <summary>The name of the section an event's <paramref name="text"/> is, or null when it isn't one; worked out once for each text.</summary>
+        private string? SectionName(string text)
+        {
+            if (_sectionNames.TryGetValue(text, out string? name))
+                return name;
+            if (_sectionNames.Count >= MaxRailTexts)
+                _sectionNames.Clear();
+            return _sectionNames[text] = SectionEvents.NameOf(text);
+        }
 
         /// <summary>
         /// The sections (charter-spec C8 item 3): a faint line across the lanes and the labels' margin at each one's start,
@@ -2433,11 +2541,11 @@ namespace ChartBuilder.Controls.Editing
             var tempoMap = session.Chart.TempoMap;
             foreach (var e in session.Chart.Events.Between((long)Math.Floor(fromTick), (long)Math.Ceiling(toTick)))
             {
-                if (SectionEvents.NameOf(e.Text) is not { } name)
+                if (SectionName(e.Text) is not { } name)
                     continue;
                 double along = projection.AlongOf(session.AudioAt(e.Tick));
                 if (lines)
-                    context.DrawLine(SectionPen, At(along, across1), At(along, across2));
+                    Line(context, SectionPen, At(along, across1), At(along, across2));
                 if (!texts)
                     continue;
 
@@ -2927,8 +3035,8 @@ namespace ChartBuilder.Controls.Editing
         {
             context.DrawRectangle(SyncCloseBrush, null, close, 3, 3);
             var inner = close.Deflate(close.Width * 0.28);
-            context.DrawLine(SyncClosePen, inner.TopLeft, inner.BottomRight);
-            context.DrawLine(SyncClosePen, inner.TopRight, inner.BottomLeft);
+            Line(context, SyncClosePen, inner.TopLeft, inner.BottomRight);
+            Line(context, SyncClosePen, inner.TopRight, inner.BottomLeft);
         }
 
         /// <summary>
@@ -3009,7 +3117,7 @@ namespace ChartBuilder.Controls.Editing
             double along = projection.AlongOf(session.Viewport.Cursor);
             double across1 = projection.LaneFrom, across2 = projection.LaneFrom + (projection.LaneSize * projection.Slots.Slots.Count);
             double half = Math.Max(3, GemSize(projection) * 0.6);
-            HighwayChrome.DrawStrikeBand(context, View, Box(along - half, along + half, across1, across2), StrikeBandBrush);
+            HighwayChrome.DrawStrikeBand(context, View, Box(along - half, along + half, across1, across2), StrikeBandBrush, asRect: _camera is not null);
         }
 
         /// <summary>
@@ -3086,7 +3194,7 @@ namespace ChartBuilder.Controls.Editing
             double along = projection.AlongOf(session.Viewport.Cursor);
             var pen = AccentPens().Cursor;
             var labels = LabelsArea(Bounds.Size, projection);
-            context.DrawLine(pen, At(along, View == LaneView.Highway ? labels.Left : labels.Top), At(along, View == LaneView.Highway ? lanes.Right : lanes.Bottom));
+            Line(context, pen, At(along, View == LaneView.Highway ? labels.Left : labels.Top), At(along, View == LaneView.Highway ? lanes.Right : lanes.Bottom));
         }
 
         /// <summary>A gem in <paramref name="column"/> at <paramref name="along"/>.</summary>
@@ -3204,6 +3312,9 @@ namespace ChartBuilder.Controls.Editing
         /// immutable copy of <paramref name="brush"/>, so it isn't one of the frame's resources.
         /// </remarks>
         private TextLayout Label(string text, double size, IBrush brush, double? maxWidth = null) => _labels.Get(text, size, brush, maxWidth);
+
+        /// <summary>A straight line on the canvas: filled as a rectangle while it's tilted back, which costs far less to draw through the tilt (see <see cref="HighwayChrome.DrawStraight"/>).</summary>
+        private void Line(DrawingContext context, IPen pen, Point from, Point to) => HighwayChrome.DrawStraight(context, pen, from, to, _camera is not null);
 
         /// <summary>Measure <paramref name="index"/>'s number, counting from one, made once.</summary>
         private string MeasureNumber(int index)
