@@ -15,10 +15,11 @@ namespace ChartShared.UI.Controls.Highway
         private const double ShareOfPerspectiveLength = 0.04;
 
         // The least and the most, in pixels of the plane. The most stops a tall highway's gems growing into blocks: in perspective a gem
-        // stands as tall as it is deep, so this is also its height. 24 is as deep as a gem is on a lane 600 pixels tall, flat or in perspective.
+        // stands about as tall as it is deep, so it's also its height. Flat, 14 is reached by a lane about 580 pixels tall, short of the
+        // usual 760; in perspective, 18 by a host 450 tall.
         private const double Least = 8;
-        private const double MostFlat = 24;
-        private const double MostPerspective = 24;
+        private const double MostFlat = 14;
+        private const double MostPerspective = 18;
 
         /// <summary>
         /// How deep a gem is, in pixels of its plane, on a highway <paramref name="length"/> pixels long: its height flat, and in

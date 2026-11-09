@@ -896,6 +896,58 @@ public sealed class StemPlayerTests
     }
 
     [TestMethod]
+    public void AFrameDrawnAheadLeavesTheSmoothPositionOnTheDevice()
+    {
+        // Each frame is drawn for a moment 8 ms on, just after the device takes more: that's read off the smooth position,
+        // which is still compared with the device now, so it lands on each taking as it would with no frame asked.
+        var clock = new ManualClock();
+        using var output = new FakeOutput();
+        using var player = SilentPlayer(output, seconds: 10, clock);
+        player.Play();
+        WaitUntil(() => output.QueuedFrames >= QueueTarget);
+        _ = player.SmoothPosition;
+
+        long ahead = 8 * clock.TimestampFrequency / 1000;
+        for (int step = 1; step <= 20; step++)
+        {
+            clock.Advance(TimeSpan.FromMilliseconds(10));
+            output.Drain(Rate / 100);
+            WaitUntil(() => output.QueuedFrames >= QueueTarget);
+            Assert.AreEqual((step * 10) + 8, player.DrawnPosition(0, clock.GetTimestamp() + ahead).TotalMilliseconds, 1e-3, $"Step {step}'s frame.");
+            Assert.AreEqual(step * 10, player.SmoothPosition.TotalMilliseconds, 1e-3, $"Step {step}.");
+        }
+    }
+
+    [TestMethod]
+    public void ADriftShortOfTheSnapIsMadeUpWithinHalfASecond()
+    {
+        var clock = new ManualClock();
+        using var output = new FakeOutput();
+        using var player = SilentPlayer(output, seconds: 10, clock);
+        player.Play();
+        WaitUntil(() => output.QueuedFrames >= QueueTarget);
+
+        // The device takes nothing for 40 ms from 500 ms, short of the 50 ms that puts the smooth position straight back on
+        // it, then takes 10 ms every 10 ms again: 40 ms behind the clock from then on.
+        var frames = Watch(player, output, clock, n => n < 50 ? (n + 1) * 10 : (n + 5) * 10, Rate / 100, QueueTarget, 1500);
+
+        for (int i = 1; i < frames.Count; i++)
+        {
+            var (last, frame) = (frames[i - 1], frames[i]);
+            double expected = frame.At - last.At;
+            double moved = frame.Smooth - last.Smooth;
+            Assert.IsTrue(moved >= expected * 0.85 && moved <= expected * 1.15, $"At {frame.At:F1} ms it moved {moved:F3} ms, against {expected:F3} ms.");
+
+            // Half a second on, it's back with the device: where it was at its last taking, every 10 ms, and on from there.
+            if (frame.At >= 1100)
+            {
+                double device = frame.Position + (frame.At % 10);
+                Assert.IsLessThanOrEqualTo(10, Math.Abs(frame.Smooth - device), $"At {frame.At:F1} ms it was at {frame.Smooth:F3} ms, against {device:F3} ms.");
+            }
+        }
+    }
+
+    [TestMethod]
     public void ASeekPutsTheSmoothPositionStraightThere()
     {
         var clock = new ManualClock();

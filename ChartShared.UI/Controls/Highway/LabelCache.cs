@@ -1,3 +1,5 @@
+using System;
+using System.Runtime.CompilerServices;
 using Avalonia.Media;
 using Avalonia.Media.TextFormatting;
 
@@ -23,6 +25,9 @@ namespace ChartShared.UI.Controls.Highway
         // same brush with a colour the label was not made in. Any other is told by the brush itself.
         private readonly LruCache<(string Text, double Size, uint Color, double Opacity, IBrush? Other, double? MaxWidth), TextLayout> _labels = new(Capacity);
 
+        // What each label was made for, as KeyOf gives it: boxed once, as it's made.
+        private readonly ConditionalWeakTable<TextLayout, object> _keys = [];
+
         /// <summary>The label for <paramref name="text"/>, cut short with an ellipsis on one line at <paramref name="maxWidth"/> when that's given.</summary>
         public TextLayout Get(string text, double size, IBrush brush, double? maxWidth = null)
         {
@@ -35,7 +40,16 @@ namespace ChartShared.UI.Controls.Highway
             label = maxWidth is { } width
                 ? new TextLayout(text, Face, size, brush.ToImmutable(), textTrimming: TextTrimming.CharacterEllipsis, maxWidth: width, maxLines: 1)
                 : new TextLayout(text, Face, size, brush.ToImmutable());
+            _keys.AddOrUpdate(label, key);
             return _labels.Add(key, label);
         }
+
+        /// <summary>
+        /// What <paramref name="label"/>, one of this cache's, was made for, equal to any other label's made for the same: for what
+        /// keeps something made from a label, as a picture of it, past the label, which is let go when the cache is full and made
+        /// again when it's next asked for.
+        /// </summary>
+        public object KeyOf(TextLayout label) =>
+            _keys.TryGetValue(label, out var key) ? key : throw new ArgumentException("Not a label of this cache.", nameof(label));
     }
 }

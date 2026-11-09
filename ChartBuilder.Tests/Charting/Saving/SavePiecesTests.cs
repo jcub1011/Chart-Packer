@@ -252,8 +252,7 @@ public sealed class SavePiecesTests
         var pairs = ChartSongSection.Read(Encoding.UTF8.GetBytes(chart));
 
         Assert.AreSequenceEqual(
-            new[]
-            {
+            [
                 KeyValuePair.Create("name", "The Name"),
                 KeyValuePair.Create("artist", "The Artist"),
                 KeyValuePair.Create("genre", "rock"),
@@ -261,7 +260,7 @@ public sealed class SavePiecesTests
                 KeyValuePair.Create("year", "2008"),
                 KeyValuePair.Create("preview_start_time", "12250"),
                 KeyValuePair.Create("diff_band", "4"),
-            },
+            ],
             [.. pairs]);
         Assert.IsEmpty(ChartSongSection.Read("[SyncTrack]\n{\n}\n"u8.ToArray()));
     }

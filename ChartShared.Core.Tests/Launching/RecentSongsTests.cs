@@ -14,7 +14,7 @@ public sealed class RecentSongsTests
         list = RecentSongs.Add(list, Song("B"));
         list = RecentSongs.Add(list, Song("A", "A again"));
 
-        Assert.AreSequenceEqual(new[] { "A again", "B" }, [.. list.Select(s => s.Title)]);
+        Assert.AreSequenceEqual(["A again", "B"], [.. list.Select(s => s.Title)]);
     }
 
     [TestMethod]

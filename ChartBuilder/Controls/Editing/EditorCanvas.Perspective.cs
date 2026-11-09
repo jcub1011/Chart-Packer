@@ -70,6 +70,10 @@ namespace ChartBuilder.Controls.Editing
                 _gems.PlainTails = value is not null;
                 _pressOffset = default;
 
+                // Flat, nothing stands up beside the plane: the page of their pictures is let go.
+                if (value is null)
+                    _pictures.Dispose();
+
                 // Tilted, the layers are not kept as pictures and their pages have no pixel limit.
                 UpdatePaging();
 
@@ -256,7 +260,9 @@ namespace ChartBuilder.Controls.Editing
         /// </summary>
         private (WriteableBitmap Page, Rect Source)? LabelPicture(TextLayout text, ISolidColorBrush? badge)
         {
-            var key = ((object)text, badge is null ? 0u : badge.Color.ToUInt32());
+            // Told by what the label was made for, not the label itself, which the label cache lets go when it's full and makes
+            // again: so a label made again is found here, and this keeps no label let go.
+            var key = (_labels.KeyOf(text), badge is null ? 0u : badge.Color.ToUInt32());
             if (_pictures.TryGet(key, out var page, out var source))
                 return (page, source);
 

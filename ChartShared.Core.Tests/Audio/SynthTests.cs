@@ -83,7 +83,7 @@ public sealed class SynthTests
 
         var found = new List<ScheduledSound>();
         metronome.SoundsBetween(metronome.FrameAt(1), metronome.FrameAt(4), found);
-        Assert.AreSequenceEqual(new[] { metronome.FrameAt(1), metronome.FrameAt(2), metronome.FrameAt(3) }, [.. found.Select(s => s.SourceFrame)], "From the first frame, up to but not including the last.");
+        Assert.AreSequenceEqual([metronome.FrameAt(1), metronome.FrameAt(2), metronome.FrameAt(3)], [.. found.Select(s => s.SourceFrame)], "From the first frame, up to but not including the last.");
         Assert.AreSame(found[0].Sound, found[1].Sound, "Every beat has the same click.");
         Assert.AreNotSame(found[0].Sound, Clicks(metronome, 4).Single().Sound, "A measure's click isn't a beat's.");
         Assert.AreSame(Clicks(metronome, 0).Single().Sound, Clicks(metronome, 4).Single().Sound);

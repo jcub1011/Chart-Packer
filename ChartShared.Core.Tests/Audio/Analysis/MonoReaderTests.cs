@@ -72,8 +72,8 @@ public sealed class MonoReaderTests
         var late = new float[20];
         WindowRead.Read(reader, 90, late);
 
-        Assert.AreSequenceEqual(new float[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }, early);
-        Assert.AreSequenceEqual(new float[] { 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, late);
+        Assert.AreSequenceEqual([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], early);
+        Assert.AreSequenceEqual([91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], late);
     }
 
     [TestMethod]

@@ -45,7 +45,7 @@ public sealed class InspectorEditsTests
         Assert.AreSequenceEqual(
             [new PendingSongIniChange("name", "New", PendingChangeReason.UserEdit), new PendingSongIniChange("album", null, PendingChangeReason.UserEdit)],
             song.PendingChanges().ToList());
-        Assert.AreSequenceEqual(new[] { KeyValuePair.Create("name", "New") }, [.. song.EffectivePairs()]);
+        Assert.AreSequenceEqual([KeyValuePair.Create("name", "New")], [.. song.EffectivePairs()]);
         Assert.IsTrue(song.PendingChanges().All(c => c.CanRevert));
     }
 

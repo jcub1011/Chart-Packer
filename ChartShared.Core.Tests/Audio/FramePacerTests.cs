@@ -123,6 +123,80 @@ public sealed class FramePacerTests
         Assert.AreEqual(At(later), pacer.Next(At(later), Frequency));
     }
 
+    [TestMethod]
+    [DataRow(75, 4.5)]
+    [DataRow(60, 5.5)]
+    public void AViewReadLateInEveryFrameWhileItLearnsIsStillTheSameFrame(int hertz, double lateMilliseconds)
+    {
+        // The views drawn in a frame's first moments read the clock, then one drawn after them, as the timeline's playhead,
+        // reads it some milliseconds on: every frame's time split in two. The beat is still the screen's, and the late read
+        // the same frame as the others.
+        double beat = 1.0 / hertz;
+        var pacer = new FramePacer();
+        for (int frame = 0; frame < 60; frame++)
+        {
+            double start = frame * beat;
+            long first = pacer.Next(At(start), Frequency);
+            long late = pacer.Next(At(start + (lateMilliseconds / 1000)), Frequency);
+            if (frame >= 40)
+                Assert.AreEqual(first, late, $"Frame {frame}'s late read.");
+        }
+
+        Assert.AreEqual(beat, pacer.FrameSeconds, beat * 0.01);
+    }
+
+    [TestMethod]
+    public void OneLateReadWhileItLearnsDoesNotSpoilTheBeat()
+    {
+        var pacer = new FramePacer();
+        for (int frame = 0; frame < 30; frame++)
+        {
+            pacer.Next(At(frame * Beat), Frequency);
+            if (frame == 5)
+                pacer.Next(At((frame * Beat) + 0.005), Frequency);
+        }
+
+        Assert.AreEqual(Beat, pacer.FrameSeconds, Beat * 0.01);
+    }
+
+    [TestMethod]
+    public void AFasterScreenIsLearnedAgain()
+    {
+        // From 75 Hz to 144 Hz, as the window is moved to another screen: kept, the beat would have every other frame taken for
+        // the one before it, and drawn again.
+        var pacer = new FramePacer();
+        for (int frame = 0; frame < 40; frame++)
+            pacer.Next(At(frame * Beat), Frequency);
+
+        AssertLearnsAgain(pacer, from: 40 * Beat, beat: 1.0 / 144);
+    }
+
+    [TestMethod]
+    public void ASlowerScreenIsLearnedAgain()
+    {
+        var pacer = new FramePacer();
+        const double Fast = 1.0 / 144;
+        for (int frame = 0; frame < 60; frame++)
+            pacer.Next(At(frame * Fast), Frequency);
+
+        AssertLearnsAgain(pacer, from: 60 * Fast, beat: 1.0 / 60);
+    }
+
+    /// <summary>Asserts that frames <paramref name="beat"/> apart from <paramref name="from"/> are soon each drawn a beat after the last.</summary>
+    private static void AssertLearnsAgain(FramePacer pacer, double from, double beat)
+    {
+        var moments = new List<double>();
+        for (int frame = 0; frame < 200; frame++)
+            moments.Add(Seconds(pacer.Next(At(from + (frame * beat)), Frequency)));
+
+        Assert.AreEqual(beat, pacer.FrameSeconds, beat * 0.01);
+        for (int i = 100; i < moments.Count; i++)
+        {
+            double step = moments[i] - moments[i - 1];
+            Assert.AreEqual(beat, step, beat * 0.02, $"Frame {i} came {step * 1000:F3} ms after the last.");
+        }
+    }
+
     // A moment in seconds as the clock's timestamp, from a start well past zero; and back.
     private static long At(double seconds) => (long)Math.Round((1000 + seconds) * Frequency);
 

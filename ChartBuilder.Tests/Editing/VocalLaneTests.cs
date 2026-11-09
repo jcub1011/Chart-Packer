@@ -27,8 +27,8 @@ public sealed class VocalLaneTests
 
         Assert.IsNotNull(vocals);
         Assert.AreEqual("PART VOCALS", vocals.TrackName);
-        Assert.AreSequenceEqual(new[] { new VocalLaneNote(0, 240, 60, false, false), new VocalLaneNote(240, 480, 62, false, false) }, [.. vocals.Notes]);
-        Assert.AreSequenceEqual(new[] { new VocalLaneLyric(0, "Hel", true), new VocalLaneLyric(240, "lo", false) }, [.. vocals.Lyrics]);
+        Assert.AreSequenceEqual([new VocalLaneNote(0, 240, 60, false, false), new VocalLaneNote(240, 480, 62, false, false)], [.. vocals.Notes]);
+        Assert.AreSequenceEqual([new VocalLaneLyric(0, "Hel", true), new VocalLaneLyric(240, "lo", false)], [.. vocals.Lyrics]);
     }
 
     [TestMethod]
@@ -83,12 +83,12 @@ public sealed class VocalLaneTests
         var doubled = session.VocalsOf(VocalTrack.Vocals)!;
 
         Assert.AreNotSame(before, doubled);
-        Assert.AreSequenceEqual(new long[] { 0, 480 }, [.. doubled.Notes.Select(n => n.Tick)]);
-        Assert.AreSequenceEqual(new long[] { 0, 480 }, [.. doubled.Lyrics.Select(l => l.Tick)]);
+        Assert.AreSequenceEqual([0, 480], [.. doubled.Notes.Select(n => n.Tick)]);
+        Assert.AreSequenceEqual([0, 480], [.. doubled.Lyrics.Select(l => l.Tick)]);
 
         session.UndoStack.Undo();
 
-        Assert.AreSequenceEqual(new long[] { 0, 240 }, [.. session.VocalsOf(VocalTrack.Vocals)!.Notes.Select(n => n.Tick)]);
+        Assert.AreSequenceEqual([0, 240], [.. session.VocalsOf(VocalTrack.Vocals)!.Notes.Select(n => n.Tick)]);
     }
 
     // The syllables, rows and searches.
@@ -100,10 +100,10 @@ public sealed class VocalLaneTests
             [new(0, 100, 60), new(120, 100, 64), new(240, 100, 50), new(360, 100, 52)],
             [new(0, "Shout#"), new(120, "yeah^"), new(240, "go-"), new(360, "+")]));
 
-        Assert.AreSequenceEqual(new[] { true, true, false, false }, [.. lane.Notes.Select(n => n.IsUnpitched)]);
-        Assert.AreSequenceEqual(new[] { false, false, false, true }, [.. lane.Notes.Select(n => n.IsSlide)]);
-        Assert.AreSequenceEqual(new[] { "Shout", "yeah", "go" }, [.. lane.Lyrics.Select(l => l.Text)]);
-        Assert.AreSequenceEqual(new[] { false, false, true }, [.. lane.Lyrics.Select(l => l.JoinsNext)]);
+        Assert.AreSequenceEqual([true, true, false, false], [.. lane.Notes.Select(n => n.IsUnpitched)]);
+        Assert.AreSequenceEqual([false, false, false, true], [.. lane.Notes.Select(n => n.IsSlide)]);
+        Assert.AreSequenceEqual(["Shout", "yeah", "go"], [.. lane.Lyrics.Select(l => l.Text)]);
+        Assert.AreSequenceEqual([false, false, true], [.. lane.Lyrics.Select(l => l.JoinsNext)]);
 
         // The rows span the sung notes only.
         Assert.AreEqual(50, lane.LowestPitch);
@@ -131,7 +131,7 @@ public sealed class VocalLaneTests
         var (from, to) = lane.NotesBetween(500, 1300);
         var found = Enumerable.Range(from, to - from).Select(i => lane.Notes[i]).Where(n => n.EndTick >= 500).Select(n => n.Tick).ToArray();
 
-        Assert.AreSequenceEqual(new long[] { 0, 1200 }, found);
+        Assert.AreSequenceEqual([0, 1200], found);
         Assert.AreEqual(0, lane.NoteAt(999));
         Assert.IsNull(lane.NoteAt(1100));
         Assert.AreEqual(1, lane.NoteAt(1200));
@@ -144,7 +144,7 @@ public sealed class VocalLaneTests
 
         var (from, to) = lane.LyricsBetween(400, 960);
 
-        Assert.AreSequenceEqual(new[] { "b", "c" }, [.. lane.Lyrics.Skip(from).Take(to - from).Select(l => l.Text)]);
+        Assert.AreSequenceEqual(["b", "c"], [.. lane.Lyrics.Skip(from).Take(to - from).Select(l => l.Text)]);
     }
 
     private static EditableChart Loaded(byte[] midi) => MidiChartLoader.Load(midi, ChartReadOptions.Default).Chart;

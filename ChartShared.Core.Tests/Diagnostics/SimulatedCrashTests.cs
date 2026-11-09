@@ -12,7 +12,7 @@ public sealed class SimulatedCrashTests
         var rest = SimulatedCrash.Take(["--new", "song.ogg"], out bool requested);
 
         Assert.IsFalse(requested);
-        Assert.AreSequenceEqual(new[] { "--new", "song.ogg" }, [.. rest]);
+        Assert.AreSequenceEqual(["--new", "song.ogg"], [.. rest]);
     }
 
     [TestMethod]
@@ -21,7 +21,7 @@ public sealed class SimulatedCrashTests
         var rest = SimulatedCrash.Take(["--new", "--crash", "song.ogg", "--crash"], out bool requested);
 
         Assert.IsTrue(requested);
-        Assert.AreSequenceEqual(new[] { "--new", "song.ogg" }, [.. rest]);
+        Assert.AreSequenceEqual(["--new", "song.ogg"], [.. rest]);
     }
 
     [TestMethod]
@@ -30,7 +30,7 @@ public sealed class SimulatedCrashTests
         var rest = SimulatedCrash.Take(["--", "--crash"], out bool requested);
 
         Assert.IsFalse(requested);
-        Assert.AreSequenceEqual(new[] { "--", "--crash" }, [.. rest]);
+        Assert.AreSequenceEqual(["--", "--crash"], [.. rest]);
     }
 
     [TestMethod]

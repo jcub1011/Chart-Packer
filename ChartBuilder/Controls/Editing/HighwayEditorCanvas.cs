@@ -2,6 +2,7 @@ using System;
 using Avalonia;
 using ChartShared.Core.Charting;
 using ChartShared.Core.Charting.Editing;
+using ChartShared.UI.Controls.Highway;
 
 namespace ChartBuilder.Controls.Editing
 {
@@ -19,12 +20,8 @@ namespace ChartBuilder.Controls.Editing
         private const double RailWidth = 56;
         private const double MarkWidth = 18;
 
-        // The widest a column gets, in pixels, on a flat highway.
+        // The widest a column gets, in pixels, on a flat highway; in perspective, all of them together get PerspectiveCamera.MaxHighwayWidth.
         private const double MaxLaneSize = 64;
-
-        // The widest a perspective highway's columns get together, in pixels of the plane: as wide as the room allows, to this, for
-        // the plane narrows towards its far end and the notes are best large near the strike line.
-        private const double MaxPerspectiveWidth = 480;
 
         protected override LaneView View => LaneView.Highway;
 
@@ -65,7 +62,7 @@ namespace ChartBuilder.Controls.Editing
         /// pixels across all of them.
         /// </summary>
         internal static double LaneSizeFor(double width, double fixedWidth, int count, bool perspective) =>
-            Math.Min(perspective ? MaxPerspectiveWidth / count : MaxLaneSize, Math.Max(1, width - fixedWidth) / count);
+            Math.Min(perspective ? PerspectiveCamera.MaxHighwayWidth / count : MaxLaneSize, Math.Max(1, width - fixedWidth) / count);
 
         protected override Rect LabelsArea(Size size, LaneProjection projection) =>
             new(projection.LaneFrom - OnsetStripSize - RailWidth, projection.TimeFrom, RailWidth, projection.TimeLength);

@@ -9,25 +9,26 @@ public sealed class GemDepthTests
     [TestMethod]
     public void ATallerLaneHasDeeperGemsFlatAndInPerspective()
     {
-        foreach (bool perspective in new[] { false, true })
+        // Lengths short of each one's most: about 580 pixels flat, a host 450 tall in perspective.
+        foreach (var (perspective, lengths) in new[] { (false, new[] { 400.0, 480, 560 }), (true, [250.0, 350, 430]) })
         {
-            double shorter = GemDepth.For(300, perspective);
-            double middle = GemDepth.For(450, perspective);
-            double taller = GemDepth.For(600, perspective);
+            double shorter = GemDepth.For(lengths[0], perspective);
+            double middle = GemDepth.For(lengths[1], perspective);
+            double taller = GemDepth.For(lengths[2], perspective);
 
-            Assert.IsLessThan(middle, shorter, $"Perspective {perspective}: 300 against 450.");
-            Assert.IsLessThan(taller, middle, $"Perspective {perspective}: 450 against 600.");
+            Assert.IsLessThan(middle, shorter, $"Perspective {perspective}: {lengths[0]} against {lengths[1]}.");
+            Assert.IsLessThan(taller, middle, $"Perspective {perspective}: {lengths[1]} against {lengths[2]}.");
         }
     }
 
     [TestMethod]
     public void TheDepthIsInProportionToTheLengthBetweenItsLimits()
     {
-        double flat = GemDepth.For(400, perspective: false);
-        Assert.AreEqual(flat * 1.5, GemDepth.For(600, perspective: false), 1e-9);
+        double flat = GemDepth.For(360, perspective: false);
+        Assert.AreEqual(flat * 1.5, GemDepth.For(540, perspective: false), 1e-9);
 
-        double tilted = GemDepth.For(400, perspective: true);
-        Assert.AreEqual(tilted * 1.5, GemDepth.For(600, perspective: true), 1e-9);
+        double tilted = GemDepth.For(250, perspective: true);
+        Assert.AreEqual(tilted * 1.5, GemDepth.For(375, perspective: true), 1e-9);
     }
 
     [TestMethod]
@@ -37,11 +38,10 @@ public sealed class GemDepthTests
         {
             Assert.AreEqual(8, GemDepth.For(0, perspective), 1e-9, $"Perspective {perspective}: no length.");
             Assert.AreEqual(8, GemDepth.For(50, perspective), 1e-9, $"Perspective {perspective}: a stub of a lane.");
-            Assert.IsLessThanOrEqualTo(24, GemDepth.For(100_000, perspective), $"Perspective {perspective}: a huge lane.");
         }
 
-        Assert.AreEqual(24, GemDepth.For(100_000, perspective: false), 1e-9);
-        Assert.AreEqual(24, GemDepth.For(100_000, perspective: true), 1e-9);
+        Assert.AreEqual(14, GemDepth.For(100_000, perspective: false), 1e-9, "A huge flat lane.");
+        Assert.AreEqual(18, GemDepth.For(100_000, perspective: true), 1e-9, "A huge perspective highway.");
     }
 
     [TestMethod]
@@ -56,15 +56,15 @@ public sealed class GemDepthTests
         }
 
         // A lane short of the limit is still in proportion.
-        Assert.IsLessThan(24, GemDepth.For(500, perspective: true));
-        Assert.IsLessThan(24, GemDepth.For(500, perspective: false));
+        Assert.IsLessThan(18, GemDepth.For(400, perspective: true));
+        Assert.IsLessThan(14, GemDepth.For(560, perspective: false));
     }
 
     [TestMethod]
-    public void ATypicalLaneKeepsGemsAboutAsDeepAsTheyWere()
+    public void ATypicalLanesGemsAreAtTheirMost()
     {
-        // The lane the editor is usually in: about 760 pixels tall. Gems were 18 deep flat, and are 24 at most in perspective.
-        Assert.AreEqual(18, GemDepth.For(760, perspective: false), 0.5);
-        Assert.AreEqual(24, GemDepth.For(760, perspective: true), 1e-9);
+        // The lane the editor is usually in: about 760 pixels tall. Its gems are 14 deep flat, and 18 in perspective.
+        Assert.AreEqual(14, GemDepth.For(760, perspective: false), 1e-9);
+        Assert.AreEqual(18, GemDepth.For(760, perspective: true), 1e-9);
     }
 }

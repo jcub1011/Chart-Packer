@@ -182,10 +182,8 @@ namespace ChartBuilder.Controls.Editing
         private readonly Action<TimeSpan> _onFrame;
         private readonly Action _redrawStalePages;
 
-        // Where a second of audio is along the time axis, for the waveform's and spectrogram's painters, of the projection they're
-        // given: one delegate, of whichever projection is set, rather than one made for each drawn.
-        private readonly Func<double, double> _alongOf;
-        private LaneProjection? _alongOfProjection;
+        // Where a second of audio is along the time axis, for the waveform's and spectrogram's painters, of the projection they're given.
+        private readonly AlongOfProjection _alongOf = new();
 
         // How brightly each column is lit as the song plays through the strike line.
         private double[] _hits = [];
@@ -302,7 +300,6 @@ namespace ChartBuilder.Controls.Editing
         {
             _onFrame = OnFrame;
             _redrawStalePages = RedrawStalePages;
-            _alongOf = seconds => _alongOfProjection!.AlongOf(seconds);
             _notePainter = new NotePainter(_gems);
             _upright = new UprightGemPainter(_gems);
             _uprightNotes = new NotePainter(_upright);
@@ -452,6 +449,10 @@ namespace ChartBuilder.Controls.Editing
         {
             base.OnDetachedFromVisualTree(e);
             Detach();
+
+            // The perspective labels' page goes with the canvas, rather than waiting on the collector; attached again, it's
+            // filled again as they're drawn.
+            _pictures.Dispose();
         }
 
         protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
@@ -1877,11 +1878,7 @@ namespace ChartBuilder.Controls.Editing
         }
 
         /// <summary>Where a second of audio is along <paramref name="projection"/>'s time axis, as a painter takes it, which reads it as it begins.</summary>
-        private Func<double, double> AlongOf(LaneProjection projection)
-        {
-            _alongOfProjection = projection;
-            return _alongOf;
-        }
+        private Func<double, double> AlongOf(LaneProjection projection) => _alongOf.For(projection);
 
         /// <returns>Whether all of it was drawn as it is now.</returns>
         private bool DrawSpectrogram(DrawingContext context, LaneAudioViewModel audio, Spectrogram spectrogram, Rect area, LaneProjection projection)

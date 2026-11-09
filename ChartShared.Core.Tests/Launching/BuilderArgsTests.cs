@@ -39,7 +39,7 @@ public sealed class BuilderArgsTests
 
         Assert.AreEqual(BuilderStart.NewChart, args.Start);
         Assert.AreSequenceEqual(
-            new[] { Path.GetFullPath("guitar.ogg"), Path.GetFullPath(Path.Combine("stems", "drums.ogg")) }, [.. args.AudioFiles]);
+            [Path.GetFullPath("guitar.ogg"), Path.GetFullPath(Path.Combine("stems", "drums.ogg"))], [.. args.AudioFiles]);
     }
 
     [TestMethod]
@@ -47,7 +47,7 @@ public sealed class BuilderArgsTests
     {
         var args = BuilderArgs.Parse(["--new", "--", "--new", "-song.ogg"]);
 
-        Assert.AreSequenceEqual(new[] { Path.GetFullPath("--new"), Path.GetFullPath("-song.ogg") }, [.. args.AudioFiles]);
+        Assert.AreSequenceEqual([Path.GetFullPath("--new"), Path.GetFullPath("-song.ogg")], [.. args.AudioFiles]);
     }
 
     [TestMethod]

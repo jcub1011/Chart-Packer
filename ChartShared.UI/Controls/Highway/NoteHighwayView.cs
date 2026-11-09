@@ -250,9 +250,6 @@ namespace ChartShared.UI.Controls.Highway
         private const double FlatStrikeFraction = 0.87;
         private const double PerspectiveStrikeFraction = 1 - EditorViewport.PerspectiveStrikeFraction;
 
-        // In perspective, how wide a highway gets at the most, in pixels of the plane, as in the editor's.
-        private const double MaxPerspectiveHighway = 480;
-
         private double StrikeFraction => _camera is null ? FlatStrikeFraction : PerspectiveStrikeFraction;
 
         // The same line, as the shared mapping measures it: from the bottom, which is where the song starts to show.
@@ -301,9 +298,8 @@ namespace ChartShared.UI.Controls.Highway
         // The callback for each frame, made once rather than each time one is asked for.
         private readonly Action<TimeSpan> _onFrame;
 
-        // Where a second is down the highway being drawn: one delegate, of whichever projection is set, rather than one for each drawn.
-        private readonly Func<double, double> _alongOf;
-        private LaneProjection? _alongOfProjection;
+        // Where a second is down the highway being drawn.
+        private readonly AlongOfProjection _alongOf = new();
         private Rect? _viewport;
         private TimeSpan _drawnAt = TimeSpan.MinValue;
 
@@ -458,7 +454,6 @@ namespace ChartShared.UI.Controls.Highway
         public NoteHighwayView()
         {
             _onFrame = OnFrame;
-            _alongOf = seconds => _alongOfProjection!.AlongOf(seconds);
             _notes = new NotePainter(_gems);
             _upright = new UprightGemPainter(_gems);
             _uprightNotes = new NotePainter(_upright);
@@ -655,7 +650,7 @@ namespace ChartShared.UI.Controls.Highway
         {
             const double GapFraction = 0.1;
             int count = scene.Lanes.Count;
-            double width = Math.Min(_camera is null ? Bounds.Height * 0.45 : MaxPerspectiveHighway, Bounds.Width * 0.96 / (count + ((count - 1) * GapFraction)));
+            double width = Math.Min(_camera is null ? Bounds.Height * 0.45 : PerspectiveCamera.MaxHighwayWidth, Bounds.Width * 0.96 / (count + ((count - 1) * GapFraction)));
             double gap = width * GapFraction;
             double left = (Bounds.Width - ((count * width) + ((count - 1) * gap))) / 2;
             return new Rect(left + (index * (width + gap)), 0, width, Bounds.Height);
@@ -933,8 +928,7 @@ namespace ChartShared.UI.Controls.Highway
         private void DrawHighway(DrawingContext context, HighwayScene scene, HighwayLane lane, Waveform? waveform, Rect bounds, double strike, double gem, double now, LaneProjection projection, int? selectedBand)
         {
             double from = projection.Start, to = projection.End;
-            _alongOfProjection = projection;
-            var y = _alongOf;
+            var y = _alongOf.For(projection);
             double laneWidth = bounds.Width / lane.LaneCount;
             var hits = HitsAt(lane, now);
 

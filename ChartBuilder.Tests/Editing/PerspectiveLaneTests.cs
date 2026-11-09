@@ -83,13 +83,12 @@ public sealed class PerspectiveLaneTests
         }
 
         Assert.AreSequenceEqual(
-            new[]
-            {
+            [
                 $"flat -> {Strings.LaneShowPerspectiveToolTip}",
                 $"perspective -> {Strings.LaneShowTimelineToolTip}",
                 $"timeline -> {Strings.LaneShowHighwayToolTip}",
                 $"flat -> {Strings.LaneShowPerspectiveToolTip}",
-            },
+            ],
             seen,
             "Each step's button says where the next goes, and the cycle comes round.");
     }

@@ -74,7 +74,7 @@ public sealed class ChartSaveTests
 
         string folder = await SaveNewAsync(song, "Band - Song");
 
-        Assert.AreSequenceEqual(new[] { "notes.mid", "song.ini", "song.wav" }, Directory.GetFiles(folder).Select(Path.GetFileName).ToArray(), Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
+        Assert.AreSequenceEqual(["notes.mid", "song.ini", "song.wav"], Directory.GetFiles(folder).Select(Path.GetFileName).ToArray(), Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
         var plan = await PackPlanner.PlanAsync(folder, cancellationToken: Token);
         Assert.IsFalse(plan.HasErrors, string.Join("; ", plan.Findings.Select(f => $"{f.RuleId} {f.Message}")));
         var packed = await Packer.PackAsync(plan, Path.Combine(_folders.Root, "Band - Song.sng"), overwrite: false, cancellationToken: Token);
@@ -197,7 +197,7 @@ public sealed class ChartSaveTests
 
         await SaveAsync(song, Token, removeChart: opened.ChartName);
 
-        Assert.AreSequenceEqual(new[] { "notes.mid", "song.ini" }, Directory.GetFiles(folder).Select(Path.GetFileName).ToArray(), Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
+        Assert.AreSequenceEqual(["notes.mid", "song.ini"], Directory.GetFiles(folder).Select(Path.GetFileName).ToArray(), Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
         var pairs = SongIni.Read(Path.Combine(folder, "song.ini"), Token).Pairs;
         Assert.AreEqual("Converted", SongIniValuesOf(pairs, "name"));
         Assert.AreEqual("Kept", SongIniValuesOf(pairs, "artist"), "A value song.ini has is kept.");
@@ -291,7 +291,7 @@ public sealed class ChartSaveTests
             SongFolderFiles.StepReached.Value = null;
         }
 
-        Assert.AreSequenceEqual(new[] { "staged", "moved:notes.mid", "before-deletes" }, [.. states.Select(s => s.Step)]);
+        Assert.AreSequenceEqual(["staged", "moved:notes.mid", "before-deletes"], [.. states.Select(s => s.Step)]);
         Assert.IsTrue(states.All(s => s.HasChart), "There's always a chart in the folder.");
         Assert.IsNull(states[0].Midi, "Before the move, the folder is as it was.");
         Assert.AreSequenceEqual(oldIni, states[0].Ini);
@@ -401,7 +401,7 @@ public sealed class ChartSaveTests
 
         await SaveAsync(song, Token);
 
-        Assert.AreSequenceEqual(new[] { "charter", "diff_bass", "sustain_cutoff_threshold", "multiplier_note" }, [.. pending.Select(c => c.Key)]);
+        Assert.AreSequenceEqual(["charter", "diff_bass", "sustain_cutoff_threshold", "multiplier_note"], [.. pending.Select(c => c.Key)]);
         string after = await File.ReadAllTextAsync(Path.Combine(folder, "song.ini"), Token);
         Assert.AreEqual(
             "; a comment\r\n[song]\r\nname = Song\r\nunknown_key = kept\r\nartist = A\r\nartist = B\r\ncharter = Me\r\ndiff_bass = -1\r\nsustain_cutoff_threshold = 59\r\n\r\n[other]\r\nx = 1\r\n",
@@ -420,7 +420,7 @@ public sealed class ChartSaveTests
 
         var metadata = SngReader.Read(sng, Token).Metadata.Select(p => (p.Key, p.Value)).ToList();
         Assert.AreSequenceEqual(
-            new[] { ("name", "Song"), ("loading_phrase", "kept"), ("diff_bass", "-1"), ("sustain_cutoff_threshold", "59") },
+            [("name", "Song"), ("loading_phrase", "kept"), ("diff_bass", "-1"), ("sustain_cutoff_threshold", "59")],
             [.. metadata]);
     }
 
@@ -461,7 +461,7 @@ public sealed class ChartSaveTests
         var chart = EditableChart.CreateNew(new NewChartSettings("", 480, 120, 4, 4, new HashSet<ChartInstrument> { ChartInstrument.Guitar }, DrumsVariant.Pro));
         var song = EditorSong.Of(SongOpener.NewChartIn(result.Empty!, chart));
 
-        Assert.AreSequenceEqual(new[] { "diff_guitar" }, [.. song.PendingChanges().Select(c => c.Key)]);
+        Assert.AreSequenceEqual(["diff_guitar"], [.. song.PendingChanges().Select(c => c.Key)]);
         await SaveAsync(song, Token);
 
         var reopened = await OpenAsync(folder, Token);

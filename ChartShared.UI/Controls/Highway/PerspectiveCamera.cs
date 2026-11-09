@@ -38,6 +38,12 @@ namespace ChartShared.UI.Controls.Highway
         /// <summary>By default the last 15% of the plane's length, by distance along it, fades out.</summary>
         public const double DefaultFadeStart = 0.85;
 
+        /// <summary>
+        /// The widest a perspective highway's columns get together, in pixels of the plane, in the editor and the preview alike: as
+        /// wide as the room allows, to this, for the plane narrows towards its far end and the notes are best large near the strike line.
+        /// </summary>
+        public const double MaxHighwayWidth = 480;
+
         private readonly double _sin;
         private readonly double _cos;
 
