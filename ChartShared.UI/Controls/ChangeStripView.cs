@@ -408,13 +408,18 @@ namespace ChartShared.UI.Controls
                 return;
 
             _frameRequested = true;
-            top.RequestAnimationFrame(_ =>
-            {
-                _frameRequested = false;
-                if (Math.Round(XOf(PlayheadSeconds, Bounds.Width)) != _playhead.Drawn)
-                    _playhead.InvalidateVisual();
-                RequestFrame();
-            });
+            top.RequestAnimationFrame(_onFrame ??= OnFrame);
+        }
+
+        // Made once: asked for again on every frame while playing.
+        private Action<TimeSpan>? _onFrame;
+
+        private void OnFrame(TimeSpan now)
+        {
+            _frameRequested = false;
+            if (Math.Round(XOf(PlayheadSeconds, Bounds.Width)) != _playhead.Drawn)
+                _playhead.InvalidateVisual();
+            RequestFrame();
         }
 
         protected override void OnPointerPressed(PointerPressedEventArgs e)

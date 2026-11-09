@@ -394,12 +394,29 @@ namespace ChartBuilder.Controls
                 return;
 
             _frameRequested = true;
-            top.RequestAnimationFrame(_ =>
-            {
-                _frameRequested = false;
+            top.RequestAnimationFrame(_onFrame ??= OnFrame);
+        }
+
+        // Made once: asked for again on every frame while playing.
+        private Action<TimeSpan>? _onFrame;
+
+        private void OnFrame(TimeSpan now)
+        {
+            _frameRequested = false;
+            if (!PlayheadPixel().Equals(_playhead.Drawn))
                 _playhead.InvalidateVisual();
-                RequestFrame();
-            });
+            RequestFrame();
+        }
+
+        /// <summary>The pixel the playhead's line is at, or NaN when it isn't in the graph's span.</summary>
+        private double PlayheadPixel()
+        {
+            if (Graph is not { } graph || graph.ToSeconds <= graph.FromSeconds)
+                return double.NaN;
+            double seconds = PlayheadSeconds;
+            if (seconds < graph.FromSeconds || seconds > graph.ToSeconds)
+                return double.NaN;
+            return Math.Round(XOf(seconds, PlotOf(new Rect(_playhead.Bounds.Size))));
         }
 
         protected override void OnPointerPressed(PointerPressedEventArgs e)
@@ -473,8 +490,12 @@ namespace ChartBuilder.Controls
             private IPen? _pen;
             private IBrush? _penBrush;
 
+            /// <summary>The pixel the line was last drawn at, NaN when none was.</summary>
+            public double Drawn { get; private set; } = double.NaN;
+
             public override void Render(DrawingContext context)
             {
+                Drawn = double.NaN;
                 if (owner.PlayheadBrush is not { } brush || owner.Graph is not { } graph || graph.ToSeconds <= graph.FromSeconds)
                     return;
                 if (!ReferenceEquals(_penBrush, brush))
@@ -487,7 +508,8 @@ namespace ChartBuilder.Controls
                 if (seconds < graph.FromSeconds || seconds > graph.ToSeconds)
                     return;
                 var plot = PlotOf(new Rect(Bounds.Size));
-                double x = Math.Round(owner.XOf(seconds, plot)) + 0.5;
+                Drawn = Math.Round(owner.XOf(seconds, plot));
+                double x = Drawn + 0.5;
                 context.DrawLine(_pen!, new Point(x, plot.Top), new Point(x, plot.Bottom));
             }
         }

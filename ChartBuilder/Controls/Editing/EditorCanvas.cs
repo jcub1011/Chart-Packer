@@ -2213,8 +2213,10 @@ namespace ChartBuilder.Controls.Editing
             }
 
             double farEnd = projection.AlongOf(projection.End);
-            foreach (var range in session.DiscoFlipRangesOf(key))
+            var flips = session.DiscoFlipRangesOf(key);
+            for (int i = 0; i < flips.Count; i++)
             {
+                var range = flips[i];
                 if (range.Tick > toTick || range.EndTick < fromTick)
                     continue;
                 double start = projection.AlongOf(session.AudioAt(range.Tick));
@@ -2287,8 +2289,10 @@ namespace ChartBuilder.Controls.Editing
             var (across1, across2) = PhraseRowOf(projection, rows.Count, row);
             var accent = ((AccentBrush ?? DefaultAccentBrush) as ISolidColorBrush)?.Color ?? Color.FromRgb(0x7C, 0xB4, 0xFF);
             double farEnd = projection.AlongOf(projection.End);
-            foreach (var range in session.DiscoFlipRangesOf(key))
+            var flips = session.DiscoFlipRangesOf(key);
+            for (int i = 0; i < flips.Count; i++)
             {
+                var range = flips[i];
                 if (range.Tick > toTick || range.EndTick < fromTick)
                     continue;
                 double start = projection.AlongOf(session.AudioAt(range.Tick));

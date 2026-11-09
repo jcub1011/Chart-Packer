@@ -98,7 +98,25 @@ namespace ChartBuilder.ViewModels
         }
 
         /// <summary>The audio a lane showing <paramref name="instrument"/> is drawn over, as <paramref name="options"/> picks it.</summary>
-        public AudioSource? SourceFor(LaneAudioOptions options, ChartInstrument instrument) => AudioSource.Resolve(options, instrument, Tracks);
+        public AudioSource? SourceFor(LaneAudioOptions options, ChartInstrument instrument)
+        {
+            // Asked for each frame by the snap to onsets under the pointer, and picking it builds lists and a key, so what was
+            // picked is kept until the tracks change. Only the source chosen and the instrument pick it.
+            ArgumentNullException.ThrowIfNull(options);
+            if (!ReferenceEquals(_sourcesFor, Tracks))
+            {
+                _sources.Clear();
+                _sourcesFor = Tracks;
+            }
+
+            var key = (options.Source, instrument);
+            if (!_sources.TryGetValue(key, out var source))
+                _sources[key] = source = AudioSource.Resolve(options, instrument, Tracks);
+            return source;
+        }
+
+        private readonly Dictionary<(string? Source, ChartInstrument Instrument), AudioSource?> _sources = [];
+        private IReadOnlyList<SongTrack>? _sourcesFor;
 
         /// <summary>
         /// Lets go of every waveform and analysis read, and the files they hold open, and starts on
@@ -128,6 +146,7 @@ namespace ChartBuilder.ViewModels
             Close();
             Entry = entry;
             Tracks = tracks;
+            _sources.Clear();
             (Waveforms, Analysis) = Open(entry, tracks, _fidelity);
             Waveforms.Start();
             if (_settled.Task.IsCompleted)

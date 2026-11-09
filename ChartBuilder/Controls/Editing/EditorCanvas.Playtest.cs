@@ -53,7 +53,7 @@ namespace ChartBuilder.Controls.Editing
                 if (_camera is null)
                     DrawPlaytestMarks(context, session, key, run, slots, screen, upright: false);
 
-                foreach (var stray in run.Strays)
+                foreach (var stray in run.StraySpan)
                 {
                     if (stray.Song < screen.Start || stray.Song > screen.End)
                         continue;
@@ -75,10 +75,8 @@ namespace ChartBuilder.Controls.Editing
             bool drums = ChartInstruments.KindOf(key.Instrument) == ChartInstrumentKind.Drums;
             var (fromTick, toTick) = TicksOf(session, screen);
             double size = GemSize(screen);
-            foreach (var ((tick, lane), mark) in run.Marks)
+            foreach (var (tick, lane, mark) in run.FlaggedBetween((long)Math.Ceiling(fromTick - 1), (long)Math.Floor(toTick + 1)))
             {
-                if (mark.Kind == JudgeKind.Hit || tick < fromTick - 1 || tick > toTick + 1)
-                    continue;
                 if (MarkRect(screen, slots, ShownOf(lane, drums), screen.AlongOf(session.AudioAt(tick)), size) is not { } rect)
                     continue;
                 if (mark.Kind == JudgeKind.Miss)
@@ -125,9 +123,10 @@ namespace ChartBuilder.Controls.Editing
                 double glow = StrikeGlow.Brightness(since, Math.Max(0, note.EndTime - judged.Song));
                 if (glow <= 0)
                     continue;
-                foreach (int lane in note.Lanes)
+                var noteLanes = note.Lanes;
+                for (int n = 0; n < noteLanes.Count; n++)
                 {
-                    int shown = ShownOf(lane, drums);
+                    int shown = ShownOf(noteLanes[n], drums);
                     if (slots.Across == shown)
                         StrikeGlow.Light(hits, count, -1, glow);
                     else if (slots.IndexOf(shown) is var column and >= 0)
@@ -193,9 +192,10 @@ namespace ChartBuilder.Controls.Editing
                 if (judged.Kind != JudgeKind.Hit || since < 0 || judged.Note < 0 || judged.Note >= run.Chart.Notes.Count)
                     continue;
                 double grown = since / BurstSeconds;
-                foreach (int lane in run.Chart.Notes[judged.Note].Lanes)
+                var burstLanes = run.Chart.Notes[judged.Note].Lanes;
+                for (int n = 0; n < burstLanes.Count; n++)
                 {
-                    int shown = ShownOf(lane, drums);
+                    int shown = ShownOf(burstLanes[n], drums);
                     Rect rect;
                     Color color;
                     if (slots.Across == shown)

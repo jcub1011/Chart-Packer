@@ -89,7 +89,7 @@ namespace ChartBuilder.ViewModels
             if (_disposed || Ready(source) is not { } prepared || _spectrograms is not { } spectrograms)
                 return null;
 
-            var result = spectrograms.GetOrStart(prepared.Key, () => prepared.Input, focusSeconds);
+            var result = spectrograms.GetOrStart(prepared.Key, prepared.Provide, focusSeconds);
             if (result.Spectrogram is not { } spectrogram)
             {
                 if (_overBudget.Add(source.Key))
@@ -342,7 +342,13 @@ namespace ChartBuilder.ViewModels
         }
 
         /// <summary>A source's audio as the analysis reads it, and the key its spectrogram is kept under.</summary>
-        private sealed record Prepared(AnalysisKey Key, AnalysisInput Input);
+        private sealed record Prepared(AnalysisKey Key, AnalysisInput Input)
+        {
+            private Func<AnalysisInput>? _provide;
+
+            /// <summary>The input as the cache asks for it, made once: it's asked for on every frame a spectrogram is drawn.</summary>
+            public Func<AnalysisInput> Provide => _provide ??= () => Input;
+        }
 
         /// <summary>An analysis's onsets at one sensitivity, and their times.</summary>
         private sealed record PickedOnsets(OnsetAnalysis? Analysis, double Sensitivity, IReadOnlyList<DetectedOnset> Onsets, double[] Times)

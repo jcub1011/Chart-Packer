@@ -744,7 +744,8 @@ namespace ChartBuilder.ViewModels
                 }
 
                 var output = openOutput(mixer.OutputRate);
-                return (audio, new StemPlayer(mixer, output), output);
+                // Nothing here reads what's heard (the spectrum is the Packer's), so the playback thread needn't keep it.
+                return (audio, new StemPlayer(mixer, output) { CapturesHeard = false }, output);
             }
             catch
             {

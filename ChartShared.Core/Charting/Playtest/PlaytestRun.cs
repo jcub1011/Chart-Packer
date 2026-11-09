@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using ChartShared.Core.Input;
 
 namespace ChartShared.Core.Charting.Playtest;
@@ -13,6 +14,9 @@ public readonly record struct NoteMark(JudgeKind Kind, double OffsetMs);
 
 /// <summary>An overstrum or overhit, where it happened, for the lane to mark.</summary>
 public readonly record struct StrayMark(JudgeKind Kind, double Song, int Lane);
+
+/// <summary>A note last judged missed or dropped, by tick and game view lane.</summary>
+public readonly record struct FlaggedMark(long Tick, int Lane, NoteMark Mark);
 
 /// <summary>
 /// A playtest of one track (charter-spec C19 item 4): an engine fed timed actions, and what it said, kept for the editor to
@@ -35,6 +39,7 @@ public sealed class PlaytestRun : IActionSink
     private readonly List<StrayMark> _strays = [];
     private readonly Dictionary<(long Tick, int Lane, JudgeKind Kind), PlaytestProblem> _problems = [];
     private PlaytestProblem[]? _sortedProblems;
+    private FlaggedMark[]? _flagged;
 
     public PlaytestRun(IPlaytestEngine engine)
     {
@@ -66,6 +71,46 @@ public sealed class PlaytestRun : IActionSink
 
     /// <summary>The overstrums and overhits since each place was last played.</summary>
     public IReadOnlyList<StrayMark> Strays => _strays;
+
+    /// <summary>The overstrums and overhits as a span, to draw each frame without an enumerator.</summary>
+    public ReadOnlySpan<StrayMark> StraySpan => CollectionsMarshal.AsSpan(_strays);
+
+    /// <summary>
+    /// The notes last judged missed or dropped, between two ticks, for the lanes to mark each frame: only these are drawn, so
+    /// the hits (most of the marks) aren't walked.
+    /// </summary>
+    public ReadOnlySpan<FlaggedMark> FlaggedBetween(long fromTick, long toTick)
+    {
+        var flagged = _flagged ??= BuildFlagged();
+        int low = 0;
+        int high = flagged.Length;
+        while (low < high)
+        {
+            int middle = (low + high) >>> 1;
+            if (flagged[middle].Tick < fromTick)
+                low = middle + 1;
+            else
+                high = middle;
+        }
+
+        int end = low;
+        while (end < flagged.Length && flagged[end].Tick <= toTick)
+            end++;
+        return flagged.AsSpan(low, end - low);
+    }
+
+    private FlaggedMark[] BuildFlagged()
+    {
+        var found = new List<FlaggedMark>();
+        foreach (var ((tick, lane), mark) in _marks)
+        {
+            if (mark.Kind != JudgeKind.Hit)
+                found.Add(new FlaggedMark(tick, lane, mark));
+        }
+
+        found.Sort(static (a, b) => a.Tick != b.Tick ? a.Tick.CompareTo(b.Tick) : a.Lane.CompareTo(b.Lane));
+        return [.. found];
+    }
 
     /// <summary>Every problem, in tick order.</summary>
     public IReadOnlyList<PlaytestProblem> Problems =>
@@ -110,6 +155,7 @@ public sealed class PlaytestRun : IActionSink
 
         foreach (var key in _marks.Keys.Where(k => !places.Contains(k)).ToList())
             _marks.Remove(key);
+        _flagged = null;
         foreach (var key in _problems.Keys.Where(k => k.Kind is JudgeKind.Miss or JudgeKind.SustainDrop && !places.Contains((k.Tick, k.Lane))).ToList())
             _problems.Remove(key);
         _sortedProblems = null;
@@ -157,7 +203,14 @@ public sealed class PlaytestRun : IActionSink
             {
                 var note = Chart.Notes[judged.Note];
                 foreach (int lane in note.Lanes)
-                    _marks[(note.Tick, lane)] = new NoteMark(judged.Kind, judged.OffsetMs);
+                {
+                    // The flagged marks are made again only when one is added, changed or replaced by a hit, not for every hit.
+                    var place = (note.Tick, lane);
+                    if (judged.Kind != JudgeKind.Hit || (_marks.TryGetValue(place, out var had) && had.Kind != JudgeKind.Hit))
+                        _flagged = null;
+                    _marks[place] = new NoteMark(judged.Kind, judged.OffsetMs);
+                }
+
                 if (judged.Kind != JudgeKind.Hit)
                     Count(note.Tick, note.Lanes[0], judged.Kind, judged.OffsetMs);
                 break;
