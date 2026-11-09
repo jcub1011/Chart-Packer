@@ -911,7 +911,7 @@
                                Position="{Binding Playback.PositionSeconds}"
                                Length="{Binding Playback.LengthSeconds}"
                                IsPlaying="{Binding Playback.IsPlaying}"
-                               Clock="{Binding Playback.Clock}"
+                               Clock="{Binding Playback.DrawClock}"
                                WheelUpIsLater="{Binding Editor.WheelUpIsLater}"
                                Waveform="{Binding Playback.Waveform}"
                                Beats="{Binding Playback.Beats}"

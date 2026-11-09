@@ -939,12 +939,17 @@ namespace ChartBuilder.Controls
                 return;
 
             _frameRequested = true;
-            top.RequestAnimationFrame(_ =>
-            {
-                _frameRequested = false;
-                InvalidatePlayheadIfMoved();
-                RequestFrame();
-            });
+            top.RequestAnimationFrame(_onFrame ??= OnFrame);
+        }
+
+        // The playhead's frame, made once rather than as a new delegate every frame the song plays.
+        private Action<TimeSpan>? _onFrame;
+
+        private void OnFrame(TimeSpan time)
+        {
+            _frameRequested = false;
+            InvalidatePlayheadIfMoved();
+            RequestFrame();
         }
 
         protected override void OnPointerPressed(PointerPressedEventArgs e)

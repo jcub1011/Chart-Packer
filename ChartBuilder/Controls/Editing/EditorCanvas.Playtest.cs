@@ -213,11 +213,16 @@ namespace ChartBuilder.Controls.Editing
                         continue;
                     }
 
+                    // Fading as it grows: its fill twice over, as its colour and its opacity both did, and its edge thinning. The
+                    // fade is the opacity's, and the edge thins by half pixels, so the burst asks for the same few brushes and pens
+                    // each frame, not new ones.
                     var ring = rect.Inflate(size * 0.7 * grown);
                     double radius = GemPainter.CornerOf(ring);
-                    var fill = HighwayPalette.WithAlpha(HighwayPalette.Lighten(color, 0.8), (byte)(0x90 * (1 - grown)));
-                    using (context.PushOpacity(1 - grown))
-                        context.DrawRectangle(_gems.Brush(fill), _gems.Pen(HighwayPalette.Lighten(color, 0.6), (3 * (1 - grown)) + 1), ring, radius, radius);
+                    double left = 1 - grown;
+                    using (context.PushOpacity(left * left))
+                        context.DrawRectangle(_gems.Brush(HighwayPalette.WithAlpha(HighwayPalette.Lighten(color, 0.8), 0x90)), null, ring, radius, radius);
+                    using (context.PushOpacity(left))
+                        context.DrawRectangle(null, _gems.Pen(HighwayPalette.Lighten(color, 0.6), Math.Round(((3 * left) + 1) * 2) / 2), ring, radius, radius);
                 }
             }
         }

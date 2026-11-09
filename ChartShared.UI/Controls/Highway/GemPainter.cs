@@ -33,6 +33,11 @@ namespace ChartShared.UI.Controls.Highway
         // How far a HOPO open's bar is lightened toward white, all over, instead of a white strip.
         internal const double HopoOpenLighten = 0.9;
 
+        // Brushes and pens are made once for each colour and thickness asked for. A caller asking for one by a value that changes
+        // smoothly, such as a fade, would have a new one made every frame, kept forever: past these many, the lot are let go.
+        private const int MaxBrushes = 2048;
+        private const int MaxPens = 1024;
+
         private readonly Dictionary<Color, IBrush> _brushes = [];
         private readonly Dictionary<(Color, double), IPen> _pens = [];
 
@@ -243,19 +248,29 @@ namespace ChartShared.UI.Controls.Highway
                 context.DrawGeometry(null, Pen(color, 1), dashes);
         }
 
-        /// <summary>A brush of <paramref name="color"/>, made once.</summary>
+        /// <summary>A brush of <paramref name="color"/>, made once: ask by a few colours, not one that changes smoothly frame to frame.</summary>
         public IBrush Brush(Color color)
         {
             if (!_brushes.TryGetValue(color, out var brush))
+            {
+                if (_brushes.Count >= MaxBrushes)
+                    _brushes.Clear();
                 _brushes[color] = brush = new ImmutableSolidColorBrush(color);
+            }
+
             return brush;
         }
 
-        /// <summary>A pen of <paramref name="color"/> and <paramref name="thickness"/>, made once.</summary>
+        /// <summary>A pen of <paramref name="color"/> and <paramref name="thickness"/>, made once: ask by a few thicknesses, not one that changes smoothly frame to frame.</summary>
         public IPen Pen(Color color, double thickness)
         {
             if (!_pens.TryGetValue((color, thickness), out var pen))
+            {
+                if (_pens.Count >= MaxPens)
+                    _pens.Clear();
                 _pens[(color, thickness)] = pen = new ImmutablePen(color.ToUInt32(), thickness);
+            }
+
             return pen;
         }
 

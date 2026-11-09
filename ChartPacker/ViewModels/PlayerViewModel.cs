@@ -439,10 +439,16 @@ namespace ChartPacker.ViewModels
         /// the audio is, moving smoothly (<see cref="StemPlayer.SmoothPosition"/>), less the calibrated latency times the
         /// speed, so it's seen as it's heard (charter-spec C10 item 5, C11 item 4); otherwise <see cref="CurrentPosition"/>.
         /// Pausing leaves the audio where this was, and playing holds here until that's heard
-        /// (<see cref="StemPlayer.DrawnPosition"/>), so it never jumps.
+        /// (<see cref="StemPlayer.DrawnPosition(int)"/>), so it never jumps. Read each frame as it's drawn, it's for the moment the
+        /// frame is for, on the screen's even beat (<see cref="StemPlayer.DrawnPositionForFrame"/>), as Chart Builder's views are.
         /// </summary>
-        public TimeSpan DrawnPosition => _player is { IsPlaying: true } player && !IsScrubbing
-            ? TimeSpan.FromTicks(Math.Max(0, player.DrawnPosition(_latencyMilliseconds).Ticks))
+        public TimeSpan DrawnPosition => Drawn(forFrame: true);
+
+        /// <summary><see cref="DrawnPosition"/> as it is the moment it's read, for an action rather than a frame drawn, such as a time set from the playhead.</summary>
+        public TimeSpan DrawnPositionNow => Drawn(forFrame: false);
+
+        private TimeSpan Drawn(bool forFrame) => _player is { IsPlaying: true } player && !IsScrubbing
+            ? TimeSpan.FromTicks(Math.Max(0, (forFrame ? player.DrawnPositionForFrame(_latencyMilliseconds) : player.DrawnPosition(_latencyMilliseconds)).Ticks))
             : CurrentPosition;
 
         /// <summary>

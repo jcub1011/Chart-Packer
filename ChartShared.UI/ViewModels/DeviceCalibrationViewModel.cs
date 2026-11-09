@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using Avalonia.Input;
 using Avalonia.Threading;
+using ChartShared.Audio.Playback;
 using ChartShared.Core.Calibration;
 using ChartShared.Core.Input;
 using ChartShared.UI.Controls.Highway;
@@ -46,6 +47,10 @@ namespace ChartShared.UI.ViewModels
 
         private readonly ICalibrationInput _input;
         private readonly Func<double> _clock;
+
+        // Whether the clock is the input clock, which is the system's: then the highway is drawn for the frame being drawn, on
+        // the screen's even beat, as playback's highways are (FrameClock).
+        private readonly bool _isSystemClock;
         private readonly double[] _notes = CalibrationChart.DeviceNoteTimes();
         private readonly List<double> _taps = [];
         private readonly DispatcherTimer _timer;
@@ -61,6 +66,7 @@ namespace ChartShared.UI.ViewModels
             ArgumentNullException.ThrowIfNull(input);
             _input = input;
             _clock = clock ?? (() => InputClock.Now);
+            _isSystemClock = clock is null;
             DeviceName = input.DeviceName;
             SavedOffset = input.OffsetMs;
             Scene = SceneOf(CalibrationChart.Notes(CalibrationChart.DeviceNoteCount, CalibrationChart.DeviceLeadBeats), TimeSpan.Zero);
@@ -107,7 +113,10 @@ namespace ChartShared.UI.ViewModels
         [ObservableProperty]
         public partial int? Measured { get; private set; }
 
-        public override TimeSpan Now() => State == DeviceTestState.Running ? TimeSpan.FromSeconds(_clock() - _startedAt) : TimeSpan.Zero;
+        public override TimeSpan Now() => State == DeviceTestState.Running ? TimeSpan.FromSeconds(FrameSeconds() - _startedAt) : TimeSpan.Zero;
+
+        // The input clock's time for the frame being drawn; what's pressed is timed by the clock itself.
+        private double FrameSeconds() => _isSystemClock ? InputClock.Seconds(FrameClock.Timestamp(TimeProvider.System)) : _clock();
 
         /// <summary>Starts listening to the device.</summary>
         public override void Start()

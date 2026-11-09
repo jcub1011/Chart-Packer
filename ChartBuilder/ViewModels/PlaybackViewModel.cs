@@ -78,8 +78,9 @@ namespace ChartBuilder.ViewModels
         // Each stem's mute, solo and volume as last set, kept as the tracks are opened again; a stem not set has its default.
         private readonly Dictionary<string, (bool IsMuted, bool IsSolo, double Volume)> _switches = new(StringComparer.Ordinal);
 
-        // Clock, made once: it's read every frame.
+        // Clock and DrawClock, made once: they're read every frame.
         private Func<TimeSpan>? _clock;
+        private Func<TimeSpan>? _drawClock;
 
         /// <summary>No song: an empty timeline, with nothing to play.</summary>
         public PlaybackViewModel()
@@ -218,8 +219,36 @@ namespace ChartBuilder.ViewModels
         public partial string? Message { get; private set; }
 
         /// <summary>The playhead and the song's length, e.g. "0:42.0 / 3:00.0".</summary>
-        public string PositionText => string.Format(
-            CultureInfo.CurrentCulture, Strings.TimelinePositionFormat, FormatTime(PositionSeconds), FormatTime(LengthSeconds));
+        /// <remarks>
+        /// Asked for each time the playhead moves, many times a second as the song plays, though it shows tenths: written again
+        /// only when the tenths shown are different, not each time, which was garbage for the collector every time.
+        /// </remarks>
+        public string PositionText
+        {
+            get
+            {
+                long position = TenthsOf(PositionSeconds), length = TenthsOf(LengthSeconds);
+                string format = Strings.TimelinePositionFormat;
+                if (_positionText is null || position != _positionTenths || length != _lengthTenths || !ReferenceEquals(format, _positionFormat)
+                    || !ReferenceEquals(CultureInfo.CurrentCulture, _positionCulture))
+                {
+                    _positionTenths = position;
+                    _lengthTenths = length;
+                    _positionFormat = format;
+                    _positionCulture = CultureInfo.CurrentCulture;
+                    _positionText = string.Format(CultureInfo.CurrentCulture, format, FormatTime(PositionSeconds), FormatTime(LengthSeconds));
+                }
+
+                return _positionText;
+            }
+        }
+
+        // PositionText as last written, and the tenths of a second, wording and culture it was written for.
+        private string? _positionText;
+        private long _positionTenths;
+        private long _lengthTenths;
+        private string? _positionFormat;
+        private CultureInfo? _positionCulture;
 
         public string PlayPauseToolTip => IsPlaying ? Strings.PauseToolTip : Strings.PlayToolTip;
 
@@ -235,9 +264,24 @@ namespace ChartBuilder.ViewModels
             ? player.DrawnPosition(LatencyMilliseconds)
             : TimeSpan.FromSeconds(PositionSeconds);
 
+        /// <summary>
+        /// <see cref="Clock"/> for what's drawn frame by frame against the song, every view that does: the lanes, the timeline,
+        /// the previews, the difficulty graph, the video. As it is for the moment the frame being drawn is for, on the screen's
+        /// even beat (<see cref="StemPlayer.DrawnPositionForFrame"/>), not the moment it's asked, so it moves on evenly however
+        /// unevenly its frames are got round to, and the same for everything drawn in a frame, as Chart Packer's views are.
+        /// Not for timing what's pressed or tapped, nor for an action's time, which are <see cref="Clock"/>.
+        /// </summary>
+        public Func<TimeSpan> DrawClock => _drawClock ??= () => _player is { } player
+            ? player.DrawnPositionForFrame(LatencyMilliseconds)
+            : TimeSpan.FromSeconds(PositionSeconds);
+
+
         private int LatencyMilliseconds => _latency?.Milliseconds ?? 0;
 
         IReadOnlyList<int> IReductionPreviewPlayback.SpeedPercents => SpeedPercents;
+
+        // The reduction preview's highways are drawn frame by frame.
+        Func<TimeSpan> IReductionPreviewPlayback.Clock => DrawClock;
 
         void IReductionPreviewPlayback.PlayPause() => PlayPauseCommand.Execute(null);
 
@@ -747,5 +791,8 @@ namespace ChartBuilder.ViewModels
         /// <summary>A time as m:ss.f, or h:mm:ss.f from an hour, e.g. 3:05.2.</summary>
         private static string FormatTime(double seconds) =>
             SongTime.Format(TimeSpan.FromSeconds(Math.Max(0, seconds)), decimals: 1);
+
+        /// <summary>The whole tenths of a second <see cref="FormatTime"/> shows of <paramref name="seconds"/>: its tenths, cut off.</summary>
+        private static long TenthsOf(double seconds) => TimeSpan.FromSeconds(Math.Max(0, seconds)).Ticks / (TimeSpan.TicksPerSecond / 10);
     }
 }

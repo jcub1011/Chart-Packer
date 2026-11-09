@@ -74,7 +74,8 @@ namespace ChartBuilder.ViewModels
 
         public PlaybackViewModel Playback => _playback;
 
-        public Func<TimeSpan> Clock => _playback.Clock;
+        /// <summary>The time the highway and the timeline are drawn at, each frame (<see cref="PlaybackViewModel.DrawClock"/>).</summary>
+        public Func<TimeSpan> Clock => _playback.DrawClock;
 
         public double LengthSeconds => _playback.LengthSeconds;
 

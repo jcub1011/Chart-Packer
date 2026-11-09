@@ -638,7 +638,7 @@ namespace ChartBuilder.Controls.Editing
                 return;
 
             DrawStrikeBand(context, session, screen);
-            if (_editor?.Playback.IsPlaying != true && !FramePerf.SimulatesPlaying)
+            if ((_editor?.Playback.IsPlaying != true && !FramePerf.SimulatesPlaying) || FramePerf.IsOff(FramePerf.Part.Glow))
                 return;
             using (new OptionalClip(context, LanesOf(screen, slots), !FramePerf.IsOff(FramePerf.Part.PlaneClips)))
             {

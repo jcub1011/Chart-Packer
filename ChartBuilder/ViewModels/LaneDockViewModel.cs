@@ -30,7 +30,8 @@ namespace ChartBuilder.ViewModels
         public ChartEditorViewModel? Editor { get; }
 
         /// <summary>Every open lane's view model.</summary>
-        public IEnumerable<EditorLaneViewModel> All => _lanes.Values;
+        /// <remarks>As the collection it is, not an interface: gone through every frame while the song plays, without allocating.</remarks>
+        public Dictionary<int, EditorLaneViewModel>.ValueCollection All => _lanes.Values;
 
         /// <summary>Raised after lanes are added, moved, closed or change part, once the lanes' view models are up to date.</summary>
         public event EventHandler? LayoutChanged;

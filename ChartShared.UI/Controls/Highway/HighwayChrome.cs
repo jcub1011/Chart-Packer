@@ -195,8 +195,7 @@ namespace ChartShared.UI.Controls.Highway
             if (lit <= 0)
                 return;
 
-            using (context.PushOpacity(lit * StrikeGlow.BeamOpacity))
-                StrikeGlow.DrawBeam(context, color, view == LaneView.Highway, rect);
+            StrikeGlow.DrawBeam(context, color, view == LaneView.Highway, rect, lit * StrikeGlow.BeamOpacity);
         }
     }
 }

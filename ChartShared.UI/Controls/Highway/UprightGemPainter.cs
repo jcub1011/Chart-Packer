@@ -169,7 +169,7 @@ namespace ChartShared.UI.Controls.Highway
                 using (context.PushOpacity(GemPainter.GhostOpacity))
                     DrawBody(context, kind, note, color, stand, outlined);
                 if ((note.Flags & NoteFlags.Cymbal) == 0)
-                    DashedOutline.DrawRectangle(context, _flat.Pen(color, 1), stand.Top.Deflate(0.5), stand.RadiusX, GemPainter.GhostDash, GemPainter.GhostGap);
+                    DashedOutline.DrawRectangleNear(context, _flat.Pen(color, 1), stand.Top.Deflate(0.5), stand.RadiusX, GemPainter.GhostDash, GemPainter.GhostGap);
             }
             else
             {
@@ -581,8 +581,13 @@ namespace ChartShared.UI.Controls.Highway
         {
             if (outlined)
             {
-                using (context.PushTransform(Matrix.CreateTranslation(stand.Top.X, stand.Top.Y)))
-                    context.DrawGeometry(null, _flat.Pen(edge, 1.5), Hexagon(stand.Floor.Size));
+                // Made at the nearest of a few sizes and stretched to the note's, which changes every frame as it comes nearer.
+                var size = stand.Floor.Size;
+                bool near = size.Width >= DashedOutline.MinBucketed && size.Height >= DashedOutline.MinBucketed;
+                var made = near ? new Size(HalfPixel(DashedOutline.Bucket(size.Width)), HalfPixel(DashedOutline.Bucket(size.Height))) : size;
+                var place = Matrix.CreateTranslation(stand.Top.X, stand.Top.Y);
+                using (context.PushTransform(near ? Matrix.CreateScale(size.Width / made.Width, size.Height / made.Height) * place : place))
+                    context.DrawGeometry(null, _flat.Pen(edge, 1.5), Hexagon(made));
                 return;
             }
 
@@ -592,6 +597,9 @@ namespace ChartShared.UI.Controls.Highway
         /// <summary>The edge of a note's shape in <paramref name="rect"/>: a rounded rectangle, as round as the note's box is.</summary>
         private static void DrawEdge(DrawingContext context, Rect rect, Stand stand, IPen pen) =>
             context.DrawRectangle(null, pen, rect, stand.RadiusX, stand.RadiusY);
+
+        // A size to the half pixel, as Hexagon makes its shapes.
+        private static double HalfPixel(double pixels) => Math.Round(pixels * 2) / 2;
 
         /// <summary>A cymbal's hexagon filling <paramref name="size"/> from the origin, made once for each size to the half pixel.</summary>
         private StreamGeometry Hexagon(Size size)

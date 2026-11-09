@@ -244,7 +244,8 @@ namespace ChartBuilder.Controls.Editing
 
             using (context.PushTransform(Matrix.CreateScale(scale, scale) * Matrix.CreateTranslation(at.X, at.Y)))
             {
-                context.FillRectangle(badge, new Rect(corner, new Size(text.Width, text.Height)).Inflate(1));
+                if (badge is not null)
+                    context.FillRectangle(badge, new Rect(corner, new Size(text.Width, text.Height)).Inflate(1));
                 text.Draw(context, corner);
             }
         }

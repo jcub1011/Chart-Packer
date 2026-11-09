@@ -57,6 +57,9 @@ namespace ChartBuilder.Controls.Editing
 
             /// <summary>Switched "off", the canvas's own clip to its bounds put back on a tilted lane, as it was: a tilt makes it a clip to a slanted quadrilateral.</summary>
             CanvasClip = 256,
+
+            /// <summary>What lights at the strike line as notes reach it: the columns' glow, and while playtesting, the presses and hit bursts.</summary>
+            Glow = 512,
         }
 
         private const Part Content = Part.Audio | Part.LaneFill | Part.BeatLines | Part.Markings | Part.Tails | Part.Strike | Part.StandingNotes;
@@ -73,6 +76,7 @@ namespace ChartBuilder.Controls.Editing
             ("no beat lines", Part.BeatLines),
             ("no markings", Part.Markings),
             ("no tails", Part.Tails),
+            ("no hit glow", Part.Glow),
             ("no strike", Part.Strike),
             ("no standing notes", Part.StandingNotes),
             ("canvas clip back (as was)", Part.CanvasClip),
@@ -110,6 +114,14 @@ namespace ChartBuilder.Controls.Editing
         private double _followMax;
         private long _holdUntil;
         private int[] _collections = [0, 0, 0];
+
+        // Whether the hitches are the collector's: the collections seen as the frames come, the longest pause of one in the window
+        // and its generation, and the longest wait for a frame with a collection in it and without one.
+        private int _gcSeen = GC.CollectionCount(0);
+        private double _gcWorstPause;
+        private int _gcWorstGen = -1;
+        private double _gapWithGc;
+        private double _gapWithoutGc;
         private TimeSpan _paused;
         private long _allocated;
         private long _tilesBuilt;
@@ -150,7 +162,7 @@ namespace ChartBuilder.Controls.Editing
         /// <summary>Whether <paramref name="part"/> is switched off: never when the readout is not asked for.</summary>
         public static bool IsOff(Part part) => (s_off & (int)part) != 0;
 
-        /// <summary>Switches the part a function key stands for, F1 to F9, off or on, or F11 puts them all on: whether <paramref name="key"/> was one.</summary>
+        /// <summary>Switches the part a function key stands for, F1 to F10, off or on, or F11 puts them all on: whether <paramref name="key"/> was one.</summary>
         public static bool Toggle(Avalonia.Input.Key key)
         {
             if (key == Avalonia.Input.Key.F11)
@@ -160,7 +172,7 @@ namespace ChartBuilder.Controls.Editing
             }
 
             int index = key - Avalonia.Input.Key.F1;
-            if (index is < 0 or > 8)
+            if (index is < 0 or > 9)
                 return false;
 
             s_off ^= 1 << index;
@@ -294,8 +306,34 @@ namespace ChartBuilder.Controls.Editing
             if (_windowStart == 0)
                 _windowStart = now;
 
+            // Every collection counts one of generation 0, whatever it collected; the details of the last are only asked for when
+            // there's been one, as asking allocates.
+            int seen = GC.CollectionCount(0);
+            bool collected = seen != _gcSeen;
+            if (collected)
+            {
+                _gcSeen = seen;
+                var info = GC.GetGCMemoryInfo(GCKind.Any);
+                double pause = 0;
+                foreach (var part in info.PauseDurations)
+                    pause += part.TotalMilliseconds;
+                if (pause > _gcWorstPause)
+                {
+                    _gcWorstPause = pause;
+                    _gcWorstGen = info.Generation;
+                }
+            }
+
             if (_lastFrame != 0)
-                _maxInterval = Math.Max(_maxInterval, Milliseconds(now - _lastFrame));
+            {
+                double gap = Milliseconds(now - _lastFrame);
+                _maxInterval = Math.Max(_maxInterval, gap);
+                if (collected)
+                    _gapWithGc = Math.Max(_gapWithGc, gap);
+                else
+                    _gapWithoutGc = Math.Max(_gapWithoutGc, gap);
+            }
+
             _lastFrame = now;
             _frames++;
 
@@ -348,7 +386,7 @@ namespace ChartBuilder.Controls.Editing
 
             var text = new StringBuilder();
             text.AppendLine($"{_header()}  [{_renderer}]");
-            text.AppendLine(s_off == 0 ? "all drawn (Ctrl+Shift+F1..F9 switch parts off, F11 all on, F12 benchmark)" : $"OFF: {(Part)s_off}");
+            text.AppendLine(s_off == 0 ? "all drawn (Ctrl+Shift+F1..F10 switch parts off, F11 all on, F12 benchmark)" : $"OFF: {(Part)s_off}");
             text.AppendLine(string.Create(culture, $"fps {_frames / seconds:F1}  every {1000 * seconds / _frames:F1}ms  worst {_maxInterval:F1}ms"));
 
             double drawn = 0;
@@ -376,7 +414,10 @@ namespace ChartBuilder.Controls.Editing
             // What the whole program allocated and how long the collector held every thread, the drawing's too, in the window.
             var paused = GC.GetTotalPauseDuration();
             long allocated = GC.GetTotalAllocatedBytes();
-            text.Append(string.Create(culture, $"GC {g0 - _collections[0]}/{g1 - _collections[1]}/{g2 - _collections[2]} paused {(paused - _paused).TotalMilliseconds:F1}ms  alloc {(allocated - _allocated) / (1024.0 * 1024.0) / seconds:F1}MB/s  waveform built {built - _tilesBuilt} kept {LaneWaveformPainter.TileCount}"));
+            text.AppendLine(string.Create(culture, $"GC {g0 - _collections[0]}/{g1 - _collections[1]}/{g2 - _collections[2]} paused {(paused - _paused).TotalMilliseconds:F1}ms  alloc {(allocated - _allocated) / (1024.0 * 1024.0) / seconds:F1}MB/s  waveform built {built - _tilesBuilt} kept {LaneWaveformPainter.TileCount}"));
+            text.Append(_gcWorstGen < 0
+                ? string.Create(culture, $"no GC  worst frame {_gapWithoutGc:F1}ms")
+                : string.Create(culture, $"worst GC pause {_gcWorstPause:F1}ms (gen{_gcWorstGen})  worst frame with a GC {_gapWithGc:F1}ms, without {_gapWithoutGc:F1}ms"));
             _collections = [g0, g1, g2];
             _paused = paused;
             _allocated = allocated;
@@ -400,6 +441,10 @@ namespace ChartBuilder.Controls.Editing
             _maxInterval = 0;
             _followSum = 0;
             _followMax = 0;
+            _gcWorstPause = 0;
+            _gcWorstGen = -1;
+            _gapWithGc = 0;
+            _gapWithoutGc = 0;
             _windowStart = now;
         }
 

@@ -34,8 +34,8 @@ namespace ChartBuilder.ViewModels
     /// natural HOPOs, sustain cutoffs and star power. Nothing is written to disk. After an edit that touches the track, the
     /// scene is built again, at most once a frame, and only while it's shown. <i>Settled in CM5:</i> the whole track, not
     /// only the range the edit touched, as the game view is worked out a track at a time.</para>
-    /// <para>It reads the same clock as the lanes (<see cref="PlaybackViewModel.Clock"/>), which allows for the latency and
-    /// the speed, in the same frame, so it stays within one frame of them (AC C18.1).</para>
+    /// <para>It reads the same clock as the lanes (<see cref="PlaybackViewModel.DrawClock"/>), which allows for the latency and
+    /// the speed, for the same moment in the same frame, so it stays with them (AC C18.1).</para>
     /// <para>Practice plays the loop region over and over at the speed picked (C18 item 2).</para>
     /// </remarks>
     public sealed partial class PreviewViewModel : ViewModelBase, IDisposable
@@ -76,8 +76,8 @@ namespace ChartBuilder.ViewModels
 
         public PlaybackViewModel Playback => _editor.Playback;
 
-        /// <summary>The time to draw at: the editor's clock, allowing for the latency and the speed.</summary>
-        public Func<TimeSpan> Clock => Playback.Clock;
+        /// <summary>The time to draw at: the editor's clock for drawing, allowing for the latency and the speed.</summary>
+        public Func<TimeSpan> Clock => Playback.DrawClock;
 
         /// <summary>The lane in focus, then each part and difficulty the chart has.</summary>
         [ObservableProperty]
