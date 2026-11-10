@@ -85,7 +85,20 @@ namespace ChartBuilder.ViewModels
         public const double PressFlashSeconds = 0.12;
 
         /// <summary>The hit window judged with, from the settings.</summary>
-        public HitWindow Window => new(_settings.Settings.PlaytestEarlyMs, _settings.Settings.PlaytestLateMs);
+        public HitWindow Window
+        {
+            get
+            {
+                // The timing meter reads this every frame, so it's made again only when the settings change.
+                int early = _settings.Settings.PlaytestEarlyMs;
+                int late = _settings.Settings.PlaytestLateMs;
+                if (_window is null || _window.EarlyMs != early || _window.LateMs != late)
+                    _window = new HitWindow(early, late);
+                return _window;
+            }
+        }
+
+        private HitWindow? _window;
 
         /// <summary>Whether any lane has anything found in it to clear.</summary>
         [ObservableProperty]

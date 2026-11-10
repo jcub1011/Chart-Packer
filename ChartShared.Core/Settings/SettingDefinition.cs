@@ -121,6 +121,15 @@ public sealed class LookAheadSetting : SettingDefinition<double>
     public override double Coerce(double value) => HighwayLookAhead.Clamp(value, DefaultValue);
 }
 
+/// <summary>
+/// How fast a highway goes by in <see cref="HighwayLengthMode.PixelsPerSecond"/>, in pixels per second
+/// (<see cref="HighwayPixelsPerSecond"/>), edited with a slider on the same logarithmic scale as <see cref="LookAheadSetting"/>'s.
+/// </summary>
+public sealed class PixelsPerSecondSetting : SettingDefinition<double>
+{
+    public override double Coerce(double value) => HighwayPixelsPerSecond.Clamp(value, DefaultValue);
+}
+
 /// <summary>One of a fixed list of values.</summary>
 public sealed class ChoiceSetting<T> : SettingDefinition<T>
 {

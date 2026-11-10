@@ -71,7 +71,7 @@ public sealed class OnsetSnapTests
 
         DragFromTo(session, At(session, 960, 1), At(session, 1920, 1));
 
-        Assert.AreSequenceEqual(new long[] { 1930, 2170 }, [.. Expert(session).Notes.Select(n => n.Tick)], "2.010 s is tick 1929.6.");
+        Assert.AreSequenceEqual([1930, 2170], [.. Expert(session).Notes.Select(n => n.Tick)], "2.010 s is tick 1929.6.");
     }
 
     [TestMethod]
@@ -95,18 +95,18 @@ public sealed class OnsetSnapTests
 
         var plan = session.Tools.NudgeSelectionToOnsets()!;
 
-        Assert.AreSequenceEqual(new long[] { 485, 485, 950, 1440 }, [.. Expert(session).Notes.Select(n => n.Tick)]);
+        Assert.AreSequenceEqual([485, 485, 950, 1440], [.. Expert(session).Notes.Select(n => n.Tick)]);
         Assert.HasCount(2, plan.Moved);
         Assert.AreEqual(5.2, plan.Moved[0].Milliseconds, 0.1, "0.505 s is tick 484.8: 5 ticks later.");
         Assert.AreEqual(-10.4, plan.Moved[1].Milliseconds, 0.1);
-        Assert.AreSequenceEqual(new long[] { 1440 }, [.. plan.NoOnset], "1.5 s has no onset within 62.5 ms, so it stays.");
+        Assert.AreSequenceEqual([1440], [.. plan.NoOnset], "1.5 s has no onset within 62.5 ms, so it stays.");
         Assert.AreEqual(ChordFlags.ForceHopo, Expert(session).FlagsAt(485), "The chord's forcing moves with it.");
         Assert.AreEqual(ChordFlags.None, Expert(session).FlagsAt(480));
         Assert.HasCount(4, session.Selection.Notes, "The notes stay selected where they land.");
         Assert.AreEqual(steps + 1, session.UndoStack.UndoCount, "One undoable step.");
 
         session.Undo();
-        Assert.AreSequenceEqual(new long[] { 480, 480, 960, 1440 }, [.. Expert(session).Notes.Select(n => n.Tick)]);
+        Assert.AreSequenceEqual([480, 480, 960, 1440], [.. Expert(session).Notes.Select(n => n.Tick)]);
         Assert.AreEqual(ChordFlags.ForceHopo, Expert(session).FlagsAt(480));
     }
 
@@ -120,8 +120,8 @@ public sealed class OnsetSnapTests
 
         var plan = session.Tools.NudgeSelectionToOnsets()!;
 
-        Assert.AreSequenceEqual(new long[] { 240, 300 }, [.. Expert(session).Notes.Select(n => n.Tick)]);
-        Assert.AreSequenceEqual(new long[] { 300 }, [.. plan.Blocked]);
+        Assert.AreSequenceEqual([240, 300], [.. Expert(session).Notes.Select(n => n.Tick)]);
+        Assert.AreSequenceEqual([300], [.. plan.Blocked]);
     }
 
     [TestMethod]
@@ -134,8 +134,8 @@ public sealed class OnsetSnapTests
         var plan = session.Tools.NudgeSelectionToOnsets()!;
 
         Assert.IsNull(plan.Command);
-        Assert.AreSequenceEqual(new long[] { 480 }, [.. plan.Blocked]);
-        Assert.AreSequenceEqual(new long[] { 480, 485 }, [.. Expert(session).Notes.Select(n => n.Tick)]);
+        Assert.AreSequenceEqual([480], [.. plan.Blocked]);
+        Assert.AreSequenceEqual([480, 485], [.. Expert(session).Notes.Select(n => n.Tick)]);
     }
 
     [TestMethod]

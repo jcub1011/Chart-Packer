@@ -1,5 +1,6 @@
 using System;
 using Avalonia;
+using ChartShared.Core.Charting;
 using ChartShared.Core.Charting.Editing;
 
 namespace ChartBuilder.Controls.Editing
@@ -27,11 +28,23 @@ namespace ChartBuilder.Controls.Editing
         // The strip is the timeline's column beside the rows: it's always there, and takes no more room when it's chosen.
         protected override double BesideSizeFor(Size size) => 0;
 
-        protected override LaneProjection Project(Size size, LaneSlots slots, EditorViewport viewport, double lookAhead, int phraseRows)
+        protected override double TimeAxisLength(Size size) => Math.Max(1, size.Width);
+
+        // The projection last worked out, and what it was for: every layer of the lane, the notes standing up and the pointer ask for
+        // it each frame, and a lane laid out the same with the cursor in the same place is projected the same.
+        private (Size Size, LaneSlots Slots, EditorViewport Viewport, double Cursor, HighwayLength Length, int PhraseRows, LaneExtras Extras) _projectedFor;
+        private LaneProjection? _projected;
+
+        protected override LaneProjection Project(Size size, LaneSlots slots, EditorViewport viewport, HighwayLength length, int phraseRows)
         {
+            var key = (size, slots, viewport, viewport.Cursor, length, phraseRows, Extras);
+            if (_projected is { } known && key.Equals(_projectedFor))
+                return known;
+
+            _projectedFor = key;
             double top = RulerHeight + StripHeight(size) + PhraseRailSize(phraseRows) + MarkHeight;
             double height = Math.Max(1, size.Height - top - 4 - OnsetStripSize);
-            return LaneProjection.Of(LaneView.Timeline, 0, Math.Max(1, size.Width), top, height / slots.Slots.Count, slots, viewport, lookAhead);
+            return _projected = LaneProjection.Of(LaneView.Timeline, 0, Math.Max(1, size.Width), top, height / slots.Slots.Count, slots, viewport, length);
         }
 
         protected override Rect LabelsArea(Size size, LaneProjection projection) => new(projection.TimeFrom, 0, projection.TimeLength, RulerHeight);
@@ -50,10 +63,10 @@ namespace ChartBuilder.Controls.Editing
         protected override double PhraseRailFrom(LaneProjection projection, int phraseRows) => projection.LaneFrom - MarkHeight - PhraseRailSize(phraseRows);
 
         // A vocal part's phrase strip is under the ruler, its rows under that, and its lyrics under them.
-        protected override LaneProjection? ProjectVocals(Size size, LaneSlots slots, EditorViewport viewport, double lookAhead)
+        protected override LaneProjection? ProjectVocals(Size size, LaneSlots slots, EditorViewport viewport, HighwayLength length)
         {
             double height = Math.Max(1, size.Height - RulerHeight - VocalPhraseHeight - LyricsHeight);
-            return LaneProjection.Of(LaneView.Timeline, 0, Math.Max(1, size.Width), RulerHeight + VocalPhraseHeight, height / slots.Slots.Count, slots, viewport, lookAhead);
+            return LaneProjection.Of(LaneView.Timeline, 0, Math.Max(1, size.Width), RulerHeight + VocalPhraseHeight, height / slots.Slots.Count, slots, viewport, length);
         }
 
         protected override Rect VocalPhraseArea(Size size, LaneProjection projection) =>

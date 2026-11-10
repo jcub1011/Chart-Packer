@@ -185,7 +185,16 @@ public sealed class StemMixer
             _scratch = new float[output.Length];
         var scratch = _scratch.AsSpan(0, output.Length);
 
-        bool anySolo = _stems.Any(s => s.IsSolo);
+        bool anySolo = false;
+        for (int i = 0; i < _stems.Count; i++)
+        {
+            if (_stems[i].IsSolo)
+            {
+                anySolo = true;
+                break;
+            }
+        }
+
         bool allEnded = true;
         foreach (var stem in _stems)
         {

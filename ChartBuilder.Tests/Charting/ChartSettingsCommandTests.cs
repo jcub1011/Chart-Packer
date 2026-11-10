@@ -328,7 +328,7 @@ public sealed class ChartSettingsCommandTests
         Assert.AreEqual(new TempoChange(0, 400_000), chart.TempoMap.Tempos[0]);
         Assert.AreEqual(new TimeSignatureMarker(0, 6, 8), chart.TempoMap.TimeSignatures[0]);
         Assert.AreSequenceEqual([Guitar, Bass, Drums], chart.Parts.Select(p => p.Instrument).ToList());
-        Assert.AreSequenceEqual(new[] { ChartInstrument.GhlGuitar }, before.Parts.Select(p => p.Instrument).Except(chart.Parts.Select(p => p.Instrument)).ToList());
+        Assert.AreSequenceEqual([ChartInstrument.GhlGuitar], before.Parts.Select(p => p.Instrument).Except(chart.Parts.Select(p => p.Instrument)).ToList());
 
         stack.Undo();
 

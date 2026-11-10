@@ -17,6 +17,15 @@ public sealed class EditorViewport
     /// <summary>How far from the strike end the strike line is: a quarter of the way (charter-spec C10 item 6).</summary>
     public const double StrikeFraction = 0.25;
 
+    /// <summary>
+    /// How far from the strike end the strike line is on a highway in perspective, as in the games: close to the bottom, where the
+    /// plane is nearest the eye, for the plane is long, and a quarter of the way up it would be far from the camera.
+    /// </summary>
+    public const double PerspectiveStrikeFraction = 0.10;
+
+    /// <summary>The farthest from the strike end a strike line can be put: short of the far end, where the span before it would have no end.</summary>
+    public const double MaxStrikeFraction = 0.95;
+
     /// <summary>The shortest look-ahead a lane can have, in seconds.</summary>
     public const double MinLookAhead = HighwayLookAhead.Min;
 
@@ -44,9 +53,42 @@ public sealed class EditorViewport
     /// </summary>
     public (double Start, double End) SpanOf(double lookAhead)
     {
-        double ahead = ClampLookAhead(lookAhead);
-        return (Cursor - (ahead * StrikeFraction / (1 - StrikeFraction)), Cursor + ahead);
+        return SpanAhead(ClampLookAhead(lookAhead));
     }
+
+    /// <summary>As <see cref="SpanOf(double)"/>, for a lane that puts its strike line <paramref name="strikeFraction"/> of the way from its strike end.</summary>
+    public (double Start, double End) SpanOf(double lookAhead, double strikeFraction)
+    {
+        return SpanAhead(Cursor, ClampLookAhead(lookAhead), strikeFraction);
+    }
+
+    /// <summary>As <see cref="SpanAhead(double)"/>, for a lane that puts its strike line <paramref name="strikeFraction"/> of the way from its strike end.</summary>
+    public (double Start, double End) SpanAhead(double secondsAhead, double strikeFraction) => SpanAhead(Cursor, secondsAhead, strikeFraction);
+
+    /// <summary>
+    /// The span a lane shows with <paramref name="secondsAhead"/> beyond its strike line as it is, not kept to a look-ahead's
+    /// range: what a lane in pixels per second mode shows, which is as long as it is tall. It's kept to the shortest a
+    /// highway is drawn showing (<see cref="HighwayLookAhead.ShortestShown"/>), as every highway is; not a positive number
+    /// is the shortest look-ahead.
+    /// </summary>
+    public (double Start, double End) SpanAhead(double secondsAhead) => SpanAhead(Cursor, secondsAhead, StrikeFraction);
+
+    /// <summary>
+    /// The span a lane shows with its strike line on <paramref name="cursor"/>, <paramref name="strikeFraction"/> of the way
+    /// from its strike end, and <paramref name="secondsAhead"/> beyond the strike line (see <see cref="SpanAhead(double)"/>).
+    /// What a lane draws wherever it puts the strike line: the editor a quarter of the way, a note highway a little above its bottom.
+    /// A <paramref name="strikeFraction"/> outside 0 to <see cref="MaxStrikeFraction"/> is kept to that range: at 1 the strike line
+    /// is at the far end, and the time before it would be endless. So the span returned is always a finite one.
+    /// </summary>
+    public static (double Start, double End) SpanAhead(double cursor, double secondsAhead, double strikeFraction)
+    {
+        strikeFraction = ClampStrikeFraction(strikeFraction);
+        double ahead = double.IsFinite(secondsAhead) && secondsAhead > 0 ? Math.Max(HighwayLookAhead.ShortestShown, secondsAhead) : MinLookAhead;
+        return (cursor - (ahead * strikeFraction / (1 - strikeFraction)), cursor + ahead);
+    }
+
+    /// <summary><paramref name="fraction"/> as a strike fraction a lane can have: from 0 to <see cref="MaxStrikeFraction"/>, and the editor's when it isn't a number.</summary>
+    public static double ClampStrikeFraction(double fraction) => double.IsFinite(fraction) ? Math.Clamp(fraction, 0, MaxStrikeFraction) : StrikeFraction;
 
     /// <summary>Moves the cursor to <paramref name="seconds"/>, for the user: playback seeks there.</summary>
     public void MoveCursor(double seconds)

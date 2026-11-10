@@ -460,16 +460,18 @@
                                 <TextBlock Classes="caption"
                                            VerticalAlignment="Center"
                                            Text="{x:Static res:Strings.GenerateLookAheadLabel}" />
-                                <ui:LookAheadSlider Width="130"
+                                <ui:HighwayLengthSlider Width="130"
                                         VerticalAlignment="Center"
+                                        Mode="{Binding LengthMode}"
                                         LookAhead="{Binding LookAhead}"
+                                        PixelsPerSecond="{Binding PixelsPerSecond}"
                                         ToolTip.Tip="{x:Static res:Strings.GenerateLookAheadToolTip}"
                                         AutomationProperties.Name="{x:Static res:Strings.GenerateLookAheadLabel}" />
                                 <TextBlock FontSize="12"
                                            FontFeatures="tnum"
                                            VerticalAlignment="Center"
                                            MinWidth="38"
-                                           Text="{Binding LookAhead, StringFormat={x:Static sres:SharedStrings.LookAheadFormat}}" />
+                                           Text="{Binding LengthText}" />
                             </StackPanel>
                         </Grid>
                     </Border>
@@ -480,6 +482,8 @@
                                             Scene="{Binding Scene}"
                                             Clock="{Binding Clock}"
                                             LookAhead="{Binding LookAhead}"
+                                            LengthMode="{Binding LengthMode}"
+                                            PixelsPerSecond="{Binding PixelsPerSecond}"
                                             LengthSeconds="{Binding LengthSeconds}"
                                             SelectedPhrase="{Binding SelectedBand}"
                                             Scrubbed="OnHighwayScrubbed" />

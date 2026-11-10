@@ -31,6 +31,9 @@ namespace ChartShared.UI.Controls
         private WriteableBitmap? _bitmap;
         private int _version;
         private bool _isFrameRequested;
+
+        // The callback for each frame, made once rather than each time one is asked for, as it is every frame the video plays.
+        private Action<TimeSpan>? _onFrame;
         private Rect? _viewport;
 
         // While attached, watches for it or a parent being shown or hidden, as hidden, frames aren't asked for.
@@ -130,7 +133,7 @@ namespace ChartShared.UI.Controls
                 return;
 
             _isFrameRequested = true;
-            topLevel.RequestAnimationFrame(OnFrame);
+            topLevel.RequestAnimationFrame(_onFrame ??= OnFrame);
         }
 
         // It or a parent shown, say a collapsed section expanded: frames are asked for again. Whether it's now seen is

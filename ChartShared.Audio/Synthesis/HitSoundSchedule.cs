@@ -68,6 +68,9 @@ public sealed class CombinedSchedule : ISoundSchedule
     private readonly List<ScheduledSound> _found = [];
     private readonly Lock _lock = new();
 
+    // Made once: the player asks for the next sounds about fifty times a second.
+    private static readonly Comparer<ScheduledSound> BySourceFrame = Comparer<ScheduledSound>.Create(static (a, b) => a.SourceFrame.CompareTo(b.SourceFrame));
+
     /// <param name="parts">Each schedule and its volume, from 0. Those at 0 are left out.</param>
     public CombinedSchedule(params (ISoundSchedule Schedule, float Gain)[] parts)
     {
@@ -94,6 +97,7 @@ public sealed class CombinedSchedule : ISoundSchedule
         }
 
         // In order, as the player asks.
-        into.Sort(start, into.Count - start, Comparer<ScheduledSound>.Create(static (a, b) => a.SourceFrame.CompareTo(b.SourceFrame)));
+        if (into.Count - start > 1)
+            into.Sort(start, into.Count - start, BySourceFrame);
     }
 }

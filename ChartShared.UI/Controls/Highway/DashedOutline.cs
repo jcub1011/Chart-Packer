@@ -21,6 +21,11 @@ namespace ChartShared.UI.Controls.Highway
         private const double SizeStep = 0.25;
         private const int MaxShapes = 512;
 
+        // The sizes a smoothly changing shape is made at (DrawRectangleNear), each this much larger than the last; and the
+        // least size made so, below which a shape is made at its own size.
+        internal const double BucketRatio = 1.02;
+        internal const double MinBucketed = 2;
+
         // How many pieces each quarter-circle corner of a rounded rectangle is drawn in, enough at a gem's few pixels.
         private const int CornerPieces = 4;
 
@@ -35,6 +40,34 @@ namespace ChartShared.UI.Controls.Highway
             using (context.PushTransform(Matrix.CreateTranslation(rect.X, rect.Y)))
                 context.DrawGeometry(null, pen, Rectangle(rect.Size, radius, dash, gap));
         }
+
+        /// <summary>
+        /// As <see cref="DrawRectangle"/>, for a rectangle whose size changes smoothly from frame to frame, as a note's does as it
+        /// comes nearer on a highway tilted back: the outline is made for the nearest of sizes a few hundredths apart
+        /// (<see cref="Bucket"/>) and stretched to the rectangle, dashes, corners and pen with it, by too little to see. Made for
+        /// its exact size, every frame would make a new one.
+        /// </summary>
+        public static void DrawRectangleNear(DrawingContext context, IPen pen, Rect rect, double radius, double dash, double gap)
+        {
+            if (rect.Width < MinBucketed || rect.Height < MinBucketed)
+            {
+                DrawRectangle(context, pen, rect, radius, dash, gap);
+                return;
+            }
+
+            double width = Bucket(rect.Width), height = Bucket(rect.Height);
+            var shape = Rectangle(new Size(width, height), Rounded(radius), dash, gap);
+            using (context.PushTransform(Matrix.CreateScale(rect.Width / width, rect.Height / height) * Matrix.CreateTranslation(rect.X, rect.Y)))
+                context.DrawGeometry(null, pen, shape);
+        }
+
+        /// <summary>
+        /// The size nearest <paramref name="pixels"/> among sizes <see cref="BucketRatio"/> apart, to <see cref="SizeStep"/>: a shape
+        /// made at it and stretched to <paramref name="pixels"/> is stretched by at most about 1%, and only some hundred of them
+        /// span every size a note is drawn at. For <see cref="MinBucketed"/> pixels and more.
+        /// </summary>
+        internal static double Bucket(double pixels) =>
+            Rounded(Math.Pow(BucketRatio, Math.Round(Math.Log(pixels) / Math.Log(BucketRatio))));
 
         /// <summary>The dashes of a rectangle's outline from the origin, as <see cref="DrawRectangle"/> draws them, made once for each size.</summary>
         public static Geometry Rectangle(Size size, double radius, double dash, double gap)

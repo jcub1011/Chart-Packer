@@ -17,7 +17,7 @@ public sealed class CalibrationChartTests
         Assert.AreEqual(0.75, CalibrationChart.BeatSeconds);
         Assert.AreEqual(0.75, tempo.SecondsAt(CalibrationChart.Resolution), 1e-12);
         Assert.AreSequenceEqual(
-            new[] { true, false, false, false, true, false, false, false },
+            [true, false, false, false, true, false, false, false],
             [.. tempo.BeatLines(0, (CalibrationChart.Resolution * 8L) - 1).Select(b => b.IsMeasure)]);
     }
 
@@ -27,7 +27,7 @@ public sealed class CalibrationChartTests
         var notes = CalibrationChart.Notes(3, first: 8);
 
         Assert.AreSequenceEqual(
-            new[] { 8L * CalibrationChart.Resolution, 9L * CalibrationChart.Resolution, 10L * CalibrationChart.Resolution },
+            [8L * CalibrationChart.Resolution, 9L * CalibrationChart.Resolution, 10L * CalibrationChart.Resolution],
             [.. notes.Select(n => n.Tick)]);
         Assert.IsTrue(notes.All(n => n.Lane == ChartNote.OpenLane && n.Length == 0 && n.Flags == NoteFlags.None));
     }

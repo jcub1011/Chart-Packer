@@ -55,4 +55,25 @@ public sealed class StrikeGlowTests
             }
         }
     }
+
+    [TestMethod]
+    public void ANoteLightsItsColumnUnlessItIsAlreadyLitMore()
+    {
+        double[] hits = [0, 0.4, 0];
+        StrikeGlow.Light(hits, 3, 1, 0.9);
+        StrikeGlow.Light(hits, 3, 1, 0.2);
+        StrikeGlow.Light(hits, 3, 2, 0.5);
+
+        CollectionAssert.AreEqual(new[] { 0, 0.9, 0.5 }, hits);
+    }
+
+    [TestMethod]
+    public void ANoteWithNoColumnOfItsOwnLightsEveryColumnByTheSpreadLevel()
+    {
+        double[] hits = [0, 0.9, 0, 0];
+        StrikeGlow.Light(hits, 3, -1, 1);
+
+        // Only the first count columns, and a column already lit more stays as it is.
+        CollectionAssert.AreEqual(new[] { StrikeGlow.SpreadLevel, 0.9, StrikeGlow.SpreadLevel, 0 }, hits);
+    }
 }

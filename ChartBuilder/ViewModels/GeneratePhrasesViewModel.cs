@@ -11,6 +11,7 @@ using ChartShared.Core.Charting.Authoring;
 using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charts;
 using ChartShared.UI.Controls.Highway;
+using ChartShared.UI.Resources;
 using ChartShared.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -43,6 +44,8 @@ namespace ChartBuilder.ViewModels
             _session = editor.Session;
             _playback = editor.Playback;
             LookAhead = HighwayLookAhead.Clamp(editor.GeneratePhrasesLookAhead, BuilderSettings.DefaultGeneratePhrasesLookAhead);
+            PixelsPerSecond = HighwayPixelsPerSecond.Clamp(editor.GeneratePhrasesPixelsPerSecond);
+            LengthMode = editor.LengthMode;
             Part = part;
             _span = overSelection ? _session.Selection.SpanIn(part) : null;
             ScopeText = overSelection ? Strings.GenerateScopeSelection : Strings.GenerateScopeWholePart;
@@ -71,7 +74,8 @@ namespace ChartBuilder.ViewModels
 
         public PlaybackViewModel Playback => _playback;
 
-        public Func<TimeSpan> Clock => _playback.Clock;
+        /// <summary>The time the highway and the timeline are drawn at, each frame (<see cref="PlaybackViewModel.DrawClock"/>).</summary>
+        public Func<TimeSpan> Clock => _playback.DrawClock;
 
         public double LengthSeconds => _playback.LengthSeconds;
 
@@ -80,10 +84,24 @@ namespace ChartBuilder.ViewModels
 
         /// <summary>How far ahead the preview highway shows, in seconds; remembered for the next time.</summary>
         [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(LengthText))]
         public partial double LookAhead { get; set; }
+
+        /// <summary>How many pixels of the highway a second of the song takes up, in pixels per second mode; remembered for the next time.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(LengthText))]
+        public partial double PixelsPerSecond { get; set; }
+
+        /// <summary>Whether the highway is sized by its look-ahead or by pixels per second: the setting's, as it was when the window opened.</summary>
+        public HighwayLengthMode LengthMode { get; }
+
+        /// <summary>The highway's length as its slider's readout shows it, e.g. "4.0 s" or "300 px/s".</summary>
+        public string LengthText => HighwayLengthText.Of(new HighwayLength(LengthMode, LookAhead, PixelsPerSecond));
 
         // Already snapped by whatever sets it: the slider and the constructor.
         partial void OnLookAheadChanged(double value) => _editor.GeneratePhrasesLookAhead = value;
+
+        partial void OnPixelsPerSecondChanged(double value) => _editor.GeneratePhrasesPixelsPerSecond = value;
 
         /// <summary>The proposals, earliest first.</summary>
         public ObservableCollection<ProposalRowViewModel> Regions { get; } = [];

@@ -12,7 +12,7 @@ public sealed class RecentJumpListTests
     {
         var entries = RecentJumpList.Build([Song("A"), Song("B"), Song("A", "A again")], _ => true);
 
-        Assert.AreSequenceEqual(new[] { "A", "B" }, [.. entries.Select(e => e.Title)]);
+        Assert.AreSequenceEqual(["A", "B"], [.. entries.Select(e => e.Title)]);
     }
 
     [TestMethod]
@@ -20,7 +20,7 @@ public sealed class RecentJumpListTests
     {
         var entries = RecentJumpList.Build([Song("A"), Song("B")], path => path.EndsWith("B", StringComparison.Ordinal));
 
-        Assert.AreSequenceEqual(new[] { "B" }, [.. entries.Select(e => e.Title)]);
+        Assert.AreSequenceEqual(["B"], [.. entries.Select(e => e.Title)]);
     }
 
     [TestMethod]
@@ -65,7 +65,7 @@ public sealed class RecentJumpListTests
 
         var entries = RecentJumpList.Build([Song("A"), Song("B")], _ => true, [removed.ToUpperInvariant()]);
 
-        Assert.AreSequenceEqual(new[] { "B" }, [.. entries.Select(e => e.Title)]);
+        Assert.AreSequenceEqual(["B"], [.. entries.Select(e => e.Title)]);
     }
 
     [TestMethod]
@@ -75,7 +75,7 @@ public sealed class RecentJumpListTests
             [new RecentSong { Path = "", Title = "Blank" }, new RecentSong { Path = "bad\0path", Title = "Bad" }, Song("A")],
             _ => true);
 
-        Assert.AreSequenceEqual(new[] { "A" }, [.. entries.Select(e => e.Title)]);
+        Assert.AreSequenceEqual(["A"], [.. entries.Select(e => e.Title)]);
     }
 
     [TestMethod]

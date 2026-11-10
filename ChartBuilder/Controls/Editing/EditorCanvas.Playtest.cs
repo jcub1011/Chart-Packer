@@ -45,36 +45,56 @@ namespace ChartBuilder.Controls.Editing
             if (PlaytestOf(key) is not { } run)
                 return;
             bool drums = ChartInstruments.KindOf(key.Instrument) == ChartInstrumentKind.Drums;
-            var (fromTick, toTick) = TicksOf(session, screen);
             double size = GemSize(screen);
             var lanes = LanesOf(screen, slots);
             using (context.PushClip(lanes))
             {
-                foreach (var ((tick, lane), mark) in run.Marks)
-                {
-                    if (mark.Kind == JudgeKind.Hit || tick < fromTick - 1 || tick > toTick + 1)
-                        continue;
-                    if (MarkRect(screen, slots, ShownOf(lane, drums), screen.AlongOf(session.AudioAt(tick)), size) is not { } rect)
-                        continue;
-                    if (mark.Kind == JudgeKind.Miss)
-                        DrawCross(context, MissPen, rect);
-                    else
-                        context.DrawLine(DropPen, rect.BottomLeft, rect.TopRight);
-                }
+                // On a perspective highway the notes stand over their places on the plane, so their marks stand up too.
+                if (_camera is null)
+                    DrawPlaytestMarks(context, session, key, run, slots, screen, upright: false);
 
-                foreach (var stray in run.Strays)
+                foreach (var stray in run.StraySpan)
                 {
                     if (stray.Song < screen.Start || stray.Song > screen.End)
                         continue;
                     double along = screen.AlongOf(stray.Song);
                     if (stray.Kind == JudgeKind.Overstrum)
-                        context.DrawLine(StrayPen, At(along, screen.LaneFrom + 2), At(along, screen.LaneFrom + (screen.LaneSize * slots.Slots.Count) - 2));
+                        Line(context, StrayPen, At(along, screen.LaneFrom + 2), At(along, screen.LaneFrom + (screen.LaneSize * slots.Slots.Count) - 2));
                     else if (MarkRect(screen, slots, ShownOf(stray.Lane, drums), along, size) is { } rect)
                         DrawCross(context, StrayPen, rect.Deflate(rect.Width * 0.15));
                 }
             }
 
             DrawTimingMeter(context, session, run, screen, lanes);
+        }
+
+        /// <summary>A mark on each note missed or sustain dropped, which stays until the note is played again or the playtest is cleared.</summary>
+        /// <param name="upright">Whether the marks are drawn standing up on the notes of a perspective highway, rather than flat.</param>
+        private void DrawPlaytestMarks(DrawingContext context, EditorSession session, ChartTrackKey key, PlaytestRun run, LaneSlots slots, LaneProjection screen, bool upright)
+        {
+            bool drums = ChartInstruments.KindOf(key.Instrument) == ChartInstrumentKind.Drums;
+            var (fromTick, toTick) = TicksOf(session, screen);
+            double size = GemSize(screen);
+            foreach (var (tick, lane, mark) in run.FlaggedBetween((long)Math.Ceiling(fromTick - 1), (long)Math.Floor(toTick + 1)))
+            {
+                if (MarkRect(screen, slots, ShownOf(lane, drums), screen.AlongOf(session.AudioAt(tick)), size) is not { } rect)
+                    continue;
+                if (mark.Kind == JudgeKind.Miss)
+                {
+                    if (upright)
+                        _upright.DrawCross(context, rect, MissPen);
+                    else
+                        DrawCross(context, MissPen, rect);
+                }
+                else if (upright)
+                {
+                    _upright.DrawSlash(context, rect, DropPen);
+                }
+                else
+                {
+                    Line(context, DropPen, rect.BottomLeft, rect.TopRight);
+                }
+            }
         }
 
         /// <summary>
@@ -103,18 +123,14 @@ namespace ChartBuilder.Controls.Editing
                 double glow = StrikeGlow.Brightness(since, Math.Max(0, note.EndTime - judged.Song));
                 if (glow <= 0)
                     continue;
-                foreach (int lane in note.Lanes)
+                var noteLanes = note.Lanes;
+                for (int n = 0; n < noteLanes.Count; n++)
                 {
-                    int shown = ShownOf(lane, drums);
+                    int shown = ShownOf(noteLanes[n], drums);
                     if (slots.Across == shown)
-                    {
-                        for (int c = 0; c < count; c++)
-                            hits[c] = Math.Max(hits[c], glow * StrikeGlow.SpreadLevel);
-                    }
+                        StrikeGlow.Light(hits, count, -1, glow);
                     else if (slots.IndexOf(shown) is var column and >= 0)
-                    {
-                        hits[column] = Math.Max(hits[column], glow);
-                    }
+                        StrikeGlow.Light(hits, count, column, glow);
                 }
             }
 
@@ -176,9 +192,10 @@ namespace ChartBuilder.Controls.Editing
                 if (judged.Kind != JudgeKind.Hit || since < 0 || judged.Note < 0 || judged.Note >= run.Chart.Notes.Count)
                     continue;
                 double grown = since / BurstSeconds;
-                foreach (int lane in run.Chart.Notes[judged.Note].Lanes)
+                var burstLanes = run.Chart.Notes[judged.Note].Lanes;
+                for (int n = 0; n < burstLanes.Count; n++)
                 {
-                    int shown = ShownOf(lane, drums);
+                    int shown = ShownOf(burstLanes[n], drums);
                     Rect rect;
                     Color color;
                     if (slots.Across == shown)
@@ -196,11 +213,16 @@ namespace ChartBuilder.Controls.Editing
                         continue;
                     }
 
+                    // Fading as it grows: its fill twice over, as its colour and its opacity both did, and its edge thinning. The
+                    // fade is the opacity's, and the edge thins by half pixels, so the burst asks for the same few brushes and pens
+                    // each frame, not new ones.
                     var ring = rect.Inflate(size * 0.7 * grown);
                     double radius = GemPainter.CornerOf(ring);
-                    var fill = HighwayPalette.WithAlpha(HighwayPalette.Lighten(color, 0.8), (byte)(0x90 * (1 - grown)));
-                    using (context.PushOpacity(1 - grown))
-                        context.DrawRectangle(_gems.Brush(fill), _gems.Pen(HighwayPalette.Lighten(color, 0.6), (3 * (1 - grown)) + 1), ring, radius, radius);
+                    double left = 1 - grown;
+                    using (context.PushOpacity(left * left))
+                        context.DrawRectangle(_gems.Brush(HighwayPalette.WithAlpha(HighwayPalette.Lighten(color, 0.8), 0x90)), null, ring, radius, radius);
+                    using (context.PushOpacity(left))
+                        context.DrawRectangle(null, _gems.Pen(HighwayPalette.Lighten(color, 0.6), Math.Round(((3 * left) + 1) * 2) / 2), ring, radius, radius);
                 }
             }
         }
@@ -266,8 +288,8 @@ namespace ChartBuilder.Controls.Editing
             double across2 = View == LaneView.Highway ? lanes.Right : lanes.Bottom;
             double middle = (across1 + across2) / 2;
             double half = (across2 - across1) * 0.25;
-            context.DrawLine(MeterPen, At(along, middle - half), At(along, middle + half));
-            context.DrawLine(MeterCentrePen, At(along - 4, middle), At(along + 4, middle));
+            Line(context, MeterPen, At(along, middle - half), At(along, middle + half));
+            Line(context, MeterCentrePen, At(along - 4, middle), At(along + 4, middle));
 
             var recent = run.Recent;
             for (int i = recent.Count - 1; i >= 0; i--)
@@ -282,7 +304,7 @@ namespace ChartBuilder.Controls.Editing
                 double at = middle + (Math.Clamp(judged.OffsetMs / reach, -1, 1) * half);
                 var color = judged.OffsetMs < 0 ? EarlyColor : LateColor;
                 using (context.PushOpacity(1 - (age / MeterSeconds)))
-                    context.DrawLine(_gems.Pen(color, 2), At(along - 3, at), At(along + 3, at));
+                    Line(context, _gems.Pen(color, 2), At(along - 3, at), At(along + 3, at));
             }
         }
     }

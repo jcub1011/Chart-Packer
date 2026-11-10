@@ -54,7 +54,18 @@ public sealed class ReduceProposals
             : [];
 
     /// <summary>The draft for <paramref name="key"/>, or null when the run has none.</summary>
-    public ReductionDraft? DraftFor(ChartTrackKey key) => Drafts.FirstOrDefault(d => d.Target == key);
+    public ReductionDraft? DraftFor(ChartTrackKey key)
+    {
+        // Asked for by every lane each frame it's drawn: a loop, not a lambda made each time.
+        var drafts = Drafts;
+        for (int i = 0; i < drafts.Count; i++)
+        {
+            if (drafts[i].Target == key)
+                return drafts[i];
+        }
+
+        return null;
+    }
 
     /// <summary>
     /// Starts a run of a 5-fret or GHL part, in place of any going on: a draft of <paramref name="to"/> from

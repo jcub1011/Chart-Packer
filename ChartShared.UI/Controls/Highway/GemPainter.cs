@@ -11,20 +11,32 @@ namespace ChartShared.UI.Controls.Highway
     /// Draws notes as the games show them: two-tone gems, HOPO and tap marks, cymbals, open-note and kick bars, and
     /// sustain tails. Each control that draws notes keeps one, for its brushes, pens and cymbal shapes.
     /// </summary>
-    public sealed class GemPainter
+    public sealed class GemPainter : IGemPainter
     {
-        private static readonly IPen OutlinePen = new ImmutablePen(Color.FromArgb(0xA0, 0x00, 0x00, 0x00).ToUInt32(), 1);
-        private static readonly IBrush HopoMarkBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xF2, 0xFF, 0xFF, 0xFF));
-        private static readonly IBrush TapBodyBrush = new ImmutableSolidColorBrush(Color.FromRgb(0x16, 0x16, 0x1B));
-        private static readonly IPen RingShadowPen = new ImmutablePen(Color.FromArgb(0xC0, 0x00, 0x00, 0x00).ToUInt32(), 4);
+        /// <summary>
+        /// Whether a sustain's tail is drawn as a plain filled rectangle, without the outline and the rounded corners. For a highway tilted
+        /// back: the graphics card draws a stroked, rounded rectangle through the tilt as a path it has to work out each frame, many
+        /// times the work of a plain one, for a stroke a pixel wide and corners a pixel round, and a busy lane has hundreds of tails.
+        /// </summary>
+        public bool PlainTails { get; set; }
+
+        internal static readonly IPen OutlinePen = new ImmutablePen(Color.FromArgb(0xA0, 0x00, 0x00, 0x00).ToUInt32(), 1);
+        internal static readonly IBrush HopoMarkBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xF2, 0xFF, 0xFF, 0xFF));
+        internal static readonly IBrush TapBodyBrush = new ImmutableSolidColorBrush(Color.FromRgb(0x16, 0x16, 0x1B));
+        internal static readonly IPen RingShadowPen = new ImmutablePen(Color.FromArgb(0xC0, 0x00, 0x00, 0x00).ToUInt32(), 4);
 
         // How opaque a ghost note's face is, and its edge's dashes and the gaps between them, in pixels.
-        private const double GhostOpacity = 0.45;
-        private const double GhostDash = 2;
-        private const double GhostGap = 1.5;
+        internal const double GhostOpacity = 0.45;
+        internal const double GhostDash = 2;
+        internal const double GhostGap = 1.5;
 
         // How far a HOPO open's bar is lightened toward white, all over, instead of a white strip.
-        private const double HopoOpenLighten = 0.9;
+        internal const double HopoOpenLighten = 0.9;
+
+        // Brushes and pens are made once for each colour and thickness asked for. A caller asking for one by a value that changes
+        // smoothly, such as a fade, would have a new one made every frame, kept forever: past these many, the lot are let go.
+        private const int MaxBrushes = 2048;
+        private const int MaxPens = 1024;
 
         private readonly Dictionary<Color, IBrush> _brushes = [];
         private readonly Dictionary<(Color, double), IPen> _pens = [];
@@ -128,6 +140,8 @@ namespace ChartShared.UI.Controls.Highway
             var tailColor = HighwayPalette.IsBlackFret(kind, note.Lane) ? HighwayPalette.BlackFretEdge : color;
             if (outlined)
                 context.DrawRectangle(null, Pen(tailColor, 1), tail.Deflate(0.5), 1, 1);
+            else if (PlainTails)
+                context.FillRectangle(Brush(HighwayPalette.WithAlpha(tailColor, 0xCC)), tail);
             else
                 context.DrawRectangle(Brush(HighwayPalette.WithAlpha(tailColor, 0xCC)), OutlinePen, tail, 1, 1);
         }
@@ -142,6 +156,8 @@ namespace ChartShared.UI.Controls.Highway
                 return;
             if (outlined)
                 context.DrawRectangle(null, Pen(color, 1), tail.Deflate(0.5), 2, 2);
+            else if (PlainTails)
+                context.FillRectangle(Brush(HighwayPalette.WithAlpha(color, 0x55)), tail);
             else
                 context.DrawRectangle(Brush(HighwayPalette.WithAlpha(color, 0x55)), Pen(HighwayPalette.WithAlpha(color, 0xCC), 1), tail.Deflate(0.5), 2, 2);
         }
@@ -232,19 +248,29 @@ namespace ChartShared.UI.Controls.Highway
                 context.DrawGeometry(null, Pen(color, 1), dashes);
         }
 
-        /// <summary>A brush of <paramref name="color"/>, made once.</summary>
+        /// <summary>A brush of <paramref name="color"/>, made once: ask by a few colours, not one that changes smoothly frame to frame.</summary>
         public IBrush Brush(Color color)
         {
             if (!_brushes.TryGetValue(color, out var brush))
+            {
+                if (_brushes.Count >= MaxBrushes)
+                    _brushes.Clear();
                 _brushes[color] = brush = new ImmutableSolidColorBrush(color);
+            }
+
             return brush;
         }
 
-        /// <summary>A pen of <paramref name="color"/> and <paramref name="thickness"/>, made once.</summary>
+        /// <summary>A pen of <paramref name="color"/> and <paramref name="thickness"/>, made once: ask by a few thicknesses, not one that changes smoothly frame to frame.</summary>
         public IPen Pen(Color color, double thickness)
         {
             if (!_pens.TryGetValue((color, thickness), out var pen))
+            {
+                if (_pens.Count >= MaxPens)
+                    _pens.Clear();
                 _pens[(color, thickness)] = pen = new ImmutablePen(color.ToUInt32(), thickness);
+            }
+
             return pen;
         }
 

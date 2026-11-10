@@ -119,12 +119,14 @@
                           ToolTip.Tip="{Binding Player.LaneWaveformsToolTip}"
                           ToolTip.ShowOnDisabled="True" />
                 <Grid ColumnDefinitions="110,*,Auto" ColumnSpacing="6">
-                    <TextBlock Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.HighwayLookAheadLabel}" />
-                    <ui:LookAheadSlider Grid.Column="1"
+                    <TextBlock Grid.Column="0" VerticalAlignment="Center" Text="{Binding Highway.LengthLabel}" />
+                    <ui:HighwayLengthSlider Grid.Column="1"
+                            Mode="{Binding Highway.LengthMode}"
                             LookAhead="{Binding Highway.LookAhead}"
-                            AutomationProperties.Name="{x:Static res:Strings.HighwayLookAheadLabel}" />
+                            PixelsPerSecond="{Binding Highway.PixelsPerSecond}"
+                            AutomationProperties.Name="{Binding Highway.LengthLabel}" />
                     <TextBlock Grid.Column="2" FontSize="12" FontFeatures="tnum" MinWidth="40" VerticalAlignment="Center"
-                               Text="{Binding Highway.LookAhead, StringFormat={x:Static sres:SharedStrings.LookAheadFormat}}" />
+                               Text="{Binding Highway.LengthText}" />
                 </Grid>
                 <TextBlock Classes="muted" TextWrapping="Wrap" MaxWidth="520" HorizontalAlignment="Left" FontSize="12" Text="{x:Static res:Strings.HighwayFootnote}" />
             </StackPanel>
@@ -571,6 +573,8 @@
                                                          Scene="{Binding Highway.Scene}"
                                                          Clock="{Binding Highway.Clock}"
                                                          LookAhead="{Binding Highway.LookAhead}"
+                                                         LengthMode="{Binding Highway.LengthMode}"
+                                                         PixelsPerSecond="{Binding Highway.PixelsPerSecond}"
                                                          Waveforms="{Binding Highway.LaneWaveforms}"
                                                          LengthSeconds="{Binding Player.TimelineSeconds}"
                                                          FineScrubFactor="{Binding Player.LaneFineScrubFactor}"
@@ -765,6 +769,8 @@
                                                      Scene="{Binding Highway.Scene}"
                                                      Clock="{Binding Highway.Clock}"
                                                      LookAhead="{Binding Highway.LookAhead}"
+                                                     LengthMode="{Binding Highway.LengthMode}"
+                                                     PixelsPerSecond="{Binding Highway.PixelsPerSecond}"
                                                      Waveforms="{Binding Highway.LaneWaveforms}"
                                                      LengthSeconds="{Binding Player.TimelineSeconds}"
                                                      FineScrubFactor="{Binding Player.LaneFineScrubFactor}"

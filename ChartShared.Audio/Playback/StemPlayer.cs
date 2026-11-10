@@ -38,9 +38,18 @@ public sealed class StemPlayer : IDisposable
     private const int SmoothSnapMilliseconds = 50;
 
     // How long SmoothPosition takes to make up how far it is from what the device has taken, and the most faster or
-    // slower than the device it runs meanwhile.
-    private const double SmoothSlewSeconds = 0.2;
-    private const double SmoothMaxTrim = 0.1;
+    // slower than the device it runs meanwhile. Slowly, and by little: what the device has taken jumps about by a few
+    // milliseconds with each taking, and made up for quickly, a highway drawn by it sped up and slowed down by several
+    // percent many times a second, which shows as a judder. A real difference of clocks is a few hundredths of a percent.
+    private const double SmoothSlewSeconds = 1;
+    private const double SmoothMaxTrim = 0.02;
+
+    // Further from it than the device's jumping about, as after a hiccup of the device's, it's a real difference, and the
+    // drawn highway visibly out of step with what's heard: what's past this is made up in about a quarter of a second, up
+    // to this much faster or slower again, as well as the slow trim above.
+    private const int SmoothSteadyMilliseconds = 5;
+    private const double SmoothCatchUpSeconds = 0.25;
+    private const double SmoothMaxCatchUp = 0.08;
 
     private readonly StemMixer _mixer;
     private readonly IAudioOutput _output;
@@ -199,6 +208,9 @@ public sealed class StemPlayer : IDisposable
         set => _mixer.MinimumLengthFrames = Math.Max(0, (long)(value.TotalSeconds * _mixer.OutputRate));
     }
 
+    /// <summary>The clock <see cref="SmoothPosition"/> runs on between the device's takings, whose timestamps <see cref="DrawnPosition(int, long)"/> takes.</summary>
+    public TimeProvider Clock => _clock;
+
     /// <summary>What's being heard now.</summary>
     public TimeSpan Position
     {
@@ -217,16 +229,21 @@ public sealed class StemPlayer : IDisposable
     /// <see cref="Position"/> moving smoothly, for what's drawn against the audio (charter-spec §4.4.1). What the device
     /// has played only moves when it takes more of the queue, every few milliseconds, so this carries it on between by a
     /// monotonic clock, at the device's own rate; and stretched, the grains played step back and forth around where the
-    /// speed says the mix has got to, so this is where the speed says. When the device takes more, this runs up to 10%
-    /// faster or slower until it has made up how far apart they are, never stepping back; past 50 ms, or after a seek, a
-    /// change of speed, playing or pausing, it's put straight back on it. While paused it's <see cref="Position"/>.
+    /// speed says the mix has got to, so this is where the speed says. When the device takes more, this runs up to 2%
+    /// faster or slower, over about a second, until it has made up how far apart they are, never stepping back; past 5 ms
+    /// apart, up to 10% faster or slower, making up what's past 5 ms in about a quarter of a second; past 50 ms,
+    /// or after a seek, a change of speed, playing or pausing, it's put straight back on it. While paused it's
+    /// <see cref="Position"/>.
     /// </summary>
     public TimeSpan SmoothPosition
     {
         get
         {
             lock (_lock)
-                return Smooth();
+            {
+                long now = _clock.GetTimestamp();
+                return Smooth(now, now);
+            }
         }
     }
 
@@ -243,14 +260,40 @@ public sealed class StemPlayer : IDisposable
     /// starts, and back as it stops: what's to come can't be shown before it's played. A loop that has just turned back
     /// to its start is drawn at its end until what's heard gets there.
     /// </remarks>
-    public TimeSpan DrawnPosition(int latencyMilliseconds)
+    public TimeSpan DrawnPosition(int latencyMilliseconds) => DrawnPosition(latencyMilliseconds, _clock.GetTimestamp());
+
+    /// <summary>
+    /// <see cref="DrawnPosition(int)"/> for the frame being drawn: as it is at the moment the frame is for, on the screen's even
+    /// beat (<see cref="FrameClock"/>), the same for everything drawn in the frame. What every highway, lane and picture drawn
+    /// against playback reads each frame; what times a press or a tap reads <see cref="DrawnPosition(int)"/>.
+    /// </summary>
+    public TimeSpan DrawnPositionForFrame(int latencyMilliseconds) => DrawnPosition(latencyMilliseconds, FrameClock.Timestamp(_clock));
+
+    /// <summary><see cref="SmoothPosition"/> for the frame being drawn, as <see cref="DrawnPositionForFrame"/> is.</summary>
+    public TimeSpan SmoothPositionForFrame
+    {
+        get
+        {
+            long timestamp = FrameClock.Timestamp(_clock);
+            lock (_lock)
+                return Smooth(_clock.GetTimestamp(), timestamp);
+        }
+    }
+
+    /// <summary>
+    /// <see cref="DrawnPosition(int)"/> as it is at <paramref name="timestamp"/> on <see cref="Clock"/>, rather than now: for
+    /// a frame drawn for a moment a little apart from when it's drawn, so that frames come evenly however unevenly they're
+    /// got round to (see <see cref="FramePacer"/>). A moment some way from now is where the position, moving on as it is,
+    /// would be then.
+    /// </summary>
+    public TimeSpan DrawnPosition(int latencyMilliseconds, long timestamp)
     {
         lock (_lock)
         {
             if (!_playing)
                 return Position;
 
-            var smooth = Smooth();
+            var smooth = Smooth(_clock.GetTimestamp(), timestamp);
             var drawn = LatencyCompensation.Drawn(smooth, latencyMilliseconds, _speed);
             if (_holdFrame is { } hold)
             {
@@ -548,8 +591,13 @@ public sealed class StemPlayer : IDisposable
 
     private TimeSpan FramesToTime(double frames) => TimeSpan.FromSeconds(frames / _mixer.OutputRate);
 
-    /// <summary><see cref="SmoothPosition"/>. Under <see cref="_lock"/>.</summary>
-    private TimeSpan Smooth()
+    /// <summary>
+    /// <see cref="SmoothPosition"/> at <paramref name="at"/>, read at <paramref name="now"/>: what the device has taken is as of
+    /// now, so it's compared with where the smooth clock is now, and only now moves the clock on, which so only ever runs
+    /// forward; the moment asked for, a frame's a little either side of now, is read off it. Both timestamps of <see cref="Clock"/>.
+    /// Under <see cref="_lock"/>.
+    /// </summary>
+    private TimeSpan Smooth(long now, long at)
     {
         if (_pendingSeek is { } target)
         {
@@ -563,22 +611,19 @@ public sealed class StemPlayer : IDisposable
             return FramesToTime(HeardSourceFrame());
         }
 
+        // The device plays what's written at its own speed: 1 while the mix is stretched.
+        double framesPerSecond = _mixer.OutputRate * (double)_output.Speed;
         long played = Math.Max(0, _writtenFrames - _output.QueuedFrames);
-        long now = _clock.GetTimestamp();
         if (!_smoothValid)
         {
             _smoothValid = true;
             _smoothOutput = _smoothSeen = played;
             _smoothAt = now;
             _smoothTrim = 1;
-            return FramesToTime(_nominal.SourceAt(played));
         }
-
-        // The device plays what's written at its own speed: 1 while the mix is stretched.
-        double framesPerSecond = _mixer.OutputRate * (double)_output.Speed;
-        double smooth = _smoothOutput + ((now - _smoothAt) * framesPerSecond * _smoothTrim / _clock.TimestampFrequency);
-        if (played != _smoothSeen)
+        else if (played != _smoothSeen)
         {
+            double smooth = _smoothOutput + ((now - _smoothAt) * framesPerSecond * _smoothTrim / _clock.TimestampFrequency);
             double error = played - smooth;
             if (Math.Abs(error) > framesPerSecond * SmoothSnapMilliseconds / 1000)
             {
@@ -587,7 +632,11 @@ public sealed class StemPlayer : IDisposable
             }
             else
             {
-                _smoothTrim = 1 + Math.Clamp(error / (framesPerSecond * SmoothSlewSeconds), -SmoothMaxTrim, SmoothMaxTrim);
+                double steady = framesPerSecond * SmoothSteadyMilliseconds / 1000;
+                double past = error - Math.Clamp(error, -steady, steady);
+                _smoothTrim = 1
+                    + Math.Clamp(error / (framesPerSecond * SmoothSlewSeconds), -SmoothMaxTrim, SmoothMaxTrim)
+                    + Math.Clamp(past / (framesPerSecond * SmoothCatchUpSeconds), -SmoothMaxCatchUp, SmoothMaxCatchUp);
             }
 
             _smoothOutput = smooth;
@@ -595,7 +644,8 @@ public sealed class StemPlayer : IDisposable
             _smoothSeen = played;
         }
 
-        return FramesToTime(_nominal.SourceAt(smooth));
+        double output = _smoothOutput + ((at - _smoothAt) * framesPerSecond * _smoothTrim / _clock.TimestampFrequency);
+        return FramesToTime(_nominal.SourceAt(output));
     }
 
     /// <summary>The frame of the mix being heard now. Under <see cref="_lock"/>.</summary>

@@ -173,14 +173,30 @@ namespace ChartBuilder.ViewModels
         /// <summary>The view a lane opens in.</summary>
         public LaneView DefaultView => _settings.Settings.DefaultEditorView;
 
+        /// <summary>Whether a highway lane opens in perspective: the setting's.</summary>
+        public bool DefaultPerspective => _settings.Settings.DefaultEditorPerspective;
+
         /// <summary>The look-ahead of a lane that hasn't had its own set: the highway speed setting's.</summary>
         public double DefaultLookAhead => HighwayLookAhead.Clamp(BuilderSettings.LookAheadAtSpeedOne / _settings.Settings.EditorHighwaySpeed);
+
+        /// <summary>How the lanes' length is chosen, by look-ahead or by pixels per second: the setting's.</summary>
+        public HighwayLengthMode LengthMode => _settings.Settings.HighwayLengthMode;
+
+        /// <summary>The pixels per second of a lane that hasn't had its own set: the setting's.</summary>
+        public double DefaultPixelsPerSecond => HighwayPixelsPerSecond.Clamp(_settings.Settings.EditorPixelsPerSecond, HighwayPixelsPerSecond.Default);
 
         /// <summary>How many seconds ahead the Generate fills and star power window's highway shows, as it was last left; kept with the settings.</summary>
         public double GeneratePhrasesLookAhead
         {
             get => _settings.Settings.GeneratePhrasesLookAhead;
             set => _settings.Settings.GeneratePhrasesLookAhead = value;
+        }
+
+        /// <summary>How many pixels a second of the song takes up in that highway in pixels per second mode, as it was last left; kept with the settings.</summary>
+        public double GeneratePhrasesPixelsPerSecond
+        {
+            get => _settings.Settings.GeneratePhrasesPixelsPerSecond;
+            set => _settings.Settings.GeneratePhrasesPixelsPerSecond = value;
         }
 
         /// <summary>
@@ -208,7 +224,8 @@ namespace ChartBuilder.ViewModels
             }
 
             var lane = focused ?? first ?? firstVocal;
-            var (start, end) = Session.Viewport.SpanOf(lane?.LookAhead ?? DefaultLookAhead);
+            // A lane's shown look-ahead is already its own, and in pixels per second not one the look-ahead's range keeps.
+            var (start, end) = lane is null ? Session.Viewport.SpanOf(DefaultLookAhead) : Session.Viewport.SpanAhead(lane.ShownLookAhead, lane.StrikeFraction);
             VisibleStart = start;
             VisibleEnd = end;
         }
@@ -487,8 +504,33 @@ namespace ChartBuilder.ViewModels
         public partial OverviewData? Overview { get; private set; }
 
         /// <summary>The chart tick the playhead is on, for beside its time, e.g. "Tick 15,360"; Tick 0 before the chart starts.</summary>
-        public string PlayheadTickText => string.Format(
-            CultureInfo.CurrentCulture, Strings.TimelineTickFormat, Math.Max(0, (long)Math.Floor(Session.TickAt(Playback.PositionSeconds))));
+        /// <remarks>Asked for each time the playhead moves, as the song plays: written again only when the tick is different.</remarks>
+        public string PlayheadTickText
+        {
+            get
+            {
+                long tick = PlayheadTick;
+                string format = Strings.TimelineTickFormat;
+                if (_tickText is null || tick != _textTick || !ReferenceEquals(format, _tickFormat) || !ReferenceEquals(CultureInfo.CurrentCulture, _tickCulture))
+                {
+                    _textTick = tick;
+                    _tickFormat = format;
+                    _tickCulture = CultureInfo.CurrentCulture;
+                    _tickText = string.Format(CultureInfo.CurrentCulture, format, tick);
+                }
+
+                return _tickText;
+            }
+        }
+
+        // The chart tick the playhead is on; 0 before the chart starts.
+        private long PlayheadTick => Math.Max(0, (long)Math.Floor(Session.TickAt(Playback.PositionSeconds)));
+
+        // PlayheadTickText as last written, and the tick, wording and culture it was written for.
+        private string? _tickText;
+        private long _textTick;
+        private string? _tickFormat;
+        private CultureInfo? _tickCulture;
 
         /// <summary>Where the span of the song the lanes show starts, in seconds of audio, as the overview marks it.</summary>
         [ObservableProperty]
@@ -512,7 +554,11 @@ namespace ChartBuilder.ViewModels
             WheelUpIsLater = IsWheelUpLater(_settings.Settings);
             Audio.ReloadSettings(_settings.Settings);
             foreach (var lane in Lanes.All)
+            {
                 lane.Audio.Refresh();
+                lane.ReloadDefaults();
+            }
+
             Playtest.ReloadSettings();
         }
 
@@ -525,7 +571,7 @@ namespace ChartBuilder.ViewModels
                 return;
             _followed = frame;
             if (Playback.IsPlaying)
-                Session.Viewport.Follow(Playback.Clock().TotalSeconds);
+                Session.Viewport.Follow(Playback.DrawClock().TotalSeconds);
             _devices?.Sample();
             Playtest.Frame();
         }
@@ -819,7 +865,7 @@ namespace ChartBuilder.ViewModels
 
         private void OnPlaybackChanged(object? sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName == nameof(PlaybackViewModel.PositionSeconds))
+            if (e.PropertyName == nameof(PlaybackViewModel.PositionSeconds) && PlayheadTick != _textTick)
                 OnPropertyChanged(nameof(PlayheadTickText));
 
             switch (e.PropertyName)

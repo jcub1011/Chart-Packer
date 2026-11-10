@@ -115,7 +115,8 @@ namespace ChartShared.UI.Controls
     /// scrubbed), so they're seen with the pointer still, whatever has focus.
     /// </summary>
     /// <param name="owner">The lane, drawn again whenever its mode changes.</param>
-    public sealed class LaneScrubMode(Control owner, Func<bool> watchesKeys)
+    /// <param name="allowsOverview">Whether Shift shows the whole chart; not in a lane whose scrub is started with Shift held.</param>
+    public sealed class LaneScrubMode(Control owner, Func<bool> watchesKeys, bool allowsOverview = true)
     {
         private readonly FineDrag _drag = new(owner);
 
@@ -150,7 +151,7 @@ namespace ChartShared.UI.Controls
         /// </summary>
         public void Set(KeyModifiers modifiers)
         {
-            bool isFine = LaneScrub.IsFine(modifiers), isOverview = LaneScrub.IsOverview(modifiers);
+            bool isFine = LaneScrub.IsFine(modifiers), isOverview = allowsOverview && LaneScrub.IsOverview(modifiers);
             if (isFine == IsFine && isOverview == IsOverview)
                 return;
 

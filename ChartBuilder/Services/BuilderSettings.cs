@@ -75,6 +75,14 @@ namespace ChartBuilder.Services
             set => settings.ReducePreviewLookAhead = value;
         }
 
+        public HighwayLengthMode LengthMode => settings.HighwayLengthMode;
+
+        public double PixelsPerSecond
+        {
+            get => settings.ReducePreviewPixelsPerSecond;
+            set => settings.ReducePreviewPixelsPerSecond = value;
+        }
+
         public ReductionChangeCategories Categories
         {
             get => settings.ReducePreviewCategories;
@@ -128,8 +136,20 @@ namespace ChartBuilder.Services
         /// <summary>The view a lane opens in: a vertical highway or a horizontal timeline.</summary>
         public LaneView DefaultEditorView { get; set; } = LaneView.Highway;
 
+        /// <summary>Whether a highway lane opens in perspective, tilted back with its notes standing up on it as in the games, rather than flat.</summary>
+        public bool DefaultEditorPerspective { get; set; }
+
         /// <summary>How fast notes go by in a lane whose look-ahead hasn't been set: 1 shows <see cref="LookAheadAtSpeedOne"/> seconds beyond the strike line.</summary>
         public double EditorHighwaySpeed { get; set; } = 1;
+
+        /// <summary>
+        /// Whether the highways are sized by their look-ahead or by pixels per second, which keeps the distance between notes
+        /// the same at any height. Every highway and timeline in Chart Builder follows it.
+        /// </summary>
+        public HighwayLengthMode HighwayLengthMode { get; set; } = HighwayLengthMode.PixelsPerSecond;
+
+        /// <summary>How many pixels of a lane a second of the song takes up, in pixels per second mode, in a lane whose own hasn't been set.</summary>
+        public double EditorPixelsPerSecond { get; set; } = HighwayPixelsPerSecond.Default;
 
         /// <summary>Which way the mouse wheel moves the cursor, in both lane views and on the timeline along the bottom.</summary>
         public WheelScrollDirection WheelScrollDirection { get; set; } = WheelScrollDirection.UpIsLater;
@@ -270,11 +290,17 @@ namespace ChartBuilder.Services
         /// <summary>How many seconds ahead the highway preview shows (charter-spec C18), as its slider last left it.</summary>
         public double PreviewLookAhead { get; set; } = DefaultPreviewLookAhead;
 
+        /// <summary>How many pixels a second of the song takes up in the highway preview, in pixels per second mode, as its slider last left it.</summary>
+        public double PreviewPixelsPerSecond { get; set; } = HighwayPixelsPerSecond.Default;
+
         /// <summary>The look-ahead the Generate fills and star power dialog starts with, in seconds.</summary>
         public const double DefaultGeneratePhrasesLookAhead = 4;
 
         /// <summary>How many seconds ahead the Generate fills and star power dialog's highway shows, as its slider last left it.</summary>
         public double GeneratePhrasesLookAhead { get; set; } = DefaultGeneratePhrasesLookAhead;
+
+        /// <summary>How many pixels a second of the song takes up in the Generate fills and star power dialog's highway, in pixels per second mode, as its slider last left it.</summary>
+        public double GeneratePhrasesPixelsPerSecond { get; set; } = HighwayPixelsPerSecond.Default;
 
         /// <summary>Whether the Reduce dialog shows its preview, as it was last left.</summary>
         public bool ReducePreviewShown { get; set; }
@@ -284,6 +310,9 @@ namespace ChartBuilder.Services
         /// than the highway preview's, to see a stretch of changes at once.
         /// </summary>
         public double ReducePreviewLookAhead { get; set; } = ReductionPreviewViewModel.DefaultLookAhead;
+
+        /// <summary>How many pixels a second of the song takes up in the Reduce dialog's preview, in pixels per second mode, as its slider last left it.</summary>
+        public double ReducePreviewPixelsPerSecond { get; set; } = HighwayPixelsPerSecond.Default;
 
         /// <summary>
         /// Which kinds of change the Reduce dialog's preview marks and stops at, as its filters were last left: all but the

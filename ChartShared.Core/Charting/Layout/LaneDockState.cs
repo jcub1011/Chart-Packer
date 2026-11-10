@@ -35,6 +35,12 @@ public sealed class LaneDockNodeState
     /// <summary>How many seconds a lane shows beyond its strike line; null for the editor's default.</summary>
     public double? LookAhead { get; set; }
 
+    /// <summary>How many pixels a second of the song takes up in a lane, in pixels per second mode; null for the editor's default.</summary>
+    public double? PixelsPerSecond { get; set; }
+
+    /// <summary>Whether a lane's highway is tilted back in perspective; null for the editor's default.</summary>
+    public bool? Perspective { get; set; }
+
     /// <summary>How a lane shows its audio; null for the defaults.</summary>
     public LaneAudioState? Audio { get; set; }
 }

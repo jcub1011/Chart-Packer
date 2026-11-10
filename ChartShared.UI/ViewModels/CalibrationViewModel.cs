@@ -190,11 +190,13 @@ namespace ChartShared.UI.ViewModels
 
         /// <summary>
         /// Where the highway is drawn: where the clicks are heard, less the latency and what's detected from the device, as
-        /// playback draws a song. Held off, only what's detected. Without audio, the time since <see cref="Start"/>.
+        /// playback draws a song. Held off, only what's detected. Without audio, the time since <see cref="Start"/>. For the
+        /// frame being drawn, on the screen's even beat, as playback's highways are (<see cref="FrameClock"/>); the taps read
+        /// the clicks' own time.
         /// </summary>
         public override TimeSpan Now()
         {
-            var position = _player is { IsPlaying: true } player ? player.SmoothPosition : _clock.GetElapsedTime(_startedAt);
+            var position = _player is { IsPlaying: true } player ? player.SmoothPositionForFrame : FrameClock.ElapsedSince(_clock, _startedAt);
             return LatencyCompensation.Drawn(position, (IsCalibrationOff ? 0 : Value) + (Detected ?? 0), 1);
         }
 

@@ -61,6 +61,42 @@ public sealed class PlaytestRunTests
     }
 
     [TestMethod]
+    public void TheFlaggedMarksInARangeAreOnlyTheMissesInTickOrderAndFollowTheNotesPlayedAgain()
+    {
+        var run = Run(Note(1.0, 0), Note(2.0, 1), Note(3.0, 2));
+        run.Start(0, 1, static _ => false, newPass: true);
+        run.Advance(4, 1);
+
+        Assert.AreSequenceEqual([(TickAt(1.0), 0), (TickAt(2.0), 1), (TickAt(3.0), 2)], Flagged(run, 0, TickAt(5.0)));
+        Assert.AreSequenceEqual([(TickAt(2.0), 1)], Flagged(run, TickAt(1.5), TickAt(2.5)), "Only those in the range.");
+        Assert.AreSequenceEqual([(TickAt(2.0), 1)], Flagged(run, TickAt(2.0), TickAt(2.0)), "Both ends are in it.");
+
+        // Played again, the first is hit and no longer flagged; the others are missed again.
+        run.Start(0.5, 1, static _ => false, newPass: true);
+        run.Handle(Down(Green, 0.9));
+        run.Handle(Down(StrumDown, 1.0));
+        run.Handle(Up(Green, 1.1));
+        run.Advance(4, 1);
+        Assert.AreEqual(JudgeKind.Hit, run.Marks[(TickAt(1.0), 0)].Kind);
+        Assert.AreSequenceEqual([(TickAt(2.0), 1), (TickAt(3.0), 2)], Flagged(run, 0, TickAt(5.0)));
+
+        run.Replace(new FiveFretEngine(Frets(Note(1.0, 0), Note(3.0, 2)), new HitWindow(), new FretRules()), 0, 1, static _ => false);
+        Assert.AreSequenceEqual([(TickAt(3.0), 2)], Flagged(run, 0, TickAt(5.0)), "A note no longer there is dropped.");
+    }
+
+    private static List<(long Tick, int Lane)> Flagged(PlaytestRun run, long from, long to)
+    {
+        var found = new List<(long, int)>();
+        foreach (var (tick, lane, mark) in run.FlaggedBetween(from, to))
+        {
+            Assert.AreNotEqual(JudgeKind.Hit, mark.Kind);
+            found.Add((tick, lane));
+        }
+
+        return found;
+    }
+
+    [TestMethod]
     public void AnOverstrumIsMarkedUntilItsPlaceIsPlayedAgain()
     {
         var run = Run(Note(3.0, 0));

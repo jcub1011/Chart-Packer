@@ -14,6 +14,12 @@ public static class HighwayLookAhead
     /// <summary>The shortest look-ahead, in seconds.</summary>
     public const double Min = 0.5;
 
+    /// <summary>
+    /// The shortest a highway is ever drawn showing, in seconds: shorter than <see cref="Min"/>, as a short highway in pixels
+    /// per second can show less than a set look-ahead can, but not so short that the notes are a blur. Every highway keeps to it.
+    /// </summary>
+    public const double ShortestShown = 0.1;
+
     /// <summary>The longest look-ahead, in seconds.</summary>
     public const double Max = 60;
 

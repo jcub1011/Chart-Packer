@@ -15,6 +15,7 @@ using ChartShared.Core.Library;
 using ChartShared.Core.Metadata;
 using ChartShared.Core.Scanning;
 using ChartShared.UI.Controls.Highway;
+using ChartShared.UI.Resources;
 using ChartShared.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -76,6 +77,13 @@ namespace ChartPacker.ViewModels
         private ChartDocument? _original;
         private (byte[] Bytes, ChartReadOptions Options)? _originalOf;
         private ChartDocument? _shown;
+
+        // The phrases of each track of what's shown (solos, fills and the rest, as well as star power), which the notes' own
+        // document doesn't keep; read from the same bytes, so they're shifted as the notes are.
+        private IReadOnlyDictionary<ChartTrackKey, IReadOnlyList<PhraseSpan>> _phrases = new Dictionary<ChartTrackKey, IReadOnlyList<PhraseSpan>>();
+
+        // The phrases of the chart as stored, so a rebuild that draws it unshifted doesn't read them out of it again.
+        private (byte[] Bytes, ChartReadOptions Options, IReadOnlyDictionary<ChartTrackKey, IReadOnlyList<PhraseSpan>> Phrases)? _originalPhrases;
         private TimeSpan _delay;
 
         // Bumped for each load and rebuild, so only the latest one is applied.
@@ -116,6 +124,8 @@ namespace ChartPacker.ViewModels
             IsEnabled = settings.Settings.ShowNoteHighway;
             Placement = settings.Settings.HighwayPlacement;
             LookAhead = settings.Settings.HighwayLookAhead;
+            LengthMode = settings.Settings.HighwayLengthMode;
+            PixelsPerSecond = settings.Settings.HighwayPixelsPerSecond;
             player.TrackWaveformsChanged += (_, e) =>
             {
                 // More read of a track only changes what's drawn, and only for the highways drawing it.
@@ -156,7 +166,28 @@ namespace ChartPacker.ViewModels
 
         /// <summary>How far ahead of the strike line the highway shows, in seconds (<see cref="HighwayLookAhead"/>).</summary>
         [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(LengthText))]
         public partial double LookAhead { get; set; }
+
+        /// <summary>Whether the highway is sized by its look-ahead or by pixels per second (<see cref="HighwayPixelsPerSecond"/>), which keeps the distance between notes the same at any height.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(LengthText), nameof(LengthLabel), nameof(IsLookAheadMode), nameof(IsPixelsPerSecondMode))]
+        public partial HighwayLengthMode LengthMode { get; set; }
+
+        /// <summary>How many pixels of the highway a second of the song takes up, in pixels per second mode.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(LengthText))]
+        public partial double PixelsPerSecond { get; set; }
+
+        public bool IsLookAheadMode => LengthMode == HighwayLengthMode.LookAhead;
+
+        public bool IsPixelsPerSecondMode => LengthMode == HighwayLengthMode.PixelsPerSecond;
+
+        /// <summary>What the highway's length slider is called: the setting's name in the mode in use.</summary>
+        public string LengthLabel => IsPixelsPerSecondMode ? SharedStrings.HighwayPixelsPerSecondLabel : Strings.HighwayLookAheadLabel;
+
+        /// <summary>The highway's length as its slider's readout shows it, e.g. "1.4 s" or "300 px/s".</summary>
+        public string LengthText => HighwayLengthText.Of(new HighwayLength(LengthMode, LookAhead, PixelsPerSecond));
 
         /// <summary>What's drawn, or <see langword="null"/> for nothing.</summary>
         [ObservableProperty]
@@ -311,6 +342,8 @@ namespace ChartPacker.ViewModels
             IsEnabled = _settings.Settings.ShowNoteHighway;
             Placement = _settings.Settings.HighwayPlacement;
             LookAhead = _settings.Settings.HighwayLookAhead;
+            LengthMode = _settings.Settings.HighwayLengthMode;
+            PixelsPerSecond = _settings.Settings.HighwayPixelsPerSecond;
             if (_original is { } chart)
             {
                 BuildRows(chart);
@@ -325,6 +358,10 @@ namespace ChartPacker.ViewModels
 
         // Already snapped by whatever sets it: the slider, the settings window, and the constructor.
         partial void OnLookAheadChanged(double value) => _settings.Settings.HighwayLookAhead = value;
+
+        partial void OnLengthModeChanged(HighwayLengthMode value) => _settings.Settings.HighwayLengthMode = value;
+
+        partial void OnPixelsPerSecondChanged(double value) => _settings.Settings.HighwayPixelsPerSecond = value;
 
         partial void OnCanEditOffsetsChanged(bool value)
         {
@@ -342,6 +379,8 @@ namespace ChartPacker.ViewModels
             _original = null;
             _originalOf = null;
             _shown = null;
+            _phrases = new Dictionary<ChartTrackKey, IReadOnlyList<PhraseSpan>>();
+            _originalPhrases = null;
             _builtOffsets = null;
             ChartParts = null;
             ChartOffset = null;
@@ -480,11 +519,18 @@ namespace ChartPacker.ViewModels
             // Markings a shift changes are a problem only where the song has an offset of its own: a shift is just how it's drawn.
             var ownOffsets = song.ChartShifts is { Count: > 0 } ? song.Draft.ChartOffsets.Keys.ToHashSet() : null;
 
-            (ChartDocument Original, ChartDocument Shown, string? Problem) result;
+            var cachedPhrases = _originalPhrases is { } stored && ReferenceEquals(stored.Bytes, bytes) && stored.Options == options ? stored.Phrases : null;
+
+            // PhrasesOf is the bytes the phrases were read from, to know when they're the stored chart's.
+            (ChartDocument Original, ChartDocument Shown, string? Problem, IReadOnlyDictionary<ChartTrackKey, IReadOnlyList<PhraseSpan>> Phrases, byte[] PhrasesOf) result;
             try
             {
                 result = await Task.Run(() =>
                 {
+                    // Nothing moved leaves the bytes as they were, which is the one chart whose phrases are kept.
+                    IReadOnlyDictionary<ChartTrackKey, IReadOnlyList<PhraseSpan>> PhrasesIn(byte[] chart) =>
+                        ReferenceEquals(chart, bytes) && cachedPhrases is not null ? cachedPhrases : PhraseSpans.Read(name, chart, song.Metadata);
+
                     var original = cached ?? ChartReader.Read(bytes, name, options);
                     try
                     {
@@ -492,11 +538,11 @@ namespace ChartPacker.ViewModels
                         var changed = shifted.ChangedMarkings.Where(k => ownOffsets?.Contains(k) != false).ToList();
                         string? problem = changed.Count == 0 ? null : string.Format(
                             CultureInfo.CurrentCulture, Strings.HighwayMarkingsChangedFormat, string.Join(", ", changed.Select(TrackName)));
-                        return (original, shifted.Document, problem);
+                        return (original, shifted.Document, problem, PhrasesIn(shifted.Bytes), shifted.Bytes);
                     }
                     catch (ChartFormatException ex)
                     {
-                        return (original, original, (string?)string.Format(CultureInfo.CurrentCulture, Strings.HighwayOffsetErrorFormat, ex.Message));
+                        return (original, original, (string?)string.Format(CultureInfo.CurrentCulture, Strings.HighwayOffsetErrorFormat, ex.Message), PhrasesIn(bytes), bytes);
                     }
                 });
             }
@@ -518,7 +564,10 @@ namespace ChartPacker.ViewModels
                 return;
 
             _shown = result.Shown;
-            _delay = SongChartSettings.DelayOf(current.Metadata, result.Original);
+            _phrases = result.Phrases;
+            if (ReferenceEquals(result.PhrasesOf, bytes))
+                _originalPhrases = (bytes, options, result.Phrases);
+            _delay =SongChartSettings.DelayOf(current.Metadata, result.Original);
             Problem = result.Problem;
             Note = null;
             if (!ReferenceEquals(result.Original, _original))
@@ -588,7 +637,7 @@ namespace ChartPacker.ViewModels
                         continue;
 
                     var kind = ChartInstruments.KindOf(row.Instrument);
-                    lanes.Add(new HighwayLane(kind, HighwayLane.LaneCountOf(kind, chart.IsFiveLaneDrums), TrackName(row.Key), track.Notes, chart.Tempo, _delay));
+                    lanes.Add(new HighwayLane(kind, HighwayLane.LaneCountOf(kind, chart.IsFiveLaneDrums), TrackName(row.Key), track.Notes, chart.Tempo, _delay, phrases: _phrases.GetValueOrDefault(row.Key)));
                     instruments.Add(row.Instrument);
                 }
             }

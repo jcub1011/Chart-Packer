@@ -551,7 +551,7 @@ namespace ChartPacker.ViewModels
 
         IRelayCommand? IMetadataEditorHost.AutoSetSongLengthCommand => AutoSetSongLengthCommand;
 
-        TimeSpan? IMetadataEditorHost.PlayheadPosition => IsBulk || _songs.Count != 1 ? null : Player.DrawnPosition;
+        TimeSpan? IMetadataEditorHost.PlayheadPosition => IsBulk || _songs.Count != 1 ? null : Player.DrawnPositionNow;
 
         bool IMetadataEditorHost.CanEditKey(string key) => true;
 

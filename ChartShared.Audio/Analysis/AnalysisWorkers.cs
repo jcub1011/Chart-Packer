@@ -25,6 +25,11 @@ public sealed class AnalysisWorkers : IDisposable
 {
     private readonly object _gate = new();
     private readonly List<AnalysisJob> _jobs = [];
+
+    // What Next works out each time a thread asks, kept and reused under the lock rather than made each time: the jobs in the order
+    // they're wanted, and the finished ones a thread has readers for.
+    private readonly List<RankedJob> _ranked = [];
+    private readonly List<AnalysisJob> _finished = [];
     private readonly Thread[] _threads;
     private bool _stopping;
     private long _submitted;
@@ -133,23 +138,58 @@ public sealed class AnalysisWorkers : IDisposable
                 if (_stopping)
                     return null;
 
-                _jobs.RemoveAll(j => j.IsFinished);
-                foreach (var job in readers.Keys.Where(j => j.IsFinished).ToList())
+                _jobs.RemoveAll(static j => j.IsFinished);
+                _finished.Clear();
+                foreach (var job in readers.Keys)
+                {
+                    if (job.IsFinished)
+                        _finished.Add(job);
+                }
+
+                foreach (var job in _finished)
                 {
                     readers[job].Dispose();
                     readers.Remove(job);
                 }
 
-                foreach (var job in _jobs.OrderBy(j => j.Priority).ThenByDescending(j => j.FocusStamp).ThenBy(j => j.Order))
+                _finished.Clear();
+
+                // The most wanted first: by priority, the most recently focused, then the first submitted. Each job's keys are read once,
+                // as another thread may change its priority while they're sorted.
+                _ranked.Clear();
+                foreach (var job in _jobs)
+                    _ranked.Add(new RankedJob(job.Priority, job.FocusStamp, job.Order, job));
+                _ranked.Sort();
+
+                foreach (var ranked in _ranked)
                 {
-                    int chunk = job.ClaimNext();
+                    int chunk = ranked.Job.ClaimNext();
                     if (chunk >= 0)
-                        return (job, chunk);
+                    {
+                        _ranked.Clear();
+                        return (ranked.Job, chunk);
+                    }
                 }
+
+                _ranked.Clear();
 
                 Monitor.Wait(_gate, TimeSpan.FromSeconds(1));
             }
         }
+    }
+}
+
+/// <summary>A job as <see cref="AnalysisWorkers"/> ranks it, with the keys it's ranked by read once: the most wanted first.</summary>
+internal readonly record struct RankedJob(AnalysisPriority Priority, long FocusStamp, long Order, AnalysisJob Job) : IComparable<RankedJob>
+{
+    public int CompareTo(RankedJob other)
+    {
+        int byPriority = ((int)Priority).CompareTo((int)other.Priority);
+        if (byPriority != 0)
+            return byPriority;
+
+        int byFocus = other.FocusStamp.CompareTo(FocusStamp);
+        return byFocus != 0 ? byFocus : Order.CompareTo(other.Order);
     }
 }
 
