@@ -864,9 +864,11 @@ Acceptance criteria:
    - *Settled in CM3:* in either view, what a press would take hold of is marked as the pointer
      passes over it: a note and its sustain's tail ringed in the theme's accent, a tempo or
      time-signature change's line across the lanes and its margin row lit, and a phrase rail bar's
-     outline; what the erase tool would take away stays in its red. The marks follow what a drag
-     would do, so a press that draws instead, selects a range or is the Loop or Sync tool's shows
-     none.
+     outline; what the erase tool would take away stays in its red. The sustained note is told
+     apart by which part the pointer is over: the gem a press would move is marked strongly and its
+     tail faintly, and over the tail the other way round, so a click that would drag the sustain's
+     end is clear from one that would move the note. The marks follow what a drag would do, so a
+     press that draws instead, selects a range or is the Loop or Sync tool's shows none.
 2. **Overview strip** along the edge. It shows the whole song: sections, note density, star power,
    solos, lint marks and the current view, and clicking or dragging it jumps there. *Settled in
    CM2:* it's the timeline along the Editor's bottom, which already spans the song. It shows the

@@ -224,7 +224,7 @@ namespace ChartBuilder.Controls.Editing
         // What's drawn every frame that would otherwise be made every frame: the pens in the accent, as of which accent,
         // a short sustain's outline's pen by colour, and the chords whose forcing marks are drawn.
         private (IBrush Accent, IPen Selected, IPen Cursor, IPen Focus)? _accentPens;
-        private (IBrush Accent, IBrush Brush, IPen Pen)? _hoverMarks;
+        private (IBrush Accent, IBrush Strong, IPen StrongPen, IBrush Faint, IPen FaintPen)? _hoverMarks;
         private readonly Dictionary<Color, IPen> _shortTailPens = [];
         private readonly HashSet<long> _flagged = [];
 
@@ -2914,10 +2914,11 @@ namespace ChartBuilder.Controls.Editing
 
         /// <summary>
         /// The note under the pointer that a press would grab, and drag to move it or its sustain: its gem or bar ringed
-        /// and its tail lit, in the accent, so the hover says what a click takes hold of. None while a press goes on, over
-        /// the phrase rail, where the Loop or Sync tool's press wins, or where a press does something else, such as with
-        /// Alt selecting a time range. On a perspective highway the gem stands up, in the layer above (PaintGemMarks),
-        /// and only its tail lies here, on the plane.
+        /// and its tail lit, in the accent. Which part the pointer is over is marked strongly, and the other faintly, so
+        /// it's clear whether a click on the gem would move the note or one on its sustain would drag the sustain's end
+        /// instead. None while a press goes on, over the phrase rail, where the Loop or Sync tool's press wins, or where
+        /// a press does something else, such as with Alt selecting a time range. On a perspective highway the gem stands
+        /// up, in the layer above (PaintGemMarks), and only its tail lies here, on the plane.
         /// </summary>
         /// <param name="upright">Whether to draw the gem's mark standing up from the plane, rather than flat.</param>
         private void DrawNoteHover(DrawingContext context, EditorSession session, ChartTrackKey key, LaneProjection projection, LaneSlots slots, bool upright)
@@ -2926,11 +2927,22 @@ namespace ChartBuilder.Controls.Editing
                 return;
             if (!session.Tools.GrabsNote(point, ModifiersOf(_keys)) || session.TrackOf(point.Track) is not { } track)
                 return;
+            var hit = session.Tools.HitTest(point)!.Value;
 
-            // The tail lies on the plane while the gem stands up; a flat highway marks both here.
-            var marks = HoverMarks();
-            DrawNoteMark(context, session, key, track, session.Tools.HitTest(point)!.Value.Note, projection, slots, marks.Brush, marks.Pen,
-                upright ? NoteMarkPart.Gem : _camera is null ? NoteMarkPart.All : NoteMarkPart.Tail, upright);
+            // A press on the gem moves the note; one on the sustain drags its end. The one over the pointer is marked
+            // strongly, and the other faintly, so the hover tells the two apart.
+            var gemMark = HoverMarks(strong: !hit.IsTail);
+            var tailMark = HoverMarks(strong: hit.IsTail);
+            if (!upright)
+            {
+                // The tail lies on the plane; a flat highway marks the gem here too.
+                DrawNoteMark(context, session, key, track, hit.Note, projection, slots, tailMark.Brush, tailMark.Pen, NoteMarkPart.Tail, upright: false);
+                if (_camera is null)
+                    DrawNoteMark(context, session, key, track, hit.Note, projection, slots, gemMark.Brush, gemMark.Pen, NoteMarkPart.Gem, upright: false);
+                return;
+            }
+
+            DrawNoteMark(context, session, key, track, hit.Note, projection, slots, gemMark.Brush, gemMark.Pen, NoteMarkPart.Gem, upright: true);
         }
 
         /// <summary>
@@ -2953,7 +2965,7 @@ namespace ChartBuilder.Controls.Editing
                 return;
             }
 
-            var marks = HoverMarks();
+            var marks = HoverMarks(strong: true);
             double along = projection.AlongOf(session.AudioAt(tick));
             double across1 = projection.LaneFrom, across2 = projection.LaneFrom + (projection.LaneSize * projection.Slots.Slots.Count);
             Line(context, marks.Pen, At(along, across1), At(along, across2));
@@ -2979,7 +2991,7 @@ namespace ChartBuilder.Controls.Editing
             if (session.Tool == EditorTool.Erase && (_keys & KeyModifiers.Shift) == 0)
                 return;
 
-            var marks = HoverMarks();
+            var marks = HoverMarks(strong: true);
             if (PhraseRail.HitTest(part, point) is { } phrase && IndexOf(rows, PhraseRail.RowOf(part.Kind, phrase.Phrase.Kind)) is var row and >= 0)
             {
                 var (across1, across2) = PhraseRowOf(projection, rows.Count, row);
@@ -3370,18 +3382,22 @@ namespace ChartBuilder.Controls.Editing
         }
 
         /// <summary>
-        /// What the hover of the lanes is marked in: a faint wash and a ring in the accent, made again only when the
-        /// accent changes, so what a press would take hold of is drawn over in it.
+        /// What the hover of the lanes is marked in, made again only when the accent changes: a strong wash and a wide
+        /// ring for the part of a note a press would take hold of, and a faint wash and thin ring for its other part, so
+        /// it's clear whether a click would move the note or drag its sustain.
         /// </summary>
-        private (IBrush Brush, IPen Pen) HoverMarks()
+        private (IBrush Brush, IPen Pen) HoverMarks(bool strong)
         {
             var accent = AccentBrush ?? DefaultAccentBrush;
             if (_hoverMarks is { } known && ReferenceEquals(known.Accent, accent))
-                return (known.Brush, known.Pen);
+                return strong ? (known.Strong, known.StrongPen) : (known.Faint, known.FaintPen);
             uint color = (accent as ISolidColorBrush)?.Color.ToUInt32() ?? 0xFF7CB4FF;
-            (IBrush, IBrush, IPen) made = (accent, _gems.Brush(HighwayPalette.WithAlpha(Color.FromUInt32(color), 0x30)), _gems.Pen(Color.FromUInt32(color), 2));
+            var accentColor = Color.FromUInt32(color);
+            var made = (accent,
+                _gems.Brush(HighwayPalette.WithAlpha(accentColor, 0x30)), _gems.Pen(accentColor, 2),
+                _gems.Brush(HighwayPalette.WithAlpha(accentColor, 0x12)), _gems.Pen(accentColor, 1));
             _hoverMarks = made;
-            return (made.Item2, made.Item3);
+            return strong ? (made.Item2, made.Item3) : (made.Item4, made.Item5);
         }
 
         /// <summary>
