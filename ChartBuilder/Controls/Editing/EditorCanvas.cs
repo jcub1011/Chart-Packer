@@ -2925,24 +2925,23 @@ namespace ChartBuilder.Controls.Editing
         {
             if (_hover is not { } hover || _isPressed || PointAt(hover) is not { Lane: not null } point || point.Rail is not null)
                 return;
-            if (!session.Tools.GrabsNote(point, ModifiersOf(_keys)) || session.TrackOf(point.Track) is not { } track)
+            if (session.Tools.GrabAt(point, ModifiersOf(_keys)) is not { Note: { } note } grab || session.TrackOf(point.Track) is not { } track)
                 return;
-            var hit = session.Tools.HitTest(point)!.Value;
 
             // A press on the gem moves the note; one on the sustain drags its end. The one over the pointer is marked
             // strongly, and the other faintly, so the hover tells the two apart.
-            var gemMark = HoverMarks(strong: !hit.IsTail);
-            var tailMark = HoverMarks(strong: hit.IsTail);
+            var gemMark = HoverMarks(strong: !grab.IsTail);
+            var tailMark = HoverMarks(strong: grab.IsTail);
             if (!upright)
             {
                 // The tail lies on the plane; a flat highway marks the gem here too.
-                DrawNoteMark(context, session, key, track, hit.Note, projection, slots, tailMark.Brush, tailMark.Pen, NoteMarkPart.Tail, upright: false);
+                DrawNoteMark(context, session, key, track, note, projection, slots, tailMark.Brush, tailMark.Pen, NoteMarkPart.Tail, upright: false);
                 if (_camera is null)
-                    DrawNoteMark(context, session, key, track, hit.Note, projection, slots, gemMark.Brush, gemMark.Pen, NoteMarkPart.Gem, upright: false);
+                    DrawNoteMark(context, session, key, track, note, projection, slots, gemMark.Brush, gemMark.Pen, NoteMarkPart.Gem, upright: false);
                 return;
             }
 
-            DrawNoteMark(context, session, key, track, hit.Note, projection, slots, gemMark.Brush, gemMark.Pen, NoteMarkPart.Gem, upright: true);
+            DrawNoteMark(context, session, key, track, note, projection, slots, gemMark.Brush, gemMark.Pen, NoteMarkPart.Gem, upright: true);
         }
 
         /// <summary>
@@ -2969,6 +2968,7 @@ namespace ChartBuilder.Controls.Editing
             double along = projection.AlongOf(session.AudioAt(tick));
             double across1 = projection.LaneFrom, across2 = projection.LaneFrom + (projection.LaneSize * projection.Slots.Slots.Count);
             Line(context, marks.Pen, At(along, across1), At(along, across2));
+            // On a perspective highway the labels stand up off the plane, so there's no margin row for the wash to sit behind.
             if (_camera is not null)
                 return;
 
@@ -2982,28 +2982,29 @@ namespace ChartBuilder.Controls.Editing
         /// <summary>
         /// The bar in the phrase rail that a press would take hold of, a phrase or a disco flip section, outlined in the
         /// accent wherever the pointer is over it, so the hover shows what a drag moves or resizes. None where a press
-        /// erases it instead, whose red already marks it, nor with a press outside the rail.
+        /// does something else (<see cref="EditorTools.GrabAt"/>): erases it, whose red already marks it, does nothing
+        /// with the Loop tool's press, or takes a selected bar out of the selection with Shift; nor with a press outside
+        /// the rail.
         /// </summary>
         private void DrawRailHover(DrawingContext context, EditorSession session, ChartTrackKey key, EditablePart part, IReadOnlyList<RailKind> rows, LaneProjection projection)
         {
             if (_hover is not { } hover || _isPressed || PointAt(hover) is not { Rail: not null, Lane: null } point)
                 return;
-            if (session.Tool == EditorTool.Erase && (_keys & KeyModifiers.Shift) == 0)
+            if (session.Tools.GrabAt(point, ModifiersOf(_keys)) is not { } grab)
                 return;
 
             var marks = HoverMarks(strong: true);
-            if (PhraseRail.HitTest(part, point) is { } phrase && IndexOf(rows, PhraseRail.RowOf(part.Kind, phrase.Phrase.Kind)) is var row and >= 0)
+            if (grab.Phrase is { } phrase && IndexOf(rows, PhraseRail.RowOf(part.Kind, phrase.Kind)) is var row and >= 0)
             {
                 var (across1, across2) = PhraseRowOf(projection, rows.Count, row);
-                context.DrawRectangle(marks.Brush, marks.Pen, BoxOf(projection, session, phrase.Phrase, across1, across2).Inflate(1), 2, 2);
+                context.DrawRectangle(marks.Brush, marks.Pen, BoxOf(projection, session, phrase, across1, across2).Inflate(1), 2, 2);
                 return;
             }
 
-            if (PhraseRail.HitTestDiscoFlip(point.Track.Difficulty, session.DiscoFlipRangesOf(point.Track), point) is { } flip
-                && IndexOf(rows, RailKind.DiscoFlip) is var flipRow and >= 0)
+            if (grab.DiscoFlip is { } section && IndexOf(rows, RailKind.DiscoFlip) is var flipRow and >= 0)
             {
                 var (across1, across2) = PhraseRowOf(projection, rows.Count, flipRow);
-                var range = flip.Section.Range;
+                var range = section.Range;
                 double start = projection.AlongOf(session.AudioAt(range.Tick));
                 double end = range.EndTick is { } endTick ? projection.AlongOf(session.AudioAt(endTick)) : projection.AlongOf(projection.End);
                 if (Math.Abs(end - start) < 2)

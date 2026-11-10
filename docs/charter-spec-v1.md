@@ -863,7 +863,7 @@ Acceptance criteria:
    a switch keeps.
    - *Settled in CM3:* in either view, what a press would take hold of is marked as the pointer
      passes over it: a note and its sustain's tail ringed in the theme's accent, a tempo or
-     time-signature change's line across the lanes and its margin row lit, and a phrase rail bar's
+     time-signature change's line across the lanes and, on a flat highway, its margin row lit, and a phrase rail bar's
      outline; what the erase tool would take away stays in its red. The sustained note is told
      apart by which part the pointer is over: the gem a press would move is marked strongly and its
      tail faintly, and over the tail the other way round, so a click that would drag the sustain's
