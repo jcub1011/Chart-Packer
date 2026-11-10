@@ -38,6 +38,7 @@ namespace ChartBuilder.ViewModels
             _dock = dock;
             Lane = lane;
             View = dock.Editor?.DefaultView ?? LaneView.Highway;
+            Perspective = lane.Perspective ?? dock.Editor?.DefaultPerspective ?? false;
             LookAhead = EditorViewport.ClampLookAhead(lane.LookAhead ?? dock.Editor?.DefaultLookAhead ?? 2);
             PixelsPerSecond = HighwayPixelsPerSecond.Clamp(lane.PixelsPerSecond ?? dock.Editor?.DefaultPixelsPerSecond ?? HighwayPixelsPerSecond.Default);
             LengthMode = dock.Editor?.LengthMode ?? HighwayLengthMode.PixelsPerSecond;
@@ -80,12 +81,27 @@ namespace ChartBuilder.ViewModels
 
         /// <summary>How the lane draws the song: a vertical highway or a horizontal timeline. <c>V</c> switches it.</summary>
         [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(IsTimeline), nameof(ViewToolTip), nameof(ShowsHighway), nameof(ShowsTimeline))]
+        [NotifyPropertyChangedFor(nameof(IsTimeline), nameof(IsPerspective), nameof(IsFlatHighway), nameof(ViewToolTip), nameof(ShowsHighway), nameof(ShowsTimeline))]
         public partial LaneView View { get; set; }
+
+        /// <summary>
+        /// Whether a highway is tilted back in perspective, with its notes standing up on it as in the games, rather than flat.
+        /// Kept with the lanes' layout. A timeline has none, so it only counts while the lane is a highway: see <see cref="IsPerspective"/>.
+        /// </summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(IsPerspective), nameof(IsFlatHighway), nameof(ViewToolTip))]
+        public partial bool Perspective { get; set; }
 
         public bool IsTimeline => View == LaneView.Timeline;
 
-        public string ViewToolTip => IsTimeline ? Strings.LaneShowHighwayToolTip : Strings.LaneShowTimelineToolTip;
+        /// <summary>Whether the lane is a highway in perspective.</summary>
+        public bool IsPerspective => Perspective && !IsTimeline;
+
+        /// <summary>Whether the lane is a highway drawn flat.</summary>
+        public bool IsFlatHighway => !Perspective && !IsTimeline;
+
+        /// <summary>What the view button does next: <c>V</c> steps a lane from a flat highway to perspective, to a timeline, and back.</summary>
+        public string ViewToolTip => IsTimeline ? Strings.LaneShowHighwayToolTip : IsPerspective ? Strings.LaneShowTimelineToolTip : Strings.LaneShowPerspectiveToolTip;
 
         /// <summary>
         /// How many seconds of the song the lane shows beyond its strike line: the further, the slower the notes go by.
@@ -126,7 +142,10 @@ namespace ChartBuilder.ViewModels
         /// How far ahead of its strike line the lane shows now, in seconds: its <see cref="LookAhead"/>, or in pixels per second what
         /// the lane's length in pixels makes of its <see cref="PixelsPerSecond"/>.
         /// </summary>
-        public double ShownLookAhead => Length.LookAheadFor(_extentPixels * (1 - EditorViewport.StrikeFraction));
+        public double ShownLookAhead => Length.LookAheadFor(_extentPixels * (1 - StrikeFraction));
+
+        /// <summary>How far from its strike end the lane's strike line is, as a fraction of its length: a quarter of the way, or in perspective close to the bottom.</summary>
+        public double StrikeFraction => IsPerspective ? EditorViewport.PerspectiveStrikeFraction : EditorViewport.StrikeFraction;
 
         /// <summary>
         /// Says how long the lane's time axis is, in pixels, as its canvas is laid out. In pixels per second that changes how far ahead
@@ -160,6 +179,8 @@ namespace ChartBuilder.ViewModels
                     LookAhead = EditorViewport.ClampLookAhead(editor.DefaultLookAhead);
                 if (layoutLane.PixelsPerSecond is null)
                     PixelsPerSecond = editor.DefaultPixelsPerSecond;
+                if (layoutLane.Perspective is null)
+                    Perspective = editor.DefaultPerspective;
                 LengthMode = editor.LengthMode;
             }
             finally
@@ -260,9 +281,25 @@ namespace ChartBuilder.ViewModels
                 editor.Session.Execute(new AddVocalPart(vocal));
         }
 
-        /// <summary>Switches the lane between highway and timeline (<c>V</c>).</summary>
+        /// <summary>Steps the lane from a flat highway to a highway in perspective, to a timeline, and back to the flat highway (<c>V</c>).</summary>
         [RelayCommand]
-        public void ToggleView() => View = IsTimeline ? LaneView.Highway : LaneView.Timeline;
+        public void ToggleView()
+        {
+            if (IsTimeline)
+            {
+                Perspective = false;
+                View = LaneView.Highway;
+            }
+            else if (!Perspective)
+            {
+                Perspective = true;
+            }
+            else
+            {
+                Perspective = false;
+                View = LaneView.Timeline;
+            }
+        }
 
         /// <summary>Shows <paramref name="difficulty"/> of the lane's part (the header's letters, Ctrl+1–4).</summary>
         public void ShowDifficulty(ChartDifficulty difficulty)
@@ -415,7 +452,22 @@ namespace ChartBuilder.ViewModels
         partial void OnGhostChanged(ChartDifficulty? value) => RefreshDifficulties();
 
         // The edit menu's shortcut keys follow the view: the arrows that shift a lane across differ between a highway and a timeline.
-        partial void OnViewChanged(LaneView value) => RefreshDifficulties();
+        partial void OnViewChanged(LaneView value)
+        {
+            RefreshDifficulties();
+            if (_isMade)
+                Editor?.RefreshVisibleSpan();
+        }
+
+        partial void OnPerspectiveChanged(bool value)
+        {
+            if (_isMade && _dock.Layout.Find(Lane.Id) is not null)
+                _dock.Layout.SetPerspective(Lane, value);
+
+            // The strike line moves, so what the lane shows ahead of it does too.
+            if (_isMade)
+                Editor?.RefreshVisibleSpan();
+        }
 
         partial void OnLookAheadChanged(double value)
         {

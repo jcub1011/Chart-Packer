@@ -130,7 +130,7 @@
         <!-- A text box's right-click menu, and selectable text's: Fluent's own (DefaultTextBoxContextFlyout and
              SelectableTextBlockContextFlyout, in its TextBox.xaml and SelectableTextBlock.xaml), with an icon on each item.
              Like Fluent's, one is shared by every text box, each item finding its own through $parent.
-             Copied from Avalonia.Themes.Fluent 12.1.4. FluentCopyTests fails when that version changes: compare these with
+             Copied from Avalonia.Themes.Fluent 12.1.6. FluentCopyTests fails when that version changes: compare these with
              the new version's, then change the version here. -->
         <MenuFlyout x:Key="TextBoxContextFlyout">
             <MenuItem Header="{DynamicResource StringTextFlyoutCutText}"

@@ -56,6 +56,11 @@ namespace ChartBuilder.ViewModels
         // On the UI thread: the mixes made, by source and whether by channel, and those being made; and a single stem's
         // waveforms, kept so each frame draws the same ones, whose pictures the painter keeps.
         private readonly Dictionary<(string Key, bool Stereo), Mixed> _mixes = [];
+
+        // The peaks PeaksOf found, kept for each thread that asks and filled again each time: a lane asks for its waveform each frame
+        // it's drawn, and what's found is used there and then.
+        [ThreadStatic]
+        private static List<(SongTrack Track, StemPeaks Peaks, int Version)>? t_found;
         private readonly Dictionary<(SongTrack Track, bool Stereo), (int Version, object Made)> _singles = [];
         private bool _changePending;
         private bool _disposed;
@@ -200,15 +205,18 @@ namespace ChartBuilder.ViewModels
             PeaksOf(tracks, channels, out _);
 
         /// <param name="had">How many of <paramref name="tracks"/> have any peaks read, by channel or not.</param>
+        /// <returns>A list kept for the calling thread, filled again by its next call: what it holds is to be used before then.</returns>
         private List<(SongTrack Track, StemPeaks Peaks, int Version)> PeaksOf(IReadOnlyList<SongTrack> tracks, bool channels, out int had)
         {
-            var found = new List<(SongTrack, StemPeaks, int)>(tracks.Count);
+            var found = t_found ??= [];
+            found.Clear();
             List<SongTrack>? missing = null;
             had = 0;
             lock (_lock)
             {
-                foreach (var track in tracks)
+                for (int i = 0; i < tracks.Count; i++)
                 {
+                    var track = tracks[i];
                     if (!_peaks.TryGetValue(track, out var peaks))
                         continue;
                     had++;
@@ -236,10 +244,33 @@ namespace ChartBuilder.ViewModels
             if (mixed is not null && (Same(mixed.Versions, peaks) || Same(mixed.Making, peaks)))
                 return mixed.Made is null ? null : mixed;
 
-            int[] versions = [.. peaks.Select(p => p.Version)];
             mixed ??= new Mixed();
-            mixed.Making = versions;
             _mixes[key] = mixed;
+            StartMix(mixed, peaks, stereo);
+            return mixed.Made is null ? null : mixed;
+
+            static bool Same(int[]? versions, List<(SongTrack Track, StemPeaks Peaks, int Version)> peaks)
+            {
+                if (versions is null || versions.Length != peaks.Count)
+                    return false;
+                for (int i = 0; i < versions.Length; i++)
+                {
+                    if (versions[i] != peaks[i].Version)
+                        return false;
+                }
+
+                return true;
+            }
+        }
+
+        /// <summary>
+        /// Mixes <paramref name="peaks"/> in the background into <paramref name="mixed"/>. Apart from <see cref="MixOf"/>, as what the
+        /// mixing closes over would be made on every call of that, the frames that find the mix made too.
+        /// </summary>
+        private void StartMix(Mixed mixed, List<(SongTrack Track, StemPeaks Peaks, int Version)> peaks, bool stereo)
+        {
+            int[] versions = [.. peaks.Select(p => p.Version)];
+            mixed.Making = versions;
             var stems = peaks.Select(p => new AudibleStem(p.Peaks, IsMuted: false, IsSolo: false)).ToList();
             var token = _cancel.Token;
             _ = Task.Run(() =>
@@ -255,20 +286,6 @@ namespace ChartBuilder.ViewModels
                     RequestChanged();
                 });
             }, token);
-            return mixed.Made is null ? null : mixed;
-
-            static bool Same(int[]? versions, List<(SongTrack Track, StemPeaks Peaks, int Version)> peaks)
-            {
-                if (versions is null || versions.Length != peaks.Count)
-                    return false;
-                for (int i = 0; i < versions.Length; i++)
-                {
-                    if (versions[i] != peaks[i].Version)
-                        return false;
-                }
-
-                return true;
-            }
         }
 
         /// <summary>Reads <paramref name="tracks"/>' peaks in the background, from the cache where it has them.</summary>

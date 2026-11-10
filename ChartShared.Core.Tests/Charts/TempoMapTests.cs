@@ -55,6 +55,32 @@ public sealed class TempoMapTests
     }
 
     [TestMethod]
+    public void BeatLinesIntoAListAreTheBeatLinesInOrder()
+    {
+        // Several signatures, one starting off the beat of the one before, and ranges that start and end inside them, before
+        // them all, past them all, and empty.
+        var map = new TempoMap(120, [], [new TimeSignature(0, 4, 4), new TimeSignature(500, 3, 8), new TimeSignature(800, 5, 4), new TimeSignature(1400, 7, 16)]);
+        var into = new List<BeatLine>();
+        foreach (var (from, to) in new (long, long)[] { (0, 2000), (130, 610), (500, 500), (801, 1399), (1500, 1700), (3000, 3100), (700, 600) })
+        {
+            into.Clear();
+            map.BeatLines(from, to, into);
+            Assert.AreSequenceEqual(map.BeatLines(from, to).ToList(), into, $"From {from} to {to}.");
+        }
+
+        // Across the first change: 4/4 beats of 120 ticks, then 3/8 beats of 60 from 500, a measure of its own.
+        into.Clear();
+        map.BeatLines(130, 610, into);
+        Assert.AreSequenceEqual([new BeatLine(240, false), new BeatLine(360, false), new BeatLine(480, true), new BeatLine(500, true), new BeatLine(560, false)], into);
+
+        // Added after what's there.
+        into.Clear();
+        into.Add(new BeatLine(-1, false));
+        map.BeatLines(0, 240, into);
+        Assert.AreSequenceEqual([new BeatLine(-1, false), new BeatLine(0, true), new BeatLine(120, false), new BeatLine(240, false)], into);
+    }
+
+    [TestMethod]
     public void StepNotesPutsATimeBetweenNotesOnTheNextOrTheOneBefore()
     {
         Assert.AreEqual(0.5, Map.StepNotes(0.2, 1, 1), 1e-9);

@@ -60,7 +60,7 @@ public sealed class RecoveryTests
         Assert.IsEmpty(differences, string.Join("; ", differences.Select(d => d.Description)));
         Assert.Contains("charter", recovered.Reverted, "Reverted changes stay reverted.");
         Assert.AreSequenceEqual(
-            new[] { "diff_bass", "sustain_cutoff_threshold" },
+            ["diff_bass", "sustain_cutoff_threshold"],
             [.. recovered.PendingChanges().Select(c => c.Key)],
             "The part added before the autosave still needs its rating, and the chart derives its cutoff.");
         Assert.IsEmpty(before.DiffTo(FolderSnapshot.Take(folder)), "Autosave never writes into the song.");

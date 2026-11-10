@@ -21,7 +21,7 @@ public sealed class LaneDockLayoutTests
         var layout = LaneDockLayout.CreateDefault();
 
         Assert.AreEqual("V(H(Guitar Bass Drums) Vocals)", Shape(layout));
-        Assert.AreSequenceEqual(new[] { 1.5, 0.5 }, [.. ((DockSplit)layout.Root!).Weights]);
+        Assert.AreSequenceEqual([1.5, 0.5], [.. ((DockSplit)layout.Root!).Weights]);
     }
 
     [TestMethod]
@@ -58,7 +58,7 @@ public sealed class LaneDockLayoutTests
 
         var row = (DockSplit)layout.Root!;
         Assert.AreEqual("H(Guitar Bass Vocals Drums)", Shape(layout));
-        Assert.AreSequenceEqual(new[] { 1.0, 0.5, 0.5, 1.0 }, Scaled(row.Weights, 3));
+        Assert.AreSequenceEqual([1.0, 0.5, 0.5, 1.0], Scaled(row.Weights, 3));
     }
 
     [TestMethod]
@@ -70,7 +70,7 @@ public sealed class LaneDockLayoutTests
 
         Assert.AreEqual("V(H(V(Guitar Drums) Bass) Vocals)", Shape(layout));
         var column = (DockSplit)((DockSplit)((DockSplit)layout.Root!).Children[0]).Children[0];
-        Assert.AreSequenceEqual(new[] { 1.0, 1.0 }, [.. column.Weights]);
+        Assert.AreSequenceEqual([1.0, 1.0], [.. column.Weights]);
     }
 
     [TestMethod]
@@ -125,7 +125,7 @@ public sealed class LaneDockLayoutTests
 
         var row = (DockSplit)layout.Root!;
         Assert.AreEqual("H(Guitar Vocals Drums)", Shape(layout));
-        Assert.AreSequenceEqual(new[] { 1.0, 0.5, 1.0 }, Scaled(row.Weights, 2.5));
+        Assert.AreSequenceEqual([1.0, 0.5, 1.0], Scaled(row.Weights, 2.5));
     }
 
     [TestMethod]
@@ -275,10 +275,10 @@ public sealed class LaneDockLayoutTests
         layout.SetWeights(row, [1, 2]);
         layout.SetWeights(row, [1, 0, 2]);
         layout.SetWeights(row, [1, double.NaN, 2]);
-        Assert.AreSequenceEqual(new[] { 1.0, 1.0, 1.0 }, [.. row.Weights]);
+        Assert.AreSequenceEqual([1.0, 1.0, 1.0], [.. row.Weights]);
 
         layout.SetWeights(row, [100, 200, 300]);
-        Assert.AreSequenceEqual(new[] { 0.5, 1.0, 1.5 }, [.. row.Weights]);
+        Assert.AreSequenceEqual([0.5, 1.0, 1.5], [.. row.Weights]);
     }
 
     [TestMethod]
@@ -341,6 +341,44 @@ public sealed class LaneDockLayoutTests
 
         Assert.IsNotNull(read);
         Assert.IsNull(Lane(read, Guitar).PixelsPerSecond);
+    }
+
+    [TestMethod]
+    public void ALanesPerspectiveIsKeptWithoutChangingTheLayout()
+    {
+        var layout = LaneDockLayout.CreateDefault();
+        int changes = 0;
+        layout.Changed += (_, _) => changes++;
+
+        layout.SetPerspective(Lane(layout, Bass), true);
+        layout.SetPerspective(Lane(layout, Drums), false);
+        string json = JsonSerializer.Serialize(layout.ToState(), LaneDockTestJsonContext.Default.LaneDockState);
+        var read = LaneDockLayout.FromState(JsonSerializer.Deserialize(json, LaneDockTestJsonContext.Default.LaneDockState))!;
+
+        Assert.AreEqual(0, changes, "Perspective isn't a change to the layout's shape.");
+        Assert.AreEqual(true, Lane(read, Bass).Perspective);
+        Assert.AreEqual(false, Lane(read, Drums).Perspective, "Flat is a choice, kept as one, not the default.");
+        Assert.IsNull(Lane(read, Guitar).Perspective, "A lane that was never set follows the editor's default.");
+    }
+
+    [TestMethod]
+    public void APerspectiveCanBePutBackToTheDefault()
+    {
+        var layout = LaneDockLayout.CreateDefault();
+        layout.SetPerspective(Lane(layout, Bass), true);
+        layout.SetPerspective(Lane(layout, Bass), null);
+
+        Assert.IsNull(Lane(layout, Bass).Perspective);
+    }
+
+    [TestMethod]
+    public void ALayoutSavedBeforePerspectiveStillLoadsWithTheDefault()
+    {
+        var read = LaneDockLayout.FromState(JsonSerializer.Deserialize("""{"Root":{"Instrument":"Guitar","Difficulty":"Expert","LookAhead":2.5,"PixelsPerSecond":150}}""", LaneDockTestJsonContext.Default.LaneDockState));
+
+        Assert.IsNotNull(read);
+        Assert.IsNull(Lane(read, Guitar).Perspective);
+        Assert.AreEqual(150, Lane(read, Guitar).PixelsPerSecond, "What it did have is kept.");
     }
 
     [TestMethod]
@@ -455,7 +493,7 @@ public sealed class LaneDockLayoutTests
         var read = LaneDockLayout.FromState(state)!;
 
         Assert.AreEqual("H(Guitar Bass Drums)", Shape(read));
-        Assert.AreSequenceEqual(new[] { 1.0, 1.0, 1.0 }, [.. ((DockSplit)read.Root!).Weights]);
+        Assert.AreSequenceEqual([1.0, 1.0, 1.0], [.. ((DockSplit)read.Root!).Weights]);
     }
 
     private static DockLane Lane(LaneDockLayout layout, LanePart part) => layout.Lanes.Single(l => l.Part == part);

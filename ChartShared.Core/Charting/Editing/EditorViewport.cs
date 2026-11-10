@@ -17,6 +17,12 @@ public sealed class EditorViewport
     /// <summary>How far from the strike end the strike line is: a quarter of the way (charter-spec C10 item 6).</summary>
     public const double StrikeFraction = 0.25;
 
+    /// <summary>
+    /// How far from the strike end the strike line is on a highway in perspective, as in the games: close to the bottom, where the
+    /// plane is nearest the eye, for the plane is long, and a quarter of the way up it would be far from the camera.
+    /// </summary>
+    public const double PerspectiveStrikeFraction = 0.10;
+
     /// <summary>The farthest from the strike end a strike line can be put: short of the far end, where the span before it would have no end.</summary>
     public const double MaxStrikeFraction = 0.95;
 
@@ -49,6 +55,15 @@ public sealed class EditorViewport
     {
         return SpanAhead(ClampLookAhead(lookAhead));
     }
+
+    /// <summary>As <see cref="SpanOf(double)"/>, for a lane that puts its strike line <paramref name="strikeFraction"/> of the way from its strike end.</summary>
+    public (double Start, double End) SpanOf(double lookAhead, double strikeFraction)
+    {
+        return SpanAhead(Cursor, ClampLookAhead(lookAhead), strikeFraction);
+    }
+
+    /// <summary>As <see cref="SpanAhead(double)"/>, for a lane that puts its strike line <paramref name="strikeFraction"/> of the way from its strike end.</summary>
+    public (double Start, double End) SpanAhead(double secondsAhead, double strikeFraction) => SpanAhead(Cursor, secondsAhead, strikeFraction);
 
     /// <summary>
     /// The span a lane shows with <paramref name="secondsAhead"/> beyond its strike line as it is, not kept to a look-ahead's

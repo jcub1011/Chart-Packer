@@ -109,7 +109,7 @@ public sealed class JsonSettingsFileTests
         file.Save(settings);
 
         // The lock file is deleted as it's let go on Windows only.
-        Assert.AreSequenceEqual(new[] { "settings.json" }, [.. _root.GetFiles().Select(f => f.Name).Where(n => !n.EndsWith(".lock", StringComparison.Ordinal))]);
+        Assert.AreSequenceEqual(["settings.json"], [.. _root.GetFiles().Select(f => f.Name).Where(n => !n.EndsWith(".lock", StringComparison.Ordinal))]);
     }
 
     [TestMethod]

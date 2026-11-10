@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Times and counts the allocations of the per-frame and per-audio-chunk paths playback runs, with BenchmarkDotNet,
+       on synthetic data only (see README.md). To compare two versions of the code, run it in each (compare.py). Never shipped. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- A copy of this tool run in an older tree sets -p:Before=true: it leaves out the benchmarks of what that tree lacks. -->
+    <DefineConstants Condition="'$(Before)' != 'true'">$(DefineConstants);AFTER</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BenchmarkDotNet" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\ChartShared.Audio\ChartShared.Audio.csproj" />
+    <ProjectReference Include="..\..\ChartShared.Core\ChartShared.Core.csproj" />
+  </ItemGroup>
+</Project>

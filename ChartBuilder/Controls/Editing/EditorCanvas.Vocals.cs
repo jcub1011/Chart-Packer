@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using Avalonia;
 using Avalonia.Input;
@@ -206,10 +207,10 @@ namespace ChartBuilder.Controls.Editing
                     DrawVocalPhrases(context, session, vocals, projection, fromTick, toTick);
                     DrawVocalPhraseStrip(context, session, vocal, projection, fromTick, toTick, size);
                     DrawSpans(context, session, projection);
-                    DrawBeats(context, session, session.TempoMap, projection, fromTick, toTick, size);
-                    DrawTempoMarkers(context, session, projection, fromTick, toTick, size);
-                    DrawTempoProposal(context, session, projection, size);
-                    DrawSections(context, session, projection, fromTick, toTick, size);
+                    DrawBeats(context, session, session.TempoMap, projection, fromTick, toTick, size, RailPass.Both);
+                    DrawTempoMarkers(context, session, projection, fromTick, toTick, size, RailPass.Both);
+                    DrawTempoProposal(context, session, projection, size, RailPass.Both);
+                    DrawSections(context, session, projection, fromTick, toTick, size, RailPass.Both);
                 }
                 else
                 {
@@ -323,8 +324,10 @@ namespace ChartBuilder.Controls.Editing
         {
             double tick = session.TickAt(session.Viewport.Cursor);
             double across1 = screen.LaneFrom, across2 = screen.LaneFrom + (screen.LaneSize * screen.Slots.Slots.Count);
-            foreach (var phrase in vocals.Phrases)
+            var phrases = vocals.Phrases;
+            for (int i = 0; i < phrases.Count; i++)
             {
+                var phrase = phrases[i];
                 if (phrase.Tick > tick)
                     break;
                 if (tick < phrase.Tick + phrase.Length)
@@ -370,8 +373,7 @@ namespace ChartBuilder.Controls.Editing
             var area = LyricsArea(size, screen);
             if (area.Height <= 0)
                 return;
-            string text = lyric.JoinsNext && !lyric.Text.EndsWith('-') ? lyric.Text + "-" : lyric.Text;
-            var label = Label(text, 11, VocalSingingBrushes[color]);
+            var label = Label(Joined(lyric), 11, VocalSingingBrushes[color]);
             var at = new Point(screen.AlongOf(session.AudioAt(lyric.Tick)) + 1, area.Y + Math.Max(0, (area.Height - label.Height) / 2));
             using (context.PushClip(area))
             {
@@ -415,8 +417,7 @@ namespace ChartBuilder.Controls.Editing
                 double along = projection.AlongOf(session.AudioAt(lyric.Tick));
                 if (along < reached)
                     continue;
-                string text = lyric.JoinsNext && !lyric.Text.EndsWith('-') ? lyric.Text + "-" : lyric.Text;
-                var label = Label(text, 11, brush);
+                var label = Label(Joined(lyric), 11, brush);
                 label.Draw(context, new Point(along + 1, area.Y + Math.Max(0, (area.Height - label.Height) / 2)));
                 reached = along + 1 + label.Width + 3;
             }
@@ -497,6 +498,32 @@ namespace ChartBuilder.Controls.Editing
         }
 
         /// <summary>The name of a C's pitch, with its octave as MIDI numbers them from middle C, C4 (60).</summary>
-        private static string PitchName(int pitch) => string.Create(CultureInfo.InvariantCulture, $"C{(pitch / 12) - 1}");
+        private static string PitchName(int pitch)
+        {
+            // Drawn for every C row every frame, so the names are made once.
+            int octave = (pitch / 12) - 1;
+            int slot = octave + 1;
+            if ((uint)slot >= (uint)OctaveNames.Length)
+                return string.Create(CultureInfo.InvariantCulture, $"C{octave}");
+            return OctaveNames[slot] ??= string.Create(CultureInfo.InvariantCulture, $"C{octave}");
+        }
+
+        private static readonly string?[] OctaveNames = new string?[12];
+
+        // The syllables made again with their hyphen, for the ones that join the next, kept so each frame doesn't build them anew.
+        private readonly Dictionary<string, string> _hyphenated = new(StringComparer.Ordinal);
+
+        /// <summary>A lyric as drawn: with a hyphen after it when it joins the next syllable.</summary>
+        private string Joined(VocalLaneLyric lyric)
+        {
+            string text = lyric.Text;
+            if (!lyric.JoinsNext || text.EndsWith('-'))
+                return text;
+            if (_hyphenated.TryGetValue(text, out var found))
+                return found;
+            if (_hyphenated.Count >= 1024)
+                _hyphenated.Clear();
+            return _hyphenated[text] = text + "-";
+        }
     }
 }

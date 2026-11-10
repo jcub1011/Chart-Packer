@@ -157,7 +157,7 @@
                                                   SelectionEnd="{Binding SelectionEnd}"
                                                   Position="{Binding Playback.PositionSeconds}"
                                                   IsPlaying="{Binding Playback.IsPlaying}"
-                                                  Clock="{Binding Playback.Clock}"
+                                                  Clock="{Binding Playback.DrawClock}"
                                                   Describe="{Binding Describe}"
                                                   LineBrush="{DynamicResource AccentTextBrush}"
                                                   TickBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"

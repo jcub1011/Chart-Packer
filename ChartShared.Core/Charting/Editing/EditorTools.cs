@@ -1018,9 +1018,9 @@ public sealed partial class EditorTools
     /// (charter-spec C6 item 7, <see cref="EditorSession.ShownLane(ChartTrackKey, EditableNote)"/>).
     /// </summary>
     public (EditableNote Note, bool IsTail)? HitTest(ChartPoint point) =>
-        _session.TrackOf(point.Track) is { } track ? HitTest(track, point, n => _session.ShownLane(point.Track, n)) : null;
+        _session.TrackOf(point.Track) is { } track ? HitTest(_session, track, point) : null;
 
-    private static (EditableNote Note, bool IsTail)? HitTest(EditableTrack track, ChartPoint point, Func<EditableNote, int> shownLane)
+    private static (EditableNote Note, bool IsTail)? HitTest(EditorSession session, EditableTrack track, ChartPoint point)
     {
         long from = (long)Math.Floor(point.Tick - point.Tolerance);
         long to = (long)Math.Ceiling(point.Tick + point.Tolerance);
@@ -1031,7 +1031,7 @@ public sealed partial class EditorTools
         foreach (var note in track.Notes.Between(Math.Max(0, from), to))
         {
             double distance = Math.Abs(note.Tick - point.Tick);
-            int drawn = shownLane(note);
+            int drawn = session.ShownLane(point.Track, note);
             if (drawn == point.Lane && distance < bestDistance)
                 (best, bestDistance) = (note, distance);
             else if (drawn == partner && distance < bestPartnerDistance)
@@ -1054,7 +1054,7 @@ public sealed partial class EditorTools
             var note = notes[i];
             if (note.Length <= EditableNote.PlainLength || note.Tick + note.Length < point.Tick)
                 continue;
-            int shown = shownLane(note);
+            int shown = session.ShownLane(point.Track, note);
             if (shown == lane || shown == partner)
                 return (note, true);
             if (shown == across && across != lane)

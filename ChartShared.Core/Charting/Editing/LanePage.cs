@@ -60,6 +60,7 @@ public sealed record LanePage(LaneProjection Screen, LaneProjection Page)
 
     // Slots are made again each time they're asked for, so they're the same when their lanes are.
     private static bool SameSlots(LaneSlots a, LaneSlots b) =>
-        a.Across == b.Across && a.Slots.SequenceEqual(b.Slots)
-        && (a.Shared is null ? b.Shared is null : b.Shared is not null && a.Shared.SequenceEqual(b.Shared));
+        ReferenceEquals(a, b)
+        || (a.Across == b.Across && a.Slots.SequenceEqual(b.Slots)
+            && (a.Shared is null ? b.Shared is null : b.Shared is not null && a.Shared.SequenceEqual(b.Shared)));
 }

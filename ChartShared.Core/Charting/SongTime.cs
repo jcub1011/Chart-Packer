@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Runtime.CompilerServices;
 
 namespace ChartShared.Core.Charting;
 
@@ -15,9 +16,23 @@ public static class SongTime
         ArgumentOutOfRangeException.ThrowIfNegative(decimals);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(decimals, 7);
 
-        string fraction = decimals > 0 ? @"\." + new string('f', decimals) : "";
-        return time.TotalHours >= 1
-            ? ((int)time.TotalHours).ToString(CultureInfo.InvariantCulture) + time.ToString(@"\:mm\:ss" + fraction, CultureInfo.InvariantCulture)
-            : ((int)time.TotalMinutes).ToString(CultureInfo.InvariantCulture) + time.ToString(@"\:ss" + fraction, CultureInfo.InvariantCulture);
+        // Written straight into the one string, as the playhead's time is many times a second while a song plays.
+        bool hours = time.TotalHours >= 1;
+        var text = new DefaultInterpolatedStringHandler(0, 2, CultureInfo.InvariantCulture);
+        text.AppendFormatted(hours ? (int)time.TotalHours : (int)time.TotalMinutes);
+        text.AppendFormatted(time, (hours ? HourFormats : MinuteFormats)[decimals]);
+        return text.ToStringAndClear();
+    }
+
+    // The rest of the time after its hours, or its minutes, with each number of decimals: worked out once, not for each time.
+    private static readonly string[] HourFormats = FormatsAfter(@"\:mm\:ss");
+    private static readonly string[] MinuteFormats = FormatsAfter(@"\:ss");
+
+    private static string[] FormatsAfter(string whole)
+    {
+        var formats = new string[8];
+        for (int decimals = 0; decimals < formats.Length; decimals++)
+            formats[decimals] = decimals > 0 ? whole + @"\." + new string('f', decimals) : whole;
+        return formats;
     }
 }

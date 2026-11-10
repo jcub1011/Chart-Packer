@@ -137,26 +137,95 @@ public sealed class TempoMap
     /// </summary>
     public const double OnNoteSeconds = 0.001;
 
+    /// <summary>
+    /// Adds the beat lines from <paramref name="fromTick"/> up to and including <paramref name="toTick"/> to <paramref name="into"/>, in
+    /// order: as <see cref="BeatLines(long, long)"/>, for a caller that draws them every frame and keeps the list.
+    /// </summary>
+    public void BeatLines(long fromTick, long toTick, List<BeatLine> into)
+    {
+        ArgumentNullException.ThrowIfNull(into);
+        var lines = new BeatLineCursor(this, fromTick, toTick);
+        while (lines.MoveNext())
+            into.Add(lines.Current);
+    }
+
     /// <summary>The beat lines from <paramref name="fromTick"/> up to and including <paramref name="toTick"/>, in order.</summary>
     public IEnumerable<BeatLine> BeatLines(long fromTick, long toTick)
     {
-        for (int i = 0; i < _signatures.Length; i++)
-        {
-            var signature = _signatures[i];
-            long end = i + 1 < _signatures.Length ? _signatures[i + 1].Tick : long.MaxValue;
-            if (end <= fromTick)
-                continue;
-            if (signature.Tick > toTick)
-                yield break;
+        var lines = new BeatLineCursor(this, fromTick, toTick);
+        while (lines.MoveNext())
+            yield return lines.Current;
+    }
 
-            long beat = Math.Max(1, Resolution * 4L / signature.Denominator);
-            long first = fromTick <= signature.Tick ? 0 : (fromTick - signature.Tick + beat - 1) / beat;
-            for (long k = first; ; k++)
+    /// <summary>
+    /// The beat lines from a tick up to and including another, one at a time, in order: what both <see cref="BeatLines(long, long)"/>
+    /// give, worked out in one place. Mutable: kept in a local and moved on there.
+    /// </summary>
+    private struct BeatLineCursor
+    {
+        private readonly TimeSignature[] _signatures;
+        private readonly long _resolution;
+        private readonly long _from;
+        private readonly long _to;
+
+        // The signature whose beats are being given, -1 before the first, and whether its beats are being given; its beat, the
+        // tick it ends at, and the next beat's number in it.
+        private int _signature;
+        private bool _inSignature;
+        private long _beat;
+        private long _end;
+        private long _k;
+
+        public BeatLineCursor(TempoMap map, long fromTick, long toTick)
+        {
+            _signatures = map._signatures;
+            _resolution = map.Resolution;
+            _from = fromTick;
+            _to = toTick;
+            _signature = -1;
+            _inSignature = false;
+            _beat = 0;
+            _end = 0;
+            _k = 0;
+            Current = default;
+        }
+
+        public BeatLine Current { get; private set; }
+
+        public bool MoveNext()
+        {
+            while (true)
             {
-                long tick = signature.Tick + (k * beat);
-                if (tick >= end || tick > toTick)
-                    break;
-                yield return new BeatLine(tick, k % signature.Numerator == 0);
+                if (_inSignature)
+                {
+                    var signature = _signatures[_signature];
+                    long tick = signature.Tick + (_k * _beat);
+                    if (tick < _end && tick <= _to)
+                    {
+                        Current = new BeatLine(tick, _k % signature.Numerator == 0);
+                        _k++;
+                        return true;
+                    }
+
+                    _inSignature = false;
+                }
+
+                // On to the next signature: past one that ends before the range, and none once one starts after it.
+                if (_signature + 1 >= _signatures.Length)
+                    return false;
+                var next = _signatures[++_signature];
+                _end = _signature + 1 < _signatures.Length ? _signatures[_signature + 1].Tick : long.MaxValue;
+                if (_end <= _from)
+                    continue;
+                if (next.Tick > _to)
+                {
+                    _signature = _signatures.Length;
+                    return false;
+                }
+
+                _beat = Math.Max(1, _resolution * 4L / next.Denominator);
+                _k = _from <= next.Tick ? 0 : (_from - next.Tick + _beat - 1) / _beat;
+                _inSignature = true;
             }
         }
     }

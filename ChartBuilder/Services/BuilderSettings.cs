@@ -136,6 +136,9 @@ namespace ChartBuilder.Services
         /// <summary>The view a lane opens in: a vertical highway or a horizontal timeline.</summary>
         public LaneView DefaultEditorView { get; set; } = LaneView.Highway;
 
+        /// <summary>Whether a highway lane opens in perspective, tilted back with its notes standing up on it as in the games, rather than flat.</summary>
+        public bool DefaultEditorPerspective { get; set; }
+
         /// <summary>How fast notes go by in a lane whose look-ahead hasn't been set: 1 shows <see cref="LookAheadAtSpeedOne"/> seconds beyond the strike line.</summary>
         public double EditorHighwaySpeed { get; set; } = 1;
 

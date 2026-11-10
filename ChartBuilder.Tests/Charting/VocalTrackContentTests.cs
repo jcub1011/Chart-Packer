@@ -77,7 +77,7 @@ public sealed class VocalTrackContentTests
     public void TheVelocitiesAndHowLyricsAreWrittenAreKept()
     {
         var content = VocalTrackContent.Of(Track("note-off events"));
-        Assert.AreSequenceEqual(new[] { 100, 90 }, [.. content.Notes.Select(n => n.Velocity)]);
+        Assert.AreSequenceEqual([100, 90], [.. content.Notes.Select(n => n.Velocity)]);
 
         var text = VocalTrackContent.Of(Track("text lyrics"));
         Assert.IsTrue(text.Lyrics.All(l => l.Type == VocalTrackContent.TextType));
@@ -106,7 +106,7 @@ public sealed class VocalTrackContentTests
         var edited = content.With(notes: [new(0, 960, 60), new(0, 100, 60), new(480, 240, 60), new(240, 240, 62)]);
 
         Assert.AreSequenceEqual(
-            new[] { new VocalNoteEvent(0, 480, 60), new VocalNoteEvent(240, 240, 62), new VocalNoteEvent(480, 240, 60) },
+            [new VocalNoteEvent(0, 480, 60), new VocalNoteEvent(240, 240, 62), new VocalNoteEvent(480, 240, 60)],
             [.. edited.Notes]);
         AssertSamePart(edited.ToPart(), VocalReader.ReadPart(edited.Write()));
     }
@@ -150,8 +150,8 @@ public sealed class VocalTrackContentTests
 
         Assert.IsTrue(result.IsValid, DescribeModel(result.ModelDifferences));
         var vocals = VocalReader.Read(result.Bytes, "notes.mid").Main!;
-        Assert.AreSequenceEqual(new[] { 62, 64 }, [.. vocals.Notes.Select(n => n.Pitch)]);
-        Assert.AreSequenceEqual(new[] { "Hel-", "lo" }, [.. vocals.Lyrics.Select(l => l.Text)]);
+        Assert.AreSequenceEqual([62, 64], [.. vocals.Notes.Select(n => n.Pitch)]);
+        Assert.AreSequenceEqual(["Hel-", "lo"], [.. vocals.Lyrics.Select(l => l.Text)]);
     }
 
     private static PassthroughTrack Track(string shape)

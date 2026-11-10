@@ -90,11 +90,11 @@ public sealed class VocalCommandTests
 
         Assert.IsTrue(result.IsValid, DescribeModel(result.ModelDifferences));
         var vocals = VocalReader.Read(result.Bytes, "notes.mid");
-        Assert.AreSequenceEqual(new[] { "PART VOCALS", "HARM1" }, [.. vocals.Parts.Select(p => p.TrackName)]);
+        Assert.AreSequenceEqual(["PART VOCALS", "HARM1"], [.. vocals.Parts.Select(p => p.TrackName)]);
         var main = vocals.Parts[0];
-        Assert.AreSequenceEqual(new[] { new VocalNote(0, 240, 60), new VocalNote(480, 240, 64) }, [.. main.Notes]);
-        Assert.AreSequenceEqual(new[] { new VocalLyric(0, "Hel-"), new VocalLyric(480, "lo") }, [.. main.Lyrics]);
-        Assert.AreSequenceEqual(new[] { new VocalPhrase(0, 960) }, [.. main.Phrases]);
+        Assert.AreSequenceEqual([new VocalNote(0, 240, 60), new VocalNote(480, 240, 64)], [.. main.Notes]);
+        Assert.AreSequenceEqual([new VocalLyric(0, "Hel-"), new VocalLyric(480, "lo")], [.. main.Lyrics]);
+        Assert.AreSequenceEqual([new VocalPhrase(0, 960)], [.. main.Phrases]);
     }
 
     private static VocalTrackContent Content(EditableChart chart, VocalTrack track) =>

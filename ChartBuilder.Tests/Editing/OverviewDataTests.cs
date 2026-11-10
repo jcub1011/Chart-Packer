@@ -215,7 +215,7 @@ public sealed class OverviewDataTests
         var overview = Overview(session, GuitarExpert);
 
         Assert.AreSequenceEqual(
-            new[] { session.AudioAt(0), session.AudioAt(960), session.AudioAt(1920) },
+            [session.AudioAt(0), session.AudioAt(960), session.AudioAt(1920)],
             overview.TempoChanges.ToList(),
             "A tempo marker and a time signature at one tick are one change.");
     }
