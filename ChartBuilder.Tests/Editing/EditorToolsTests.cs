@@ -1,4 +1,5 @@
 using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Commands;
 using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charts;
 using static ChartBuilder.Tests.Editing.EditorSessions;
@@ -358,6 +359,132 @@ public sealed class EditorToolsTests
         Assert.AreEqual(open, session.Tools.EraseTargetAt(At(session, 960, openLane, view))?.Note);
         Assert.IsNull(session.Tools.EraseTargetAt(At(session, 1200, openLane, view)), "An open note's tail is passed over.");
         Assert.IsNull(session.Tools.EraseTargetAt(At(session, 0, 3, view)));
+    }
+
+    [TestMethod]
+    [DynamicData(nameof(Views))]
+    public void TheHoverShowsWhatTheSelectToolPressWouldGrab(LaneView view)
+    {
+        // What the canvas rings in the accent before a click: a note or its sustain's tail.
+        var session = Of(Guitar());
+        var track = Expert(session);
+        var note = new EditableNote(0, 480, 2);
+        track.Notes.Add(note);
+        session.Tool = EditorTool.Select;
+
+        Assert.IsNotNull(session.Tools.GrabAt(At(session, 0, 2, view)), "The note's gem.");
+        Assert.IsNotNull(session.Tools.GrabAt(At(session, 300, 2, view)), "Its sustain's tail.");
+        Assert.IsNull(session.Tools.GrabAt(At(session, 240, 4, view)), "No note under the pointer; a press would drag a box.");
+        Assert.IsNull(session.Tools.GrabAt(At(session, 0, 2, view), EditorModifiers.Alt), "Alt selects a time range instead.");
+        Assert.IsNotNull(session.Tools.GrabAt(At(session, 0, 2, view), EditorModifiers.Control), "Ctrl still moves the note there, or stretches its sustain.");
+
+        session.Selection.Select(GuitarExpert, [note]);
+        Assert.IsNotNull(session.Tools.GrabAt(At(session, 0, 2, view), EditorModifiers.Alt), "Alt on a selected note stretches its sustain.");
+        Assert.IsNotNull(session.Tools.GrabAt(At(session, 0, 2, view), EditorModifiers.Control), "Ctrl on a selected note lengthens the selection's sustains.");
+    }
+
+    [TestMethod]
+    [DynamicData(nameof(Views))]
+    public void TheHoverShowsWhatThePlaceToolsPressWouldGrab(LaneView view)
+    {
+        var session = Of(Guitar());
+        var track = Expert(session);
+        track.Notes.Add(new EditableNote(0, 1, 2));
+        session.Tool = EditorTool.Place;
+
+        Assert.IsNull(session.Tools.GrabAt(At(session, 240, 2, view)), "An empty fret places a new note instead.");
+        Assert.IsNotNull(session.Tools.GrabAt(At(session, 0, 2, view)), "A note there already is moved, not placed over.");
+    }
+
+    [TestMethod]
+    [DynamicData(nameof(Views))]
+    public void ThePlaceToolGrabsOnlyTheNoteItsPressWouldPlaceOn(LaneView view)
+    {
+        var session = Of(Guitar());
+        var track = Expert(session);
+        var sustain = new EditableNote(0, 480, 2);
+        var open = new EditableNote(960, 1, Open);
+        track.Notes.Add(sustain);
+        track.Notes.Add(open);
+        session.Tool = EditorTool.Place;
+        int? openLane = view == LaneView.Highway ? 2 : Open;
+
+        Assert.AreEqual(new GrabTarget(sustain), session.Tools.GrabAt(At(session, 0, 2, view)), "The gem; a press moves it.");
+        Assert.IsNull(session.Tools.GrabAt(At(session, 300, 2, view)), "Inside the sustain a press places a note, as the grid has none there.");
+        Assert.IsNull(session.Tools.GrabAt(At(session, 100, 2, view, tolerance: 150)), "Near the note but off its grid step, a press places at the step.");
+        Assert.IsNull(session.Tools.GrabAt(At(session, 0, 2, view), EditorModifiers.Alt), "Alt places an open note, not on the fret's.");
+        Assert.AreEqual(new GrabTarget(open), session.Tools.GrabAt(At(session, 960, openLane, view), EditorModifiers.Alt), "Alt's open note is already there.");
+    }
+
+    [TestMethod]
+    [DynamicData(nameof(Views))]
+    public void AShiftPressOnASelectedNoteGrabsNothingButItsTail(LaneView view)
+    {
+        var session = Of(Guitar());
+        var track = Expert(session);
+        var note = new EditableNote(0, 480, 2);
+        track.Notes.Add(note);
+        session.Tool = EditorTool.Select;
+
+        Assert.IsNotNull(session.Tools.GrabAt(At(session, 0, 2, view), EditorModifiers.Shift), "Shift adds an unselected note, and a drag moves it.");
+        session.Selection.Select(GuitarExpert, [note]);
+        Assert.IsNull(session.Tools.GrabAt(At(session, 0, 2, view), EditorModifiers.Shift), "Shift takes a selected note out of the selection, with nothing to drag.");
+        Assert.IsNotNull(session.Tools.GrabAt(At(session, 300, 2, view), EditorModifiers.Shift), "Its tail is dragged whatever's selected.");
+    }
+
+    [TestMethod]
+    [DynamicData(nameof(Views))]
+    public void TheHoverShowsWhatAPressOnABarInTheRailWouldGrab(LaneView view)
+    {
+        var session = Of(Guitar());
+        var starPower = new Phrase(PhraseKind.StarPower, 0, 960);
+        new AddPhrase(ChartInstrument.Guitar, starPower).Apply(session.Chart);
+        var bar = RailAt(session, 600, PhraseKind.StarPower, view);
+
+        session.Tool = EditorTool.Select;
+        Assert.AreEqual(new GrabTarget(Phrase: starPower), session.Tools.GrabAt(bar), "A press selects the bar and drags it.");
+        Assert.IsNull(session.Tools.GrabAt(RailAt(session, 3000, PhraseKind.StarPower, view)), "An empty part of the rail draws a phrase instead.");
+
+        session.Selection.SelectPhrases(ChartInstrument.Guitar, [starPower]);
+        Assert.IsNull(session.Tools.GrabAt(bar, EditorModifiers.Shift), "Shift takes a selected bar out of the selection.");
+
+        session.Tool = EditorTool.Erase;
+        Assert.IsNull(session.Tools.GrabAt(bar), "The erase tool erases it, in its red.");
+
+        session.Tool = EditorTool.Loop;
+        Assert.IsNull(session.Tools.GrabAt(bar), "The Loop tool's press does nothing in the rail.");
+    }
+
+    [TestMethod]
+    [DynamicData(nameof(Views))]
+    public void TheHoverShowsWhatTheOtherToolsPressWouldGrab(LaneView view)
+    {
+        var session = Of(Guitar());
+        var track = Expert(session);
+        track.Notes.Add(new EditableNote(0, 1, 2));
+
+        foreach (var tool in (EditorTool[])[EditorTool.Erase, EditorTool.Phrase, EditorTool.Tempo, EditorTool.Sync])
+        {
+            session.Tool = tool;
+            Assert.IsNull(session.Tools.GrabAt(At(session, 0, 2, view)), $"{tool} doesn't grab the note.");
+        }
+
+        session.Tool = EditorTool.Erase;
+        Assert.IsNotNull(session.Tools.GrabAt(At(session, 0, 2, view), EditorModifiers.Shift), "Shift lends the erase tool the select tool's press.");
+    }
+
+    [TestMethod]
+    [DynamicData(nameof(Views))]
+    public void TheHoverShowsNothingWhenTheLoopOrSyncPressWins(LaneView view)
+    {
+        var session = Of(Guitar());
+        var track = Expert(session);
+        track.Notes.Add(new EditableNote(0, 1, 2));
+        session.Tool = EditorTool.Loop;
+        Assert.IsNull(session.Tools.GrabAt(At(session, 0, 2, view)), "The Loop tool's press wins over the note.");
+
+        session.Tool = EditorTool.Select;
+        Assert.IsNull(session.Tools.GrabAt(At(session, 0, 2, view), EditorModifiers.Control | EditorModifiers.Shift), "Ctrl+Shift holds the Sync tool's press instead.");
     }
 
     [TestMethod]

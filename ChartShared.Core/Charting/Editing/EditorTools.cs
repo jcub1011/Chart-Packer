@@ -1064,6 +1064,83 @@ public sealed partial class EditorTools
         return acrossTail is { } held ? (held, true) : null;
     }
 
+    /// <summary>
+    /// What a press at <paramref name="point"/> with <paramref name="modifiers"/> held would take hold of and drag, as
+    /// <see cref="Press"/> routes it, or null where it does something else: what the hover shows as can be grabbed. In the
+    /// lanes, a note, and whether it's the gem or the sustain's tail the press drags; in the phrase rail, a phrase's bar or
+    /// a disco flip section's. The Loop tool's press wins over every tool, as does the Sync tool's in the lanes. The Select
+    /// tool grabs the note under the pointer, but with Alt it selects a time range instead, unless the note is selected and
+    /// the press stretches its sustain; the Place tool grabs a note only where its press would place one, the note already
+    /// there; and the other tools' presses grab only while Shift lends them the select tool's. A Shift press on a note or
+    /// bar already selected takes it out of the selection, with nothing to drag.
+    /// </summary>
+    public GrabTarget? GrabAt(ChartPoint point, EditorModifiers modifiers = EditorModifiers.None)
+    {
+        if (LoopActive || _session.TrackOf(point.Track) is not { } track)
+            return null;
+        return point.Rail is not null ? GrabInRail(point, modifiers) : GrabInLanes(point, track, modifiers);
+    }
+
+    private GrabTarget? GrabInLanes(ChartPoint point, EditableTrack track, EditorModifiers modifiers)
+    {
+        if (point.Lane is null || IsSyncPress(modifiers))
+            return null;
+
+        bool shift = modifiers.HasFlag(EditorModifiers.Shift);
+        bool alt = modifiers.HasFlag(EditorModifiers.Alt);
+        var hit = HitTest(point);
+
+        // Ctrl or Alt on a selected note lengthens its sustain, and the selection's (PressSelected).
+        if ((alt || modifiers.HasFlag(EditorModifiers.Control)) && _session.Tool is EditorTool.Select or EditorTool.Place
+            && hit is { } held && _session.Selection.Contains(point.Track, held.Note))
+        {
+            return new GrabTarget(held.Note, held.IsTail);
+        }
+
+        // Shift lends the other tools the select tool's press, which starts the selection afresh the first time.
+        if (shift && _session.Tool != EditorTool.Select)
+            return GrabSelected(point, hit, shift: true, clears: !_shiftSelecting);
+        if (_session.Tool == EditorTool.Select)
+            return alt ? null : GrabSelected(point, hit, shift, clears: false);
+        if (_session.Tool != EditorTool.Place)
+            return null;
+
+        // The place tool grabs the note its press would place on, as PressPlace has it, and otherwise places one.
+        if (PlacedLane(track.Kind, point.Lane, point.Slots, alt) is not { } shown)
+            return null;
+        long tick = SnapTick(point.Tick, point.Track);
+        var note = PlacedNote(point.Track, track.Kind, tick, _session.StoredLane(point.Track, tick, shown));
+        return TryGetPlaced(track, note, out var there) ? new GrabTarget(there) : null;
+    }
+
+    // The select tool's press on the note under the pointer (PressSelect): a tail is dragged whatever's selected, and a gem
+    // is, unless Shift takes the note out of the selection. With clears, the selection was started afresh first.
+    private GrabTarget? GrabSelected(ChartPoint point, (EditableNote Note, bool IsTail)? hit, bool shift, bool clears)
+    {
+        if (hit is not { } found)
+            return null;
+        if (found.IsTail)
+            return new GrabTarget(found.Note, IsTail: true);
+        bool selected = _session.Selection.Contains(point.Track, found.Note);
+        return !shift || clears || !selected ? new GrabTarget(found.Note) : null;
+    }
+
+    // A press in the phrase rail with any tool but the erase tool (PressRail), which a Shift press toggles: a bar selected
+    // already is taken out of the selection rather than dragged.
+    private GrabTarget? GrabInRail(ChartPoint point, EditorModifiers modifiers)
+    {
+        bool shift = modifiers.HasFlag(EditorModifiers.Shift);
+        if ((_session.Tool == EditorTool.Erase && !shift) || Chart.PartOf(point.Track.Instrument) is not { } part)
+            return null;
+
+        var selection = _session.Selection;
+        if (PhraseRail.HitTestDiscoFlip(point.Track.Difficulty, _session.DiscoFlipRangesOf(point.Track), point) is { } flip)
+            return shift && selection.Contains(flip.Section) ? null : new GrabTarget(DiscoFlip: flip.Section);
+        if (PhraseRail.HitTest(part, point) is { } bar)
+            return shift && selection.Contains(part.Instrument, bar.Phrase) ? null : new GrabTarget(Phrase: bar.Phrase);
+        return null;
+    }
+
     private Gesture? PressSelect(ChartPoint point, bool shift)
     {
         var selection = _session.Selection;
