@@ -209,17 +209,18 @@ namespace ChartShared.UI.Views
 
         /// <summary>
         /// Fits <paramref name="window"/>, just shown, to its screen's working area when it's bigger, as a size saved on a
-        /// bigger screen may be, centered where it is: when <see cref="FitBeforeShow"/> took the wrong screen.
+        /// bigger screen may be, centered where it is: when <see cref="FitBeforeShow"/> took the wrong screen. The client is
+        /// compared, not the frame: Windows draws the resize borders invisible, so a window flush with an edge has a frame
+        /// that's wider than the working area and fits it in every way that shows.
         /// </summary>
         private static void FitToScreen(Window window)
         {
             if (window.WindowState != WindowState.Normal
-                || window.FrameSize is not { } frame
                 || WindowPlacement.CenterOf(window) is not { } center
                 || WindowPlacement.ScreenOf(window, center) is not { } screen)
                 return;
 
-            var size = PixelSize.FromSize(frame, window.RenderScaling);
+            var size = PixelSize.FromSize(window.ClientSize, window.RenderScaling);
             var area = screen.WorkingArea;
             if (size.Width > area.Width || size.Height > area.Height)
                 WindowPlacement.CenterOn(window, center);
