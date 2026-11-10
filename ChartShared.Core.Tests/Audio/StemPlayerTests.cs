@@ -961,9 +961,11 @@ public sealed class StemPlayerTests
 
         int clears = output.Clears;
         player.Seek(TimeSpan.FromSeconds(5));
+        // 5 s whether or not the playback thread has applied the seek yet.
         Assert.AreEqual(TimeSpan.FromSeconds(5), player.SmoothPosition);
         WaitUntil(() => output.Clears > clears && output.QueuedFrames >= QueueTarget);
-        clock.Advance(TimeSpan.FromMilliseconds(30));
+        // No clock advance before this read: whether the read above has already anchored the smooth clock depends on which
+        // thread got there first, so any advance between them would be counted or not by chance.
         Assert.AreEqual(5000, player.SmoothPosition.TotalMilliseconds, 1e-3);
         clock.Advance(TimeSpan.FromMilliseconds(5));
         Assert.AreEqual(5005, player.SmoothPosition.TotalMilliseconds, 1e-3);
