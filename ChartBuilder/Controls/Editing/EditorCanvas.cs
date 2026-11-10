@@ -224,6 +224,7 @@ namespace ChartBuilder.Controls.Editing
         // What's drawn every frame that would otherwise be made every frame: the pens in the accent, as of which accent,
         // a short sustain's outline's pen by colour, and the chords whose forcing marks are drawn.
         private (IBrush Accent, IPen Selected, IPen Cursor, IPen Focus)? _accentPens;
+        private (IBrush Accent, IBrush Brush, IPen Pen)? _hoverMarks;
         private readonly Dictionary<Color, IPen> _shortTailPens = [];
         private readonly HashSet<long> _flagged = [];
 
@@ -713,15 +714,19 @@ namespace ChartBuilder.Controls.Editing
             var lanes = LanesOf(screen, slots);
             using (context.PushClip(lanes))
             {
-                // On a perspective highway the place tool's ghost and the notes marked stand up, in the layer above (PaintGemMarks).
+                // On a perspective highway the place tool's ghost and the notes marked stand up, in the layer above (PaintGemMarks),
+                // as the note a press would grab does; only its tail lies on the plane.
                 if (_camera is null)
                     DrawHover(context, session, key, track, screen, slots, _gems);
+                DrawNoteHover(context, session, key, screen, slots, upright: false);
                 DrawSyncNotes(context, session, key, track, screen, slots, upright: false);
             }
 
             DrawEraseHover(context, session, key, track, part, rows, screen, slots, upright: false);
             DrawPhraseHover(context, session, key, part, rows, screen, slots);
             DrawTempoHover(context, session, screen, slots);
+            DrawTempoHoverMark(context, session, Bounds.Size, screen);
+            DrawRailHover(context, session, key, part, rows, screen);
             DrawLoopLine(context, session, screen, slots);
             DrawSyncLine(context, session, screen, slots);
             DrawSyncHover(context, session, key, screen, slots);
@@ -2908,6 +2913,94 @@ namespace ChartBuilder.Controls.Editing
         }
 
         /// <summary>
+        /// The note under the pointer that a press would grab, and drag to move it or its sustain: its gem or bar ringed
+        /// and its tail lit, in the accent, so the hover says what a click takes hold of. None while a press goes on, over
+        /// the phrase rail, where the Loop or Sync tool's press wins, or where a press does something else, such as with
+        /// Alt selecting a time range. On a perspective highway the gem stands up, in the layer above (PaintGemMarks),
+        /// and only its tail lies here, on the plane.
+        /// </summary>
+        /// <param name="upright">Whether to draw the gem's mark standing up from the plane, rather than flat.</param>
+        private void DrawNoteHover(DrawingContext context, EditorSession session, ChartTrackKey key, LaneProjection projection, LaneSlots slots, bool upright)
+        {
+            if (_hover is not { } hover || _isPressed || PointAt(hover) is not { Lane: not null } point || point.Rail is not null)
+                return;
+            if (!session.Tools.GrabsNote(point, ModifiersOf(_keys)) || session.TrackOf(point.Track) is not { } track)
+                return;
+
+            // The tail lies on the plane while the gem stands up; a flat highway marks both here.
+            var marks = HoverMarks();
+            DrawNoteMark(context, session, key, track, session.Tools.HitTest(point)!.Value.Note, projection, slots, marks.Brush, marks.Pen,
+                upright ? NoteMarkPart.Gem : _camera is null ? NoteMarkPart.All : NoteMarkPart.Tail, upright);
+        }
+
+        /// <summary>
+        /// A tempo or time signature change a press of the Tempo tool would drag: its line across the lanes lit in the
+        /// accent, and the margin's row at its tick washed with it, so the hover shows what a press takes hold of. None
+        /// where the change can't move, with Shift held, in the phrase rail, with the Sync tool's press, or where a press
+        /// would add a marker instead.
+        /// </summary>
+        private void DrawTempoHoverMark(DrawingContext context, EditorSession session, Size size, LaneProjection projection)
+        {
+            if (_hover is not { } hover || _isPressed || session.Tool != EditorTool.Tempo || (_keys & KeyModifiers.Shift) != 0
+                || session.Tools.IsSyncPress(ModifiersOf(_keys)))
+            {
+                return;
+            }
+
+            if (PointAt(hover) is not { Rail: null, Lane: not null } point || session.Tools.TempoChangeAt(point) is not { } tick
+                || !EditorTools.TempoChangeMoves(tick))
+            {
+                return;
+            }
+
+            var marks = HoverMarks();
+            double along = projection.AlongOf(session.AudioAt(tick));
+            double across1 = projection.LaneFrom, across2 = projection.LaneFrom + (projection.LaneSize * projection.Slots.Slots.Count);
+            Line(context, marks.Pen, At(along, across1), At(along, across2));
+            if (_camera is not null)
+                return;
+
+            // The margin's row at the change, behind its label.
+            var labels = LabelsArea(size, projection);
+            double margin1 = View == LaneView.Highway ? labels.Left : labels.Top;
+            double margin2 = View == LaneView.Highway ? labels.Right : labels.Bottom;
+            context.FillRectangle(marks.Brush, Box(along - 1.5, along + 1.5, margin1, margin2));
+        }
+
+        /// <summary>
+        /// The bar in the phrase rail that a press would take hold of, a phrase or a disco flip section, outlined in the
+        /// accent wherever the pointer is over it, so the hover shows what a drag moves or resizes. None where a press
+        /// erases it instead, whose red already marks it, nor with a press outside the rail.
+        /// </summary>
+        private void DrawRailHover(DrawingContext context, EditorSession session, ChartTrackKey key, EditablePart part, IReadOnlyList<RailKind> rows, LaneProjection projection)
+        {
+            if (_hover is not { } hover || _isPressed || PointAt(hover) is not { Rail: not null, Lane: null } point)
+                return;
+            if (session.Tool == EditorTool.Erase && (_keys & KeyModifiers.Shift) == 0)
+                return;
+
+            var marks = HoverMarks();
+            if (PhraseRail.HitTest(part, point) is { } phrase && IndexOf(rows, PhraseRail.RowOf(part.Kind, phrase.Phrase.Kind)) is var row and >= 0)
+            {
+                var (across1, across2) = PhraseRowOf(projection, rows.Count, row);
+                context.DrawRectangle(marks.Brush, marks.Pen, BoxOf(projection, session, phrase.Phrase, across1, across2).Inflate(1), 2, 2);
+                return;
+            }
+
+            if (PhraseRail.HitTestDiscoFlip(point.Track.Difficulty, session.DiscoFlipRangesOf(point.Track), point) is { } flip
+                && IndexOf(rows, RailKind.DiscoFlip) is var flipRow and >= 0)
+            {
+                var (across1, across2) = PhraseRowOf(projection, rows.Count, flipRow);
+                var range = flip.Section.Range;
+                double start = projection.AlongOf(session.AudioAt(range.Tick));
+                double end = range.EndTick is { } endTick ? projection.AlongOf(session.AudioAt(endTick)) : projection.AlongOf(projection.End);
+                if (Math.Abs(end - start) < 2)
+                    end = start + (View == LaneView.Highway ? -2 : 2);
+                context.DrawRectangle(marks.Brush, marks.Pen, Box(start, end, across1, across2).Inflate(1), 2, 2);
+            }
+        }
+
+        /// <summary>
         /// Where a press would start drawing, on the grid: a line across the lanes in the colour of the kind drawn, and a
         /// mark in its row of the rail. The Phrase tool draws where a press does in the lanes; the Select, Place and Phrase
         /// tools draw in an empty part of the rail, where the row's kind is drawn whatever's picked. None where a press does
@@ -3274,6 +3367,21 @@ namespace ChartBuilder.Controls.Editing
             (IBrush, IPen, IPen, IPen) made = (accent, new ImmutablePen(color, 2), new ImmutablePen(color, 1.5), new ImmutablePen(color, 1));
             _accentPens = made;
             return made;
+        }
+
+        /// <summary>
+        /// What the hover of the lanes is marked in: a faint wash and a ring in the accent, made again only when the
+        /// accent changes, so what a press would take hold of is drawn over in it.
+        /// </summary>
+        private (IBrush Brush, IPen Pen) HoverMarks()
+        {
+            var accent = AccentBrush ?? DefaultAccentBrush;
+            if (_hoverMarks is { } known && ReferenceEquals(known.Accent, accent))
+                return (known.Brush, known.Pen);
+            uint color = (accent as ISolidColorBrush)?.Color.ToUInt32() ?? 0xFF7CB4FF;
+            (IBrush, IBrush, IPen) made = (accent, _gems.Brush(HighwayPalette.WithAlpha(Color.FromUInt32(color), 0x30)), _gems.Pen(Color.FromUInt32(color), 2));
+            _hoverMarks = made;
+            return (made.Item2, made.Item3);
         }
 
         /// <summary>

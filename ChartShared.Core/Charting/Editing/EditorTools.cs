@@ -1064,6 +1064,37 @@ public sealed partial class EditorTools
         return acrossTail is { } held ? (held, true) : null;
     }
 
+    /// <summary>
+    /// Whether a press at <paramref name="point"/> with <paramref name="modifiers"/> held would take hold of the note
+    /// there and move it or its sustain, rather than do something else: what the hover of the lanes shows as can be
+    /// grabbed. The Loop tool's press wins over every tool, as does the Sync tool's; with the Select tool Alt selects a
+    /// time range instead, unless the note is selected and the press stretches its sustain, and the other tools' presses
+    /// only grab a note while Shift lends them the select tool's.
+    /// </summary>
+    public bool GrabsNote(ChartPoint point, EditorModifiers modifiers = EditorModifiers.None)
+    {
+        if (point.Lane is null || point.Rail is not null || LoopActive || IsSyncPress(modifiers))
+            return false;
+        if (HitTest(point) is not { } hit)
+            return false;
+
+        bool shift = modifiers.HasFlag(EditorModifiers.Shift);
+        bool alt = modifiers.HasFlag(EditorModifiers.Alt);
+        if (_session.Tool is EditorTool.Select or EditorTool.Place)
+        {
+            if (!modifiers.HasFlag(EditorModifiers.Control) && !alt)
+                return true;
+
+            // With Ctrl or Alt on one of the selected notes a drag lengthens its sustain; either way it's a grab.
+            // Otherwise the Select tool's Alt press selects a time range instead, and its Ctrl press and the Place
+            // tool's press still move the note there.
+            return _session.Selection.Contains(point.Track, hit.Note)
+                || !(alt && _session.Tool == EditorTool.Select);
+        }
+
+        return shift;
+    }
+
     private Gesture? PressSelect(ChartPoint point, bool shift)
     {
         var selection = _session.Selection;

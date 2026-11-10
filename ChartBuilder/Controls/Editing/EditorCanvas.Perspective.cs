@@ -197,6 +197,7 @@ namespace ChartBuilder.Controls.Editing
                 return;
 
             DrawHover(context, scene.Session, scene.Key, scene.Track, scene.Screen, scene.Slots, _upright);
+            DrawNoteHover(context, scene.Session, scene.Key, scene.Screen, scene.Slots, upright: true);
             DrawEraseHover(context, scene.Session, scene.Key, scene.Track, scene.Part, scene.Rows, scene.Screen, scene.Slots, upright: true);
             DrawSyncNotes(context, scene.Session, scene.Key, scene.Track, scene.Screen, scene.Slots, upright: true);
             if (PlaytestOf(scene.Key) is { } run)

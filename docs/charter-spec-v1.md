@@ -861,6 +861,12 @@ Acceptance criteria:
    *Settled in CM2:* each docked lane has its own view, and `V` switches the lane in focus. Every
    lane shares the cursor, selection and tool. Zoom is each lane's own look-ahead (C10 item 6), which
    a switch keeps.
+   - *Settled in CM3:* in either view, what a press would take hold of is marked as the pointer
+     passes over it: a note and its sustain's tail ringed in the theme's accent, a tempo or
+     time-signature change's line across the lanes and its margin row lit, and a phrase rail bar's
+     outline; what the erase tool would take away stays in its red. The marks follow what a drag
+     would do, so a press that draws instead, selects a range or is the Loop or Sync tool's shows
+     none.
 2. **Overview strip** along the edge. It shows the whole song: sections, note density, star power,
    solos, lint marks and the current view, and clicking or dragging it jumps there. *Settled in
    CM2:* it's the timeline along the Editor's bottom, which already spans the song. It shows the

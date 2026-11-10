@@ -362,6 +362,73 @@ public sealed class EditorToolsTests
 
     [TestMethod]
     [DynamicData(nameof(Views))]
+    public void TheHoverShowsWhatTheSelectToolPressWouldGrab(LaneView view)
+    {
+        // What the canvas rings in the accent before a click: a note or its sustain's tail.
+        var session = Of(Guitar());
+        var track = Expert(session);
+        var note = new EditableNote(0, 480, 2);
+        track.Notes.Add(note);
+        session.Tool = EditorTool.Select;
+
+        Assert.IsTrue(session.Tools.GrabsNote(At(session, 0, 2, view)), "The note's gem.");
+        Assert.IsTrue(session.Tools.GrabsNote(At(session, 300, 2, view)), "Its sustain's tail.");
+        Assert.IsFalse(session.Tools.GrabsNote(At(session, 240, 4, view)), "No note under the pointer; a press would drag a box.");
+        Assert.IsFalse(session.Tools.GrabsNote(At(session, 0, 2, view), EditorModifiers.Alt), "Alt selects a time range instead.");
+        Assert.IsTrue(session.Tools.GrabsNote(At(session, 0, 2, view), EditorModifiers.Control), "Ctrl still moves the note there, or stretches its sustain.");
+
+        session.Selection.Select(GuitarExpert, [note]);
+        Assert.IsTrue(session.Tools.GrabsNote(At(session, 0, 2, view), EditorModifiers.Alt), "Alt on a selected note stretches its sustain.");
+        Assert.IsTrue(session.Tools.GrabsNote(At(session, 0, 2, view), EditorModifiers.Control), "Ctrl on a selected note lengthens the selection's sustains.");
+    }
+
+    [TestMethod]
+    [DynamicData(nameof(Views))]
+    public void TheHoverShowsWhatThePlaceToolsPressWouldGrab(LaneView view)
+    {
+        var session = Of(Guitar());
+        var track = Expert(session);
+        track.Notes.Add(new EditableNote(0, 1, 2));
+        session.Tool = EditorTool.Place;
+
+        Assert.IsFalse(session.Tools.GrabsNote(At(session, 240, 2, view)), "An empty fret places a new note instead.");
+        Assert.IsTrue(session.Tools.GrabsNote(At(session, 0, 2, view)), "A note there already is moved, not placed over.");
+    }
+
+    [TestMethod]
+    [DynamicData(nameof(Views))]
+    public void TheHoverShowsWhatTheOtherToolsPressWouldGrab(LaneView view)
+    {
+        var session = Of(Guitar());
+        var track = Expert(session);
+        track.Notes.Add(new EditableNote(0, 1, 2));
+
+        foreach (var tool in (EditorTool[])[EditorTool.Erase, EditorTool.Phrase, EditorTool.Tempo, EditorTool.Sync])
+        {
+            session.Tool = tool;
+            Assert.IsFalse(session.Tools.GrabsNote(At(session, 0, 2, view)), $"{tool} doesn't grab the note.");
+        }
+
+        session.Tool = EditorTool.Erase;
+        Assert.IsTrue(session.Tools.GrabsNote(At(session, 0, 2, view), EditorModifiers.Shift), "Shift lends the erase tool the select tool's press.");
+    }
+
+    [TestMethod]
+    [DynamicData(nameof(Views))]
+    public void TheHoverShowsNothingWhenTheLoopOrSyncPressWins(LaneView view)
+    {
+        var session = Of(Guitar());
+        var track = Expert(session);
+        track.Notes.Add(new EditableNote(0, 1, 2));
+        session.Tool = EditorTool.Loop;
+        Assert.IsFalse(session.Tools.GrabsNote(At(session, 0, 2, view)), "The Loop tool's press wins over the note.");
+
+        session.Tool = EditorTool.Select;
+        Assert.IsFalse(session.Tools.GrabsNote(At(session, 0, 2, view), EditorModifiers.Control | EditorModifiers.Shift), "Ctrl+Shift holds the Sync tool's press instead.");
+    }
+
+    [TestMethod]
+    [DynamicData(nameof(Views))]
     public void ThePlaceToolCtrlDragsASelectedNoteToLengthenEachSustain(LaneView view)
     {
         // A disjoint chord and an extended sustain are both allowed (C5 item 3).
