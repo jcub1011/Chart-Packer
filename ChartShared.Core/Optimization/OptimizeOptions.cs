@@ -51,11 +51,20 @@ public sealed record MetadataCleanupOptions(
 
 /// <summary>Audio transcoding and stem mixdown settings.</summary>
 /// <param name="Enabled">Whether the strategy runs.</param>
-/// <param name="BitrateKbps">The bitrate of the Opus it writes, per file.</param>
-public sealed record AudioOptimizeOptions(bool Enabled = false, int BitrateKbps = 128)
+/// <param name="BitrateKbps">The bitrate of the Opus it writes, per stereo file; a mono file gets half.</param>
+public sealed record AudioOptimizeOptions(bool Enabled = false, int BitrateKbps = AudioOptimizeOptions.DefaultBitrateKbps)
 {
+    /// <summary>The default bitrate, 128 kbps per stereo stem: the Chart Packer export default (<c>OpusQuality.Music</c>).</summary>
+    public const int DefaultBitrateKbps = 128;
+
+    /// <summary>The "smaller" preset's bitrate, 80 kbps per stereo stem: SngCli's default.</summary>
+    public const int SmallerBitrateKbps = 80;
+
     /// <summary>Off, at 128 kbps.</summary>
     public static AudioOptimizeOptions Default { get; } = new();
+
+    /// <summary>Off, at the "smaller" preset's 80 kbps.</summary>
+    public static AudioOptimizeOptions Smaller { get; } = new(false, SmallerBitrateKbps);
 }
 
 /// <summary>Video recompression settings.</summary>

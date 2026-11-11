@@ -48,16 +48,51 @@ public static class OpusTranscoder
         ArgumentException.ThrowIfNullOrWhiteSpace(sourcePath);
         ArgumentException.ThrowIfNullOrWhiteSpace(targetPath);
 
-        string stem = Path.GetFileNameWithoutExtension(targetPath);
-        int stereoBps = Math.Clamp(bitrateKbps * 1000, 8000, 512000);
-
         using var source = AudioDecoder.Open(
             new FileStream(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read), sourcePath);
+
+        try
+        {
+            using var output = new FileStream(targetPath, FileMode.Create, FileAccess.Write, FileShare.None);
+            Transcode(source, output, bitrateKbps, sourcePath, progress, cancellationToken, Path.GetFileNameWithoutExtension(targetPath));
+        }
+        catch
+        {
+            TryDelete(targetPath);
+            throw;
+        }
+    }
+
+    /// <summary>Transcodes everything <paramref name="source"/> has from where it is to Ogg Opus written to <paramref name="output"/>.</summary>
+    /// <param name="source">The audio to transcode. Read, not disposed.</param>
+    /// <param name="output">Where the Ogg Opus stream is written, in order: it only has to be writable. Not disposed, and not deleted on failure.</param>
+    /// <param name="bitrateKbps">The bitrate in kbps per stereo stem (mono uses half).</param>
+    /// <param name="name">What the audio is called, for error messages.</param>
+    /// <param name="progress">Receives the transcode's fraction; may be <see langword="null"/>.</param>
+    /// <param name="stem">What progress reports call the audio; <paramref name="name"/>'s file name without its extension by default.</param>
+    /// <exception cref="InvalidDataException">The audio has no audio, is damaged, or can't be encoded.</exception>
+    /// <exception cref="IOException"><paramref name="output"/> can't be written.</exception>
+    /// <exception cref="OperationCanceledException">Transcoding was cancelled.</exception>
+    public static void Transcode(
+        IPcmSource source,
+        Stream output,
+        int bitrateKbps,
+        string name,
+        IProgress<TranscodeFileProgress>? progress = null,
+        CancellationToken cancellationToken = default,
+        string? stem = null)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(output);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+
+        stem ??= Path.GetFileNameWithoutExtension(name);
         if (source.Channels < 1)
-            throw new InvalidDataException($"'{sourcePath}' has no audio channels.");
+            throw new InvalidDataException($"'{name}' has no audio channels.");
 
         int channels = Math.Min(source.Channels, 2);
-        int bitrate = channels == 1 ? Math.Max(stereoBps / 2, 8000) : stereoBps;
+        // Widened before the multiply, so a huge request is clamped to the encoder's maximum rather than wrapping negative.
+        int bitrate = OpusBitrates.ForStereoBps((int)Math.Clamp((long)bitrateKbps * 1000, int.MinValue, int.MaxValue), channels);
 
         IOpusEncoder encoder;
         try
@@ -88,11 +123,8 @@ public static class OpusTranscoder
         long decodedFrames = 0;
         bool sourceEnded = false;
 
-        try
+        using (var writer = new OggOpusWriter(output, channels, lookahead, source.SampleRate))
         {
-            using var output = new FileStream(targetPath, FileMode.Create, FileAccess.ReadWrite, FileShare.None);
-            using var writer = new OggOpusWriter(output, channels, lookahead, source.SampleRate);
-
             Report(0);
             while (!sourceEnded)
             {
@@ -139,7 +171,7 @@ public static class OpusTranscoder
             }
 
             if (validFrames == 0)
-                throw new InvalidDataException($"'{sourcePath}' has no audio.");
+                throw new InvalidDataException($"'{name}' has no audio.");
 
             // The encoder holds back its lookahead: flush it with silence so every valid
             // frame comes out, then trim the flush (and the padding) with the final granule.
@@ -155,11 +187,6 @@ public static class OpusTranscoder
 
             writer.Finish(lookahead + validFrames);
             Report(1);
-        }
-        catch
-        {
-            TryDelete(targetPath);
-            throw;
         }
 
         void Report(double fraction) => progress?.Report(new TranscodeFileProgress(stem, Math.Clamp(fraction, 0, 1)));
