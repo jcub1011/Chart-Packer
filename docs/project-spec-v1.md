@@ -135,7 +135,13 @@ through `IProgress<T>`.
   (MIT) for warm-up, iterations and statistics, on the JIT and on Native AOT as the app ships.
   It's a developer tool that's never shipped or referenced by the app, so the trim and AOT rule
   below doesn't apply to it.
-- Image preview uses Avalonia's built-in Skia `Bitmap`.
+- Image preview uses Avalonia's built-in Skia `Bitmap`. So does the Library Optimization Tool's
+  image optimizer (`AvaloniaImageOptimizer` in `ChartShared.UI`): a scaled decode
+  (`Bitmap.DecodeToWidth`/`DecodeToHeight`), `CopyPixels` to a known pixel format to find
+  transparency, and `Save` with `JpegBitmapEncoderOptions` or `PngBitmapEncoderOptions`. No image
+  package is added. Skia must be initialised, which it is in the apps and isn't in the test
+  projects, so tests use a fake `IImageOptimizer` and the decisions (fit, format, rename) live in
+  `ChartShared.Core` as pure code (`ImageOptimization`, `ImageHeader`).
 - The one exception to Core's budget: it uses `z440.atl.core` (ATL.NET, MIT) to read audio
   durations from file headers, for the library list's length when a song has no `song_length`.
 - `ChartShared.Audio` plays audio (F7). It keeps codecs and native code out of Core, and uses:

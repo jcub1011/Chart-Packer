@@ -48,7 +48,10 @@ public sealed record ProbeResult(string CodecKey, int? Width = null, int? Height
 public sealed record ChartAsset(string StoredName, string Extension, long Length, AssetKind Kind, string? Stem = null, ProbeResult? Probe = null)
 {
     /// <summary>The probed codec, or <c>kind/ext</c> from the extension when it wasn't probed.</summary>
-    public string CodecKey => Probe?.CodecKey ?? KindPrefix(Kind) + Extension.TrimStart('.');
+    public string CodecKey => Probe?.CodecKey ?? KindPrefix(Kind) + FormatName(Extension.TrimStart('.'));
+
+    // .jpg and .jpeg are one format, so they group as one.
+    private static string FormatName(string extension) => extension == "jpg" ? "jpeg" : extension;
 
     private static string KindPrefix(AssetKind kind) => kind switch
     {

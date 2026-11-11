@@ -127,7 +127,8 @@ public static class MetadataCleanup
     private static bool HasKey(IEnumerable<KeyValuePair<string, string>> pairs, string key) =>
         pairs.Any(p => p.Key.Equals(key, StringComparison.OrdinalIgnoreCase));
 
-    private static async Task<IReadOnlyList<KeyValuePair<string, string>>?> ReadMetadataAsync(SongEntry entry, CancellationToken cancellationToken)
+    /// <summary>The chart's metadata pairs, or <see langword="null"/> when it has none that can be read.</summary>
+    internal static async Task<IReadOnlyList<KeyValuePair<string, string>>?> ReadMetadataAsync(SongEntry entry, CancellationToken cancellationToken)
     {
         if (entry.Kind == SongEntryKind.SngFile)
         {

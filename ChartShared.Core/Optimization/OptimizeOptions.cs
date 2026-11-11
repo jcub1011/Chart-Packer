@@ -80,13 +80,33 @@ public sealed record VideoOptimizeOptions(bool Enabled = false, VideoTarget Targ
 
 /// <summary>Image recompression settings, for album art or the background image.</summary>
 /// <param name="Enabled">Whether the strategy runs.</param>
-/// <param name="Quality">The encoder quality, 1 to 100.</param>
-/// <param name="MaxDimension">The longest side an image is scaled down to; <see langword="null"/> keeps its size.</param>
+/// <param name="Quality">The JPEG quality, 1 to 100.</param>
+/// <param name="MaxWidth">The widest an image is left; a wider one is scaled down to fit. <see langword="null"/> sets no limit.</param>
+/// <param name="MaxHeight">The tallest an image is left; a taller one is scaled down to fit. <see langword="null"/> sets no limit.</param>
 /// <param name="Remove">Delete the image instead of recompressing it.</param>
-public sealed record ImageOptimizeOptions(bool Enabled = false, int Quality = 85, int? MaxDimension = null, bool Remove = false)
+/// <remarks>An image is fitted inside <paramref name="MaxWidth"/> by <paramref name="MaxHeight"/> with its aspect kept, and is never scaled up.</remarks>
+public sealed record ImageOptimizeOptions(bool Enabled = false, int Quality = ImageOptimizeOptions.DefaultQuality, int? MaxWidth = null, int? MaxHeight = null, bool Remove = false)
 {
-    /// <summary>Off, at quality 85, keeping the size.</summary>
+    /// <summary>The default JPEG quality.</summary>
+    public const int DefaultQuality = 80;
+
+    /// <summary>The size album art is fitted inside.</summary>
+    public const int AlbumArtSize = 512;
+
+    /// <summary>The width a background image is fitted inside.</summary>
+    public const int BackgroundWidth = 1920;
+
+    /// <summary>The height a background image is fitted inside.</summary>
+    public const int BackgroundHeight = 1080;
+
+    /// <summary>Off, at quality 80, keeping the size.</summary>
     public static ImageOptimizeOptions Default { get; } = new();
+
+    /// <summary>Off, at quality 80, album art fitted inside 512x512.</summary>
+    public static ImageOptimizeOptions AlbumArtDefault { get; } = new(false, DefaultQuality, AlbumArtSize, AlbumArtSize);
+
+    /// <summary>Off, at quality 80, a background image fitted inside 1920x1080.</summary>
+    public static ImageOptimizeOptions BackgroundDefault { get; } = new(false, DefaultQuality, BackgroundWidth, BackgroundHeight);
 }
 
 /// <summary>What the Library Optimization Tool does. Every strategy is optional and configurable.</summary>
@@ -121,8 +141,8 @@ public sealed record OptimizeOptions(
         AudioOptimizeOptions.Default,
         AudioOptimizeOptions.Default,
         VideoOptimizeOptions.Default,
-        ImageOptimizeOptions.Default,
-        ImageOptimizeOptions.Default);
+        ImageOptimizeOptions.AlbumArtDefault,
+        ImageOptimizeOptions.BackgroundDefault);
 
     /// <summary>Whether <paramref name="strategy"/> is switched on.</summary>
     public bool IsEnabled(OptimizeStrategy strategy) => strategy switch

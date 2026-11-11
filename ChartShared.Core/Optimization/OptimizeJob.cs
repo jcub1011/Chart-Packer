@@ -167,6 +167,9 @@ public static class OptimizeJob
 
         public MetadataDraft? Edits { get; set; }
 
+        /// <summary>Images stored under another name now (<c>album.png</c> to <c>album.jpg</c>), old name to new.</summary>
+        public Dictionary<string, string> Renames { get; } = new(StringComparer.OrdinalIgnoreCase);
+
         public bool HasChanges => Removes.Count > 0 || Adds.Count > 0 || Edits is { HasMetadataChanges: true };
     }
 
@@ -203,7 +206,65 @@ public static class OptimizeJob
             }
         }
 
+        if (change.Renames.Count > 0 && !await StageReferencesAsync(entry, change, cancellationToken).ConfigureAwait(false))
+            RevertRenames(change);
+
         return change;
+    }
+
+    /// <summary>
+    /// Points the metadata at the images that were renamed, so a <c>background = background.png</c> doesn't name a file
+    /// that's gone. It's applied after any cleanup edits, whose keys it then doesn't revive.
+    /// </summary>
+    /// <returns>
+    /// Whether the renames are safe to make: the metadata was read and updated, or there's none that could name an image.
+    /// <see langword="false"/> when the metadata is there but can't be read, so a key may name a file that's about to go.
+    /// </returns>
+    private static async Task<bool> StageReferencesAsync(SongEntry entry, Change change, CancellationToken cancellationToken)
+    {
+        var pairs = await MetadataCleanup.ReadMetadataAsync(entry, cancellationToken).ConfigureAwait(false);
+        if (pairs is null)
+        {
+            // A folder with no song.ini has no key to name an image, which is then found by its name alone. Any other
+            // metadata that can't be read might name it.
+            return entry.Kind == SongEntryKind.SongFolder && SongIni.FindIn(entry.FullPath) is null;
+        }
+
+        var edits = change.Edits ?? new MetadataDraft();
+        if (ImageOptimization.UpdateReferences(edits.ApplyTo(pairs), change.Renames, edits))
+            change.Edits = edits;
+        return true;
+    }
+
+    /// <summary>
+    /// Undoes the renamed images' changes, as the metadata can't be pointed at their new names: each is left as it was, and
+    /// reported as failed.
+    /// </summary>
+    private static void RevertRenames(Change change)
+    {
+        foreach (var (oldName, newName) in change.Renames)
+        {
+            change.Removes.Remove(oldName);
+            foreach (var added in change.Adds.Where(a => a.StoredName.Equals(newName, StringComparison.OrdinalIgnoreCase)).ToList())
+            {
+                StagingPath.TryDeleteFile(added.SourcePath);
+                change.Adds.Remove(added);
+            }
+
+            int index = change.Assets.FindIndex(a => a.Outcome == AssetOutcome.Applied && a.StoredName.Equals(oldName, StringComparison.OrdinalIgnoreCase));
+            if (index >= 0)
+            {
+                var applied = change.Assets[index];
+                change.Assets[index] = applied with
+                {
+                    BytesAfter = applied.BytesBefore,
+                    Outcome = AssetOutcome.Failed,
+                    Detail = "The chart's metadata can't be read, so it can't be pointed at the renamed image.",
+                };
+            }
+        }
+
+        change.Renames.Clear();
     }
 
     private static async Task StageOptimizedAsync(
@@ -235,6 +296,9 @@ public static class OptimizeJob
 
             change.Removes.UnionWith(action.SourceNames);
             change.Adds.Add(new AddedFile(action.OutputName!, output, info.Length));
+            if (action.Strategy is OptimizeStrategy.AlbumArt or OptimizeStrategy.BackgroundArt
+                && !action.OutputName!.Equals(name, StringComparison.OrdinalIgnoreCase))
+                change.Renames[name] = action.OutputName;
             change.Assets.Add(new AssetResult(name, action.Strategy, action.Kind, action.InputBytes, info.Length, AssetOutcome.Applied, action.OutputName));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
