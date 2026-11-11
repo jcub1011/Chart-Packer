@@ -15,6 +15,7 @@ This wiki gives a high-level overview of what each window does and its idiosyncr
 - [Validate Metadata](Validator.md) and its [progress dialog](Validator-Progress.md)
 - [Generate Lower Difficulties](Lower-Difficulties.md)
 - [Deduplicate Library](Dedup.md)
+- [Optimize Library](Optimize.md)
 - [Job Progress](Job-Progress.md)
 - [Message dialog](Message-Dialog.md)
 

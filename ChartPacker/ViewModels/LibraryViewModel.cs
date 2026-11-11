@@ -72,6 +72,7 @@ namespace ChartPacker.ViewModels
         private readonly IDedupWindowService _dedupWindow;
         private readonly IValidatorWindowService _validatorWindow;
         private readonly ILowerDifficultiesWindowService? _lowerDifficultiesWindow;
+        private readonly IOptimizeWindowService? _optimizeWindow;
         private readonly IFileRevealService _reveal;
         private readonly IDownloadService _downloads;
         private readonly IChartBuilderLauncher _chartBuilder;
@@ -138,6 +139,7 @@ namespace ChartPacker.ViewModels
         /// <param name="chartBuilder">Starts Chart Builder to edit the selected song's chart.</param>
         /// <param name="notice">Says why Chart Builder couldn't be started.</param>
         /// <param name="lowerDifficultiesWindow">Generates the selected songs' lower difficulties; none to offer it.</param>
+        /// <param name="optimizeWindow">Optimizes the selected songs, or the whole library; none to offer it.</param>
         public LibraryViewModel(
             IFolderPickerService folderPicker,
             SettingsService settings,
@@ -151,7 +153,8 @@ namespace ChartPacker.ViewModels
             IDownloadService downloads,
             IChartBuilderLauncher chartBuilder,
             NoticeViewModel notice,
-            ILowerDifficultiesWindowService? lowerDifficultiesWindow = null)
+            ILowerDifficultiesWindowService? lowerDifficultiesWindow = null,
+            IOptimizeWindowService? optimizeWindow = null)
         {
             _folderPicker = folderPicker;
             _settings = settings;
@@ -160,6 +163,7 @@ namespace ChartPacker.ViewModels
             _dedupWindow = dedupWindow;
             _validatorWindow = validatorWindow;
             _lowerDifficultiesWindow = lowerDifficultiesWindow;
+            _optimizeWindow = optimizeWindow;
             _reveal = reveal;
             _downloads = downloads;
             _chartBuilder = chartBuilder;
@@ -258,6 +262,7 @@ namespace ChartPacker.ViewModels
         [NotifyCanExecuteChangedFor(nameof(MergeCommand))]
         [NotifyCanExecuteChangedFor(nameof(ValidateCommand))]
         [NotifyCanExecuteChangedFor(nameof(GenerateLowerDifficultiesCommand))]
+        [NotifyCanExecuteChangedFor(nameof(OptimizeCommand))]
         [NotifyCanExecuteChangedFor(nameof(CancelScanCommand))]
         public partial bool IsScanning { get; set; }
 
@@ -310,6 +315,7 @@ namespace ChartPacker.ViewModels
         [NotifyCanExecuteChangedFor(nameof(MergeCommand))]
         [NotifyCanExecuteChangedFor(nameof(ValidateCommand))]
         [NotifyCanExecuteChangedFor(nameof(GenerateLowerDifficultiesCommand))]
+        [NotifyCanExecuteChangedFor(nameof(OptimizeCommand))]
         [NotifyCanExecuteChangedFor(nameof(EditChartCommand))]
         [NotifyPropertyChangedFor(nameof(IsSingleSelection))]
         [NotifyPropertyChangedFor(nameof(IsMultipleSelection))]
@@ -772,6 +778,41 @@ namespace ChartPacker.ViewModels
                 ScanParallelism);
             var result = await _dedupWindow.ShowAsync(request);
             RemoveEntries(result.RemovedPaths);
+            if (result.OutputsChanged)
+                _outputsChanged = true;
+            RefreshState();
+        }
+
+        // Unlike the other jobs it needs no selection: with none it works on the whole library.
+        private bool CanOptimize() => _optimizeWindow is not null && FolderPath is not null && HasScanned && !IsScanning && !Job.IsRunning;
+
+        /// <summary>
+        /// Opens the Optimize window for the selected songs, or for the whole library when none is selected, which is
+        /// scanned again first as for Deduplicate. Once it closes, charts it rewrote in place are scanned again.
+        /// </summary>
+        [RelayCommand(CanExecute = nameof(CanOptimize))]
+        private async Task OptimizeAsync()
+        {
+            if (_optimizeWindow is null || FolderPath is not { } folder)
+                return;
+
+            var selected = SelectedEntries;
+            // With nothing selected the scan starts now, which also clears the selection; with songs selected it starts
+            // only if the window is asked for the whole library. Each later ask is a fresh scan, to see what a run changed.
+            Task<bool>? pending = selected.Count == 0 ? StartScan(folder, _settings.Settings.ScanMaxDepth) : null;
+            var request = new OptimizeRequest(
+                selected,
+                (progress, ct) =>
+                {
+                    var scan = pending ?? StartScan(folder, _settings.Settings.ScanMaxDepth);
+                    pending = null;
+                    return WaitForScanAsync(scan, progress, ct);
+                });
+
+            var result = await _optimizeWindow.ShowAsync(request);
+            // A scan starts with the output folder as unchanged, so it's flagged after it.
+            if (result.ChangedInPlace)
+                _ = StartScan(folder, _settings.Settings.ScanMaxDepth);
             if (result.OutputsChanged)
                 _outputsChanged = true;
             RefreshState();
@@ -1247,6 +1288,7 @@ namespace ChartPacker.ViewModels
             MergeCommand.NotifyCanExecuteChanged();
             ValidateCommand.NotifyCanExecuteChanged();
             GenerateLowerDifficultiesCommand.NotifyCanExecuteChanged();
+            OptimizeCommand.NotifyCanExecuteChanged();
             DeduplicateCommand.NotifyCanExecuteChanged();
             EditChartCommand.NotifyCanExecuteChanged();
         }

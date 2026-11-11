@@ -34,6 +34,9 @@ public static class UserConfigPaths
     /// </summary>
     public static string ReductionRulesFile => Path.Combine(ConfigFolder, "reduction-rules.json");
 
+    /// <summary>The defaults the Library Optimization Tool starts from, written by Chart Packer's Optimize window.</summary>
+    public static string OptimizerSettingsFile => Path.Combine(ConfigFolder, "optimizer-settings.json");
+
     /// <summary>
     /// The audio/visual latency per output device, written by Chart Builder's calibration tool and read
     /// by both apps (charter-spec C11, §10).

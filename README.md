@@ -86,6 +86,10 @@ Generate lower difficulties for songs across your entire library.
 
 ![Bulk difficulty reduction screen](<screenshots/Bulk Difficulty Reduction Generation.webp>)
 
+### Library Optimization
+
+Make your library smaller. Recompress audio to Opus, background videos to VP8 WebM, and album art and background images to JPEG, mix stems down, and clean up metadata no game needs. Estimate the savings from a sample first, then optimize the selected songs or the whole library. Optimizing in place can't be undone, so back up your charts first or write the changed charts to an output folder. See the [Optimize Library help page](docs/help/Optimize.md).
+
 ## Good to Know
 
 - Chart Builder opens `.sng` files directly and converts `.chart` to `.mid` on save. Back up the original first, because that conversion loses information.
