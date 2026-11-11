@@ -4,7 +4,8 @@ namespace ChartShared.Core.Optimization;
 
 /// <summary>
 /// Estimates what a strategy would save across a library, by asking its optimizer about the files of a sample of
-/// charts and grouping the answers by codec: a codec that gets larger when "compressed" shows as a negative saving.
+/// charts and grouping the answers by codec: a codec that gets larger when "compressed" shows as a negative saving. The
+/// sampled charts are estimated <see cref="OptimizeOptions.Parallelism"/> at a time; the answer is the same either way.
 /// </summary>
 public static class SavingsEstimator
 {
@@ -61,22 +62,39 @@ public static class SavingsEstimator
         }
 
         var sampled = new Dictionary<string, (int Count, long Input, long Output)>(StringComparer.Ordinal);
+        var sync = new object();
         int done = 0;
-        foreach (var chart in sample)
+
+        async ValueTask EstimateChartAsync(ChartAssets chart, CancellationToken token)
         {
-            cancellationToken.ThrowIfCancellationRequested();
+            token.ThrowIfCancellationRequested();
             using var stager = AssetStager.InTemp(chart.Entry);
             foreach (var unit in UnitsOf(strategy, chart))
             {
-                var (ok, output) = estimate is null ? (true, 0L) : await TryEstimateAsync(unit, stager, estimate, cancellationToken).ConfigureAwait(false);
+                var (ok, output) = estimate is null ? (true, 0L) : await TryEstimateAsync(unit, stager, estimate, token).ConfigureAwait(false);
                 if (!ok)
                     continue;
 
-                sampled.TryGetValue(unit.CodecKey, out var s);
-                sampled[unit.CodecKey] = (s.Count + 1, s.Input + unit.InputBytes, s.Output + output);
+                lock (sync)
+                {
+                    sampled.TryGetValue(unit.CodecKey, out var s);
+                    sampled[unit.CodecKey] = (s.Count + 1, s.Input + unit.InputBytes, s.Output + output);
+                }
             }
 
-            progress?.Report((++done, sample.Count));
+            lock (sync)
+                progress?.Report((++done, sample.Count));
+        }
+
+        int parallelism = Math.Max(1, options.Parallelism);
+        if (parallelism == 1)
+        {
+            foreach (var chart in sample)
+                await EstimateChartAsync(chart, cancellationToken).ConfigureAwait(false);
+        }
+        else
+        {
+            await Parallel.ForEachAsync(sample, new ParallelOptions { MaxDegreeOfParallelism = parallelism, CancellationToken = cancellationToken }, EstimateChartAsync).ConfigureAwait(false);
         }
 
         var codecs = totals.Select(t =>

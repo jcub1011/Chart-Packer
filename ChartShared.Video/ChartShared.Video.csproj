@@ -9,6 +9,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- The tests encode synthetic videos with the VP8 encoder and WebM writer. -->
+    <InternalsVisibleTo Include="ChartShared.Core.Tests" />
     <ProjectReference Include="..\ChartShared.Core\ChartShared.Core.csproj" />
     <!-- FFmpeg's bindings and shared libraries. -->
     <ProjectReference Include="..\ChartShared.Ffmpeg\ChartShared.Ffmpeg.csproj" />

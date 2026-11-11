@@ -48,6 +48,9 @@ public enum OptimizeSkipReason
 
     /// <summary>The file couldn't be read to estimate it.</summary>
     EstimateFailed,
+
+    /// <summary>A video in a codec the games can't all play, and converting it for compatibility (<see cref="VideoOptimizeOptions.ConvertUnsupported"/>) is off.</summary>
+    UnsupportedCodec,
 }
 
 /// <summary>One thing the planner decided about a chart.</summary>
@@ -59,6 +62,10 @@ public enum OptimizeSkipReason
 /// <param name="InputBytes">The size of what it replaces.</param>
 /// <param name="EstimatedOutputBytes">The estimated size of what it writes; 0 for a removal.</param>
 /// <param name="Reason">Why it's a skip; <see cref="OptimizeSkipReason.None"/> otherwise.</param>
+/// <param name="ForCompatibility">
+/// It converts a file so the games can play it, not to save space (a video in an unsupported codec): it's done whatever
+/// it saves, and what it writes is kept even when it's larger than what it replaces.
+/// </param>
 public sealed record PlannedAction(
     OptimizeStrategy Strategy,
     OptimizeActionKind Kind,
@@ -67,7 +74,8 @@ public sealed record PlannedAction(
     string? CodecKey,
     long InputBytes,
     long EstimatedOutputBytes,
-    OptimizeSkipReason Reason = OptimizeSkipReason.None)
+    OptimizeSkipReason Reason = OptimizeSkipReason.None,
+    bool ForCompatibility = false)
 {
     /// <summary>Whether it leaves the chart alone.</summary>
     public bool IsSkip => Kind == OptimizeActionKind.Skip;

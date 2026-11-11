@@ -9,8 +9,8 @@ using ChartShared.Core.Validation;
 namespace ChartShared.Core.Optimization;
 
 /// <summary>
-/// Applies a plan: works through the charts one at a time, optimizing each one's files into a staging folder beside it
-/// and then swapping the result in, in place or as a copy in an output folder.
+/// Applies a plan: works through the charts, <see cref="OptimizeOptions.Parallelism"/> at a time, optimizing each one's files
+/// into a staging folder beside it and then swapping the result in, in place or as a copy in an output folder.
 /// </summary>
 /// <remarks>
 /// <para>A <c>.sng</c> is written with <see cref="SngWriter.RewriteAsync"/> and a folder with
@@ -19,14 +19,18 @@ namespace ChartShared.Core.Optimization;
 /// include it. Each chart is held with <see cref="SongLockSet.TryHold"/> and <see cref="SongFileGate"/> for as long as it's written.</para>
 /// <para>A chart that's held by another app, has unsaved changes, changed since it was planned, or has no work is
 /// skipped. A chart that fails is reported and never stops the run; a file that fails is left as it was, and the chart's
-/// others are still done. Only cancellation stops the run, by throwing after the chart in flight has cleaned up its
+/// others are still done. Only cancellation stops the run, by throwing after the charts in flight have cleaned up their
 /// staging files. The results of the charts finished by then were reported through the progress.</para>
+/// <para>With <see cref="OptimizeOptions.Parallelism"/> above 1, charts are worked on at once but their results stay in the
+/// order of the plans. Progress reports are made one at a time, never overlapping, but those of different charts
+/// interleave: each carries the chart it's about, and <see cref="OptimizeProgress.Done"/> is how many charts have
+/// finished (so it rises by one with each completed report).</para>
 /// </remarks>
 public static class OptimizeJob
 {
     private const string MetadataName = "metadata";
 
-    /// <summary>Runs <paramref name="plans"/>, one chart at a time.</summary>
+    /// <summary>Runs <paramref name="plans"/>, <see cref="OptimizeOptions.Parallelism"/> charts at a time.</summary>
     /// <param name="services">What the host app contributes; none by default.</param>
     /// <param name="progress">Reports as each chart starts, as each file starts, and as each chart finishes.</param>
     /// <exception cref="OperationCanceledException">The run was cancelled.</exception>
@@ -43,18 +47,20 @@ public static class OptimizeJob
         ArgumentNullException.ThrowIfNull(optimizers);
 
         services ??= new OptimizeJobServices();
-        var context = new Context(options, optimizers, services.Locks ?? new SongLockSet(SongLockHolder.Unknown), services.Gate ?? new SongFileGate(), services, progress);
-        var results = new List<OptimizeItemResult>(plans.Count);
-        for (int i = 0; i < plans.Count; i++)
+        var reporter = new Reporter(progress);
+        var context = new Context(options, optimizers, services.Locks ?? new SongLockSet(SongLockHolder.Unknown), services.Gate ?? new SongFileGate(), services, reporter);
+        var results = new OptimizeItemResult[plans.Count];
+
+        async ValueTask RunOneAsync(int i, CancellationToken token)
         {
-            cancellationToken.ThrowIfCancellationRequested();
+            token.ThrowIfCancellationRequested();
             var plan = plans[i];
-            progress?.Report(new OptimizeProgress(i, plans.Count, plan.Chart.Entry, null, null));
+            reporter.Report(plans.Count, plan.Chart.Entry, null, null);
 
             OptimizeItemResult result;
             try
             {
-                result = await RunChartAsync(plan, context, i, plans.Count, cancellationToken).ConfigureAwait(false);
+                result = await RunChartAsync(plan, context, plans.Count, token).ConfigureAwait(false);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -62,16 +68,85 @@ public static class OptimizeJob
                 result = new OptimizeItemResult(plan.Chart.Entry, OptimizeItemStatus.Failed, OptimizeItemSkipReason.None, SkippedAssets(plan), plan.Chart.TotalBytes, plan.Chart.TotalBytes, null, ex.Message);
             }
 
-            results.Add(result);
-            progress?.Report(new OptimizeProgress(i + 1, plans.Count, plan.Chart.Entry, null, result));
+            results[i] = result;
+            reporter.Report(plans.Count, plan.Chart.Entry, null, result);
+        }
+
+        int parallelism = Math.Max(1, options.Parallelism);
+        if (parallelism == 1)
+        {
+            for (int i = 0; i < plans.Count; i++)
+                await RunOneAsync(i, cancellationToken).ConfigureAwait(false);
+        }
+        else
+        {
+            await Parallel.ForEachAsync(
+                Enumerable.Range(0, plans.Count),
+                new ParallelOptions { MaxDegreeOfParallelism = parallelism, CancellationToken = cancellationToken },
+                (i, token) => RunOneAsync(i, token)).ConfigureAwait(false);
         }
 
         return new OptimizeJobResult(results);
     }
 
-    private sealed record Context(OptimizeOptions Options, OptimizerSet Optimizers, SongLockSet Locks, SongFileGate Gate, OptimizeJobServices Services, IProgress<OptimizeProgress>? Progress);
+    private sealed record Context(OptimizeOptions Options, OptimizerSet Optimizers, SongLockSet Locks, SongFileGate Gate, OptimizeJobServices Services, Reporter Progress);
 
-    private static async Task<OptimizeItemResult> RunChartAsync(ChartPlan plan, Context context, int index, int total, CancellationToken cancellationToken)
+    /// <summary>
+    /// Keeps the count of charts finished, and passes progress reports to the host one at a time and in the order they were
+    /// made, so a host's progress never has two calls in flight and a report's count never goes back. A report is queued under
+    /// a lock; the thread that finds none being delivered delivers the queue, outside the lock, so a slow host blocks that
+    /// thread alone, not the others making reports.
+    /// </summary>
+    private sealed class Reporter(IProgress<OptimizeProgress>? inner)
+    {
+        private readonly object _sync = new();
+        private readonly Queue<OptimizeProgress> _pending = new();
+        private int _finished;
+        private bool _delivering;
+
+        /// <summary>Reports, carrying the count of charts finished, which a <paramref name="completed"/> result raises by one.</summary>
+        public void Report(int total, SongEntry? current, string? asset, OptimizeItemResult? completed, double? fileFraction = null)
+        {
+            lock (_sync)
+            {
+                int count = completed is null ? _finished : ++_finished;
+                if (inner is null)
+                    return;
+
+                _pending.Enqueue(new OptimizeProgress(count, total, current, asset, completed, fileFraction));
+                if (_delivering)
+                    return;
+                _delivering = true;
+            }
+
+            try
+            {
+                while (true)
+                {
+                    OptimizeProgress next;
+                    lock (_sync)
+                    {
+                        if (!_pending.TryDequeue(out next!))
+                        {
+                            _delivering = false;
+                            return;
+                        }
+                    }
+
+                    inner.Report(next);
+                }
+            }
+            catch
+            {
+                // A host that throws leaves what's queued for the next report to deliver.
+                lock (_sync)
+                    _delivering = false;
+                throw;
+            }
+        }
+    }
+
+    private static async Task<OptimizeItemResult> RunChartAsync(ChartPlan plan, Context context, int total, CancellationToken cancellationToken)
     {
         var entry = plan.Chart.Entry;
         var skipped = SkippedAssets(plan);
@@ -105,7 +180,7 @@ public static class OptimizeJob
         try
         {
             Directory.CreateDirectory(staging);
-            var change = await StageAsync(plan, context, staging, index, total, cancellationToken).ConfigureAwait(false);
+            var change = await StageAsync(plan, context, staging, total, cancellationToken).ConfigureAwait(false);
             if (!change.HasChanges)
             {
                 var status = change.Assets.Any(a => a.Outcome == AssetOutcome.Failed) ? OptimizeItemStatus.Failed : OptimizeItemStatus.Skipped;
@@ -174,7 +249,7 @@ public static class OptimizeJob
     }
 
     /// <summary>Optimizes each of the plan's files into <paramref name="staging"/>; nothing in the chart is touched.</summary>
-    private static async Task<Change> StageAsync(ChartPlan plan, Context context, string staging, int index, int total, CancellationToken cancellationToken)
+    private static async Task<Change> StageAsync(ChartPlan plan, Context context, string staging, int total, CancellationToken cancellationToken)
     {
         var entry = plan.Chart.Entry;
         var change = new Change();
@@ -186,7 +261,7 @@ public static class OptimizeJob
         {
             cancellationToken.ThrowIfCancellationRequested();
             string name = action.SourceNames.FirstOrDefault() ?? MetadataName;
-            context.Progress?.Report(new OptimizeProgress(index, total, entry, name, null));
+            context.Progress.Report(total, entry, name, null);
 
             if (action.Kind == OptimizeActionKind.Remove)
             {
@@ -199,9 +274,8 @@ public static class OptimizeJob
             }
             else
             {
-                IProgress<double>? fileProgress = context.Progress is { } reporter
-                    ? new InlineProgress<double>(f => reporter.Report(new OptimizeProgress(index, total, entry, name, null, f)))
-                    : null;
+                var reporter = context.Progress;
+                IProgress<double> fileProgress = new InlineProgress<double>(f => reporter.Report(total, entry, name, null, f));
                 await StageOptimizedAsync(plan, action, context, stager, staging, change, fileProgress, cancellationToken).ConfigureAwait(false);
             }
         }
@@ -286,8 +360,9 @@ public static class OptimizeJob
             if (!info.Exists)
                 throw new IOException($"The optimizer wrote no file for '{name}'.");
 
-            // The estimate was a guess; a result that's no smaller than what it replaces isn't kept.
-            if (info.Length >= action.InputBytes)
+            // The estimate was a guess; a result that's no smaller than what it replaces isn't kept, unless the file was
+            // converted so the games can play it, when being larger is the price.
+            if (info.Length >= action.InputBytes && !action.ForCompatibility)
             {
                 info.Delete();
                 change.Assets.Add(new AssetResult(name, action.Strategy, action.Kind, action.InputBytes, action.InputBytes, AssetOutcome.Skipped, action.OutputName, nameof(OptimizeSkipReason.WouldGrow)));

@@ -8,7 +8,9 @@ namespace ChartShared.Ffmpeg.Interop;
 // FfmpegLibrary refuses any other major version, since the layouts can change between them.
 // FFmpeg's own names are kept, so each binding reads like its header. Video uses avformat, avcodec
 // and swscale; a video's audio track uses avformat to read its packets and avcodec's decoder;
-// song audio otherwise only uses avcodec's decoders, given packets our own code has read.
+// song audio otherwise only uses avcodec's decoders, given packets our own code has read. Video is
+// also encoded (VP8 through libvpx), so avcodec's encoder calls are bound too; the encoder's
+// AVCodecContext stays opaque, and is set up through the option API (av_opt_set*).
 
 /// <summary>The leading fields of <c>AVCodec</c> (libavcodec/codec.h).</summary>
 [StructLayout(LayoutKind.Sequential)]
@@ -119,6 +121,10 @@ internal unsafe struct AVPacket
     public byte* data;
     public int size;
     public int stream_index;
+    public int flags;
+    public void* side_data;
+    public int side_data_elems;
+    public long duration;
 }
 
 /// <summary>The leading fields of <c>AVFrame</c> (libavutil/frame.h).</summary>
@@ -207,10 +213,20 @@ internal static unsafe partial class Native
     public const ulong ChannelMaskMono = 0x4;
     public const ulong ChannelMaskStereo = 0x3;
     public const int PixelFormatBgra = 28;
+    // libavutil/pixfmt.h: AV_PIX_FMT_YUV420P, the only format VP8 holds.
+    public const int PixelFormatYuv420p = 0;
+    // libavcodec/packet.h: AV_PKT_FLAG_KEY.
+    public const int PacketFlagKey = 1;
+    // libavutil/opt.h: AV_OPT_SEARCH_CHILDREN, which lets an option name reach an encoder's own (private) options.
+    public const int OptSearchChildren = 1;
     // libswscale/swscale.h: SWS_BILINEAR, set through the "sws_flags" option.
     public const int SwsBilinear = 2;
+    // libswscale/swscale.h: SWS_BICUBIC, sws_alloc_context's own default, set explicitly where it matters.
+    public const int SwsBicubic = 4;
     // libavutil/frame.h: AV_FRAME_FLAG_INTERLACED, and AV_FRAME_DATA_DYNAMIC_HDR_PLUS of enum AVFrameSideDataType.
     public const int FrameFlagInterlaced = 1 << 3;
+    // libavutil/frame.h: AV_FRAME_FLAG_KEY.
+    public const int FrameFlagKey = 1 << 1;
     public const int FrameDataDynamicHdrPlus = 17;
     public const int SeekFlagBackward = 1;
     public const int SeekSize = 0x10000;
@@ -231,9 +247,16 @@ internal static unsafe partial class Native
     /// <summary>AVERROR(EAGAIN): EAGAIN is 35 on macOS and 11 elsewhere.</summary>
     public static int ErrorAgain { get; } = OperatingSystem.IsMacOS() || OperatingSystem.IsIOS() ? -35 : -11;
 
+    // libavutil/log.h: AV_LOG_WARNING. FFmpeg logs to stderr at AV_LOG_INFO by default, which includes libvpx's version
+    // line every time an encoder is opened.
+    public const int LogLevelWarning = 24;
+
     // libavutil
     [LibraryImport(AvUtil, EntryPoint = "avutil_version")]
     public static partial uint avutil_version();
+
+    [LibraryImport(AvUtil, EntryPoint = "av_log_set_level")]
+    public static partial void av_log_set_level(int level);
 
     [LibraryImport(AvUtil, EntryPoint = "av_malloc")]
     public static partial void* av_malloc(nuint size);
@@ -265,6 +288,30 @@ internal static unsafe partial class Native
     [LibraryImport(AvUtil, EntryPoint = "av_opt_set_int", StringMarshalling = StringMarshalling.Utf8)]
     public static partial int av_opt_set_int(void* target, string name, long value, int searchFlags);
 
+    [LibraryImport(AvUtil, EntryPoint = "av_opt_set", StringMarshalling = StringMarshalling.Utf8)]
+    public static partial int av_opt_set(void* target, string name, string value, int searchFlags);
+
+    [LibraryImport(AvUtil, EntryPoint = "av_opt_set_double", StringMarshalling = StringMarshalling.Utf8)]
+    public static partial int av_opt_set_double(void* target, string name, double value, int searchFlags);
+
+    [LibraryImport(AvUtil, EntryPoint = "av_opt_set_q", StringMarshalling = StringMarshalling.Utf8)]
+    public static partial int av_opt_set_q(void* target, string name, AVRational value, int searchFlags);
+
+    [LibraryImport(AvUtil, EntryPoint = "av_frame_get_buffer")]
+    public static partial int av_frame_get_buffer(AVFrame* frame, int align);
+
+    [LibraryImport(AvUtil, EntryPoint = "av_frame_make_writable")]
+    public static partial int av_frame_make_writable(AVFrame* frame);
+
+    [LibraryImport(AvUtil, EntryPoint = "av_frame_is_writable")]
+    public static partial int av_frame_is_writable(AVFrame* frame);
+
+    [LibraryImport(AvUtil, EntryPoint = "av_rescale_q")]
+    public static partial long av_rescale_q(long value, AVRational source, AVRational destination);
+
+    [LibraryImport(AvUtil, EntryPoint = "av_strerror")]
+    public static partial int av_strerror(int error, byte* buffer, nuint size);
+
     // libavformat
     [LibraryImport(AvFormat, EntryPoint = "avformat_version")]
     public static partial uint avformat_version();
@@ -295,6 +342,9 @@ internal static unsafe partial class Native
 
     [LibraryImport(AvFormat, EntryPoint = "avformat_find_stream_info")]
     public static partial int avformat_find_stream_info(AVFormatContext* context, void** options);
+
+    [LibraryImport(AvFormat, EntryPoint = "av_guess_frame_rate")]
+    public static partial AVRational av_guess_frame_rate(AVFormatContext* context, AVStream* stream, AVFrame* frame);
 
     [LibraryImport(AvFormat, EntryPoint = "av_find_best_stream")]
     public static partial int av_find_best_stream(AVFormatContext* context, int type, int wanted, int related, void** decoder, int flags);
@@ -333,6 +383,25 @@ internal static unsafe partial class Native
 
     [LibraryImport(AvCodec, EntryPoint = "avcodec_find_decoder")]
     public static partial AVCodec* avcodec_find_decoder(int codecId);
+
+    [LibraryImport(AvCodec, EntryPoint = "avcodec_find_encoder_by_name", StringMarshalling = StringMarshalling.Utf8)]
+    public static partial AVCodec* avcodec_find_encoder_by_name(string name);
+
+    [LibraryImport(AvCodec, EntryPoint = "avcodec_find_encoder")]
+    public static partial AVCodec* avcodec_find_encoder(int codecId);
+
+    /// <summary>The name of a codec id, never null: <c>"vp8"</c>, <c>"hevc"</c>, <c>"unknown_codec"</c>.</summary>
+    [LibraryImport(AvCodec, EntryPoint = "avcodec_get_name")]
+    public static partial byte* avcodec_get_name(int codecId);
+
+    [LibraryImport(AvCodec, EntryPoint = "avcodec_parameters_from_context")]
+    public static partial int avcodec_parameters_from_context(AVCodecParameters* parameters, void* codecContext);
+
+    [LibraryImport(AvCodec, EntryPoint = "avcodec_send_frame")]
+    public static partial int avcodec_send_frame(void* codecContext, AVFrame* frame);
+
+    [LibraryImport(AvCodec, EntryPoint = "avcodec_receive_packet")]
+    public static partial int avcodec_receive_packet(void* codecContext, AVPacket* packet);
 
     [LibraryImport(AvCodec, EntryPoint = "avcodec_parameters_copy")]
     public static partial int avcodec_parameters_copy(AVCodecParameters* destination, AVCodecParameters* source);

@@ -32,6 +32,22 @@ public enum VideoTarget
     Uhd,
 }
 
+/// <summary>How hard the video encoder works. Slower takes longer and gives a smaller file, or a better picture, for the same CQ.</summary>
+public enum VideoEncodeSpeed
+{
+    /// <summary>The quickest, about twice as fast as <see cref="Slow"/>, at 10 to 20% more bits for the same picture.</summary>
+    Fast,
+
+    /// <summary>A little slower than <see cref="Fast"/>'s half-way: about 1.5 times as fast as <see cref="Slow"/>, within a few percent of its efficiency. The default.</summary>
+    Balanced,
+
+    /// <summary>libvpx's own default speed.</summary>
+    Slow,
+
+    /// <summary>The slowest and most efficient; about 5 to 10% fewer bits than <see cref="Slow"/>, in about 20% more time.</summary>
+    Best,
+}
+
 /// <summary>Which parts of metadata cleanup run. Every step is optional.</summary>
 /// <param name="Enabled">Whether metadata cleanup runs at all.</param>
 /// <param name="PruneEmptyParts">Drop the <c>song.ini</c> keys of parts the chart has no notes for (SNG062).</param>
@@ -70,12 +86,37 @@ public sealed record AudioOptimizeOptions(bool Enabled = false, int BitrateKbps 
 /// <summary>Video recompression settings.</summary>
 /// <param name="Enabled">Whether the strategy runs.</param>
 /// <param name="Target">The size the video is brought down to.</param>
-/// <param name="Cq">The constant-quality value; lower is better quality and a larger file.</param>
+/// <param name="Cq">libvpx's constant-quality value, 4 to 63 (FFmpeg's <c>-crf</c> for VP8); lower is better quality and a larger file.</param>
 /// <param name="Remove">Delete the video instead of recompressing it.</param>
-public sealed record VideoOptimizeOptions(bool Enabled = false, VideoTarget Target = VideoTarget.Fhd, int Cq = 30, bool Remove = false)
+/// <param name="ConvertUnsupported">
+/// Also convert videos in a codec the games can't all play (<see cref="VideoCodecs.IsUnsupported"/>: VP9, AV1, HEVC) to
+/// VP8 WebM, which plays everywhere. Such a conversion is for compatibility, not size: it's done whatever it saves, and
+/// the file that results may be larger. Off, those videos are left alone, and only an estimate shows what converting would cost.
+/// </param>
+/// <param name="Speed">How hard the encoder works; slower is more efficient. An estimate is made at the same speed, so it matches the encode.</param>
+/// <remarks>Videos are written as VP8 in WebM, with no audio track, and a video that's already VP8 WebM within the target size is left alone.</remarks>
+public sealed record VideoOptimizeOptions(bool Enabled = false, VideoTarget Target = VideoTarget.Fhd, int Cq = VideoOptimizeOptions.DefaultCq, bool Remove = false, bool ConvertUnsupported = false, VideoEncodeSpeed Speed = VideoEncodeSpeed.Balanced)
 {
-    /// <summary>Off, FHD at CQ 30.</summary>
+    /// <summary>
+    /// The default CQ, 32: what the author's own compressed videos used (HandBrake), and about 40% smaller than 10 on real
+    /// 1080p videos. The FFmpeg wiki suggests starting at 10, which is far larger than most sources.
+    /// </summary>
+    public const int DefaultCq = 32;
+
+    /// <summary>Off, FHD at CQ 32, leaving unsupported codecs alone.</summary>
     public static VideoOptimizeOptions Default { get; } = new();
+}
+
+/// <summary>Which video codecs the games can play.</summary>
+public static class VideoCodecs
+{
+    // VP8 in WebM is the only video that plays on every platform in both Clone Hero and YARG. VP9, AV1 and HEVC aren't
+    // listed as supported anywhere (HEVC plays in Clone Hero only with codecs installed); H.264 and the older codecs play on
+    // some platforms, so they're recompressed under the usual rules rather than converted as a matter of compatibility.
+    private static readonly HashSet<string> Unsupported = new(StringComparer.OrdinalIgnoreCase) { "video/vp9", "video/av1", "video/hevc" };
+
+    /// <summary>Whether a video whose probed codec is <paramref name="codecKey"/> (<c>video/vp9</c>) is in a codec the games can't all play.</summary>
+    public static bool IsUnsupported(string? codecKey) => codecKey is not null && Unsupported.Contains(codecKey);
 }
 
 /// <summary>Image recompression settings, for album art or the background image.</summary>
@@ -125,6 +166,11 @@ public sealed record ImageOptimizeOptions(bool Enabled = false, int Quality = Im
 /// were changed are written there: one that's skipped (nothing to do, below the margin, in use, with unsaved changes) or
 /// that fails is not copied, so the folder is not a full copy of the library.
 /// </param>
+/// <param name="Parallelism">
+/// How many charts are worked on at once, by <see cref="OptimizeJob"/>, <see cref="OptimizationPlanner.PlanAllAsync"/> and
+/// <see cref="SavingsEstimator"/>; 1 does them one at a time. Videos take far longer than anything else, so this is mostly
+/// how many encode at once; the video optimizer shares the machine's cores between those running. Below 1 counts as 1.
+/// </param>
 public sealed record OptimizeOptions(
     MetadataCleanupOptions Metadata,
     AudioOptimizeOptions Audio,
@@ -133,8 +179,12 @@ public sealed record OptimizeOptions(
     ImageOptimizeOptions AlbumArt,
     ImageOptimizeOptions BackgroundArt,
     double SavingsMargin = 0.10,
-    string? OutputFolder = null)
+    string? OutputFolder = null,
+    int Parallelism = 1)
 {
+    /// <summary>A number of charts to work on at once that suits this machine: a quarter of its cores, at least 2 where it has them.</summary>
+    public static int RecommendedParallelism => Math.Max(1, Math.Max(Environment.ProcessorCount >= 4 ? 2 : 1, Environment.ProcessorCount / 4));
+
     /// <summary>Every strategy off, in place, with a 10% margin.</summary>
     public static OptimizeOptions Default { get; } = new(
         MetadataCleanupOptions.Default,

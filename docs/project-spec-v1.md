@@ -166,12 +166,20 @@ through `IProgress<T>`.
 - `ChartShared.Ffmpeg` binds, by hand with `[LibraryImport]`, the few functions Video and Audio
   need from FFmpeg 9.0's shared libraries (`avformat`, `avcodec`, `avutil`, `swscale` and
   `swresample`, LGPL 2.1+), and has no packages. Audio uses it through a safe wrapper,
-  `FfmpegAudioDecoder`; Video calls the bindings directly.
+  `FfmpegAudioDecoder`; Video calls the bindings directly. Video also encodes: the Library
+  Optimization Tool's `VideoReencoder` writes VP8 in WebM, with no audio track, through libvpx (the
+  `libvpx` encoder; its codec context stays opaque and is set up with codec parameters and the
+  option API). Every scale or colour conversion is `sws_scale_frame` into a frame FFmpeg allocated,
+  never into a managed array.
   - The libraries are built by `build/ffmpeg/build.sh` with only the registered video formats'
     demuxers and decoders, the registered audio formats' decoders, AAC (which a background video's
-    audio track can carry, read through `avformat`), and swresample (which the Opus decoder needs),
-    nothing GPL or non-free. They ship beside the executable like SDL's. Without them the app still
-    runs: videos aren't previewed, and audio is decoded by the managed decoders.
+    audio track can carry, read through `avformat`), swresample (which the Opus decoder needs), and
+    the one encoder, libvpx's VP8 (BSD-3, linked in statically; libx264 is GPL, so there is no
+    H.264 output), nothing GPL or non-free. They ship beside the executable like SDL's. Without
+    them the app still runs: videos aren't previewed or optimized, and audio is decoded by the
+    managed decoders. A build without libvpx still plays video; `VideoReencoder.IsAvailable` says
+    whether this one can encode, and `build/publish.ps1` refuses libraries without the `libvpx.txt`
+    marker that `build.sh` writes.
   - The bindings are written for one major version of each library, which is checked at load.
 - Any new dependency must be trim- and AOT-compatible, and the reason for it must be added to
   this section.

@@ -264,6 +264,7 @@ builds only) aren't part of a release and aren't listed.
 | [ppy/SDL3-CS](https://github.com/ppy/SDL3-CS) (`ppy.SDL3-CS`) | 2026.722.0 | MIT | © 2024 ppy Pty Ltd |
 | [SDL](https://github.com/libsdl-org/SDL), the native library in `ppy.SDL3-CS` | 3.5.0 | zlib | © 1997-2026 Sam Lantinga |
 | [FFmpeg](https://ffmpeg.org): `libavformat`, `libavcodec`, `libavutil`, `libswscale`, `libswresample` | 9.0 | LGPL 2.1 or later | © 2000-2026 the FFmpeg developers |
+| [libvpx](https://chromium.googlesource.com/webm/libvpx), the VP8 encoder linked into `libavcodec` | 1.17.0 | BSD 3-Clause | © 2010 The WebM Project authors |
 
 ATL.NET reads audio durations in `ChartShared.Core/Scanning/AudioLength.cs`, the library list's
 fallback when a song has no `song_length`.
@@ -281,6 +282,9 @@ For background video (`ChartShared.Video`), FFmpeg's shared libraries decode the
 frames, and decode its audio track (AAC, Vorbis, Opus or MPEG audio) for the waveform and alignment
 in the Art tab. They ship beside the executable, unmodified, as separate files; see
 [FFmpeg](#ffmpeg) below.
+
+For the Library Optimization Tool, FFmpeg's `libavcodec` encodes background videos to VP8 in WebM
+with libvpx, which is linked into it; see [libvpx](#libvpx) below.
 
 ### MIT License
 
@@ -717,7 +721,7 @@ the [FFmpeg source](https://git.ffmpeg.org/ffmpeg.git) by
 [build/ffmpeg/build.sh](build/ffmpeg/build.sh), which gives the full configure line. They can be
 replaced with any other build of the same major versions. Chart-Packer's bindings to them
 (`ChartShared.Ffmpeg/Interop/Native.cs`) are written from FFmpeg's public headers; no FFmpeg code
-is copied.
+is copied. `libavcodec` has [libvpx](#libvpx) linked into it.
 
 ```
 FFmpeg is free software; you can redistribute it and/or
@@ -729,4 +733,47 @@ FFmpeg is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 Lesser General Public License for more details.
+```
+
+### libvpx
+
+The VP8 encoder in `avcodec` (FFmpeg's `libvpx` wrapper) is libvpx, version 1.17.0 of the
+[WebM Project's libvpx](https://chromium.googlesource.com/webm/libvpx), linked into `libavcodec`
+statically and unmodified, so that nothing else ships beside it. The Library Optimization Tool writes
+background videos with it, as VP8 in WebM. libvpx is under the BSD 3-Clause license below; the WebM
+Project also grants a patent license for it, in the `PATENTS` file of its source. It's built by
+[build/ffmpeg/build.sh](build/ffmpeg/build.sh) from the package of the platform (MSYS2's, in the
+release build).
+
+```
+Copyright (c) 2010, The WebM Project authors. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+  * Redistributions of source code must retain the above copyright
+    notice, this list of conditions and the following disclaimer.
+
+  * Redistributions in binary form must reproduce the above copyright
+    notice, this list of conditions and the following disclaimer in
+    the documentation and/or other materials provided with the
+    distribution.
+
+  * Neither the name of Google, nor the WebM Project, nor the names
+    of its contributors may be used to endorse or promote products
+    derived from this software without specific prior written
+    permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```

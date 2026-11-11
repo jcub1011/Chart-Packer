@@ -10,6 +10,9 @@ namespace ChartShared.Core.Optimization;
 /// <para>A file is skipped when the optimizer says it's already optimal, when the output would be as large as the
 /// input, or when the saving is under <see cref="OptimizeOptions.SavingsMargin"/>, in that order. What's already
 /// optimal is the optimizer's to say, as it owns the codec: already Opus, or already VP8 WebM within the target.</para>
+/// <para>A video in a codec the games can't all play (<see cref="VideoCodecs.IsUnsupported"/>) is only converted when
+/// <see cref="VideoOptimizeOptions.ConvertUnsupported"/> is on, and then whatever the conversion saves: neither the
+/// margin nor the larger-file rule applies, as the point is that the games can play it.</para>
 /// <para>Nothing is written to the chart. <c>highway.*</c> images, charts, and unregistered files are never touched.
 /// A song with several formats of one stem has only the first, in <see cref="AudioStems.Extensions"/> order, planned.</para>
 /// </remarks>
@@ -17,8 +20,59 @@ public static class OptimizationPlanner
 {
     private const string MixedStem = "song";
 
+    /// <summary>
+    /// Plans every chart in <paramref name="charts"/>, <see cref="OptimizeOptions.Parallelism"/> at a time, which is where
+    /// video estimates take their time. The plans are in the order of the charts.
+    /// </summary>
+    /// <param name="progress">Reports charts planned and charts to plan, as each is planned.</param>
+    /// <exception cref="IOException">A chart can't be read to clean its metadata; none of the plans is returned.</exception>
+    /// <exception cref="UnauthorizedAccessException">Access is denied.</exception>
+    /// <exception cref="OperationCanceledException">The plan was cancelled.</exception>
+    public static async Task<IReadOnlyList<ChartPlan>> PlanAllAsync(
+        IReadOnlyList<ChartAssets> charts, OptimizeOptions options, OptimizerSet optimizers, IProgress<(int Done, int Total)>? progress = null, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(charts);
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(optimizers);
+
+        var plans = new ChartPlan[charts.Count];
+        var sync = new object();
+        int done = 0;
+
+        async ValueTask PlanOneAsync(int i, CancellationToken token)
+        {
+            plans[i] = await PlanAsync(charts[i], options, optimizers, token).ConfigureAwait(false);
+            if (progress is null)
+                return;
+            lock (sync)
+                progress.Report((++done, charts.Count));
+        }
+
+        int parallelism = Math.Max(1, options.Parallelism);
+        if (parallelism == 1)
+        {
+            for (int i = 0; i < charts.Count; i++)
+                await PlanOneAsync(i, cancellationToken).ConfigureAwait(false);
+        }
+        else
+        {
+            await Parallel.ForEachAsync(
+                Enumerable.Range(0, charts.Count),
+                new ParallelOptions { MaxDegreeOfParallelism = parallelism, CancellationToken = cancellationToken },
+                (i, token) => PlanOneAsync(i, token)).ConfigureAwait(false);
+        }
+
+        return plans;
+    }
+
     /// <summary>One strategy's way of estimating a file, for <see cref="PlanFileAsync"/>.</summary>
-    private sealed record Step(OptimizeStrategy Strategy, OptimizeActionKind Kind, bool Remove, bool Available, Func<AssetFile, Task<OptimizeEstimate>> Estimate);
+    /// <param name="Compatibility">
+    /// Says whether a file is converted for compatibility rather than size, as a video in an unsupported codec is; null when
+    /// none is. Whether that's done is <paramref name="ConvertForCompatibility"/>.
+    /// </param>
+    private sealed record Step(
+        OptimizeStrategy Strategy, OptimizeActionKind Kind, bool Remove, bool Available, Func<AssetFile, Task<OptimizeEstimate>> Estimate,
+        Func<ChartAsset, bool>? Compatibility = null, bool ConvertForCompatibility = false);
 
     /// <summary>Plans <paramref name="chart"/>.</summary>
     /// <exception cref="IOException">The chart can't be read to clean its metadata.</exception>
@@ -52,7 +106,8 @@ public static class OptimizationPlanner
         if (options.Video.Enabled)
         {
             var step = new Step(OptimizeStrategy.Video, OptimizeActionKind.Recompress, options.Video.Remove, optimizers.Video?.IsAvailable == true,
-                file => optimizers.Video!.EstimateAsync(file, options.Video, cancellationToken));
+                file => optimizers.Video!.EstimateAsync(file, options.Video, cancellationToken),
+                asset => VideoCodecs.IsUnsupported(asset.CodecKey), options.Video.ConvertUnsupported);
             await PlanFilesAsync(plan, chart.Assets.Where(a => a.Kind == AssetKind.Video), step).ConfigureAwait(false);
         }
 
@@ -129,6 +184,14 @@ public static class OptimizationPlanner
         if (!step.Available)
             return Skipped(step.Strategy, names, null, asset, asset.Length, OptimizeSkipReason.OptimizerUnavailable);
 
+        // A file that's only converted so the games can play it: when that's off it's left alone, and not estimated, as the
+        // answer would only be shown (SavingsEstimator shows what converting costs, by codec). When it's on, it's converted
+        // whatever it saves. It's judged by the codec the inspector probed: a video it couldn't probe has none, and goes by the
+        // ordinary rules (the optimizer's own probe reads the same files, so one the inspector can't read fails its estimate).
+        bool compatibility = step.Compatibility?.Invoke(asset) == true;
+        if (compatibility && !step.ConvertForCompatibility)
+            return Skipped(step.Strategy, names, null, asset, asset.Length, OptimizeSkipReason.UnsupportedCodec);
+
         OptimizeEstimate estimate;
         try
         {
@@ -140,7 +203,8 @@ public static class OptimizationPlanner
         }
 
         string output = Path.GetFileNameWithoutExtension(asset.StoredName) + estimate.OutputExtension;
-        var reason = Judge(asset.Length, estimate, plan.Margin);
+        // The savings margin and the larger-file rule don't apply to a conversion for compatibility; what's already optimal does.
+        var reason = compatibility ? (estimate.AlreadyOptimal ? OptimizeSkipReason.AlreadyOptimal : OptimizeSkipReason.None) : Judge(asset.Length, estimate, plan.Margin);
         if (reason == OptimizeSkipReason.None && NameTaken(plan, output, names))
             reason = OptimizeSkipReason.OutputNameTaken;
 
@@ -148,7 +212,8 @@ public static class OptimizationPlanner
             return Skipped(step.Strategy, names, output, asset, estimate.OutputBytes, reason);
 
         plan.Written.Add(output);
-        return new PlannedAction(step.Strategy, step.Kind, names, output, asset.CodecKey, asset.Length, estimate.OutputBytes);
+        return new PlannedAction(step.Strategy, compatibility ? OptimizeActionKind.Transcode : step.Kind, names, output, asset.CodecKey, asset.Length, estimate.OutputBytes,
+            ForCompatibility: compatibility);
     }
 
     private static async Task PlanMixdownAsync(PlanState plan, OptimizeOptions options, IAudioOptimizer? audio, HashSet<string> consumed)
