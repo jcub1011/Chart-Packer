@@ -65,9 +65,8 @@ namespace ChartPacker.ViewModels
     {
         private static readonly int[] BitratePresets = [64, 80, 96, 128, 160, 192, 256];
 
-        // Not offered in the window, so they're carried from the saved settings to the run, and back when they're saved.
+        // Not offered in the window, so it's carried from the saved settings to the run, and back when they're saved.
         private int _parallelism;
-        private VideoEncodeSpeed _videoSpeed = VideoEncodeSpeed.Balanced;
         private bool _applying;
 
         /// <param name="settings">What the window was last set to.</param>
@@ -96,6 +95,15 @@ namespace ChartPacker.ViewModels
                 new(VideoTarget.Fhd, Strings.OptimizeVideoFhd),
                 new(VideoTarget.Qhd, Strings.OptimizeVideoQhd),
                 new(VideoTarget.Uhd, Strings.OptimizeVideoUhd),
+            ];
+            // Quickest first.
+            VideoSpeeds =
+            [
+                new(VideoEncodeSpeed.Fastest, Strings.OptimizeVideoSpeedFastest),
+                new(VideoEncodeSpeed.Fast, Strings.OptimizeVideoSpeedFast),
+                new(VideoEncodeSpeed.Balanced, Strings.OptimizeVideoSpeedBalanced),
+                new(VideoEncodeSpeed.Slow, Strings.OptimizeVideoSpeedSlow),
+                new(VideoEncodeSpeed.Best, Strings.OptimizeVideoSpeedBest),
             ];
             AlbumArtLimits = [.. new (int? W, int? H)[] { (null, null), (256, 256), (512, 512), (1024, 1024) }.Select(LimitChoice)];
             BackgroundArtLimits = [.. new (int? W, int? H)[] { (null, null), (854, 480), (1280, 720), (1920, 1080), (2560, 1440), (3840, 2160) }.Select(LimitChoice)];
@@ -128,6 +136,8 @@ namespace ChartPacker.ViewModels
         public ObservableCollection<OptimizeChoice<int>> MixdownBitrateChoices { get; }
 
         public IReadOnlyList<OptimizeChoice<VideoTarget>> VideoTargets { get; }
+
+        public IReadOnlyList<OptimizeChoice<VideoEncodeSpeed>> VideoSpeeds { get; }
 
         public ObservableCollection<OptimizeChoice<(int? W, int? H)>> AlbumArtLimits { get; }
 
@@ -165,6 +175,9 @@ namespace ChartPacker.ViewModels
         public partial double VideoCq { get; set; }
 
         public string VideoCqText => string.Format(CultureInfo.CurrentCulture, Strings.OptimizeVideoCqFormat, (int)Math.Round(VideoCq));
+
+        [ObservableProperty]
+        public partial OptimizeChoice<VideoEncodeSpeed>? SelectedVideoSpeed { get; set; }
 
         [ObservableProperty]
         public partial bool VideoConvertUnsupported { get; set; }
@@ -222,7 +235,6 @@ namespace ChartPacker.ViewModels
             try
             {
                 _parallelism = s.Parallelism;
-                _videoSpeed = s.VideoSpeed;
 
                 Set(Metadata, s.MetadataEnabled);
                 PruneEmptyParts = s.PruneEmptyParts;
@@ -236,6 +248,7 @@ namespace ChartPacker.ViewModels
                 Set(Video, s.VideoEnabled);
                 SelectedVideoTarget = VideoTargets.First(c => c.Value == s.VideoTarget);
                 VideoCq = s.VideoCq;
+                SelectedVideoSpeed = VideoSpeeds.FirstOrDefault(c => c.Value == s.VideoSpeed) ?? VideoSpeeds.First(c => c.Value == VideoEncodeSpeed.Balanced);
                 VideoConvertUnsupported = s.VideoConvertUnsupported;
                 Set(AlbumArt, s.AlbumArtEnabled);
                 AlbumArtQuality = s.AlbumArtQuality;
@@ -271,7 +284,7 @@ namespace ChartPacker.ViewModels
             VideoTarget = SelectedVideoTarget?.Value ?? VideoTarget.Fhd,
             VideoCq = (int)Math.Round(VideoCq),
             VideoConvertUnsupported = VideoConvertUnsupported,
-            VideoSpeed = _videoSpeed,
+            VideoSpeed = SelectedVideoSpeed?.Value ?? VideoEncodeSpeed.Balanced,
             AlbumArtEnabled = AlbumArt.IsOn,
             AlbumArtQuality = (int)Math.Round(AlbumArtQuality),
             AlbumArtMaxWidth = SelectedAlbumArtLimit?.Value.W,

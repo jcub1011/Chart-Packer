@@ -29,7 +29,7 @@ public sealed class EstimateCache
 
     // Which way of estimating a video the kept estimates were made by. Raised when the way changes, so that estimates made
     // the old way aren't taken for the new: 2 is two windows of 512 frames, with keyframes counted apart.
-    private const int VideoMethod = 2;
+    private const int VideoMethod = 3;
 
     private readonly object _sync = new();
     private readonly Dictionary<string, Chart> _charts = new(OutputPaths.PathComparer);

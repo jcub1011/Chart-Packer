@@ -19,6 +19,7 @@ On the left, what to do:
   - **Compress audio to Opus:** each stem at the bitrate you pick, 128 kbps by default or the 80 kbps "smaller" preset. Stems that are already Opus are left alone, including Opus in an `.ogg` file.
   - **Mix stems down to one:** replaces a chart's stems with a single song stem. You can no longer hear the stems apart.
   - **Recompress background video:** re-encodes as VP8 in WebM, fitted inside the size you pick (480p, 720p, Full HD, 1440p or Ultra HD) and never scaled up, at the CQ you choose (lower is better quality and a larger file). The result has no audio track.
+    - **Speed** is how long the encoder spends on each video. Slower gives a smaller file for the same picture. **Balanced** is the default; **Fastest** is about three times as quick, with a rougher picture for its size. The estimate takes the same time whichever you pick.
     - **Convert unsupported codecs for compatibility** also converts VP9, AV1 and HEVC videos, which some games can't play. This is for compatibility, not size, so it is done whatever it saves, and the result may be larger. It is off by default.
   - **Recompress album art** and **background images:** as JPEG at the quality you pick, fitted inside the size limit and never scaled up.
   - **Clean up metadata:** drops `song.ini` keys and chart events no game needs. It is done whatever it saves.
@@ -65,7 +66,7 @@ Each chart shows what it saved, with the estimate beside it. Select a chart to s
 - Charts with unsaved changes, charts another app has open, and charts that changed since they were read are left alone. The list says why, and the **Problems** chip shows only those.
 - **Stop** cancels the run. Charts already finished keep their changes; the one being worked on is left as it was.
 - Videos take far longer than anything else, to measure and to optimize. A video is measured from two long stretches of it (about 17 seconds each at 30 frames a second), not the whole of it; a video shorter than that is measured whole.
-- A video's estimate is the least sure of the figures: expect the file a run writes to be within about 15% of it. A video the estimate says would save too little is left alone.
+- A video's estimate is the least sure of the figures: expect the file a run writes to be within about 20% of it, and now and then a third out. A video the estimate says would save too little is left alone, and one that turns out larger than the original while it's being written is stopped there and left as it was.
 - When Optimize is pressed before every chart is measured, the run measures the rest as it reaches them, and the footer says so while it does.
 
 [Back to Home](Home.md)

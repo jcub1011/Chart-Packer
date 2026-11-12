@@ -11,6 +11,8 @@
   <ItemGroup>
     <!-- The tests encode synthetic videos with the VP8 encoder and WebM writer. -->
     <InternalsVisibleTo Include="ChartShared.Core.Tests" />
+    <!-- The encode benchmark sets encoder options the app doesn't offer. -->
+    <InternalsVisibleTo Include="EncodeBench" />
     <ProjectReference Include="..\ChartShared.Core\ChartShared.Core.csproj" />
     <!-- FFmpeg's bindings and shared libraries. -->
     <ProjectReference Include="..\ChartShared.Ffmpeg\ChartShared.Ffmpeg.csproj" />

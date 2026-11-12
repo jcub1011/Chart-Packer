@@ -72,9 +72,19 @@ public interface IVideoOptimizer
     /// <param name="progress">Reports 0 to 1.</param>
     /// <exception cref="IOException">A file can't be read or written.</exception>
     /// <exception cref="InvalidDataException">The file can't be decoded.</exception>
+    /// <exception cref="OutputTooLargeException">
+    /// What it was writing had already passed the size of <paramref name="source"/>, so it stopped; nothing is written. Not
+    /// thrown for a conversion for compatibility, which is kept whatever its size.
+    /// </exception>
     /// <exception cref="OperationCanceledException">It was cancelled; a partial output may be left for the caller to delete.</exception>
     Task OptimizeAsync(AssetFile source, string destinationPath, VideoOptimizeOptions options, IProgress<double>? progress, CancellationToken cancellationToken);
 }
+
+/// <summary>
+/// An optimizer stopped part-way because its output had already grown past the file it would replace: carrying on could
+/// only write a file that wouldn't be kept. <see cref="OptimizeJob"/> leaves the file as it was, as <see cref="OptimizeSkipReason.WouldGrow"/>.
+/// </summary>
+public sealed class OutputTooLargeException(string message) : Exception(message);
 
 /// <summary>Recompresses album art or a background image. Implemented by <c>ChartShared.UI</c>.</summary>
 public interface IImageOptimizer

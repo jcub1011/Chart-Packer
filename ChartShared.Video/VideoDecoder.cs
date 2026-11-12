@@ -59,7 +59,7 @@ public sealed unsafe class VideoDecoder : IDisposable
     private bool _hasNext;
     private TimeSpan _lastTime;
 
-    private VideoDecoder(Stream stream, int maxWidth)
+    private VideoDecoder(Stream stream, int maxWidth, int threads)
     {
         _input = FfmpegStreamInput.Open(stream);
         _format = _input.Format;
@@ -80,7 +80,7 @@ public sealed unsafe class VideoDecoder : IDisposable
             Check(Native.avcodec_parameters_to_context(_codec, videoStream->codecpar), "The video's codec can't be set up");
 
             void* options = null;
-            Native.av_dict_set(&options, "threads", "auto", 0);
+            Native.av_dict_set(&options, "threads", threads > 0 ? threads.ToString(System.Globalization.CultureInfo.InvariantCulture) : "auto", 0);
             result = Native.avcodec_open2(_codec, decoder, &options);
             Native.av_dict_free(&options);
             Check(result, "The video's codec can't be opened");
@@ -141,16 +141,20 @@ public sealed unsafe class VideoDecoder : IDisposable
     /// owns it from here on: disposing the decoder disposes it, and so does a failed open.
     /// </summary>
     /// <param name="maxWidth">Frames wider than this are scaled down to it, keeping their shape.</param>
+    /// <param name="threads">
+    /// How many threads it decodes with; 0 or less leaves it to FFmpeg, which takes one per core. A caller that runs several
+    /// decoders at once, as the optimizer does, gives each its share.
+    /// </param>
     /// <exception cref="InvalidOperationException">FFmpeg isn't available; see <see cref="FfmpegLibrary"/>.</exception>
     /// <exception cref="InvalidDataException">The stream isn't a video that can be decoded.</exception>
-    public static VideoDecoder Open(Stream stream, int maxWidth)
+    public static VideoDecoder Open(Stream stream, int maxWidth, int threads = 0)
     {
         ArgumentNullException.ThrowIfNull(stream);
         ArgumentOutOfRangeException.ThrowIfLessThan(maxWidth, 1);
         try
         {
             FfmpegLibrary.EnsureAvailable();
-            return new VideoDecoder(stream, maxWidth);
+            return new VideoDecoder(stream, maxWidth, threads);
         }
         catch
         {

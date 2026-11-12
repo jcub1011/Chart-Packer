@@ -2981,6 +2981,33 @@ Each song is rechecked first. Changed songs, or ones whose kept copy is missing,
   <data name="OptimizeVideoCqDescription" xml:space="preserve">
     <value>Lower is better quality and a larger file. 32 is the default.</value>
   </data>
+  <data name="OptimizeVideoSpeedLabel" xml:space="preserve">
+    <value>Speed</value>
+    <comment>Label of the drop-down that picks how hard the video encoder works.</comment>
+  </data>
+  <data name="OptimizeVideoSpeedDescription" xml:space="preserve">
+    <value>How long the encoder spends on each video. Slower gives a smaller file for the same picture. Balanced is the default.</value>
+  </data>
+  <data name="OptimizeVideoSpeedFastest" xml:space="preserve">
+    <value>Fastest (about 3× quicker, rougher picture)</value>
+    <comment>A video encoding speed, compared with Balanced.</comment>
+  </data>
+  <data name="OptimizeVideoSpeedFast" xml:space="preserve">
+    <value>Fast</value>
+    <comment>A video encoding speed.</comment>
+  </data>
+  <data name="OptimizeVideoSpeedBalanced" xml:space="preserve">
+    <value>Balanced (default)</value>
+    <comment>A video encoding speed.</comment>
+  </data>
+  <data name="OptimizeVideoSpeedSlow" xml:space="preserve">
+    <value>Slow</value>
+    <comment>A video encoding speed.</comment>
+  </data>
+  <data name="OptimizeVideoSpeedBest" xml:space="preserve">
+    <value>Best (slowest, smallest)</value>
+    <comment>A video encoding speed.</comment>
+  </data>
   <data name="OptimizeVideoConvertLabel" xml:space="preserve">
     <value>Convert unsupported codecs for compatibility</value>
   </data>

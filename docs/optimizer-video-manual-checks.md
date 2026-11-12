@@ -45,10 +45,13 @@ Play each result in Clone Hero and in YARG, on the platforms you have.
 | 12 | A `.sng` and a song folder of the same chart | The same result for each; the `.sng` is rewritten with the new video. |
 | 13 | Cancel partway through a long video | No `.webm` or `*.chartpacker-tmp` is left, and the chart is unchanged. |
 | 14 | A damaged or truncated video | Skipped as an estimate failure, or failed for that file only; the chart's other files still run. |
-| 16 | Speed set to Fast, Balanced (the default), Slow and Best on one video | Each plays. Fast is about twice as fast as Slow and 10 to 20% larger for the same picture; Best is the slowest and smallest. An estimate at a speed matches the size that speed writes. |
-| 17 | A library of videos with parallelism 1, then 2, then 4 | The same results each time, in the same order. Total time falls (about 2x at 4 on a 16-core machine); the CPU is shared, not oversubscribed, and the UI stays responsive. |
+| 16 | Speed set to Fastest, Fast, Balanced (the default), Slow and Best on one video, from the window's Speed drop-down | Each plays. Fastest is about three times as fast as Balanced, with a rougher picture; Fast is about twice as fast as Slow and 10 to 20% larger for the same picture; Best is the slowest and smallest. The choice is kept when the window is reopened. |
+| 16b | Change Speed with estimates already shown | The videos are measured again, in about the same time whatever the speed: an estimate is always encoded at the quickest speed and scaled. |
+| 17 | A library of videos with parallelism 1, then 2, then 4 | The same results each time, in the same order. Total time falls (about 2x at 4 on a 16-core machine), and the UI stays responsive. |
+| 17b | A library of videos with the default parallelism on a 16-core machine | Six charts are worked on at once. Memory use stays reasonable (each 1080p encode holds a few hundred MB). |
+| 19 | A video whose estimate says it saves, but which comes out larger (a low-bitrate source near the margin; lower the CQ to force it) | Its encode stops partway, it's reported **would grow** and left as it was; the chart's other files still run and no `.*.webm` is left. |
 | 18 | Cancel with several videos encoding at once | All stop; no `.webm`, `.*.webm` or `*.chartpacker-tmp` is left, and each chart is as it was. |
-| 15 | Switch video on, and select a chart with a long video once it's measured | Its breakdown shows the video's size before and after. After a run, the size written is within about 25% of that estimate. |
+| 15 | Switch video on, and select a chart with a long video once it's measured | Its breakdown shows the video's size before and after. After a run, the size written is within about 20% of that estimate for most videos, and now and then a third out. |
 
 After every run: no `*.chartpacker-tmp` files or folders, and no `.*.webm` temp files, anywhere in
 the library or output folder, including after cancelling mid-run.

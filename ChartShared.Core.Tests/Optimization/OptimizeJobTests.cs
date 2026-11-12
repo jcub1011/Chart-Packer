@@ -272,6 +272,31 @@ public sealed class OptimizeJobTests
     }
 
     [TestMethod]
+    public async Task AFileWhoseOptimizerGivesUpAsTooLargeIsSkippedNotFailed()
+    {
+        var entry = await FolderChartAsync();
+        var optimizer = new FakeOptimizer
+        {
+            OnOptimize = (files, _) =>
+            {
+                if (files[0].Asset.Kind == AssetKind.Video)
+                    throw new OutputTooLargeException("It passed the source's size.");
+            },
+        };
+        var options = AllOn();
+
+        var result = await RunAsync([await PlanAsync(entry, options, optimizer)], options, optimizer);
+
+        var item = result.Items.Single();
+        Assert.AreEqual(OptimizeItemStatus.Succeeded, item.Status, item.ErrorMessage);
+        var video = item.Assets.Single(a => a.Strategy == OptimizeStrategy.Video);
+        Assert.AreEqual(AssetOutcome.Skipped, video.Outcome);
+        Assert.AreEqual(nameof(OptimizeSkipReason.WouldGrow), video.Detail);
+        Assert.AreEqual(video.BytesBefore, video.BytesAfter);
+        Assert.AreEqual(0, Leftovers(_root.FullName).Count);
+    }
+
+    [TestMethod]
     public async Task AFailingFileIsReportedAndTheChartsOtherFilesCarryOn()
     {
         var entry = await FolderChartAsync();

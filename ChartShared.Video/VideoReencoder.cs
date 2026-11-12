@@ -66,6 +66,11 @@ public static class VideoReencoder
     /// behind and whatever was at the destination as it was. The source is never changed.
     /// </summary>
     /// <param name="progress">Reports 0 to 1, by how far into the video it is.</param>
+    /// <param name="maxBytes">
+    /// The most the video's packets may come to before the encode is given up, with <see cref="OutputTooLargeException"/>:
+    /// the size of the file it would replace, when a larger one wouldn't be kept. 0 or less is no limit.
+    /// </param>
+    /// <exception cref="OutputTooLargeException">The output passed <paramref name="maxBytes"/>; nothing is left behind.</exception>
     /// <exception cref="InvalidOperationException">FFmpeg isn't available, or has no VP8 encoder; see <see cref="IsAvailable"/>.</exception>
     /// <exception cref="InvalidDataException">The video can't be decoded, has no frames, or can't be encoded.</exception>
     /// <exception cref="IOException">A file can't be read or written.</exception>
@@ -73,7 +78,8 @@ public static class VideoReencoder
     /// <exception cref="ArgumentOutOfRangeException">The quality is outside libvpx's range.</exception>
     /// <exception cref="OperationCanceledException">The encode was cancelled.</exception>
     public static unsafe void Reencode(
-        string sourcePath, string destinationPath, VideoReencodeSettings settings, IProgress<double>? progress = null, CancellationToken cancellationToken = default)
+        string sourcePath, string destinationPath, VideoReencodeSettings settings, IProgress<double>? progress = null, CancellationToken cancellationToken = default,
+        long maxBytes = 0)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sourcePath);
         ArgumentException.ThrowIfNullOrWhiteSpace(destinationPath);
@@ -81,12 +87,14 @@ public static class VideoReencoder
         settings.Validate();
         EnsureAvailable();
 
+        long started = System.Diagnostics.Stopwatch.GetTimestamp();
+        int encoded = 0;
         string folder = Path.GetDirectoryName(Path.GetFullPath(destinationPath)) ?? throw new IOException($"'{destinationPath}' has no folder.");
         string temp = Path.Combine(folder, $".{Path.GetFileNameWithoutExtension(destinationPath)}.{Guid.NewGuid():N}.webm");
         bool moved = false;
         try
         {
-            using (var decoder = OpenDecoder(sourcePath))
+            using (var decoder = OpenDecoder(sourcePath, settings))
             using (var pipeline = new Pipeline(decoder, settings))
             {
                 WebmWriter? writer = null;
@@ -98,11 +106,22 @@ public static class VideoReencoder
                         : time => progress.Report(Math.Clamp(time.TotalSeconds / seconds, 0, 1));
 
                     // Time zero is the start of the video, not its first frame, so a lead-in is kept.
-                    int frames = pipeline.Run(int.MaxValue, TimeSpan.Zero, encoder => writer = new WebmWriter(temp, encoder), packet => writer!.Write(packet), onFrame, cancellationToken);
+                    // The packets alone are less than the file they're written to, so a file that's given up was certain to be too large.
+                    long written = 0;
+                    PacketHandler write = packet =>
+                    {
+                        written += packet->size;
+                        if (maxBytes > 0 && written > maxBytes)
+                            throw new OutputTooLargeException($"The re-encoded video passed {maxBytes} bytes, the size it had to stay under.");
+                        writer!.Write(packet);
+                    };
+
+                    int frames = pipeline.Run(int.MaxValue, TimeSpan.Zero, encoder => writer = new WebmWriter(temp, encoder), write, onFrame, cancellationToken);
                     if (frames == 0)
                         throw new InvalidDataException("The video has no frames that can be decoded.");
 
                     writer!.Finish();
+                    encoded = frames;
                 }
                 finally
                 {
@@ -114,6 +133,7 @@ public static class VideoReencoder
             File.Move(temp, destinationPath, overwrite: true);
             moved = true;
             progress?.Report(1);
+            LogTiming("Encoded", sourcePath, encoded, started, settings);
         }
         finally
         {
@@ -145,7 +165,8 @@ public static class VideoReencoder
         settings.Validate();
         EnsureAvailable();
 
-        using var decoder = OpenDecoder(sourcePath);
+        long started = System.Diagnostics.Stopwatch.GetTimestamp();
+        using var decoder = OpenDecoder(sourcePath, settings);
         using var pipeline = new Pipeline(decoder, settings);
         var counter = new PacketCounter();
         double fps = pipeline.FrameRate;
@@ -157,6 +178,7 @@ public static class VideoReencoder
             int all = pipeline.Run(int.MaxValue, TimeSpan.Zero, null, counter.Add, null, cancellationToken);
             if (all == 0)
                 throw new InvalidDataException("The video has no frames that can be decoded.");
+            LogTiming("Estimated (whole)", sourcePath, all, started, settings);
             return WebmFixedBytes + counter.Bytes + (counter.Packets * WebmBytesPerPacket);
         }
 
@@ -175,6 +197,8 @@ public static class VideoReencoder
 
         if (frames == 0)
             throw new InvalidDataException("The video has no frames that can be decoded.");
+
+        LogTiming("Estimated", sourcePath, (int)frames, started, settings);
 
         // Bytes per frame of what was sampled, over every frame, with the container's overhead per packet; the header once.
         return WebmFixedBytes + (long)Math.Round(counter.BytesPerFrame(frames) * totalFrames);
@@ -220,7 +244,7 @@ public static class VideoReencoder
         try
         {
             TimeSpan shown = TimeSpan.Zero;
-            using (var decoder = OpenDecoder(sourcePath))
+            using (var decoder = OpenDecoder(sourcePath, settings))
             using (var pipeline = new Pipeline(decoder, settings))
             {
                 double duration = decoder.Duration.TotalSeconds;
@@ -289,14 +313,23 @@ public static class VideoReencoder
         }
     }
 
+    // How long an encode or an estimate took, for reading a run's speed out of the log.
+    private static void LogTiming(string what, string path, int frames, long started, VideoReencodeSettings settings)
+    {
+        double seconds = System.Diagnostics.Stopwatch.GetElapsedTime(started).TotalSeconds;
+        Logger.Debug(
+            "{What} {Frames} frames of '{File}' in {Seconds:F1} s ({Fps:F1} fps; cpu-used {CpuUsed}, {Threads} threads)",
+            what, frames, Path.GetFileName(path), seconds, seconds > 0 ? frames / seconds : 0, settings.EffectiveCpuUsed, settings.Threads);
+    }
+
     private static void EnsureAvailable()
     {
         if (UnavailableReason is { } reason)
             throw new InvalidOperationException(reason);
     }
 
-    private static VideoDecoder OpenDecoder(string path) =>
-        VideoDecoder.Open(new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete, IoBufferSize), int.MaxValue);
+    private static VideoDecoder OpenDecoder(string path, VideoReencodeSettings settings) =>
+        VideoDecoder.Open(new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete, IoBufferSize), int.MaxValue, settings.DecoderThreads);
 
     private static void TryDelete(string path)
     {
@@ -505,6 +538,8 @@ public static class VideoReencoder
                 if (_scaler == null)
                     throw new OutOfMemoryException();
                 Vp8Encoder.Check(Native.av_opt_set_int(_scaler, "sws_flags", Native.SwsBicubic, 0), "The video's scaler can't be set up");
+                if (_settings.ScalerThreads > 1)
+                    Vp8Encoder.Check(Native.av_opt_set_int(_scaler, "threads", _settings.ScalerThreads, 0), "The video's scaler can't be given threads");
             }
 
             if (_scaled == null)

@@ -55,6 +55,13 @@ public enum VideoEncodeSpeed
 
     /// <summary>The slowest and most efficient; about 5 to 10% fewer bits than <see cref="Slow"/>, in about 20% more time.</summary>
     Best,
+
+    /// <summary>
+    /// libvpx's quickest setting short of its realtime mode: about three times as fast as <see cref="Balanced"/>. The
+    /// picture is rougher for its size; at the same CQ the file came out anywhere from a tenth smaller to a third larger.
+    /// Last, so the values saved before it keep their meaning.
+    /// </summary>
+    Fastest,
 }
 
 /// <summary>Which parts of metadata cleanup run. Every step is optional.</summary>
@@ -102,7 +109,10 @@ public sealed record AudioOptimizeOptions(bool Enabled = false, int BitrateKbps 
 /// VP8 WebM, which plays everywhere. Such a conversion is for compatibility, not size: it's done whatever it saves, and
 /// the file that results may be larger. Off, those videos are left alone, and only an estimate shows what converting would cost.
 /// </param>
-/// <param name="Speed">How hard the encoder works; slower is more efficient. An estimate is made at the same speed, so it matches the encode.</param>
+/// <param name="Speed">
+/// How hard the encoder works; slower is more efficient. An estimate is always made at the quickest speed and scaled to
+/// what this one writes, so it takes the same time whatever the speed.
+/// </param>
 /// <remarks>Videos are written as VP8 in WebM, with no audio track, and a video that's already VP8 WebM within the target size is left alone.</remarks>
 public sealed record VideoOptimizeOptions(bool Enabled = false, VideoTarget Target = VideoTarget.Fhd, int Cq = VideoOptimizeOptions.DefaultCq, bool Remove = false, bool ConvertUnsupported = false, VideoEncodeSpeed Speed = VideoEncodeSpeed.Balanced)
 {
@@ -191,8 +201,12 @@ public sealed record OptimizeOptions(
     string? OutputFolder = null,
     int Parallelism = 1)
 {
-    /// <summary>A number of charts to work on at once that suits this machine: a quarter of its cores, at least 2 where it has them.</summary>
-    public static int RecommendedParallelism => Math.Max(1, Math.Max(Environment.ProcessorCount >= 4 ? 2 : 1, Environment.ProcessorCount / 4));
+    /// <summary>
+    /// A number of charts to work on at once that suits this machine: three eighths of its cores, at least 2 where it has
+    /// them. Measured on 16 cores (tools/EncodeBench), six videos at once with four or five encoder threads each encoded
+    /// about 15% more frames a second in all than four with four, and no split of the cores did better than about 20%.
+    /// </summary>
+    public static int RecommendedParallelism => Math.Max(1, Math.Max(Environment.ProcessorCount >= 4 ? 2 : 1, Environment.ProcessorCount * 3 / 8));
 
     /// <summary>
     /// A number of charts to measure at once that suits this machine: all but one of its cores. Measuring audio and images

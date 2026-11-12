@@ -14,16 +14,24 @@ namespace ChartShared.Video;
 /// file with far more bits than that is estimated like any other, so the planner's margin decides. It's judged by probing
 /// the file itself, not by what the inspector recorded. (Its audio track, if it has one, stays: stripping it isn't worth
 /// a re-encode.)</para>
-/// <para><b>Estimates.</b> <see cref="VideoReencoder.EstimateSize"/> encodes equally spaced windows of the video, one
-/// keyframe interval each, and scales their size per frame to the whole video; a short video is encoded whole. Only the
-/// windows are decoded, so damage elsewhere passes the estimate and fails the optimize. It's the size of what would be
-/// written; what it's compared with, and so the skip rules (below the margin, larger than the input, and the exemption of
-/// a conversion for compatibility), are <see cref="OptimizationPlanner"/>'s.</para>
-/// <para><b>Speed and cores.</b> <see cref="VideoOptimizeOptions.Speed"/> sets how hard libvpx works, for the estimate as
-/// for the encode. Any number of calls may run at once (the job runs <see cref="OptimizeOptions.Parallelism"/> charts at a
-/// time); each encode's threads are the machine's cores divided by the most of <paramref name="expectedConcurrency"/> and the
-/// calls running when it started, so that the calls of a job that runs <see cref="OptimizeOptions.Parallelism"/> at once
-/// share the machine from the first, rather than the first taking it all.</para>
+/// <para><b>Estimates.</b> <see cref="VideoReencoder.EstimateSize"/> encodes equally spaced windows of the video
+/// (<see cref="VideoReencoder.DefaultWindowFrames"/> frames each) and scales their size per frame to the whole video; a
+/// short video is encoded whole. The windows are encoded at libvpx's quickest speed
+/// (<see cref="VideoReencodeSettings.EstimateCpuUsed"/>), whatever the encode's, and the result scaled by
+/// <see cref="VideoReencodeSettings.EstimateFactor"/> to what the encode's speed writes: about a quarter of the time of
+/// estimating at the default speed, for a little less accuracy (the factor's remarks have the measurements), so no
+/// estimate is exact, a short video's included. Only the windows are decoded, so damage elsewhere passes the estimate and
+/// fails the optimize. It's the size of what would be written; what it's compared with, and so the skip rules (below the
+/// margin, larger than the input, and the exemption of a conversion for compatibility), are <see cref="OptimizationPlanner"/>'s.</para>
+/// <para><b>Giving up.</b> An encode whose output passes the size of its source stops there, with
+/// <see cref="OutputTooLargeException"/>, as the file wouldn't be kept; a conversion for compatibility, which is kept
+/// whatever its size, runs to the end.</para>
+/// <para><b>Speed and cores.</b> <see cref="VideoOptimizeOptions.Speed"/> sets how hard libvpx works. Any number of calls
+/// may run at once (the job runs <see cref="OptimizeOptions.Parallelism"/> charts at a time); each encode's threads are
+/// twice the machine's cores divided by the most of <paramref name="expectedConcurrency"/> and the calls running when it
+/// started, up to 8, so that the calls of a job that runs <see cref="OptimizeOptions.Parallelism"/> at once share the
+/// machine from the first, rather than the first taking it all. Twice, as libvpx's threads wait on each other for much of
+/// the time: four threads encode 2.6 times what one does, and eight barely more.</para>
 /// <para><b>Availability.</b> It needs FFmpeg built with the libvpx encoder; <see cref="IsAvailable"/> is false otherwise,
 /// and the planner leaves videos alone with <see cref="OptimizeSkipReason.OptimizerUnavailable"/> (the UI can show the
 /// option disabled, with <see cref="VideoReencoder.UnavailableReason"/>).</para>
@@ -88,7 +96,9 @@ public sealed class VideoOptimizer(
             var settings = Begin(options);
             try
             {
-                VideoReencoder.Reencode(source.Path, destinationPath, settings, inline, cancellationToken);
+                // A file that comes out larger than the one it replaces isn't kept, unless it was converted so the games can play it.
+                bool compatibility = options.ConvertUnsupported && VideoCodecs.IsUnsupported(source.Asset.CodecKey);
+                VideoReencoder.Reencode(source.Path, destinationPath, settings, inline, cancellationToken, compatibility ? 0 : source.Asset.Length);
             }
             finally
             {
@@ -97,14 +107,14 @@ public sealed class VideoOptimizer(
         }, cancellationToken);
     }
 
-    // An encode's threads are the machine's cores (up to the 8 libvpx can use) over the calls expected at once, or running now
-    // if that's more: fixed when the encode starts, so the first of several doesn't take the whole machine before the rest
-    // have begun.
+    // An encode's threads are twice the machine's cores (up to the 8 libvpx can use) over the calls expected at once, or
+    // running now if that's more: fixed when the encode starts, so the first of several doesn't take the whole machine
+    // before the rest have begun.
     private VideoReencodeSettings Begin(VideoOptimizeOptions options)
     {
         int active = Interlocked.Increment(ref _active);
         int sharing = Math.Max(Math.Max(expectedConcurrency, 1), active);
-        return VideoReencodeSettings.From(options) with { Threads = Math.Clamp(Environment.ProcessorCount / sharing, 1, 8) };
+        return VideoReencodeSettings.From(options) with { Threads = Math.Clamp(Environment.ProcessorCount * 2 / sharing, 1, 8) };
     }
 
     private void End() => Interlocked.Decrement(ref _active);
@@ -136,7 +146,10 @@ public sealed class VideoOptimizer(
         if (IsAlreadyOptimal(source.Asset, info, settings))
             return new OptimizeEstimate(source.Asset.Length, OutputExtension, AlreadyOptimal: true);
 
-        return new OptimizeEstimate(VideoReencoder.EstimateSize(source.Path, settings, _windowCount, _windowFrames, cancellationToken: cancellationToken), OutputExtension);
+        // Encoded at the quickest speed, and scaled to what the encode's own speed writes.
+        var quick = settings with { CpuUsedOverride = VideoReencodeSettings.EstimateCpuUsed };
+        long sampled = VideoReencoder.EstimateSize(source.Path, quick, _windowCount, _windowFrames, cancellationToken: cancellationToken);
+        return new OptimizeEstimate(Math.Max(1, (long)Math.Round(sampled * VideoReencodeSettings.EstimateFactor(settings.Speed))), OutputExtension);
     }
 
     private sealed class InlineProgress(Action<double> report) : IProgress<double>

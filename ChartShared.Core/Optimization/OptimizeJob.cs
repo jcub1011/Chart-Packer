@@ -376,6 +376,12 @@ public static class OptimizeJob
                 change.Renames[name] = action.OutputName;
             change.Assets.Add(new AssetResult(name, action.Strategy, action.Kind, action.InputBytes, info.Length, AssetOutcome.Applied, action.OutputName, null, action.EstimatedOutputBytes));
         }
+        catch (OutputTooLargeException)
+        {
+            // The optimizer saw its output pass the input's size and stopped: the same verdict as above, reached sooner.
+            StagingPath.TryDeleteFile(output);
+            change.Assets.Add(new AssetResult(name, action.Strategy, action.Kind, action.InputBytes, action.InputBytes, AssetOutcome.Skipped, action.OutputName, nameof(OptimizeSkipReason.WouldGrow), action.EstimatedOutputBytes));
+        }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             // This file stays as it was; the chart's others carry on.

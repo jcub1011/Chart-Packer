@@ -378,6 +378,7 @@ public sealed class VideoReencoderTests
     [DataRow(VideoEncodeSpeed.Balanced)]
     [DataRow(VideoEncodeSpeed.Slow)]
     [DataRow(VideoEncodeSpeed.Best)]
+    [DataRow(VideoEncodeSpeed.Fastest)]
     public void EverySpeedEncodesAndEstimatesAValidVideo(VideoEncodeSpeed speed)
     {
         string source = Temp("source.webm");
@@ -391,6 +392,45 @@ public sealed class VideoReencoderTests
         Assert.AreEqual(40, CountFrames(output));
         long actual = new FileInfo(output).Length;
         Assert.IsLessThan(0.1, Math.Abs(estimate - actual) / (double)actual, $"{speed}: estimated {estimate}, wrote {actual}");
+    }
+
+    [TestMethod]
+    public void AnEncodeThatPassesItsLimitStopsAndLeavesNothing()
+    {
+        string source = Temp("source.webm");
+        SyntheticVideo.Write(source, 320, 180, frames: 40, fps: 20);
+        string output = Temp("out.webm");
+
+        Assert.ThrowsExactly<OutputTooLargeException>(() => VideoReencoder.Reencode(source, output, new VideoReencodeSettings(Threads: 2), maxBytes: 200));
+
+        Assert.AreSequenceEqual(new[] { "source.webm" }, Directory.GetFileSystemEntries(_root.FullName).Select(Path.GetFileName).ToArray()!);
+    }
+
+    [TestMethod]
+    public void AnEncodeWithinItsLimitIsWrittenWhole()
+    {
+        string source = Temp("source.webm");
+        SyntheticVideo.Write(source, 320, 180, frames: 40, fps: 20);
+        string output = Temp("out.webm");
+
+        VideoReencoder.Reencode(source, output, new VideoReencodeSettings(Threads: 2), maxBytes: 100_000_000);
+
+        Assert.AreEqual(40, CountFrames(output));
+    }
+
+    [TestMethod]
+    public void TheFastestSpeedIsTheOneEstimatesAreMadeAt()
+    {
+        // So an estimate for it needs no scaling, and every other speed's is scaled down, as a slower encode is smaller.
+        Assert.AreEqual(VideoReencodeSettings.EstimateCpuUsed, VideoReencodeSettings.CpuUsedOf(VideoEncodeSpeed.Fastest));
+        Assert.AreEqual(1.0, VideoReencodeSettings.EstimateFactor(VideoEncodeSpeed.Fastest));
+        foreach (var speed in Enum.GetValues<VideoEncodeSpeed>())
+        {
+            Assert.IsGreaterThan(0.5, VideoReencodeSettings.EstimateFactor(speed));
+            Assert.IsLessThanOrEqualTo(1.0, VideoReencodeSettings.EstimateFactor(speed));
+        }
+
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => VideoReencodeSettings.EstimateFactor((VideoEncodeSpeed)99));
     }
 
     [TestMethod]

@@ -111,8 +111,46 @@ public sealed class VideoOptimizerTests
         Assert.IsFalse(estimate.AlreadyOptimal);
         Assert.AreEqual(".webm", estimate.OutputExtension);
         long actual = new FileInfo(output).Length;
-        Assert.IsLessThan(0.1, Math.Abs(estimate.OutputBytes - actual) / (double)actual, $"Estimated {estimate.OutputBytes}, wrote {actual}");
+        // The estimate is encoded at the quickest speed and scaled, so it's near the size written, not the size itself.
+        Assert.IsLessThan(0.35, Math.Abs(estimate.OutputBytes - actual) / (double)actual, $"Estimated {estimate.OutputBytes}, wrote {actual}");
         Assert.AreEqual("vp8", VideoProbe.Probe(output).Codec);
+    }
+
+    [TestMethod]
+    public async Task AnEstimateTakesTheSameSampleWhateverTheSpeedAndScalesIt()
+    {
+        var source = FileOf(Path.Combine(Fixtures, "tiny.mp4"));
+        var optimizer = new VideoOptimizer();
+
+        var fastest = await optimizer.EstimateAsync(source, Enabled with { Speed = VideoEncodeSpeed.Fastest }, TestContext.CancellationToken);
+        var best = await optimizer.EstimateAsync(source, Enabled with { Speed = VideoEncodeSpeed.Best }, TestContext.CancellationToken);
+
+        Assert.AreEqual(Math.Round(fastest.OutputBytes * VideoReencodeSettings.EstimateFactor(VideoEncodeSpeed.Best)), best.OutputBytes, 1.0);
+    }
+
+    [TestMethod]
+    public async Task AnOptimizeWhoseOutputPassesItsSourceStopsAndLeavesNothing()
+    {
+        // The source is said to be far smaller than anything the encoder could write.
+        string path = Path.Combine(Fixtures, "tiny.mp4");
+        var source = new AssetFile(new ChartAsset("video.mp4", ".mp4", 200, AssetKind.Video), path);
+
+        await Assert.ThrowsExactlyAsync<OutputTooLargeException>(
+            () => new VideoOptimizer().OptimizeAsync(source, Temp("video.webm"), Enabled, null, TestContext.CancellationToken));
+
+        Assert.IsEmpty(Directory.GetFileSystemEntries(_root.FullName));
+    }
+
+    [TestMethod]
+    public async Task AConversionForCompatibilityIsWrittenHoweverLargeItIs()
+    {
+        string path = Path.Combine(Fixtures, "tiny.mp4");
+        var source = new AssetFile(new ChartAsset("video.mp4", ".mp4", 200, AssetKind.Video, Probe: new ProbeResult("video/vp9")), path);
+        string output = Temp("video.webm");
+
+        await new VideoOptimizer().OptimizeAsync(source, output, Enabled with { ConvertUnsupported = true }, null, TestContext.CancellationToken);
+
+        Assert.IsGreaterThan(200, new FileInfo(output).Length);
     }
 
     [TestMethod]

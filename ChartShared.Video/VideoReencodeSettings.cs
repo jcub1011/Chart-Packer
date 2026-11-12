@@ -84,11 +84,31 @@ public sealed record VideoReencodeSettings(
     /// <summary>libvpx's <c>cpu-used</c> for <see cref="Speed"/>: 0 is its slowest and best.</summary>
     public int CpuUsed => CpuUsedOf(Speed);
 
+    /// <summary>A <c>cpu-used</c> that's used whatever <see cref="Speed"/> is: for measuring (tools/EncodeBench), and for estimates.</summary>
+    internal int? CpuUsedOverride { get; init; }
+
+    /// <summary>The <c>cpu-used</c> the encoder is given: <see cref="CpuUsedOverride"/>, or <see cref="Speed"/>'s.</summary>
+    internal int EffectiveCpuUsed => CpuUsedOverride ?? CpuUsed;
+
+    /// <summary>Encodes with libvpx's <c>deadline=realtime</c> rather than its default, <c>good</c>: much faster, and less efficient.</summary>
+    internal bool Realtime { get; init; }
+
+    /// <summary>How many threads the decoder uses; 0 or less leaves it to FFmpeg (one per core).</summary>
+    internal int DecoderThreads { get; init; }
+
+    /// <summary>How many threads the scaler uses; 1 or less is one, swscale's default.</summary>
+    internal int ScalerThreads { get; init; }
+
+    /// <summary>VP8's token partitions (FFmpeg's <c>-slices</c>: 1, 2, 4 or 8); 0 or less leaves libvpx's default, one.</summary>
+    internal int Slices { get; init; }
+
     /// <summary>
     /// libvpx's <c>cpu-used</c> for <paramref name="speed"/>. Measured on real 480p, 1080p and 4K videos at CQ 32 (same CQ,
     /// so quality and size both move): from 0 to 1 the encode is about 20% faster, and costs about 5 to 10% more bits for
     /// the same picture; 2 and 3 cost about 1 to 3% more again and are about 1.5 times as fast as 1; 4 and 5 are twice and
     /// four times as fast as 1 and give up 10 to 20% in efficiency. libvpx's <c>deadline=best</c> was no better than 0.
+    /// Measured again with tools/EncodeBench on 400 frames of two 1080p videos, 5 was three times as fast as 2, and at
+    /// the same CQ its size was 0.90 and 1.34 of 2's.
     /// </summary>
     public static int CpuUsedOf(VideoEncodeSpeed speed) => speed switch
     {
@@ -96,6 +116,33 @@ public sealed record VideoReencodeSettings(
         VideoEncodeSpeed.Balanced => 2,
         VideoEncodeSpeed.Slow => 1,
         VideoEncodeSpeed.Best => 0,
+        VideoEncodeSpeed.Fastest => 5,
+        _ => throw new ArgumentOutOfRangeException(nameof(speed), speed, null),
+    };
+
+    /// <summary>The <c>cpu-used</c> the optimizer's estimates are encoded at, whatever the speed of the encode they're for: libvpx's quickest in its <c>good</c> mode.</summary>
+    public const int EstimateCpuUsed = 5;
+
+    /// <summary>
+    /// What an estimate encoded at <see cref="EstimateCpuUsed"/> is multiplied by to give the size an encode at
+    /// <paramref name="speed"/> writes.
+    /// </summary>
+    /// <remarks>
+    /// Measured with tools/EncodeBench on six real 1080p videos (H.264 and VP8 sources) at CQ 32, against whole encodes
+    /// at <see cref="VideoEncodeSpeed.Balanced"/>: the quick estimate took 0.28 of the time of one made at the encode's
+    /// own speed, and came to 0.82 to 1.40 of the size written (1.05 on average), where the slow one came to 0.91 to 1.33
+    /// (1.08 on average). Most of either's error is the windows not being the whole video; scaled by its average, the
+    /// quick one was out by 19% on average and 33% at worst, the slow one by 15% and 23%. libvpx's realtime mode was no
+    /// quicker for the same error until <c>cpu-used</c> 16, which was out by far more. The factors of the speeds other
+    /// than Balanced weren't measured against whole encodes: Fast's is from estimates at its <c>cpu-used</c> on the same
+    /// six (0.98 of the quick one's), Slow's and Best's from two 400-frame samples (Slow as Balanced, Best 5% smaller).
+    /// </remarks>
+    public static double EstimateFactor(VideoEncodeSpeed speed) => speed switch
+    {
+        VideoEncodeSpeed.Fastest => 1.0,
+        VideoEncodeSpeed.Fast => 0.98,
+        VideoEncodeSpeed.Balanced or VideoEncodeSpeed.Slow => 0.95,
+        VideoEncodeSpeed.Best => 0.90,
         _ => throw new ArgumentOutOfRangeException(nameof(speed), speed, null),
     };
 

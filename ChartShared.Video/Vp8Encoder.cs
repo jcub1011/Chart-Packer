@@ -84,7 +84,11 @@ internal sealed unsafe class Vp8Encoder : IDisposable
             SetInt("g", VideoReencodeSettings.GopFrames);
             // Slower is better compression: cpu-used runs from 0 (slowest) to 5 and up. Threads share the machine with the
             // other encodes running at once, which is the optimizer's to say.
-            SetInt("cpu-used", settings.CpuUsed);
+            SetInt("cpu-used", settings.EffectiveCpuUsed);
+            if (settings.Realtime)
+                Check(Native.av_opt_set(_context, "deadline", "realtime", Native.OptSearchChildren), "The encoder's deadline can't be set");
+            if (settings.Slices > 0)
+                SetInt("slices", settings.Slices);
             SetInt("threads", settings.Threads > 0 ? settings.Threads : Math.Clamp(Environment.ProcessorCount, 1, 8));
             Check(Native.av_opt_set(_context, "flags", "+global_header", Native.OptSearchChildren), "The encoder's flags can't be set");
 

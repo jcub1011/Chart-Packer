@@ -415,6 +415,11 @@
                                             Value="{Binding VideoCq}" AutomationProperties.Name="{x:Static res:Strings.OptimizeVideoCqLabel}" />
                                     <TextBlock Grid.Column="2" Classes="caption number" MinWidth="44" Text="{Binding VideoCqText}" />
                                 </Grid>
+                                <Grid Classes="setting" ColumnDefinitions="84,*" ColumnSpacing="8" ToolTip.Tip="{x:Static res:Strings.OptimizeVideoSpeedDescription}">
+                                    <TextBlock Grid.Column="0" Classes="caption" Text="{x:Static res:Strings.OptimizeVideoSpeedLabel}" />
+                                    <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding VideoSpeeds}" SelectedItem="{Binding SelectedVideoSpeed}"
+                                              AutomationProperties.Name="{x:Static res:Strings.OptimizeVideoSpeedLabel}" />
+                                </Grid>
                                 <CheckBox IsChecked="{Binding VideoConvertUnsupported}" Content="{x:Static res:Strings.OptimizeVideoConvertLabel}" />
                                 <TextBlock Classes="note" Margin="26,-4,0,0" Text="{x:Static res:Strings.OptimizeVideoConvertDescription}" />
                             </StackPanel>
