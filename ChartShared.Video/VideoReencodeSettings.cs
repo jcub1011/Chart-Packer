@@ -30,6 +30,24 @@ public sealed record VideoReencodeSettings(
     /// </summary>
     public const int GopFrames = 128;
 
+    /// <summary>The widest an SD video is left.</summary>
+    public const int SdWidth = 854;
+
+    /// <summary>The tallest an SD video is left.</summary>
+    public const int SdHeight = 480;
+
+    /// <summary>The widest an HD video is left.</summary>
+    public const int HdWidth = 1280;
+
+    /// <summary>The tallest an HD video is left.</summary>
+    public const int HdHeight = 720;
+
+    /// <summary>The widest a QHD video is left.</summary>
+    public const int QhdWidth = 2560;
+
+    /// <summary>The tallest a QHD video is left.</summary>
+    public const int QhdHeight = 1440;
+
     /// <summary>The widest an FHD video is left.</summary>
     public const int FhdWidth = 1920;
 
@@ -46,7 +64,17 @@ public sealed record VideoReencodeSettings(
     // 7 Mbps whatever the source's rate, and a 4 Mbps cap held it to about 4 Mbps (a 4K source of 7 to 8 Mbps went to about
     // half its size) where 8 Mbps barely changed anything. At the default CQ 32, 1080p comes out at about 4 Mbps by itself,
     // so the cap only bites for demanding content or a lower CQ. The UHD cap is that scaled by about three rather than the pixel
-    // count's four, and wasn't measured.
+    // count's four, and wasn't measured. The SD, HD and QHD caps are scaled from FHD's by the same rule, and weren't measured
+    // either.
+    /// <summary>The bitrate cap an SD encode has when none is given, in kilobits per second.</summary>
+    public const int SdMaxBitrateKbps = 1000;
+
+    /// <summary>The bitrate cap an HD encode has when none is given, in kilobits per second.</summary>
+    public const int HdMaxBitrateKbps = 2000;
+
+    /// <summary>The bitrate cap a QHD encode has when none is given, in kilobits per second.</summary>
+    public const int QhdMaxBitrateKbps = 6500;
+
     /// <summary>The bitrate cap an FHD encode has when none is given, in kilobits per second.</summary>
     public const int FhdMaxBitrateKbps = 4000;
 
@@ -75,10 +103,26 @@ public sealed record VideoReencodeSettings(
     public int EffectiveMaxBitrateKbps => MaxBitrateKbps > 0 ? MaxBitrateKbps : DefaultMaxBitrateKbps(Target);
 
     /// <summary>The size <see cref="Target"/> fits a video inside.</summary>
-    public (int Width, int Height) MaxSize => Target == VideoTarget.Uhd ? (UhdWidth, UhdHeight) : (FhdWidth, FhdHeight);
+    public (int Width, int Height) MaxSize => Target switch
+    {
+        VideoTarget.Sd => (SdWidth, SdHeight),
+        VideoTarget.Hd => (HdWidth, HdHeight),
+        VideoTarget.Fhd => (FhdWidth, FhdHeight),
+        VideoTarget.Qhd => (QhdWidth, QhdHeight),
+        VideoTarget.Uhd => (UhdWidth, UhdHeight),
+        _ => throw new ArgumentOutOfRangeException(nameof(Target), Target, null),
+    };
 
     /// <summary>The default bitrate cap of <paramref name="target"/>, in kilobits per second.</summary>
-    public static int DefaultMaxBitrateKbps(VideoTarget target) => target == VideoTarget.Uhd ? UhdMaxBitrateKbps : FhdMaxBitrateKbps;
+    public static int DefaultMaxBitrateKbps(VideoTarget target) => target switch
+    {
+        VideoTarget.Sd => SdMaxBitrateKbps,
+        VideoTarget.Hd => HdMaxBitrateKbps,
+        VideoTarget.Fhd => FhdMaxBitrateKbps,
+        VideoTarget.Qhd => QhdMaxBitrateKbps,
+        VideoTarget.Uhd => UhdMaxBitrateKbps,
+        _ => throw new ArgumentOutOfRangeException(nameof(target), target, null),
+    };
 
     /// <summary>Settings for what the Library Optimization Tool was asked for.</summary>
     public static VideoReencodeSettings From(VideoOptimizeOptions options) => new(options.Target, options.Cq, Speed: options.Speed);

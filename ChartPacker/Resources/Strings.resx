@@ -2955,6 +2955,15 @@ Each song is rechecked first. Changed songs, or ones whose kept copy is missing,
     <value>Size</value>
     <comment>Label of the drop-down that picks the size a video is brought down to.</comment>
   </data>
+  <data name="OptimizeVideoSd" xml:space="preserve">
+    <value>SD (854×480)</value>
+  </data>
+  <data name="OptimizeVideoHd" xml:space="preserve">
+    <value>HD (1280×720)</value>
+  </data>
+  <data name="OptimizeVideoQhd" xml:space="preserve">
+    <value>Quad HD (2560×1440)</value>
+  </data>
   <data name="OptimizeVideoFhd" xml:space="preserve">
     <value>Full HD (1920×1080)</value>
   </data>

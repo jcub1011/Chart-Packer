@@ -91,11 +91,14 @@ namespace ChartPacker.ViewModels
             MixdownBitrateChoices = [.. BitratePresets.Select(BitrateChoice)];
             VideoTargets =
             [
+                new(VideoTarget.Sd, Strings.OptimizeVideoSd),
+                new(VideoTarget.Hd, Strings.OptimizeVideoHd),
                 new(VideoTarget.Fhd, Strings.OptimizeVideoFhd),
+                new(VideoTarget.Qhd, Strings.OptimizeVideoQhd),
                 new(VideoTarget.Uhd, Strings.OptimizeVideoUhd),
             ];
             AlbumArtLimits = [.. new (int? W, int? H)[] { (null, null), (256, 256), (512, 512), (1024, 1024) }.Select(LimitChoice)];
-            BackgroundArtLimits = [.. new (int? W, int? H)[] { (null, null), (1280, 720), (1920, 1080), (2560, 1440), (3840, 2160) }.Select(LimitChoice)];
+            BackgroundArtLimits = [.. new (int? W, int? H)[] { (null, null), (854, 480), (1280, 720), (1920, 1080), (2560, 1440), (3840, 2160) }.Select(LimitChoice)];
 
             Apply(settings);
         }

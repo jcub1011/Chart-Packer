@@ -30,6 +30,15 @@ public enum VideoTarget
 
     /// <summary>Ultra HD, 3840x2160.</summary>
     Uhd,
+
+    /// <summary>SD, 854x480.</summary>
+    Sd,
+
+    /// <summary>HD, 1280x720.</summary>
+    Hd,
+
+    /// <summary>Quad HD, 2560x1440.</summary>
+    Qhd,
 }
 
 /// <summary>How hard the video encoder works. Slower takes longer and gives a smaller file, or a better picture, for the same CQ.</summary>

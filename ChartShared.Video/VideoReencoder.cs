@@ -10,7 +10,7 @@ namespace ChartShared.Video;
 /// platform in both Clone Hero and YARG, and estimates what that would weigh by encoding a few short windows of it.
 /// </summary>
 /// <remarks>
-/// <para>The picture is fitted inside the target (1920×1080 for FHD, 3840×2160 for UHD) with its shape kept and is never
+/// <para>The picture is fitted inside the target (<see cref="VideoReencodeSettings.MaxSize"/>) with its shape kept and is never
 /// scaled up; both sides are made even, as VP8's 4:2:0 needs. It keeps the source's frame rate and each frame's time, so
 /// a video with gaps keeps them. The audio track, and any other stream, is left out.</para>
 /// <para>Every scale and colour conversion is swscale's <c>sws_scale_frame</c> into frames FFmpeg allocated itself:

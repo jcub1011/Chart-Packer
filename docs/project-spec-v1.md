@@ -630,8 +630,8 @@ Behaviour:
      an empty value, and legacy keys' old names (each step optional). It is done whatever it saves.
    - *Audio to Opus*: each stem at a bitrate per stereo stem, 128 kbps by default, with an 80 kbps "smaller" preset.
    - *Stem mixdown*: a chart's stems become one `song` stem, at its own bitrate.
-   - *Background video*: re-encoded as VP8 in WebM with no audio track, Full HD or Ultra HD, at a CQ (4 to 63, 32 by
-     default). **Convert unsupported codecs for compatibility** (off by default) also converts VP9, AV1 and HEVC videos,
+   - *Background video*: re-encoded as VP8 in WebM with no audio track, fitted inside 480p, 720p, Full HD (the default),
+     1440p or Ultra HD, at a CQ (4 to 63, 32 by default). **Convert unsupported codecs for compatibility** (off by default) also converts VP9, AV1 and HEVC videos,
      whatever it saves; the result may be larger.
    - *Album art* and *background image*: recompressed as JPEG at a quality (1 to 100, 80 by default) and fitted inside a size
      limit, never scaled up. Art with transparency stays PNG.

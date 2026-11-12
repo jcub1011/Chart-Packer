@@ -18,7 +18,7 @@ On the left, what to do:
 - **Shrink:** each way of making charts smaller, with what it saves across the charts beside it. Its settings appear once it is switched on.
   - **Compress audio to Opus:** each stem at the bitrate you pick, 128 kbps by default or the 80 kbps "smaller" preset. Stems that are already Opus are left alone, including Opus in an `.ogg` file.
   - **Mix stems down to one:** replaces a chart's stems with a single song stem. You can no longer hear the stems apart.
-  - **Recompress background video:** re-encodes as VP8 in WebM at Full HD or Ultra HD, at the CQ you choose (lower is better quality and a larger file). The result has no audio track.
+  - **Recompress background video:** re-encodes as VP8 in WebM, fitted inside the size you pick (480p, 720p, Full HD, 1440p or Ultra HD) and never scaled up, at the CQ you choose (lower is better quality and a larger file). The result has no audio track.
     - **Convert unsupported codecs for compatibility** also converts VP9, AV1 and HEVC videos, which some games can't play. This is for compatibility, not size, so it is done whatever it saves, and the result may be larger. It is off by default.
   - **Recompress album art** and **background images:** as JPEG at the quality you pick, fitted inside the size limit and never scaled up.
   - **Clean up metadata:** drops `song.ini` keys and chart events no game needs. It is done whatever it saves.

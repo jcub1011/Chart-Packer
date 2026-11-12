@@ -486,6 +486,13 @@ public sealed class VideoReencoderSizeTests
     [DataRow(3840, 2160, VideoTarget.Uhd, 3840, 2160)]
     [DataRow(4096, 2160, VideoTarget.Uhd, 3840, 2024)]
     [DataRow(7680, 4320, VideoTarget.Uhd, 3840, 2160)]
+    [DataRow(1920, 1080, VideoTarget.Sd, 854, 480)]
+    [DataRow(640, 360, VideoTarget.Sd, 640, 360)]
+    [DataRow(1920, 1080, VideoTarget.Hd, 1280, 720)]
+    [DataRow(640, 360, VideoTarget.Hd, 640, 360)]
+    [DataRow(1080, 1920, VideoTarget.Hd, 404, 720)]
+    [DataRow(3840, 2160, VideoTarget.Qhd, 2560, 1440)]
+    [DataRow(1920, 1080, VideoTarget.Qhd, 1920, 1080)]
     [DataRow(1, 1, VideoTarget.Fhd, 2, 2)]
     [DataRow(5000, 100, VideoTarget.Fhd, 1920, 38)]
     public void AVideoIsFittedInsideTheTargetWithEvenSides(int width, int height, VideoTarget target, int expectedWidth, int expectedHeight) =>
@@ -511,6 +518,9 @@ public sealed class VideoReencoderSizeTests
         Assert.AreEqual(32, fhd.Cq);
         Assert.AreEqual(VideoReencodeSettings.FhdMaxBitrateKbps, fhd.EffectiveMaxBitrateKbps);
         Assert.AreEqual(VideoReencodeSettings.UhdMaxBitrateKbps, uhd.EffectiveMaxBitrateKbps);
+        Assert.AreEqual(VideoReencodeSettings.SdMaxBitrateKbps, new VideoReencodeSettings(VideoTarget.Sd).EffectiveMaxBitrateKbps);
+        Assert.AreEqual(VideoReencodeSettings.HdMaxBitrateKbps, new VideoReencodeSettings(VideoTarget.Hd).EffectiveMaxBitrateKbps);
+        Assert.AreEqual(VideoReencodeSettings.QhdMaxBitrateKbps, new VideoReencodeSettings(VideoTarget.Qhd).EffectiveMaxBitrateKbps);
         Assert.AreEqual(500, new VideoReencodeSettings(MaxBitrateKbps: 500).EffectiveMaxBitrateKbps);
     }
 }

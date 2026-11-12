@@ -73,6 +73,17 @@ public sealed class OptimizeSettingsFileTests
     }
 
     [TestMethod]
+    [DataRow(VideoTarget.Sd)]
+    [DataRow(VideoTarget.Hd)]
+    [DataRow(VideoTarget.Qhd)]
+    public void EveryVideoTargetIsReadBack(VideoTarget target)
+    {
+        Assert.IsTrue(new OptimizeSettingsFile(_path).Save(new OptimizeSettings { VideoTarget = target }));
+
+        Assert.AreEqual(target, new OptimizeSettingsFile(_path).Load().VideoTarget);
+    }
+
+    [TestMethod]
     public void AnUnreadableFileGivesTheShippedSettings()
     {
         File.WriteAllText(_path, "{ not json");
