@@ -1,14 +1,15 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.ComponentModel;
 using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Avalonia.Collections;
+using Avalonia.Threading;
 using ChartPacker.Resources;
 using ChartPacker.Services;
+using ChartShared.Core.Jobs;
 using ChartShared.Core.Optimization;
 using ChartShared.Core.Scanning;
 using ChartShared.Core.Settings;
@@ -20,65 +21,66 @@ using CommunityToolkit.Mvvm.Input;
 
 namespace ChartPacker.ViewModels
 {
-    /// <summary>One choice in a drop-down. It's shown as its label.</summary>
-    public sealed record OptimizeChoice<T>(T Value, string Label)
+    /// <summary>What the Optimize window is doing.</summary>
+    public enum OptimizePhase
     {
-        public override string ToString() => Label;
+        /// <summary>Listing the charts' files.</summary>
+        Reading,
+
+        /// <summary>Measuring what each chart would save; the ones not reached yet are predicted.</summary>
+        Measuring,
+
+        /// <summary>Nothing: every chart is measured, or nothing is switched on to measure.</summary>
+        Ready,
+
+        /// <summary>Optimizing.</summary>
+        Running,
+
+        /// <summary>A run has finished, or was stopped, and its results are shown.</summary>
+        Done,
     }
 
-    /// <summary>One strategy's switch: whether it's on, and whether its backend can run at all.</summary>
-    public sealed partial class OptimizeStrategyToggle : ObservableObject
+    /// <summary>A filter chip over the chart list: one group of charts, and how many are in it.</summary>
+    public sealed partial class OptimizeFilterChip(OptimizeRowGroup group) : ObservableObject
     {
-        public OptimizeStrategyToggle(OptimizeStrategy strategy, string title, string description, string? unavailableReason)
-        {
-            Strategy = strategy;
-            Title = title;
-            Description = description;
-            UnavailableReason = unavailableReason;
-        }
+        public OptimizeRowGroup Group { get; } = group;
 
-        public OptimizeStrategy Strategy { get; }
-
-        public string Title { get; }
-
-        public string Description { get; }
-
-        /// <summary>Why the strategy can't run, or <see langword="null"/> when it can.</summary>
-        public string? UnavailableReason { get; }
-
-        public bool IsAvailable => UnavailableReason is null;
-
-        public bool IsUnavailable => UnavailableReason is not null;
-
-        public string UnavailableText => UnavailableReason is { } reason ? string.Format(CultureInfo.CurrentCulture, Strings.OptimizeUnavailableFormat, reason) : string.Empty;
-
-        /// <summary>Whether the strategy is switched on. Its switch is disabled while it's unavailable.</summary>
         [ObservableProperty]
         public partial bool IsOn { get; set; }
+
+        [ObservableProperty]
+        public partial string Label { get; set; } = string.Empty;
+
+        /// <summary>The chip is the problems', and there are some: it's shown in amber.</summary>
+        [ObservableProperty]
+        public partial bool IsAlert { get; set; }
     }
 
-    /// <summary>A codec's line in an estimate.</summary>
-    public sealed record OptimizeEstimateRow(string Codec, string Assets, string Saving, string PerChart, bool IsCost, bool IsCompatibility);
-
-    /// <summary>One strategy's estimate: its codecs, and what they come to.</summary>
-    public sealed record OptimizeEstimateSection(string Title, string Sample, IReadOnlyList<OptimizeEstimateRow> Rows, string Total, string? CompatibilityNote)
+    /// <summary>How the chart list is ordered.</summary>
+    public enum OptimizeSort
     {
-        public bool HasRows => Rows.Count > 0;
-
-        public bool HasNoRows => Rows.Count == 0;
-
-        public bool HasCompatibilityNote => CompatibilityNote is not null;
+        Saving,
+        Size,
+        Name,
+        Problems,
     }
-
-    /// <summary>A chart's result in a run.</summary>
-    public sealed record OptimizeResultRow(string Name, string Status, bool IsProblem);
 
     /// <summary>
-    /// The Optimize window (issue #257): what to optimize and how, an estimate of the savings, and the run itself.
+    /// The Optimize window (issue #257): every chart with what optimizing it saves, the settings that decide that, and
+    /// the run itself.
     /// </summary>
+    /// <remarks>
+    /// <para>Opening the window reads the charts' files, then measures them a chart at a time in the background
+    /// (<see cref="LibraryEstimator"/>): a few files of each media type first, from which every other chart is predicted
+    /// at once, then the rest, each chart's prediction giving way to its own measured figure. A changed setting starts
+    /// the measuring again, which costs only what the estimate cache doesn't already hold.</para>
+    /// <para>A measured chart's figure is the plan a run carries out, so the run doesn't measure it again; charts not yet
+    /// measured are planned a batch at a time as the run reaches them.</para>
+    /// </remarks>
     public sealed partial class OptimizeWindowViewModel : ViewModelBase
     {
-        private static readonly int[] BitratePresets = [64, 80, 96, 128, 160, 192, 256];
+        // How many charts not yet measured a run plans before it optimizes them, and plans the next lot.
+        private const int RunBatch = 24;
 
         private readonly OptimizeRequest _request;
         private readonly OptimizeSettingsFile _defaults;
@@ -86,45 +88,64 @@ namespace ChartPacker.ViewModels
         private readonly OptimizeJobServices _services;
         private readonly IConfirmationService _confirmation;
         private readonly IFolderPickerService _folderPicker;
+        private readonly IFileRevealService _reveal;
         private readonly CancellationTokenSource _closing = new();
-        private readonly Dictionary<string, ChartAssets> _inspected = new(StringComparer.Ordinal);
+        private readonly DispatcherTimer _refresh;
+        private readonly DispatcherTimer _settle;
+        private readonly EstimateCache _cache;
+        private readonly SemaphoreSlim _videoGate;
 
-        private readonly OptimizeChoice<SamplingMode> _single;
-        private readonly OptimizeChoice<SamplingMode> _sample;
-        private readonly OptimizeChoice<SamplingMode> _all;
-
-        private IReadOnlyList<SongEntry> _scope;
-        private IReadOnlyList<SongEntry>? _library;
+        private List<OptimizeChartRow> _rows = [];
+        private Dictionary<string, OptimizeChartRow> _byPath = new(OutputPaths.PathComparer);
         private OptimizerSet? _optimizers;
         private int _optimizersParallelism;
-        private int _parallelism;
-        // Not offered in the window, so it's carried from the saved settings to the run, and back when they're saved.
-        private VideoEncodeSpeed _videoSpeed = VideoEncodeSpeed.Balanced;
-        private int _unreadable;
-        private bool _closeWhenIdle;
+
+        // The background work: reading and measuring. Each change of scope or settings starts a new generation of it.
+        private CancellationTokenSource? _work;
+        private Task _pipeline = Task.CompletedTask;
+        private int _generation;
+        private LibraryEstimator? _estimator;
+        private SavingsModel? _model;
+        private int _modelVersion = -1;
+        private OptimizeOptions? _measuredOptions;
+
         private CancellationTokenSource? _run;
         private Task _current = Task.CompletedTask;
+        private bool _closeWhenIdle;
+        private bool _dirty;
+        private bool _resort;
+        private bool _sampleShown;
+        private bool _shutDown;
 
+        private int _read;
+        private int _measured;
+        private int _toMeasure;
+        private int _finished;
+        private int _toRun;
         private int _applied;
         private int _skipped;
         private int _failed;
         private long _bytesSaved;
+        private long _bytesEstimated;
         private int _changedInPlace;
         private int _written;
+        private bool _stopped;
 
         /// <param name="request">What the window works on.</param>
-        /// <param name="defaults">Where the window's defaults are read from and saved to.</param>
-        /// <param name="backends">The optimizers, probes and availability.</param>
+        /// <param name="defaults">Where the window's settings are read from and kept.</param>
+        /// <param name="backends">The optimizers, probes, availability and estimate cache.</param>
         /// <param name="services">What a run needs from the app: its locks, gate and drafts.</param>
         /// <param name="confirmation">Asks before charts are changed in place.</param>
         /// <param name="folderPicker">Picks the output folder.</param>
+        /// <param name="reveal">Opens the output folder.</param>
         public OptimizeWindowViewModel(
             OptimizeRequest request,
             OptimizeSettingsFile defaults,
             OptimizeBackends backends,
             OptimizeJobServices services,
             IConfirmationService confirmation,
-            IFolderPickerService folderPicker)
+            IFolderPickerService folderPicker,
+            IFileRevealService reveal)
         {
             _request = request;
             _defaults = defaults;
@@ -132,151 +153,52 @@ namespace ChartPacker.ViewModels
             _services = services;
             _confirmation = confirmation;
             _folderPicker = folderPicker;
-            _scope = request.Selected;
+            _reveal = reveal;
+            _cache = backends.Estimates;
+            _videoGate = new SemaphoreSlim(OptimizeOptions.RecommendedParallelism);
             _useWholeLibrary = request.Selected.Count == 0;
 
-            Metadata = Toggle(OptimizeStrategy.Metadata, Strings.OptimizeMetadataLabel, Strings.OptimizeMetadataDescription);
-            Audio = Toggle(OptimizeStrategy.Audio, Strings.OptimizeAudioLabel, Strings.OptimizeAudioDescription);
-            StemMixdown = Toggle(OptimizeStrategy.StemMixdown, Strings.OptimizeStemMixdownLabel, Strings.OptimizeStemMixdownDescription);
-            Video = Toggle(OptimizeStrategy.Video, Strings.OptimizeVideoLabel, Strings.OptimizeVideoDescription);
-            AlbumArt = Toggle(OptimizeStrategy.AlbumArt, Strings.OptimizeAlbumArtLabel, Strings.OptimizeImageDescription);
-            BackgroundArt = Toggle(OptimizeStrategy.BackgroundArt, Strings.OptimizeBackgroundArtLabel, Strings.OptimizeImageDescription);
-            AlbumArt.PropertyChanged += OnImageToggleChanged;
-            BackgroundArt.PropertyChanged += OnImageToggleChanged;
-            foreach (var toggle in Toggles)
-                toggle.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(OptimizeStrategyToggle.IsOn)) RefreshCommands(); };
+            Settings = new OptimizeSettingsViewModel(defaults.Load(), backends.UnavailableReason);
+            Settings.Changed += OnSettingsChanged;
 
-            BitrateChoices = [.. BitratePresets.Select(BitrateChoice)];
-            MixdownBitrateChoices = [.. BitratePresets.Select(BitrateChoice)];
-            VideoTargets =
+            SortChoices =
             [
-                new(VideoTarget.Fhd, Strings.OptimizeVideoFhd),
-                new(VideoTarget.Uhd, Strings.OptimizeVideoUhd),
+                new(OptimizeSort.Saving, Strings.OptimizeSortSaving),
+                new(OptimizeSort.Size, Strings.OptimizeSortSize),
+                new(OptimizeSort.Name, Strings.OptimizeSortName),
+                new(OptimizeSort.Problems, Strings.OptimizeSortProblems),
             ];
-            AlbumArtLimits = [.. new (int? W, int? H)[] { (null, null), (256, 256), (512, 512), (1024, 1024) }.Select(LimitChoice)];
-            BackgroundArtLimits = [.. new (int? W, int? H)[] { (null, null), (1280, 720), (1920, 1080), (2560, 1440), (3840, 2160) }.Select(LimitChoice)];
+            Chips = [new(OptimizeRowGroup.Shrinks), new(OptimizeRowGroup.Nothing), new(OptimizeRowGroup.Problem)];
+            foreach (var chip in Chips)
+                chip.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(OptimizeFilterChip.IsOn)) ShowRows(); };
+            SelectedSort = SortChoices[0];
 
-            _single = new(SamplingMode.SingleChart, Strings.OptimizeSamplingSingle);
-            _sample = new(SamplingMode.RandomSample, Strings.OptimizeSamplingSample);
-            _all = new(SamplingMode.AllCharts, Strings.OptimizeSamplingAll);
-            SamplingChoices = [_single, _sample, _all];
-
-            Apply(defaults.Load());
-            ShowScope();
+            // What's measured arrives in bursts from several threads; the list and the totals catch up a few times a second.
+            _refresh = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(250) };
+            _refresh.Tick += (_, _) => RefreshView();
+            // A slider being dragged is many changes; measuring starts again once they stop.
+            _settle = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(350) };
+            _settle.Tick += (_, _) =>
+            {
+                _settle.Stop();
+                OnSettingsSettled();
+            };
         }
 
         /// <summary>The window should close.</summary>
         public event Action? CloseRequested;
 
-        public OptimizeStrategyToggle Metadata { get; }
+        /// <summary>What to shrink and how.</summary>
+        public OptimizeSettingsViewModel Settings { get; }
 
-        public OptimizeStrategyToggle Audio { get; }
+        /// <summary>The charts shown, as searched, filtered and sorted.</summary>
+        public AvaloniaList<OptimizeChartRow> Rows { get; } = [];
 
-        public OptimizeStrategyToggle StemMixdown { get; }
+        public IReadOnlyList<OptimizeChoice<OptimizeSort>> SortChoices { get; }
 
-        public OptimizeStrategyToggle Video { get; }
+        public IReadOnlyList<OptimizeFilterChip> Chips { get; }
 
-        public OptimizeStrategyToggle AlbumArt { get; }
-
-        public OptimizeStrategyToggle BackgroundArt { get; }
-
-        private IEnumerable<OptimizeStrategyToggle> Toggles => [Metadata, Audio, StemMixdown, Video, AlbumArt, BackgroundArt];
-
-        public ObservableCollection<OptimizeChoice<int>> BitrateChoices { get; }
-
-        public ObservableCollection<OptimizeChoice<int>> MixdownBitrateChoices { get; }
-
-        public IReadOnlyList<OptimizeChoice<VideoTarget>> VideoTargets { get; }
-
-        public ObservableCollection<OptimizeChoice<(int? W, int? H)>> AlbumArtLimits { get; }
-
-        public ObservableCollection<OptimizeChoice<(int? W, int? H)>> BackgroundArtLimits { get; }
-
-        public ObservableCollection<OptimizeChoice<SamplingMode>> SamplingChoices { get; }
-
-        public ObservableCollection<OptimizeChoice<SongEntry>> ChartChoices { get; } = [];
-
-        public ObservableCollection<OptimizeEstimateSection> EstimateSections { get; } = [];
-
-        public ObservableCollection<OptimizeResultRow> Results { get; } = [];
-
-        // The metadata steps.
-
-        [ObservableProperty]
-        public partial bool PruneEmptyParts { get; set; }
-
-        [ObservableProperty]
-        public partial bool StripEditorEvents { get; set; }
-
-        [ObservableProperty]
-        public partial bool DropEmptyValues { get; set; }
-
-        [ObservableProperty]
-        public partial bool ReplaceLegacyKeys { get; set; }
-
-        // Audio.
-
-        [ObservableProperty]
-        public partial OptimizeChoice<int>? SelectedBitrate { get; set; }
-
-        [ObservableProperty]
-        public partial OptimizeChoice<int>? SelectedMixdownBitrate { get; set; }
-
-        // Video.
-
-        [ObservableProperty]
-        public partial OptimizeChoice<VideoTarget>? SelectedVideoTarget { get; set; }
-
-        [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(VideoCqText))]
-        public partial double VideoCq { get; set; }
-
-        public string VideoCqText => string.Format(CultureInfo.CurrentCulture, Strings.OptimizeVideoCqFormat, (int)Math.Round(VideoCq));
-
-        [ObservableProperty]
-        public partial bool VideoConvertUnsupported { get; set; }
-
-        // Images.
-
-        [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(AlbumArtQualityText))]
-        public partial double AlbumArtQuality { get; set; }
-
-        public string AlbumArtQualityText => string.Format(CultureInfo.CurrentCulture, Strings.OptimizeImageQualityFormat, (int)Math.Round(AlbumArtQuality));
-
-        [ObservableProperty]
-        public partial OptimizeChoice<(int? W, int? H)>? SelectedAlbumArtLimit { get; set; }
-
-        [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(BackgroundArtQualityText))]
-        public partial double BackgroundArtQuality { get; set; }
-
-        public string BackgroundArtQualityText => string.Format(CultureInfo.CurrentCulture, Strings.OptimizeImageQualityFormat, (int)Math.Round(BackgroundArtQuality));
-
-        [ObservableProperty]
-        public partial OptimizeChoice<(int? W, int? H)>? SelectedBackgroundArtLimit { get; set; }
-
-        // The margin, as a percentage.
-
-        [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(MarginText))]
-        public partial double MarginPercent { get; set; }
-
-        public string MarginText => string.Format(CultureInfo.CurrentCulture, Strings.OptimizeMarginFormat, (int)Math.Round(MarginPercent));
-
-        // Sampling.
-
-        [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(IsSingleChartMode))]
-        public partial OptimizeChoice<SamplingMode>? SelectedSampling { get; set; }
-
-        /// <summary>The estimate is of one chart, which the user picks.</summary>
-        public bool IsSingleChartMode => SelectedSampling?.Value == SamplingMode.SingleChart;
-
-        [ObservableProperty]
-        public partial OptimizeChoice<SongEntry>? SelectedChart { get; set; }
-
-        // Scope.
+        // ---- Scope --------------------------------------------------------------------------------------------
 
         private bool _useWholeLibrary;
 
@@ -286,11 +208,11 @@ namespace ChartPacker.ViewModels
             get => _useWholeLibrary;
             set
             {
-                // The scope is what an estimate or run is working on, so it can't change under one.
-                if (IsBusy || !SetProperty(ref _useWholeLibrary, value))
+                // The scope is what a run is working on, so it can't change under one.
+                if (IsRunning || !SetProperty(ref _useWholeLibrary, value))
                     return;
                 OnPropertyChanged(nameof(UseSelection));
-                _ = Track(ChangeScopeAsync());
+                LoadScope();
             }
         }
 
@@ -304,42 +226,106 @@ namespace ChartPacker.ViewModels
         /// <summary>Songs were selected, so the user may choose between them and the whole library.</summary>
         public bool HasSelection => _request.Selected.Count > 0;
 
+        public bool HasNoSelection => !HasSelection;
+
         public string SelectedScopeText => string.Format(CultureInfo.CurrentCulture, Strings.OptimizeScopeSelectedFormat, _request.Selected.Count);
 
-        [ObservableProperty]
-        public partial string ScopeText { get; set; } = string.Empty;
+        public string LibraryScopeText => string.Format(CultureInfo.CurrentCulture, Strings.OptimizeScopeLibraryCountFormat, _request.Library.Count);
 
-        // Where the changed charts go.
+        public string OnlyLibraryScopeText => string.Format(CultureInfo.CurrentCulture, Strings.OptimizeScopeLibraryFormat, _request.Library.Count);
 
-        [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(IsInPlace))]
-        [NotifyCanExecuteChangedFor(nameof(OptimizeCommand))]
-        public partial bool UseOutputFolder { get; set; }
-
-        /// <summary>Charts are changed where they are, which can't be undone.</summary>
-        public bool IsInPlace => !UseOutputFolder;
+        // ---- The list -----------------------------------------------------------------------------------------
 
         [ObservableProperty]
-        [NotifyCanExecuteChangedFor(nameof(OptimizeCommand))]
-        public partial string? OutputFolder { get; set; }
-
-        // What's going on.
+        public partial string SearchText { get; set; } = string.Empty;
 
         [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(IsIdle))]
-        [NotifyPropertyChangedFor(nameof(CloseLabel))]
-        [NotifyCanExecuteChangedFor(nameof(EstimateCommand))]
+        public partial OptimizeChoice<OptimizeSort> SelectedSort { get; set; }
+
+        [ObservableProperty]
+        public partial OptimizeChartRow? SelectedRow { get; set; }
+
+        /// <summary>There are charts, and the search and filters hide them all.</summary>
+        [ObservableProperty]
+        public partial bool HasNoMatches { get; set; }
+
+        /// <summary>There are no charts to work on at all.</summary>
+        [ObservableProperty]
+        public partial bool HasNoCharts { get; set; }
+
+        // ---- The summary --------------------------------------------------------------------------------------
+
+        /// <summary>The charts' size before and after: "41.2 GB → 27.9 GB".</summary>
+        [ObservableProperty]
+        public partial string SizesText { get; set; } = string.Empty;
+
+        /// <summary>What's saved: "Saves 13.3 GB", or "Saved" once a run has.</summary>
+        [ObservableProperty]
+        public partial string SavingText { get; set; } = string.Empty;
+
+        [ObservableProperty]
+        public partial string PercentText { get; set; } = string.Empty;
+
+        [ObservableProperty]
+        public partial bool HasSaving { get; set; }
+
+        /// <summary>How much of the figure is measured, or how the run went.</summary>
+        [ObservableProperty]
+        public partial string CoverageText { get; set; } = string.Empty;
+
+        [ObservableProperty]
+        public partial double BarKept { get; set; }
+
+        [ObservableProperty]
+        public partial double BarSaved { get; set; }
+
+        [ObservableProperty]
+        public partial double BarPredicted { get; set; }
+
+        /// <summary>What went wrong, for the banner; empty when nothing has.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasError))]
+        public partial string ErrorText { get; set; } = string.Empty;
+
+        public bool HasError => ErrorText.Length > 0;
+
+        // ---- What's going on ----------------------------------------------------------------------------------
+
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(IsRunning))]
+        [NotifyPropertyChangedFor(nameof(IsNotRunning))]
+        [NotifyPropertyChangedFor(nameof(IsMeasuring))]
+        [NotifyPropertyChangedFor(nameof(IsWorking))]
+        [NotifyPropertyChangedFor(nameof(IsDone))]
+        [NotifyPropertyChangedFor(nameof(CanOpenOutput))]
         [NotifyCanExecuteChangedFor(nameof(OptimizeCommand))]
         [NotifyCanExecuteChangedFor(nameof(StopCommand))]
         [NotifyCanExecuteChangedFor(nameof(CloseCommand))]
         [NotifyCanExecuteChangedFor(nameof(ResetCommand))]
-        [NotifyCanExecuteChangedFor(nameof(SaveDefaultsCommand))]
         [NotifyCanExecuteChangedFor(nameof(BrowseOutputCommand))]
-        public partial bool IsBusy { get; set; }
+        [NotifyCanExecuteChangedFor(nameof(TogglePauseCommand))]
+        public partial OptimizePhase Phase { get; set; }
 
-        public bool IsIdle => !IsBusy;
+        public bool IsRunning => Phase == OptimizePhase.Running;
 
-        public string CloseLabel => Strings.CloseButton;
+        // The button's label and whether it can be pressed follow the phase at once, not at the next refresh.
+        partial void OnPhaseChanged(OptimizePhase value) => RefreshOptimizeState();
+
+        public bool IsNotRunning => !IsRunning;
+
+        public bool IsMeasuring => Phase == OptimizePhase.Measuring;
+
+        /// <summary>Something is going on in the background: reading, measuring or a run.</summary>
+        public bool IsWorking => Phase is OptimizePhase.Reading or OptimizePhase.Measuring or OptimizePhase.Running && !IsPaused;
+
+        public bool IsDone => Phase == OptimizePhase.Done;
+
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(IsWorking))]
+        [NotifyPropertyChangedFor(nameof(PauseLabel))]
+        public partial bool IsPaused { get; set; }
+
+        public string PauseLabel => IsPaused ? Strings.OptimizeResumeButton : Strings.OptimizePauseButton;
 
         [ObservableProperty]
         public partial double ProgressValue { get; set; }
@@ -347,32 +333,53 @@ namespace ChartPacker.ViewModels
         [ObservableProperty]
         public partial bool IsProgressIndeterminate { get; set; }
 
-        [ObservableProperty]
-        public partial string ProgressText { get; set; } = string.Empty;
-
+        /// <summary>What's going on, for the footer.</summary>
         [ObservableProperty]
         public partial string StatusText { get; set; } = string.Empty;
 
+        /// <summary>The Optimize button, naming how many charts it changes.</summary>
         [ObservableProperty]
-        public partial bool StatusIsProblem { get; set; }
+        public partial string OptimizeLabel { get; set; } = Strings.OptimizeButton;
 
+        /// <summary>Why Optimize can't be used yet; empty when it can.</summary>
         [ObservableProperty]
-        public partial bool HasResults { get; set; }
+        [NotifyPropertyChangedFor(nameof(OptimizeToolTip))]
+        public partial string BlockedText { get; set; } = string.Empty;
 
+        public string OptimizeToolTip => BlockedText.Length > 0 ? BlockedText : Strings.OptimizeButtonToolTip;
+
+        /// <summary>Why the output folder can't be used, or empty when it can, or hasn't been chosen yet.</summary>
         [ObservableProperty]
-        public partial bool HasEstimate { get; set; }
+        [NotifyPropertyChangedFor(nameof(HasOutputFolderProblem))]
+        public partial string OutputFolderProblemText { get; set; } = string.Empty;
+
+        public bool HasOutputFolderProblem => OutputFolderProblemText.Length > 0;
+
+        /// <summary>A run wrote charts to the output folder, which can be opened.</summary>
+        public bool CanOpenOutput => IsDone && _written > 0 && !string.IsNullOrWhiteSpace(Settings.OutputFolder);
 
         /// <summary>What the window changed on disk, for the library to catch up with.</summary>
         public OptimizeWindowResult Result => new(_changedInPlace > 0, _written > 0);
 
-        /// <summary>Reads the songs to work on: for the whole library, a fresh scan.</summary>
-        public Task LoadAsync() => Track(ChangeScopeAsync());
+        // ---- Opening and closing ------------------------------------------------------------------------------
 
-        /// <summary>Stops everything going on and waits for it, once the window's closed.</summary>
+        /// <summary>Lists the charts and starts reading them.</summary>
+        public void Load()
+        {
+            _refresh.Start();
+            LoadScope();
+        }
+
+        /// <summary>Stops everything going on and waits for it, once the window's closed; then keeps the settings and what was measured.</summary>
         public async Task ShutdownAsync()
         {
             // The window's gone already, so there's nothing left to close once the run ends.
             _closeWhenIdle = false;
+            _shutDown = true;
+            foreach (var row in _rows)
+                row.ClearPreviews();
+            _refresh.Stop();
+            _settle.Stop();
             _closing.Cancel();
             try
             {
@@ -381,13 +388,16 @@ namespace ChartPacker.ViewModels
             catch (Exception ex) when (ex is OperationCanceledException or IOException or UnauthorizedAccessException)
             {
             }
+
+            _defaults.Save(Settings.ToSettings());
+            await Task.Run(_cache.Save);
         }
 
         /// <summary>The window is closing some other way: a run still going is stopped, and the window closes once it has.</summary>
         /// <returns>Whether the window may close now.</returns>
         public bool OnClosing()
         {
-            if (!IsBusy)
+            if (!IsRunning)
                 return true;
 
             _closeWhenIdle = true;
@@ -395,462 +405,938 @@ namespace ChartPacker.ViewModels
             return false;
         }
 
-        partial void OnSelectedSamplingChanged(OptimizeChoice<SamplingMode>? value) => RefreshCommands();
+        // ---- Settings -----------------------------------------------------------------------------------------
 
-        partial void OnSelectedChartChanged(OptimizeChoice<SongEntry>? value) => RefreshCommands();
-
-        private void OnImageToggleChanged(object? sender, PropertyChangedEventArgs e)
+        private void OnSettingsChanged()
         {
-            if (e.PropertyName != nameof(OptimizeStrategyToggle.IsOn))
+            if (_shutDown)
                 return;
 
-            // Images are estimated from a sample or every chart, not one.
-            bool images = AlbumArt.IsOn || BackgroundArt.IsOn;
-            if (images)
-            {
-                if (SelectedSampling == _single)
-                    SelectedSampling = _sample;
-                SamplingChoices.Remove(_single);
-            }
-            else if (!SamplingChoices.Contains(_single))
-            {
-                SamplingChoices.Insert(0, _single);
-            }
+            RefreshOutputFolderProblem();
+            RefreshOptimizeState();
+            _settle.Stop();
+            _settle.Start();
         }
 
-        // Settings.
+        // What's measured depends on every setting but where the charts go and how many are optimized at once.
+        private static OptimizeOptions Measuring(OptimizeOptions options) => options with { OutputFolder = null, Parallelism = 1 };
 
-        private void Apply(OptimizeSettings s)
+        private void OnSettingsSettled()
         {
-            _parallelism = s.Parallelism;
-            _videoSpeed = s.VideoSpeed;
+            if (_shutDown || IsRunning)
+                return;
+            if (_measuredOptions is { } measured && measured == Measuring(Settings.ToOptions()))
+                return;
 
-            Set(Metadata, s.MetadataEnabled);
-            PruneEmptyParts = s.PruneEmptyParts;
-            StripEditorEvents = s.StripEditorEvents;
-            DropEmptyValues = s.DropEmptyValues;
-            ReplaceLegacyKeys = s.ReplaceLegacyKeys;
-            Set(Audio, s.AudioEnabled);
-            SelectedBitrate = Pick(BitrateChoices, s.AudioBitrateKbps, BitrateChoice);
-            Set(StemMixdown, s.StemMixdownEnabled);
-            SelectedMixdownBitrate = Pick(MixdownBitrateChoices, s.StemMixdownBitrateKbps, BitrateChoice);
-            Set(Video, s.VideoEnabled);
-            SelectedVideoTarget = VideoTargets.First(c => c.Value == s.VideoTarget);
-            VideoCq = s.VideoCq;
-            VideoConvertUnsupported = s.VideoConvertUnsupported;
-            Set(AlbumArt, s.AlbumArtEnabled);
-            AlbumArtQuality = s.AlbumArtQuality;
-            SelectedAlbumArtLimit = Pick(AlbumArtLimits, (s.AlbumArtMaxWidth, s.AlbumArtMaxHeight), LimitChoice);
-            Set(BackgroundArt, s.BackgroundArtEnabled);
-            BackgroundArtQuality = s.BackgroundArtQuality;
-            SelectedBackgroundArtLimit = Pick(BackgroundArtLimits, (s.BackgroundArtMaxWidth, s.BackgroundArtMaxHeight), LimitChoice);
-            MarginPercent = Math.Round(s.SavingsMargin * 100);
-            SelectedSampling = SamplingChoices.FirstOrDefault(c => c.Value == s.Sampling) ?? _sample;
+            StartWork();
         }
 
-        // A strategy whose backend is missing stays off, whatever was saved.
-        private static void Set(OptimizeStrategyToggle toggle, bool on) => toggle.IsOn = on && toggle.IsAvailable;
-
-        private OptimizeSettings ToSettings() => new()
-        {
-            MetadataEnabled = Metadata.IsOn,
-            PruneEmptyParts = PruneEmptyParts,
-            StripEditorEvents = StripEditorEvents,
-            DropEmptyValues = DropEmptyValues,
-            ReplaceLegacyKeys = ReplaceLegacyKeys,
-            AudioEnabled = Audio.IsOn,
-            AudioBitrateKbps = SelectedBitrate?.Value ?? AudioOptimizeOptions.DefaultBitrateKbps,
-            StemMixdownEnabled = StemMixdown.IsOn,
-            StemMixdownBitrateKbps = SelectedMixdownBitrate?.Value ?? AudioOptimizeOptions.DefaultBitrateKbps,
-            VideoEnabled = Video.IsOn,
-            VideoTarget = SelectedVideoTarget?.Value ?? VideoTarget.Fhd,
-            VideoCq = (int)Math.Round(VideoCq),
-            VideoConvertUnsupported = VideoConvertUnsupported,
-            VideoSpeed = _videoSpeed,
-            AlbumArtEnabled = AlbumArt.IsOn,
-            AlbumArtQuality = (int)Math.Round(AlbumArtQuality),
-            AlbumArtMaxWidth = SelectedAlbumArtLimit?.Value.W,
-            AlbumArtMaxHeight = SelectedAlbumArtLimit?.Value.H,
-            BackgroundArtEnabled = BackgroundArt.IsOn,
-            BackgroundArtQuality = (int)Math.Round(BackgroundArtQuality),
-            BackgroundArtMaxWidth = SelectedBackgroundArtLimit?.Value.W,
-            BackgroundArtMaxHeight = SelectedBackgroundArtLimit?.Value.H,
-            SavingsMargin = MarginPercent / 100,
-            Sampling = SelectedSampling?.Value ?? SamplingMode.RandomSample,
-            Parallelism = _parallelism,
-        };
-
-        /// <summary>Puts every setting back to the shipped defaults. The saved defaults are as they were until saved over.</summary>
-        [RelayCommand(CanExecute = nameof(IsIdle))]
+        /// <summary>Puts every setting back to the shipped ones, keeping where the charts are written.</summary>
+        [RelayCommand(CanExecute = nameof(IsNotRunning))]
         private void Reset()
         {
-            Apply(OptimizeSettings.Shipped);
-            Say(Strings.OptimizeResetDone, problem: false);
+            var shipped = OptimizeSettings.Shipped;
+            shipped.UseOutputFolder = Settings.UseOutputFolder;
+            shipped.OutputFolder = Settings.OutputFolder;
+            Settings.Apply(shipped);
         }
 
-        /// <summary>Keeps the settings as they are now as the defaults the window starts from.</summary>
-        [RelayCommand(CanExecute = nameof(IsIdle))]
-        private void SaveDefaults()
-        {
-            if (_defaults.Save(ToSettings()))
-                Say(Strings.OptimizeSavedDefaults, problem: false);
-            else
-                Say(Strings.OptimizeSaveDefaultsFailed, problem: true);
-        }
-
-        [RelayCommand(CanExecute = nameof(IsIdle))]
+        [RelayCommand(CanExecute = nameof(IsNotRunning))]
         private async Task BrowseOutputAsync()
         {
-            string? folder = await _folderPicker.PickFolderAsync(Strings.OptimizeBrowseOutputTitle, OutputFolder);
+            string? folder = await _folderPicker.PickFolderAsync(Strings.OptimizeBrowseOutputTitle, Settings.OutputFolder);
             if (folder is null)
                 return;
 
-            OutputFolder = folder;
-            UseOutputFolder = true;
+            Settings.OutputFolder = folder;
+            Settings.UseOutputFolder = true;
         }
 
-        // The songs to work on.
-
-        private async Task ChangeScopeAsync()
+        [RelayCommand]
+        private void OpenOutput()
         {
-            Say(string.Empty, problem: false);
-            await RunAsync(async ct =>
-            {
-                if (UseWholeLibrary)
-                {
-                    if (_library is null)
-                    {
-                        _library = await LoadLibraryAsync(ct);
-                        // A fresh scan has what's been changed in place already.
-                        _changedInPlace = 0;
-                    }
+            if (Settings.OutputFolder is { Length: > 0 } folder)
+                _reveal.OpenFolder(folder);
+        }
 
-                    if (_library is null)
+        private void RefreshOutputFolderProblem()
+        {
+            string problem = string.Empty;
+            if (Settings.UseOutputFolder && !string.IsNullOrWhiteSpace(Settings.OutputFolder))
+            {
+                try
+                {
+                    if (!Path.IsPathRooted(Settings.OutputFolder))
                     {
-                        // The scan stopped short, so there's no complete list to work on.
-                        Say(Strings.OptimizeLibraryScanStopped, problem: true);
-                        _scope = [];
+                        problem = Strings.OptimizeOutputFolderNotFullPath;
                     }
                     else
                     {
-                        _scope = _library;
+                        string folder = Path.TrimEndingDirectorySeparator(Path.GetFullPath(Settings.OutputFolder));
+                        // A chart written into itself, or over another, isn't a copy of it.
+                        foreach (var row in _rows)
+                        {
+                            string chart = Path.TrimEndingDirectorySeparator(row.Path);
+                            if (folder.Equals(chart, StringComparison.OrdinalIgnoreCase)
+                                || (row.Entry.Kind != SongEntryKind.SngFile
+                                    && folder.StartsWith(chart + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)))
+                            {
+                                problem = Strings.OptimizeOutputFolderInsideChart;
+                                break;
+                            }
+                        }
                     }
-                }
-                else
-                {
-                    _scope = _request.Selected;
-                }
-            });
-            ShowScope();
-        }
-
-        private async Task<IReadOnlyList<SongEntry>?> LoadLibraryAsync(CancellationToken cancellationToken)
-        {
-            IsProgressIndeterminate = true;
-            var progress = new Progress<DedupScanProgress>(p =>
-            {
-                ProgressText = string.Format(CultureInfo.CurrentCulture, p.IsSearching ? Strings.ScanSearchingProgressFormat : Strings.ScanReadingProgressFormat, p.Read, p.Found);
-                IsProgressIndeterminate = p.Found == 0;
-                ProgressValue = p.Found == 0 ? 0 : 100.0 * p.Read / p.Found;
-            });
-            return await _request.LoadLibrary(progress, cancellationToken);
-        }
-
-        private void ShowScope()
-        {
-            ScopeText = UseWholeLibrary
-                ? string.Format(CultureInfo.CurrentCulture, Strings.OptimizeScopeLibraryFormat, _scope.Count)
-                : SelectedScopeText;
-
-            string? keep = SelectedChart?.Value.FullPath;
-            ChartChoices.Clear();
-            foreach (var entry in _scope)
-                ChartChoices.Add(new OptimizeChoice<SongEntry>(entry, entry.DisplayName));
-            SelectedChart = ChartChoices.FirstOrDefault(c => c.Value.FullPath == keep) ?? ChartChoices.FirstOrDefault();
-            NotifyOutputFolderProblem();
-            RefreshCommands();
-        }
-
-        // Estimating.
-
-        private bool CanEstimate() =>
-            IsIdle && _scope.Count > 0 && EstimatedStrategies().Any() && (!IsSingleChartMode || SelectedChart is not null);
-
-        private IEnumerable<OptimizeStrategy> EstimatedStrategies() =>
-            Toggles.Where(t => t.IsOn && t.Strategy != OptimizeStrategy.Metadata).Select(t => t.Strategy);
-
-        /// <summary>Estimates what each strategy that's on would save, from the sampled charts, and lists it by codec.</summary>
-        [RelayCommand(CanExecute = nameof(CanEstimate))]
-        private Task EstimateAsync() => Track(RunAsync(async ct =>
-        {
-            Say(string.Empty, problem: false);
-            var options = Options();
-            var charts = await InspectAsync(_scope, options.Parallelism, cached: true, ct);
-            if (charts.Count == 0)
-            {
-                Say(Strings.OptimizeNoCharts, problem: true);
-                return;
-            }
-
-            var optimizers = Optimizers(options);
-            var mode = SelectedSampling?.Value ?? SamplingMode.RandomSample;
-            var selected = IsSingleChartMode ? SelectedChart?.Value : null;
-            var sections = new List<OptimizeEstimateSection>();
-            foreach (var strategy in EstimatedStrategies().ToList())
-            {
-                string title = Toggles.First(t => t.Strategy == strategy).Title;
-                var progress = new Progress<(int Done, int Total)>(p =>
-                {
-                    ProgressText = string.Format(CultureInfo.CurrentCulture, Strings.OptimizeEstimatingFormat, title, p.Done, p.Total);
-                    ProgressValue = p.Total == 0 ? 0 : 100.0 * p.Done / p.Total;
-                });
-                IsProgressIndeterminate = true;
-                ProgressText = string.Format(CultureInfo.CurrentCulture, Strings.OptimizeEstimatingFormat, title, 0, 0);
-
-                var estimate = await SavingsEstimator.EstimateAsync(strategy, charts, options, optimizers, mode, selected, progress: progress, cancellationToken: ct);
-                sections.Add(Section(title, estimate, options));
-            }
-
-            EstimateSections.Clear();
-            foreach (var section in sections)
-                EstimateSections.Add(section);
-            HasEstimate = true;
-            Say(WithUnreadable(Strings.OptimizeEstimateDone), problem: _unreadable > 0);
-        }));
-
-        private OptimizeEstimateSection Section(string title, SavingsEstimate estimate, OptimizeOptions options)
-        {
-            bool compatibility = estimate.Strategy != OptimizeStrategy.Video || options.Video.ConvertUnsupported;
-            var table = SavingsTable.From(estimate, compatibility);
-
-            var rows = table.Rows.Select(r => new OptimizeEstimateRow(
-                r.CodecKey,
-                string.Format(CultureInfo.CurrentCulture, Strings.OptimizeSavingsAssetsFormat, r.AssetsSampled, r.AssetsTotal),
-                r.AssetsSampled == 0 ? Strings.OptimizeNotEstimated : Signed(r.EstimatedSavingBytes),
-                r.SavingPerChartBytes is { } perChart ? Signed(perChart) : Strings.OptimizeNotEstimated,
-                r.EstimatedSavingBytes < 0,
-                r.IsCompatibilityConversion)).ToList();
-
-            string? note = table.CompatibilityCostBytes > 0
-                ? string.Format(CultureInfo.CurrentCulture, compatibility ? Strings.OptimizeCompatibilityCostFormat : Strings.OptimizeCompatibilityWouldCostFormat, ByteSizeFormatter.Format((ulong)table.CompatibilityCostBytes))
-                : null;
-
-            return new OptimizeEstimateSection(
-                title,
-                string.Format(CultureInfo.CurrentCulture, Strings.OptimizeSavingsSampleFormat, estimate.ChartsSampled, estimate.ChartsTotal),
-                rows,
-                string.Format(CultureInfo.CurrentCulture, Strings.OptimizeSavingsTotalFormat, Signed(table.TotalSavingBytes)),
-                note);
-        }
-
-        // "Saves 12 MB", or "Costs 3 MB" when it grows.
-        private static string Signed(long bytes) => bytes >= 0
-            ? string.Format(CultureInfo.CurrentCulture, Strings.OptimizeSavesFormat, ByteSizeFormatter.Format((ulong)bytes))
-            : string.Format(CultureInfo.CurrentCulture, Strings.OptimizeCostsFormat, ByteSizeFormatter.Format((ulong)-bytes));
-
-        // Optimizing.
-
-        private bool CanOptimize() =>
-            IsIdle && _scope.Count > 0 && Toggles.Any(t => t.IsOn)
-            && (IsInPlace || (!string.IsNullOrWhiteSpace(OutputFolder) && !HasOutputFolderProblem));
-
-        /// <summary>Why the output folder can't be used, or empty when it can, or hasn't been chosen yet.</summary>
-        public string OutputFolderProblemText
-        {
-            get
-            {
-                if (!UseOutputFolder || string.IsNullOrWhiteSpace(OutputFolder))
-                    return string.Empty;
-
-                string folder;
-                try
-                {
-                    if (!Path.IsPathRooted(OutputFolder))
-                        return Strings.OptimizeOutputFolderNotFullPath;
-                    folder = Path.TrimEndingDirectorySeparator(Path.GetFullPath(OutputFolder));
                 }
                 catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
                 {
-                    return Strings.OptimizeOutputFolderNotFullPath;
+                    problem = Strings.OptimizeOutputFolderNotFullPath;
                 }
+            }
 
-                // A chart written into itself, or over another, isn't a copy of it.
-                foreach (var entry in _scope)
+            OutputFolderProblemText = problem;
+        }
+
+        // ---- The charts ---------------------------------------------------------------------------------------
+
+        private void LoadScope()
+        {
+            foreach (var row in _rows)
+                row.ClearPreviews();
+            var scope = UseWholeLibrary ? _request.Library : _request.Selected;
+            _rows = [.. scope.Select(e => new OptimizeChartRow(e))];
+            _byPath = new Dictionary<string, OptimizeChartRow>(OutputPaths.PathComparer);
+            foreach (var row in _rows)
+                _byPath.TryAdd(row.Path, row);
+
+            SelectedRow = null;
+            HasNoCharts = _rows.Count == 0;
+            ErrorText = string.Empty;
+            RefreshOutputFolderProblem();
+            ShowRows();
+            StartWork();
+        }
+
+        partial void OnSearchTextChanged(string value) => ShowRows();
+
+        partial void OnSelectedSortChanged(OptimizeChoice<OptimizeSort> value) => ShowRows();
+
+        partial void OnSelectedRowChanged(OptimizeChartRow? oldValue, OptimizeChartRow? newValue)
+        {
+            if (oldValue is not null)
+            {
+                oldValue.ClearPreviews();
+                oldValue.IsExpanded = false;
+            }
+
+            if (newValue is null)
+                return;
+
+            newValue.IsExpanded = true;
+            ShowPreviews(newValue);
+            // The chart being looked at is measured next, so its own figure replaces the prediction.
+            if (newValue.Plan is null)
+                _estimator?.Prioritize(newValue.Entry);
+        }
+
+        // Shows the open chart's images and video before and after, for the ones its plan changes. Not during a run, which
+        // may be rewriting the very files a preview would hold open.
+        private void ShowPreviews(OptimizeChartRow row)
+        {
+            if (_backends.Previews is not { } previewer || IsRunning || _shutDown || !row.IsExpanded
+                || row.Plan is not { } plan || row.Assets is not { } assets || row.IsStale)
+            {
+                row.ClearPreviews();
+                return;
+            }
+
+            var options = Settings.ToOptions();
+            var previews = new List<OptimizeMediaPreviewViewModel>();
+            IMediaPreviewSession? session = null;
+            foreach (var action in plan.Work)
+            {
+                if (action.Kind is not (OptimizeActionKind.Recompress or OptimizeActionKind.Transcode) || action.SourceNames.Count == 0
+                    || action.Strategy is not (OptimizeStrategy.Video or OptimizeStrategy.AlbumArt or OptimizeStrategy.BackgroundArt))
+                    continue;
+                if (assets.Assets.FirstOrDefault(a => a.StoredName.Equals(action.SourceNames[0], StringComparison.OrdinalIgnoreCase)) is not { } asset)
+                    continue;
+
+                var opened = session ??= previewer.Open(row.Entry);
+                previews.Add(action.Strategy switch
                 {
-                    string chart = Path.TrimEndingDirectorySeparator(entry.FullPath);
-                    if (folder.Equals(chart, StringComparison.OrdinalIgnoreCase)
-                        || (entry.Kind != SongEntryKind.SngFile
-                            && folder.StartsWith(chart + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)))
-                        return Strings.OptimizeOutputFolderInsideChart;
-                }
+                    OptimizeStrategy.Video => new OptimizeMediaPreviewViewModel(
+                        asset.StoredName, true,
+                        (frame, ct) => opened.VideoFrameAsync(asset, options.Video, (frame + 0.5) / OptimizeMediaPreviewViewModel.VideoFrames, ct)),
+                    OptimizeStrategy.AlbumArt => new OptimizeMediaPreviewViewModel(asset.StoredName, false, (_, ct) => opened.ImageAsync(asset, options.AlbumArt, ct)),
+                    _ => new OptimizeMediaPreviewViewModel(asset.StoredName, false, (_, ct) => opened.ImageAsync(asset, options.BackgroundArt, ct)),
+                });
+            }
 
-                return string.Empty;
+            row.SetPreviews(previews, session);
+        }
+
+        [RelayCommand]
+        private void ClearSearch() => SearchText = string.Empty;
+
+        [RelayCommand]
+        private void ClearFilters()
+        {
+            SearchText = string.Empty;
+            foreach (var chip in Chips)
+                chip.IsOn = false;
+        }
+
+        // Shows the charts that match the search and the chips that are on, in the chosen order.
+        private void ShowRows()
+        {
+            _resort = false;
+            string search = SearchText.Trim();
+            var groups = Chips.Where(c => c.IsOn).Select(c => c.Group).ToHashSet();
+            IEnumerable<OptimizeChartRow> shown = _rows;
+            if (search.Length > 0)
+                shown = shown.Where(r => r.Name.Contains(search, StringComparison.CurrentCultureIgnoreCase));
+            if (groups.Count > 0)
+                shown = shown.Where(r => groups.Contains(r.Group));
+
+            var name = StringComparer.CurrentCultureIgnoreCase;
+            IEnumerable<OptimizeChartRow> ordered = SelectedSort.Value switch
+            {
+                OptimizeSort.Size => shown.OrderByDescending(r => r.SizeBytes).ThenBy(r => r.Name, name),
+                OptimizeSort.Name => shown.OrderBy(r => r.Name, name),
+                OptimizeSort.Problems => shown.OrderBy(r => r.Group == OptimizeRowGroup.Problem ? 0 : 1).ThenByDescending(r => r.SavingBytes ?? long.MinValue).ThenBy(r => r.Name, name),
+                _ => shown.OrderByDescending(r => r.SavingBytes ?? long.MinValue).ThenByDescending(r => r.SizeBytes).ThenBy(r => r.Name, name),
+            };
+
+            var selected = SelectedRow;
+            var next = ordered.ToList();
+            ListRows.Replace(Rows, next);
+            HasNoMatches = _rows.Count > 0 && next.Count == 0;
+            // Replacing the rows can drop the selection even where its row stayed.
+            if (selected is not null && !ReferenceEquals(SelectedRow, selected))
+                SelectedRow = next.Contains(selected) ? selected : null;
+        }
+
+        // ---- Reading and measuring ----------------------------------------------------------------------------
+
+        // Starts the background work again from the charts and settings as they are now: what was going on is stopped first.
+        private void StartWork()
+        {
+            if (IsRunning || _shutDown)
+                return;
+
+            int generation = ++_generation;
+            _work?.Cancel();
+            var cts = _work = CancellationTokenSource.CreateLinkedTokenSource(_closing.Token);
+            var previous = _pipeline;
+            _pipeline = Track(WorkAsync(previous, cts, generation));
+        }
+
+        private async Task StopWorkAsync()
+        {
+            _generation++;
+            _work?.Cancel();
+            try
+            {
+                await _pipeline;
+            }
+            catch (OperationCanceledException)
+            {
             }
         }
 
-        public bool HasOutputFolderProblem => OutputFolderProblemText.Length > 0;
-
-        partial void OnOutputFolderChanged(string? value) => NotifyOutputFolderProblem();
-
-        partial void OnUseOutputFolderChanged(bool value) => NotifyOutputFolderProblem();
-
-        private void NotifyOutputFolderProblem()
+        private async Task WorkAsync(Task previous, CancellationTokenSource cts, int generation)
         {
-            OnPropertyChanged(nameof(OutputFolderProblemText));
-            OnPropertyChanged(nameof(HasOutputFolderProblem));
+            try
+            {
+                try
+                {
+                    await previous;
+                }
+                catch (OperationCanceledException)
+                {
+                }
+
+                // A later change has already asked for the work to start again; that one does it.
+                if (generation != _generation)
+                    return;
+
+                var ct = cts.Token;
+                ErrorText = string.Empty;
+                IsPaused = false;
+                await ReadAsync(ct);
+                await MeasureAsync(ct);
+                if (generation == _generation)
+                    Phase = OptimizePhase.Ready;
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception ex)
+            {
+                // Whatever went wrong, it's shown: this isn't awaited by anything that would see it.
+                System.Diagnostics.Trace.TraceError($"Optimize window measuring failed: {ex}");
+                ErrorText = string.Format(CultureInfo.CurrentCulture, Strings.OptimizeFailedFormat, ex.Message);
+                if (generation == _generation)
+                    Phase = OptimizePhase.Ready;
+            }
+            finally
+            {
+                if (ReferenceEquals(_work, cts))
+                    _work = null;
+                cts.Dispose();
+                _dirty = true;
+            }
         }
+
+        // Lists the files of every chart that hasn't been read, or was rewritten since.
+        private async Task ReadAsync(CancellationToken cancellationToken)
+        {
+            var unread = _rows.Where(r => r.State == OptimizeRowState.Reading || r.IsStale).ToList();
+            _read = _rows.Count - unread.Count;
+            if (unread.Count == 0)
+                return;
+
+            Phase = OptimizePhase.Reading;
+            foreach (var row in unread)
+            {
+                row.Assets = null;
+                row.Plan = null;
+                row.Savings = null;
+                row.Result = null;
+                row.Error = null;
+                row.State = OptimizeRowState.Reading;
+                row.Refresh();
+            }
+
+            var probes = _backends.Probes;
+            var queue = new UiBatchQueue<(OptimizeChartRow Row, ChartAssets? Assets, string? Error)>(TimeSpan.FromMilliseconds(100), TakeRead, TimeSpan.FromMilliseconds(30));
+            queue.Start();
+            try
+            {
+                await Task.Run(
+                    () => Parallel.ForEachAsync(
+                        unread,
+                        new ParallelOptions { MaxDegreeOfParallelism = OptimizeOptions.RecommendedMeasuringParallelism, CancellationToken = cancellationToken },
+                        async (row, token) =>
+                        {
+                            try
+                            {
+                                queue.Report((row, await AssetInspector.InspectAsync(row.Entry, probes, token).ConfigureAwait(false), null));
+                            }
+                            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
+                            {
+                                // A chart that can't be read is left out, and says so in the list.
+                                queue.Report((row, null, ex.Message));
+                            }
+                        }),
+                    cancellationToken);
+            }
+            finally
+            {
+                queue.Stop();
+                queue.TakeAll();
+            }
+
+            RefreshOutputFolderProblem();
+        }
+
+        private void TakeRead(IEnumerable<(OptimizeChartRow Row, ChartAssets? Assets, string? Error)> batch)
+        {
+            foreach (var (row, assets, error) in batch)
+            {
+                row.Assets = assets;
+                row.Error = error;
+                row.IsStale = false;
+                row.State = assets is null ? OptimizeRowState.Unreadable : OptimizeRowState.Unknown;
+                row.Refresh();
+                _read++;
+            }
+
+            _dirty = true;
+        }
+
+        // Measures every chart with the settings as they are, predicting the ones not reached yet.
+        private async Task MeasureAsync(CancellationToken cancellationToken)
+        {
+            var options = Settings.ToOptions();
+            _measuredOptions = Measuring(options);
+            var readable = _rows.Where(r => r.IsReadable).ToList();
+            var charts = readable.Select(r => r.Assets!).ToList();
+
+            // What each chart has for the strategies that are on: what its prediction is made from.
+            var units = await Task.Run(() => charts.Select(c => OptimizationPlanner.UnitsOf(c, options)).ToList(), cancellationToken);
+            var model = new SavingsModel(options);
+            _model = model;
+            _modelVersion = -1;
+            _sampleShown = false;
+            _measured = 0;
+            _toMeasure = readable.Count;
+            for (int i = 0; i < readable.Count; i++)
+            {
+                var row = readable[i];
+                row.ClearPreviews();
+                row.Units = units[i];
+                row.Plan = null;
+                row.Result = null;
+                row.Error = null;
+                row.Savings = null;
+                row.State = OptimizeRowState.Unknown;
+                row.Refresh();
+            }
+
+            ClearRunTotals();
+            _resort = true;
+            _dirty = true;
+            if (!Settings.AnyOn || readable.Count == 0)
+            {
+                // Nothing is asked of the charts, so there's nothing to predict: they're listed with their sizes.
+                _model = null;
+                foreach (var row in readable)
+                {
+                    row.State = OptimizeRowState.Listed;
+                    row.Refresh();
+                }
+
+                return;
+            }
+
+            Phase = OptimizePhase.Measuring;
+            var optimizers = Optimizers(options);
+            var services = new PlanServices(_cache, _videoGate);
+            var estimator = await Task.Run(
+                () => new LibraryEstimator(charts, options, optimizers, services, model, OptimizeOptions.RecommendedMeasuringParallelism), cancellationToken);
+            _estimator = estimator;
+            if (SelectedRow is { Plan: null } looking)
+                estimator.Prioritize(looking.Entry);
+
+            var queue = new UiBatchQueue<ChartEstimate>(TimeSpan.FromMilliseconds(100), TakeMeasured, TimeSpan.FromMilliseconds(30));
+            queue.Start();
+            try
+            {
+                await Task.Run(() => estimator.RunAsync(queue, cancellationToken), cancellationToken);
+            }
+            finally
+            {
+                queue.Stop();
+                queue.TakeAll();
+                if (ReferenceEquals(_estimator, estimator))
+                    _estimator = null;
+                // What was measured is kept even when the measuring was stopped part-way.
+                _ = Track(Task.Run(_cache.Save));
+            }
+
+            _resort = true;
+        }
+
+        private void TakeMeasured(IEnumerable<ChartEstimate> batch)
+        {
+            foreach (var estimate in batch)
+            {
+                if (!_byPath.TryGetValue(estimate.Chart.Entry.FullPath, out var row) || !ReferenceEquals(row.Assets, estimate.Chart))
+                    continue;
+
+                Measured(row, estimate.Plan, estimate.Error);
+                if (ReferenceEquals(row, SelectedRow))
+                    ShowPreviews(row);
+                _measured++;
+                // The first predictions are in: the list is worth putting in order now.
+                if (estimate.SampleComplete && !_sampleShown)
+                {
+                    _sampleShown = true;
+                    _resort = true;
+                }
+            }
+
+            _dirty = true;
+        }
+
+        private static void Measured(OptimizeChartRow row, ChartPlan? plan, string? error)
+        {
+            row.Plan = plan;
+            row.Error = error;
+            row.Savings = plan is null ? new ChartSavings() : SavingsModel.Measured(plan);
+            row.State = OptimizeRowState.Measured;
+            row.Refresh();
+        }
+
+        [RelayCommand(CanExecute = nameof(IsMeasuring))]
+        private void TogglePause()
+        {
+            if (_estimator is not { } estimator)
+                return;
+
+            if (IsPaused)
+                estimator.Resume();
+            else
+                estimator.Pause();
+            IsPaused = estimator.IsPaused;
+            _dirty = true;
+        }
+
+        // ---- Catching the window up ---------------------------------------------------------------------------
+
+        // Runs a few times a second: predictions, totals and the order of the list, when something's changed.
+        private void RefreshView()
+        {
+            var model = _model;
+            bool learned = model is not null && model.Version != _modelVersion && !IsRunning;
+            if (!_dirty && !learned)
+                return;
+
+            _dirty = false;
+            if (learned)
+            {
+                _modelVersion = model!.Version;
+                foreach (var row in _rows)
+                {
+                    if (row.Plan is not null || !row.IsReadable || row.State is not (OptimizeRowState.Unknown or OptimizeRowState.Predicted))
+                        continue;
+
+                    var predicted = model.Predict(row.Units);
+                    row.Savings = predicted;
+                    // A chart with a file of a type nothing's known about yet has no figure worth showing.
+                    row.State = predicted.IsComplete ? OptimizeRowState.Predicted : OptimizeRowState.Unknown;
+                    row.Refresh();
+                }
+            }
+
+            RefreshSummary();
+            RefreshOptimizeState();
+            if (_resort)
+                ShowRows();
+        }
+
+        private void RefreshSummary()
+        {
+            long before = 0, measured = 0, predicted = 0;
+            int unreadable = 0, unknown = 0, known = 0, shrinks = 0, nothing = 0, problems = 0;
+            var byStrategy = new long[Settings.Toggles.Count];
+            var predictedStrategy = new bool[Settings.Toggles.Count];
+            foreach (var row in _rows)
+            {
+                switch (row.Group)
+                {
+                    case OptimizeRowGroup.Shrinks: shrinks++; break;
+                    case OptimizeRowGroup.Problem: problems++; break;
+                    default: nothing++; break;
+                }
+
+                if (!row.IsReadable)
+                {
+                    if (row.State == OptimizeRowState.Unreadable)
+                        unreadable++;
+                    continue;
+                }
+
+                before += row.SizeBytes;
+                if (row.State == OptimizeRowState.Unknown)
+                    unknown++;
+                if (row.State == OptimizeRowState.Saved)
+                {
+                    measured += row.Result?.BytesSaved ?? 0;
+                    continue;
+                }
+
+                if (IsDone || row.Savings is not { } savings)
+                    continue;
+
+                known++;
+
+                if (row.Plan is null)
+                    predicted += savings.TotalBytes;
+                else
+                    measured += savings.TotalBytes;
+                for (int i = 0; i < byStrategy.Length; i++)
+                {
+                    long bytes = savings[Settings.Toggles[i].Strategy];
+                    byStrategy[i] += bytes;
+                    predictedStrategy[i] |= row.Plan is null && bytes != 0;
+                }
+            }
+
+            long saving = measured + predicted;
+            // Until something's been measured there's no saving to show, not a saving of nothing.
+            bool any = _rows.Count > 0 && before > 0 && (IsDone || IsRunning || (Settings.AnyOn && known > 0));
+            HasSaving = any;
+            SizesText = before > 0
+                ? any
+                    ? string.Format(CultureInfo.CurrentCulture, Strings.OptimizeSummarySizesFormat, Size(before), Size(before - saving))
+                    : Size(before)
+                : string.Empty;
+            SavingText = !any ? string.Empty
+                : IsDone ? string.Format(CultureInfo.CurrentCulture, Strings.OptimizeStatusSavedFormat, Size(saving))
+                : saving >= 0 ? string.Format(CultureInfo.CurrentCulture, Strings.OptimizeSavesFormat, Size(saving))
+                : string.Format(CultureInfo.CurrentCulture, Strings.OptimizeCostsFormat, Size(-saving));
+            PercentText = any && saving > 0
+                ? string.Format(CultureInfo.CurrentCulture, Strings.OptimizePercentFormat, Math.Max(1, (int)Math.Round(100.0 * saving / before)))
+                : string.Empty;
+            BarKept = before > 0 ? Math.Clamp(1 - ((double)Math.Max(0, saving) / before), 0, 1) : 0;
+            BarSaved = before > 0 ? Math.Clamp((double)Math.Max(0, measured) / before, 0, 1) : 0;
+            BarPredicted = before > 0 ? Math.Clamp((double)Math.Max(0, predicted) / before, 0, 1) : 0;
+
+            for (int i = 0; i < byStrategy.Length; i++)
+            {
+                var toggle = Settings.Toggles[i];
+                // A strategy with nothing known of it yet shows no figure, rather than a nought that isn't one.
+                bool show = toggle.IsOn && !IsDone && toggle.Strategy != OptimizeStrategy.Metadata
+                    && (byStrategy[i] != 0 || (_toMeasure > 0 && _measured >= _toMeasure));
+                string amount = byStrategy[i] >= 0 ? Size(byStrategy[i])
+                    : string.Format(CultureInfo.CurrentCulture, Strings.OptimizeRowGrowsFormat, Size(-byStrategy[i]));
+                toggle.IsSavingPredicted = show && predictedStrategy[i];
+                toggle.SavingText = !show ? string.Empty
+                    : toggle.IsSavingPredicted ? string.Format(CultureInfo.CurrentCulture, Strings.OptimizeStrategySavingPredictedFormat, amount)
+                    : amount;
+            }
+
+            Chips[0].Label = string.Format(CultureInfo.CurrentCulture, IsDone ? Strings.OptimizeChipSavedFormat : Strings.OptimizeChipShrinksFormat, shrinks);
+            Chips[1].Label = string.Format(CultureInfo.CurrentCulture, IsDone ? Strings.OptimizeChipLeftFormat : Strings.OptimizeChipNothingFormat, nothing);
+            Chips[2].Label = string.Format(CultureInfo.CurrentCulture, Strings.OptimizeChipProblemsFormat, problems);
+            Chips[2].IsAlert = problems > 0;
+
+            CoverageText = Coverage(unreadable, unknown);
+            RefreshProgress();
+        }
+
+        private string Coverage(int unreadable, int unknown)
+        {
+            string text;
+            switch (Phase)
+            {
+                case OptimizePhase.Reading:
+                    text = string.Format(CultureInfo.CurrentCulture, Strings.OptimizeCoverageReadingFormat, _read, _rows.Count);
+                    break;
+
+                case OptimizePhase.Running:
+                    text = string.Format(CultureInfo.CurrentCulture, Strings.OptimizeResultSummaryFormat, _applied, _skipped, _failed);
+                    break;
+
+                case OptimizePhase.Done:
+                    text = string.Format(CultureInfo.CurrentCulture, Strings.OptimizeResultSummaryFormat, _applied, _skipped, _failed);
+                    if (_applied > 0)
+                        text += " " + string.Format(CultureInfo.CurrentCulture, Strings.OptimizeDoneEstimateFormat, Size(_bytesEstimated));
+                    if (_stopped)
+                        text = Strings.OptimizeStopped + " " + text;
+                    break;
+
+                default:
+                    if (_rows.Count == 0)
+                        return string.Empty;
+                    if (!Settings.AnyOn)
+                        text = Strings.OptimizeNothingOn;
+                    else if (_measured >= _toMeasure)
+                        text = Strings.OptimizeCoverageDone;
+                    else if (unknown > 0 && _measured < _toMeasure)
+                        text = string.Format(CultureInfo.CurrentCulture, Strings.OptimizeCoverageSamplingFormat, _measured, _toMeasure);
+                    else
+                        text = string.Format(CultureInfo.CurrentCulture, Strings.OptimizeCoverageMeasuringFormat, _measured, _toMeasure);
+                    break;
+            }
+
+            return unreadable == 0 ? text : text + " " + string.Format(CultureInfo.CurrentCulture, Strings.OptimizeUnreadableFormat, unreadable);
+        }
+
+        private void RefreshProgress()
+        {
+            switch (Phase)
+            {
+                case OptimizePhase.Reading:
+                    IsProgressIndeterminate = false;
+                    ProgressValue = _rows.Count == 0 ? 0 : 100.0 * _read / _rows.Count;
+                    StatusText = string.Format(CultureInfo.CurrentCulture, Strings.OptimizeInspectingFormat, _read, _rows.Count);
+                    break;
+
+                case OptimizePhase.Measuring:
+                    IsProgressIndeterminate = false;
+                    ProgressValue = _toMeasure == 0 ? 0 : 100.0 * _measured / _toMeasure;
+                    StatusText = IsPaused
+                        ? string.Format(CultureInfo.CurrentCulture, Strings.OptimizeStatusPausedFormat, _measured, _toMeasure)
+                        : string.Format(CultureInfo.CurrentCulture, Strings.OptimizeStatusMeasuringFormat, _measured, _toMeasure);
+                    break;
+
+                case OptimizePhase.Running:
+                    IsProgressIndeterminate = _toRun == 0;
+                    ProgressValue = _toRun == 0 ? 0 : 100.0 * _finished / _toRun;
+                    break;
+
+                default:
+                    IsProgressIndeterminate = false;
+                    ProgressValue = 0;
+                    StatusText = string.Empty;
+                    break;
+            }
+        }
+
+        private void RefreshOptimizeState()
+        {
+            int charts = _rows.Count(r => r.MayChange);
+            // While a run goes the button stays where it is, greyed out and saying so, so it can't be pressed twice.
+            OptimizeLabel = IsRunning ? Strings.OptimizeBusy
+                : _rows.Count == 0 || !Settings.AnyOn || charts == 0 ? Strings.OptimizeButton
+                : charts == 1 ? Strings.OptimizeButtonOne
+                : string.Format(CultureInfo.CurrentCulture, Strings.OptimizeButtonFormat, charts);
+
+            BlockedText = IsRunning ? string.Empty
+                : _rows.Count == 0 ? Strings.OptimizeNoCharts
+                : !Settings.AnyOn ? Strings.OptimizeBlockedNothingOn
+                : Phase == OptimizePhase.Reading ? Strings.OptimizeBlockedReading
+                : Settings.UseOutputFolder && string.IsNullOrWhiteSpace(Settings.OutputFolder) ? Strings.OptimizeBlockedNoFolder
+                : HasOutputFolderProblem ? OutputFolderProblemText
+                : charts == 0 ? (IsDone ? Strings.OptimizeBlockedDone : Strings.OptimizeBlockedNothingToDo)
+                : string.Empty;
+            OptimizeCommand.NotifyCanExecuteChanged();
+        }
+
+        private static string Size(long bytes) => ByteSizeFormatter.Format((ulong)Math.Max(0, bytes));
+
+        // ---- Optimizing ---------------------------------------------------------------------------------------
+
+        private bool CanOptimize() => !IsRunning && BlockedText.Length == 0 && _rows.Count > 0;
 
         /// <summary>Optimizes every chart, in place or into the output folder, with the strategies that are on.</summary>
         [RelayCommand(CanExecute = nameof(CanOptimize))]
         private async Task OptimizeAsync()
         {
-            await Track(RunAsync(OptimizeCoreAsync));
-
-            // The whole library is scanned again, so the next estimate or run sees the charts as they now are.
-            // Not when the window is closing, as the run was stopped for that.
-            if (!_closeWhenIdle && UseWholeLibrary && _library is null && _changedInPlace > 0)
-                await Track(ChangeScopeAsync());
-        }
-
-        private async Task OptimizeCoreAsync(CancellationToken ct)
-        {
-            if (IsInPlace)
+            if (Settings.IsInPlace)
             {
-                string message = string.Format(CultureInfo.CurrentCulture, Strings.OptimizeConfirmMessageFormat, _scope.Count);
+                string message = string.Format(CultureInfo.CurrentCulture, Strings.OptimizeConfirmMessageFormat, _rows.Count(r => r.MayChange));
                 if (!await _confirmation.ConfirmAsync(Strings.OptimizeConfirmTitle, message, Strings.OptimizeConfirmButton))
                     return;
             }
 
-            Say(string.Empty, problem: false);
-            Results.Clear();
-            HasResults = false;
-            _applied = _skipped = _failed = 0;
-            _bytesSaved = 0;
+            _defaults.Save(Settings.ToSettings());
+            await Track(RunAsync());
+        }
 
-            var options = Options();
-            var charts = await InspectAsync(_scope, options.Parallelism, cached: false, ct);
-            _inspected.Clear();
-            if (charts.Count == 0)
+        private void ClearRunTotals()
+        {
+            _finished = _toRun = _applied = _skipped = _failed = 0;
+            _bytesSaved = _bytesEstimated = 0;
+            _stopped = false;
+        }
+
+        private async Task RunAsync()
+        {
+            _settle.Stop();
+            // The window shows the run from the press: stopping what's being measured can take a moment.
+            SelectedRow?.ClearPreviews();
+            Phase = OptimizePhase.Running;
+            IsPaused = false;
+            StatusText = Strings.OptimizeRunStopping;
+            await StopWorkAsync();
+
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(_closing.Token);
+            _run = cts;
+            var ct = cts.Token;
+            var options = Settings.ToOptions();
+            // Plans made with other settings aren't this run's.
+            if (_measuredOptions != Measuring(options))
             {
-                Say(Strings.OptimizeNoCharts, problem: true);
-                return;
+                foreach (var row in _rows)
+                    row.Plan = null;
+                _measuredOptions = Measuring(options);
             }
 
-            var optimizers = Optimizers(options);
-            int changedBefore = _changedInPlace;
-            IsProgressIndeterminate = false;
-            var planning = new Progress<(int Done, int Total)>(p =>
+            ClearRunTotals();
+            ErrorText = string.Empty;
+            // A chart an earlier run already made smaller keeps its result, and isn't run again. The charts with the most
+            // to save go first, which is the order the list starts in, so the work shows where it's being looked for.
+            var running = _rows.Where(r => r.IsReadable && !r.IsStale && r.State != OptimizeRowState.Saved)
+                .OrderByDescending(r => r.Savings?.TotalBytes ?? 0).ThenByDescending(r => r.SizeBytes).ToList();
+            _toRun = running.Count;
+            foreach (var row in running)
             {
-                ProgressText = string.Format(CultureInfo.CurrentCulture, Strings.OptimizePlanningFormat, p.Done, p.Total);
-                ProgressValue = p.Total == 0 ? 0 : 100.0 * p.Done / p.Total;
-            });
-            var plans = await Task.Run(() => OptimizationPlanner.PlanAllAsync(charts, options, optimizers, planning, ct), ct);
+                row.Result = null;
+                row.State = OptimizeRowState.Waiting;
+                row.Refresh();
+            }
 
-            var queue = new UiBatchQueue<OptimizeProgress>(TimeSpan.FromMilliseconds(100), Take, TimeSpan.FromMilliseconds(30));
+            _dirty = true;
+            var optimizers = Optimizers(options);
+            var queue = new UiBatchQueue<OptimizeProgress>(TimeSpan.FromMilliseconds(100), TakeRun, TimeSpan.FromMilliseconds(30));
             queue.Start();
-            bool stopped = false;
             try
             {
-                await Task.Run(() => OptimizeJob.RunAsync(plans, options, optimizers, _services, queue, ct), ct);
+                // The charts already measured go first, as they are: their plans are what was shown.
+                var planned = running.Where(r => r.Plan is not null).ToList();
+                if (planned.Count > 0)
+                    await Task.Run(() => OptimizeJob.RunAsync([.. planned.Select(r => r.Plan!)], options, optimizers, _services, queue, ct), ct);
+
+                // The rest are measured a batch at a time, and each batch optimized before the next is measured.
+                var services = new PlanServices(_cache, _videoGate);
+                foreach (var batch in running.Where(r => r.Plan is null).Chunk(RunBatch))
+                {
+                    ct.ThrowIfCancellationRequested();
+                    foreach (var row in batch)
+                    {
+                        row.State = OptimizeRowState.Measuring;
+                        row.Refresh();
+                    }
+
+                    StatusText = string.Format(CultureInfo.CurrentCulture, Strings.OptimizeRunMeasuringFormat, _finished, _toRun);
+                    var plans = await Task.Run(() => PlanAsync(batch, options, optimizers, services, ct), ct);
+                    var ready = new List<ChartPlan>();
+                    for (int i = 0; i < batch.Length; i++)
+                    {
+                        if (plans[i].Plan is { } plan)
+                        {
+                            batch[i].Plan = plan;
+                            batch[i].Savings = SavingsModel.Measured(plan);
+                            batch[i].State = OptimizeRowState.Waiting;
+                            batch[i].Refresh();
+                            ready.Add(plan);
+                        }
+                        else
+                        {
+                            Finished(batch[i], OptimizeRowState.Failed, plans[i].Error);
+                        }
+                    }
+
+                    _dirty = true;
+                    if (ready.Count > 0)
+                        await Task.Run(() => OptimizeJob.RunAsync(ready, options, optimizers, _services, queue, ct), ct);
+                }
             }
             catch (OperationCanceledException)
             {
-                stopped = true;
+                _stopped = true;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.TraceError($"Optimize run failed: {ex}");
+                ErrorText = string.Format(CultureInfo.CurrentCulture, Strings.OptimizeFailedFormat, ex.Message);
+                _stopped = true;
             }
             finally
             {
                 // What was reported before a stop or a failure still counts.
                 queue.Stop();
                 queue.TakeAll();
-                // The library as it was read is out of date only if charts were rewritten where they are; a run into the output folder leaves it as it was.
-                if (_changedInPlace > changedBefore)
-                    _library = null;
-                _inspected.Clear();
-                EstimateSections.Clear();
-                HasEstimate = false;
-                HasResults = Results.Count > 0;
-                string summary = Summary();
-                Say(WithUnreadable(stopped ? Strings.OptimizeStopped + " " + summary : summary), problem: _failed > 0 || _unreadable > 0);
+                _run = null;
+
+                // The charts the run didn't reach go back to what was known of them.
+                foreach (var row in running.Where(r => r.State is OptimizeRowState.Waiting or OptimizeRowState.Working or OptimizeRowState.Measuring))
+                {
+                    row.State = row.Plan is not null ? OptimizeRowState.Measured
+                        : row.Savings is { IsComplete: true } ? OptimizeRowState.Predicted
+                        : OptimizeRowState.Unknown;
+                    row.Refresh();
+                }
+
+                Phase = OptimizePhase.Done;
+                OnPropertyChanged(nameof(CanOpenOutput));
+                if (SelectedRow is { } open && !_shutDown)
+                    ShowPreviews(open);
+                _resort = true;
+                _dirty = true;
+                RefreshView();
+                _ = Track(Task.Run(_cache.Save));
+
+                // The window was closed while this was going on, so it closes now that it has stopped.
+                if (_closeWhenIdle)
+                    CloseRequested?.Invoke();
             }
         }
 
-        private void Take(IEnumerable<OptimizeProgress> batch)
+        // Plans the charts of a batch, several at once. One that can't be planned has its error instead, and doesn't stop the rest.
+        private static async Task<(ChartPlan? Plan, string? Error)[]> PlanAsync(
+            OptimizeChartRow[] batch, OptimizeOptions options, OptimizerSet optimizers, PlanServices services, CancellationToken cancellationToken)
+        {
+            var plans = new (ChartPlan? Plan, string? Error)[batch.Length];
+            await Parallel.ForEachAsync(
+                Enumerable.Range(0, batch.Length),
+                new ParallelOptions { MaxDegreeOfParallelism = OptimizeOptions.RecommendedMeasuringParallelism, CancellationToken = cancellationToken },
+                async (i, token) =>
+                {
+                    try
+                    {
+                        plans[i] = (await OptimizationPlanner.PlanAsync(batch[i].Assets!, options, optimizers, services, token).ConfigureAwait(false), null);
+                    }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        plans[i] = (null, ex.Message);
+                    }
+                }).ConfigureAwait(false);
+            return plans;
+        }
+
+        private void TakeRun(IEnumerable<OptimizeProgress> batch)
         {
             foreach (var report in batch)
             {
-                if (report.Total > 0)
-                {
-                    ProgressValue = 100.0 * report.Done / report.Total;
-                    ProgressText = report.CurrentAsset is { } asset && report.Current is { } current
-                        ? string.Format(CultureInfo.CurrentCulture, Strings.OptimizeRunningAssetFormat, current.DisplayName, asset)
-                        : string.Format(CultureInfo.CurrentCulture, Strings.OptimizeRunningFormat, report.Done, report.Total);
-                }
+                if (report.Current is not { } entry || !_byPath.TryGetValue(entry.FullPath, out var row))
+                    continue;
 
                 if (report.Completed is { } item)
-                    Record(item);
+                {
+                    Record(row, item);
+                    continue;
+                }
+
+                row.State = OptimizeRowState.Working;
+                row.WorkingFile = report.CurrentAsset;
+                row.WorkingFraction = report.FileFraction ?? 0;
+                row.Refresh();
+                StatusText = report.CurrentAsset is { } asset
+                    ? string.Format(CultureInfo.CurrentCulture, Strings.OptimizeRunningAssetFormat, entry.DisplayName, asset)
+                    : string.Format(CultureInfo.CurrentCulture, Strings.OptimizeRunningFormat, _finished, _toRun);
             }
+
+            _dirty = true;
         }
 
-        private void Record(OptimizeItemResult item)
+        private void Record(OptimizeChartRow row, OptimizeItemResult item)
         {
-            string name = item.Entry.DisplayName;
+            row.Result = item;
             switch (item.Status)
             {
                 case OptimizeItemStatus.Succeeded:
                     _applied++;
                     _bytesSaved += item.BytesSaved;
-                    if (IsInPlace)
+                    _bytesEstimated += row.EstimatedSavingBytes ?? 0;
+                    if (Settings.IsInPlace)
+                    {
                         _changedInPlace++;
+                        // Its files aren't what was read any more.
+                        row.IsStale = true;
+                    }
                     else
+                    {
                         _written++;
-                    Results.Add(new OptimizeResultRow(name, string.Format(CultureInfo.CurrentCulture, Strings.OptimizeStatusSavedFormat, SignedSize(item.BytesSaved)), false));
+                    }
+
+                    Finished(row, OptimizeRowState.Saved, null);
                     break;
 
                 case OptimizeItemStatus.Failed:
-                    _failed++;
-                    Results.Add(new OptimizeResultRow(name, string.Format(CultureInfo.CurrentCulture, Strings.OptimizeStatusFailedFormat, item.ErrorMessage ?? string.Empty), true));
+                    Finished(row, OptimizeRowState.Failed, item.ErrorMessage);
                     break;
 
                 default:
                     _skipped++;
-                    // A chart with nothing to do is the usual case in a library; listing each would bury the rest.
-                    if (item.SkipReason != OptimizeItemSkipReason.NothingToDo)
-                        Results.Add(new OptimizeResultRow(name, SkipText(item.SkipReason), true));
+                    _finished++;
+                    row.State = OptimizeRowState.Skipped;
+                    row.Refresh();
                     break;
             }
         }
 
-        private static string SignedSize(long bytes) => bytes >= 0
-            ? ByteSizeFormatter.Format((ulong)bytes)
-            : "-" + ByteSizeFormatter.Format((ulong)-bytes);
-
-        private static string SkipText(OptimizeItemSkipReason reason) => reason switch
+        private void Finished(OptimizeChartRow row, OptimizeRowState state, string? error)
         {
-            OptimizeItemSkipReason.HasUnsavedChanges => Strings.OptimizeSkipHasUnsavedChanges,
-            OptimizeItemSkipReason.InUseElsewhere => Strings.OptimizeSkipInUse,
-            OptimizeItemSkipReason.ChartChanged => Strings.OptimizeSkipChartChanged,
-            OptimizeItemSkipReason.OutputExists => Strings.OptimizeSkipOutputExists,
-            _ => Strings.OptimizeSkipNothingToDo,
-        };
+            if (state == OptimizeRowState.Failed)
+                _failed++;
+            _finished++;
+            row.Error = error;
+            row.State = state;
+            row.Refresh();
+        }
 
-        // Charts that couldn't be read were left out of the estimate or run, which would otherwise look like all of them were done.
-        private string WithUnreadable(string text) => _unreadable == 0
-            ? text
-            : text + " " + string.Format(CultureInfo.CurrentCulture, Strings.OptimizeUnreadableFormat, _unreadable);
-
-        private string Summary() => string.Format(
-            CultureInfo.CurrentCulture, Strings.OptimizeResultSummaryFormat, _applied, _skipped, _failed, SignedSize(_bytesSaved));
-
-        /// <summary>Stops the estimate or run going on; charts already finished keep their changes.</summary>
-        [RelayCommand(CanExecute = nameof(IsBusy))]
+        /// <summary>Stops the run; charts already finished keep their changes.</summary>
+        [RelayCommand(CanExecute = nameof(IsRunning))]
         private void Stop() => _run?.Cancel();
 
-        [RelayCommand(CanExecute = nameof(IsIdle))]
+        [RelayCommand(CanExecute = nameof(IsNotRunning))]
         private void Close() => CloseRequested?.Invoke();
 
-        // Shared by the commands.
-
-        private OptimizeOptions Options() => ToSettings().ToOptions(UseOutputFolder ? OutputFolder : null);
+        // ---- Shared -------------------------------------------------------------------------------------------
 
         private OptimizerSet Optimizers(OptimizeOptions options)
         {
@@ -865,138 +1351,11 @@ namespace ChartPacker.ViewModels
             return _optimizers;
         }
 
-        private async Task<IReadOnlyList<ChartAssets>> InspectAsync(IReadOnlyList<SongEntry> entries, int parallelism, bool cached, CancellationToken cancellationToken)
-        {
-            var found = new ChartAssets?[entries.Count];
-            int done = 0;
-            int failed = 0;
-            var progress = new Progress<int>(n =>
-            {
-                ProgressText = string.Format(CultureInfo.CurrentCulture, Strings.OptimizeInspectingFormat, n, entries.Count);
-                ProgressValue = entries.Count == 0 ? 0 : 100.0 * n / entries.Count;
-            });
-            IsProgressIndeterminate = false;
-
-            await Parallel.ForEachAsync(
-                Enumerable.Range(0, entries.Count),
-                new ParallelOptions { MaxDegreeOfParallelism = Math.Max(1, parallelism), CancellationToken = cancellationToken },
-                async (i, token) =>
-                {
-                    var entry = entries[i];
-                    ChartAssets? assets = null;
-                    if (cached)
-                    {
-                        lock (_inspected)
-                            _inspected.TryGetValue(entry.FullPath, out assets);
-                    }
-
-                    if (assets is null)
-                    {
-                        try
-                        {
-                            assets = await AssetInspector.InspectAsync(entry, _backends.Probes, token);
-                            if (cached)
-                            {
-                                lock (_inspected)
-                                    _inspected[entry.FullPath] = assets;
-                            }
-                        }
-                        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
-                        {
-                            // A chart that can't be read is left out, and the status says how many were.
-                            Interlocked.Increment(ref failed);
-                        }
-                    }
-
-                    found[i] = assets;
-                    ((IProgress<int>)progress).Report(Interlocked.Increment(ref done));
-                });
-
-            _unreadable = failed;
-            return [.. found.OfType<ChartAssets>()];
-        }
-
-        // Runs one operation: the window is busy for as long as it takes, and Stop cancels it.
-        private async Task RunAsync(Func<CancellationToken, Task> body)
-        {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(_closing.Token);
-            _run = cts;
-            IsBusy = true;
-            ProgressText = string.Empty;
-            ProgressValue = 0;
-            IsProgressIndeterminate = false;
-            try
-            {
-                await body(cts.Token);
-            }
-            catch (OperationCanceledException)
-            {
-                Say(Strings.OptimizeStopped, problem: false);
-            }
-            catch (Exception ex)
-            {
-                // Whatever went wrong, it's shown here: this runs from commands and fire-and-forget calls, where nothing else would see it.
-                System.Diagnostics.Trace.TraceError($"Optimize window operation failed: {ex}");
-                Say(string.Format(CultureInfo.CurrentCulture, Strings.OptimizeFailedFormat, ex.Message), problem: true);
-            }
-            finally
-            {
-                _run = null;
-                IsBusy = false;
-                IsProgressIndeterminate = false;
-                ProgressText = string.Empty;
-                ProgressValue = 0;
-                RefreshCommands();
-
-                // The window was closed while this was going on, so it closes now that it has stopped.
-                if (_closeWhenIdle)
-                    CloseRequested?.Invoke();
-            }
-        }
-
         // Keeps the running task, so shutting down can wait for it.
         private Task Track(Task task)
         {
             _current = Task.WhenAll(_current, task);
             return task;
-        }
-
-        private void Say(string text, bool problem)
-        {
-            StatusText = text;
-            StatusIsProblem = problem;
-        }
-
-        private void RefreshCommands()
-        {
-            EstimateCommand.NotifyCanExecuteChanged();
-            OptimizeCommand.NotifyCanExecuteChanged();
-        }
-
-        private OptimizeStrategyToggle Toggle(OptimizeStrategy strategy, string title, string description) =>
-            new(strategy, title, description, _backends.UnavailableReason(strategy));
-
-        private static OptimizeChoice<int> BitrateChoice(int kbps) => new(kbps, kbps switch
-        {
-            AudioOptimizeOptions.DefaultBitrateKbps => string.Format(CultureInfo.CurrentCulture, Strings.OptimizeBitrateDefaultFormat, kbps),
-            AudioOptimizeOptions.SmallerBitrateKbps => string.Format(CultureInfo.CurrentCulture, Strings.OptimizeBitrateSmallerFormat, kbps),
-            _ => string.Format(CultureInfo.CurrentCulture, Strings.OptimizeBitrateFormat, kbps),
-        });
-
-        private static OptimizeChoice<(int? W, int? H)> LimitChoice((int? W, int? H) limit) => new(limit, limit is { W: { } w, H: { } h }
-            ? string.Format(CultureInfo.CurrentCulture, Strings.OptimizeSizeLimitFormat, w, h)
-            : Strings.OptimizeNoLimit);
-
-        // The choice for a value, adding one when what was saved isn't among the presets.
-        private static OptimizeChoice<T> Pick<T>(ObservableCollection<OptimizeChoice<T>> choices, T value, Func<T, OptimizeChoice<T>> make)
-        {
-            var existing = choices.FirstOrDefault(c => EqualityComparer<T>.Default.Equals(c.Value, value));
-            if (existing is not null)
-                return existing;
-
-            var added = make(value);
-            choices.Add(added);
-            return added;
         }
     }
 }

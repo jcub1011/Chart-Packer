@@ -266,7 +266,7 @@ public static class OptimizeJob
             if (action.Kind == OptimizeActionKind.Remove)
             {
                 change.Removes.UnionWith(action.SourceNames);
-                change.Assets.Add(new AssetResult(name, action.Strategy, action.Kind, action.InputBytes, 0, AssetOutcome.Applied));
+                change.Assets.Add(new AssetResult(name, action.Strategy, action.Kind, action.InputBytes, 0, AssetOutcome.Applied, EstimatedBytesAfter: 0));
             }
             else if (action.Kind == OptimizeActionKind.CleanMetadata)
             {
@@ -365,7 +365,7 @@ public static class OptimizeJob
             if (info.Length >= action.InputBytes && !action.ForCompatibility)
             {
                 info.Delete();
-                change.Assets.Add(new AssetResult(name, action.Strategy, action.Kind, action.InputBytes, action.InputBytes, AssetOutcome.Skipped, action.OutputName, nameof(OptimizeSkipReason.WouldGrow)));
+                change.Assets.Add(new AssetResult(name, action.Strategy, action.Kind, action.InputBytes, action.InputBytes, AssetOutcome.Skipped, action.OutputName, nameof(OptimizeSkipReason.WouldGrow), action.EstimatedOutputBytes));
                 return;
             }
 
@@ -374,13 +374,13 @@ public static class OptimizeJob
             if (action.Strategy is OptimizeStrategy.AlbumArt or OptimizeStrategy.BackgroundArt
                 && !action.OutputName!.Equals(name, StringComparison.OrdinalIgnoreCase))
                 change.Renames[name] = action.OutputName;
-            change.Assets.Add(new AssetResult(name, action.Strategy, action.Kind, action.InputBytes, info.Length, AssetOutcome.Applied, action.OutputName));
+            change.Assets.Add(new AssetResult(name, action.Strategy, action.Kind, action.InputBytes, info.Length, AssetOutcome.Applied, action.OutputName, null, action.EstimatedOutputBytes));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             // This file stays as it was; the chart's others carry on.
             StagingPath.TryDeleteFile(output);
-            change.Assets.Add(new AssetResult(name, action.Strategy, action.Kind, action.InputBytes, action.InputBytes, AssetOutcome.Failed, action.OutputName, ex.Message));
+            change.Assets.Add(new AssetResult(name, action.Strategy, action.Kind, action.InputBytes, action.InputBytes, AssetOutcome.Failed, action.OutputName, ex.Message, action.EstimatedOutputBytes));
         }
     }
 

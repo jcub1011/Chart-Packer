@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Threading;
 using System.Threading.Tasks;
 using ChartShared.Core.Optimization;
 using ChartShared.Core.Scanning;
@@ -9,13 +8,11 @@ namespace ChartPacker.Services
 {
     /// <summary>What the Optimize window works on.</summary>
     /// <param name="Selected">The songs selected in the library; none when the window opens on the whole library.</param>
-    /// <param name="LoadLibrary">
-    /// Rescans the library, reporting the scan's progress, and gives every song in it; or <see langword="null"/> when the
-    /// scan stopped short. Each call is a fresh scan, so it sees what an earlier run changed. Called on the UI thread.
+    /// <param name="Library">
+    /// Every song in the library, as it was last scanned. The window reads each chart's files itself, so it needs no fresh
+    /// scan, and the main window's list and selection stay as they are while it's open.
     /// </param>
-    public sealed record OptimizeRequest(
-        IReadOnlyList<SongEntry> Selected,
-        Func<IProgress<DedupScanProgress>, CancellationToken, Task<IReadOnlyList<SongEntry>?>> LoadLibrary);
+    public sealed record OptimizeRequest(IReadOnlyList<SongEntry> Selected, IReadOnlyList<SongEntry> Library);
 
     /// <summary>What the Optimize window changed on disk.</summary>
     /// <param name="ChangedInPlace">Charts were rewritten where they are, so the library needs a rescan to show their sizes.</param>
@@ -34,10 +31,14 @@ namespace ChartPacker.Services
     /// <param name="UnavailableReason">
     /// Why a strategy can't run (video without the libvpx encoder, for one), or <see langword="null"/> when it can.
     /// </param>
+    /// <param name="Estimates">What's been measured of the charts, kept between sessions so they aren't measured again.</param>
+    /// <param name="Previews">Makes before-and-after pictures of a chart's images and video; none when null.</param>
     public sealed record OptimizeBackends(
         Func<int, OptimizerSet> CreateOptimizers,
         AssetProbes Probes,
-        Func<OptimizeStrategy, string?> UnavailableReason);
+        Func<OptimizeStrategy, string?> UnavailableReason,
+        EstimateCache Estimates,
+        IMediaPreviewer? Previews = null);
 
     /// <summary>Opens the Optimize window (issue #257), over the library's songs.</summary>
     public interface IOptimizeWindowService

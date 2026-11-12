@@ -5,7 +5,9 @@
 background videos through them and rewrites a video without its audio when packing.
 `ChartShared.Audio` decodes Vorbis, Opus and MPEG audio packets with them, having read the
 containers itself, and reads a video's audio track through `avformat` for alignment. The Library
-Optimization Tool re-encodes videos to VP8 in WebM with libvpx (`VideoReencoder`). The libraries go in
+Optimization Tool re-encodes videos to VP8 in WebM with libvpx (`VideoReencoder`). Packing and the
+optimizer encode Opus audio with libopus (`FfmpegOpusEncoder`), which `ChartShared.Audio` frames into Ogg
+Opus itself. The libraries go in
 `ChartShared.Ffmpeg/runtimes/<rid>/native/`, which is gitignored. From there they're copied beside
 the executable on build and publish, as SDL's library is.
 
@@ -15,13 +17,16 @@ Without them the app builds and runs:
 - audio is decoded by the managed decoders (NVorbis, NLayer and Concentus), which are several times
   slower (see `tools/DecodeBench/RESULTS.md`);
 - videos can't be optimized: the video optimizer is unavailable, and its option shows disabled;
-- the video decoder tests, the video re-encoder tests and the FFmpeg rows of the audio decoder tests
-  are skipped as inconclusive.
+- Opus is encoded by the managed Concentus encoder, which is slower, and the files differ slightly
+  from libopus's, though they sound the same at a given bitrate; Opus encoding is never unavailable;
+- the video decoder tests, the video re-encoder tests, the libopus encoder tests and the FFmpeg rows of
+  the audio decoder tests are skipped as inconclusive.
 
 Libraries built before the audio decoders were added still play video. Audio falls back to the
 managed decoders. Libraries built before libvpx was added (no `libvpx.txt` beside them) still play
 video and decode audio, but can't optimize videos: `VideoReencoder.IsAvailable` is false, and
-`build/publish.ps1` offers to rebuild them.
+`build/publish.ps1` offers to rebuild them. Libraries built before libopus was added (no `libopus.txt`)
+encode Opus with the managed encoder, and `build/publish.ps1` offers to rebuild them too.
 
 ## For a release: `build.sh <rid>`
 
@@ -38,10 +43,14 @@ This builds FFmpeg from the `n9.0.2` tag with only what the app needs, and nothi
 - the `libvpx` VP8 encoder (`--enable-libvpx --enable-encoder=libvpx_vp8`; the encoder's name at
   run time is `libvpx`), which the video optimizer writes WebM with, through the `webm` muxer. libvpx
   is BSD-3, so the result is still LGPL 2.1+. libx264 is GPL, so there is no H.264 output. libvpx is
-  linked in statically, so no libvpx library ships beside FFmpeg's.
+  linked in statically, so no libvpx library ships beside FFmpeg's;
+- the `libopus` Opus encoder (`--enable-libopus --enable-encoder=libopus`), which writes Opus audio when
+  packing and optimizing. libopus is BSD-3, so the result is still LGPL 2.1+, and it's linked in
+  statically too. FFmpeg's own `opus` decoder stays the one that decodes Opus.
 
-The result is LGPL 2.1+ and a few MB per RID. When it's done, `libvpx.txt` is written beside the
-libraries; `build/publish.ps1` looks for it to tell a build with the VP8 encoder from an older one.
+The result is LGPL 2.1+ and a few MB per RID. When it's done, `libvpx.txt` and `libopus.txt` are written
+beside the libraries; `build/publish.ps1` looks for them to tell a build with the VP8 and Opus encoders
+from an older one.
 
 `build/publish.ps1` offers to run this for its RID when the libraries are missing or have no
 swresample. Pass `-Yes` to run it, and install what it needs, without being asked.
@@ -52,8 +61,8 @@ swresample. Pass `-Yes` to run it, and install what it needs, without being aske
 | `linux-x64`, `linux-arm64` | That platform |
 | `osx-x64`, `osx-arm64` | macOS with Xcode's command-line tools |
 
-It needs `git`, `make`, `pkg-config`, a C compiler, libvpx (its headers and static library, found
-through `pkg-config`) and, for x86-64, `nasm`. The script checks for these before it starts. If any are missing, it shows the command that installs them and asks
+It needs `git`, `make`, `pkg-config`, a C compiler, libvpx and libopus (their headers and static
+libraries, found through `pkg-config`) and, for x86-64, `nasm`. The script checks for these before it starts. If any are missing, it shows the command that installs them and asks
 before running it. It uses pacman on MSYS2; apt, dnf or pacman on Linux; and `xcode-select` and
 Homebrew on macOS. Pass `--yes` (`build.sh --yes <rid>`) to install without being asked. Without a
 terminal, it prints the command and stops.
@@ -80,13 +89,13 @@ The first run offers to install MSYS2 (`winget install MSYS2.MSYS2`). Then, in M
 it offers to install the toolchain:
 
 ```
-pacman -S --needed git make diffutils mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-pkgconf mingw-w64-ucrt-x86_64-nasm
+pacman -S --needed git make diffutils mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-pkgconf mingw-w64-ucrt-x86_64-libvpx mingw-w64-ucrt-x86_64-opus mingw-w64-ucrt-x86_64-nasm
 ```
 
 `configure` is slow under MSYS2, so the build takes several minutes. The DLLs are linked with
 `-static`, so they need nothing from MSYS2 at run time: not its libwinpthread, and not
-`libvpx-1.dll`, which MSYS2's libvpx package may also provide. The static `libvpx.a` has to be what
-gets linked; if it isn't, the import check below stops the build. The script checks each DLL's imports, and
+`libvpx-1.dll` or `libopus-0.dll`, which MSYS2's libvpx and opus packages may also provide. The static
+`libvpx.a` and `libopus.a` have to be what gets linked; if they aren't, the import check below stops the build. The script checks each DLL's imports, and
 stops if one needs a toolchain DLL such as `libwinpthread-1.dll`. Don't run it
 from the plain MSYS shell, whose binaries need `msys-2.0.dll`.
 
@@ -109,7 +118,9 @@ cross-compile it from WSL with llvm-mingw.
    Distributions have no libvpx for mingw-w64, so a cross-compiled build needs one you build yourself
    as a static library (`libvpx.a`, from [libvpx](https://chromium.googlesource.com/webm/libvpx) with
    `CROSS=x86_64-w64-mingw32-` and `--target=x86_64-win64-gcc --disable-shared --enable-static`),
-   with `PKG_CONFIG_PATH` pointing at its `lib/pkgconfig`. Building in MSYS2 is easier.
+   with `PKG_CONFIG_PATH` pointing at its `lib/pkgconfig`. They have no libopus for it either: build
+   [Opus](https://opus-codec.org/downloads/) the same way (`--host=x86_64-w64-mingw32 --disable-shared --enable-static`).
+   Building in MSYS2 is easier.
 
 ## For development: `fetch-prebuilt.sh <rid>`
 
@@ -117,7 +128,8 @@ This downloads a prebuilt LGPL FFmpeg 9.0 from
 [BtbN/FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds) for `win-x64`, `win-arm64`,
 `linux-x64` or `linux-arm64`, and copies the libraries in. It needs no compiler, and runs in Git
 Bash on Windows. These builds enable much more than the app needs, so they're about 120 MB, and
-include libvpx, so they can optimize videos too (the script leaves the `libvpx.txt` marker).
+include libvpx and libopus, so they can optimize videos and encode Opus natively too (the script leaves
+the `libvpx.txt` and `libopus.txt` markers).
 Don't ship them.
 
 ## Another version

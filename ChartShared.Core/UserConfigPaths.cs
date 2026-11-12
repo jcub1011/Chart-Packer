@@ -38,6 +38,12 @@ public static class UserConfigPaths
     public static string OptimizerSettingsFile => Path.Combine(ConfigFolder, "optimizer-settings.json");
 
     /// <summary>
+    /// What the Library Optimization Tool has measured of the charts it's seen, so they aren't measured again
+    /// (<see cref="Optimization.EstimateCache"/>). Safe to delete: it's only ever a saving of time.
+    /// </summary>
+    public static string OptimizerEstimatesFile => Path.Combine(ConfigFolder, "optimizer-estimates.json");
+
+    /// <summary>
     /// The audio/visual latency per output device, written by Chart Builder's calibration tool and read
     /// by both apps (charter-spec C11, §10).
     /// </summary>

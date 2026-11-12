@@ -217,17 +217,20 @@ public sealed class OptimizeVideoTests
     }
 
     [TestMethod]
-    public async Task TheSavingsEstimateStillShowsWhatConvertingAnUnsupportedCodecCosts()
+    public async Task AnUnsupportedCodecIsKnownToSaveNothingUntilItsConvertedWhenItShowsWhatThatCosts()
     {
         var assets = await InspectedAsync("video/vp9");
         var optimizer = new FakeOptimizer { Estimate = FakeOptimizer.DefaultEstimate(1.5) };
 
-        // Convert-for-compatibility is off: the estimate is about the strategy's settings, not the opt-in.
-        var estimate = await SavingsEstimator.EstimateAsync(
-            OptimizeStrategy.Video, [assets], VideoOptions(), new OptimizerSet(null, optimizer), SamplingMode.AllCharts, cancellationToken: TestContext.CancellationToken);
+        // Convert-for-compatibility is off: the video is left alone, which is known without measuring it.
+        var left = OptimizationPlanner.UnitsOf(assets, VideoOptions()).Single();
+        Assert.AreEqual(0, left.KnownSavingBytes);
+        Assert.AreEqual(0, new SavingsModel(VideoOptions()).Predict([left]).TotalBytes);
 
-        var vp9 = estimate.Codecs.Single(c => c.CodecKey == "video/vp9");
-        Assert.AreEqual(5000, vp9.TotalInputBytes);
-        Assert.AreEqual(-2500, vp9.EstimatedSavingBytes);
+        // On, it has to be measured, and the estimate is what converting costs.
+        var converting = VideoOptions(convertUnsupported: true);
+        Assert.IsTrue(OptimizationPlanner.UnitsOf(assets, converting).Single().NeedsMeasuring);
+        var plan = await OptimizationPlanner.PlanAsync(assets, converting, new OptimizerSet(null, optimizer), TestContext.CancellationToken);
+        Assert.AreEqual(-2500, SavingsModel.Measured(plan).TotalBytes);
     }
 }

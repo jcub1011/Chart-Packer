@@ -29,13 +29,13 @@ namespace ChartShared.Video;
 /// option disabled, with <see cref="VideoReencoder.UnavailableReason"/>).</para>
 /// </remarks>
 /// <param name="windowCount">How many windows an estimate encodes.</param>
-/// <param name="windowFrames">How many frames each window is; a keyframe interval by default.</param>
+/// <param name="windowFrames">How many frames each window is.</param>
 /// <param name="expectedConcurrency">How many calls the host runs at once, as <see cref="OptimizeOptions.Parallelism"/>; 1 or less when it runs them one at a time.</param>
 public sealed class VideoOptimizer(
-    int windowCount = VideoOptimizer.DefaultWindowCount, int windowFrames = VideoReencodeSettings.GopFrames, int expectedConcurrency = 1) : IVideoOptimizer
+    int windowCount = VideoOptimizer.DefaultWindowCount, int windowFrames = VideoReencoder.DefaultWindowFrames, int expectedConcurrency = 1) : IVideoOptimizer
 {
     /// <summary>How many windows an estimate encodes by default.</summary>
-    public const int DefaultWindowCount = 5;
+    public const int DefaultWindowCount = VideoReencoder.DefaultWindowCount;
 
     /// <summary>
     /// The bits per pixel per frame above which a VP8 file is too lavish to be left alone: 0.1 is 6 Mbps for 1080p30, several
@@ -136,7 +136,7 @@ public sealed class VideoOptimizer(
         if (IsAlreadyOptimal(source.Asset, info, settings))
             return new OptimizeEstimate(source.Asset.Length, OutputExtension, AlreadyOptimal: true);
 
-        return new OptimizeEstimate(VideoReencoder.EstimateSize(source.Path, settings, _windowCount, _windowFrames, cancellationToken), OutputExtension);
+        return new OptimizeEstimate(VideoReencoder.EstimateSize(source.Path, settings, _windowCount, _windowFrames, cancellationToken: cancellationToken), OutputExtension);
     }
 
     private sealed class InlineProgress(Action<double> report) : IProgress<double>

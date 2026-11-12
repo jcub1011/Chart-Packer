@@ -6,7 +6,8 @@ using ChartShared.UI.Views;
 namespace ChartPacker.Views
 {
     /// <summary>
-    /// The Optimize window. Closing it while an estimate or a run is going stops that first; the window stays until it has.
+    /// The Optimize window. Closing it while a run is going stops the run first; the window stays until it has. Measuring
+    /// is simply stopped, as what's been measured is kept.
     /// </summary>
     public partial class OptimizeWindow : Window
     {

@@ -52,7 +52,8 @@ $ffmpegDir = Join-Path $repoRoot "ChartShared.Ffmpeg/runtimes/$Runtime/native"
 # Why the FFmpeg in $ffmpegDir can't be published, or $null when it can. Only builds with the audio
 # decoders have swresample, which the Opus decoder needs; without it, audio would play on the managed decoders.
 # Only builds with the VP8 encoder (libvpx) can optimize videos. The libraries don't say whether they have it, so
-# build.sh and fetch-prebuilt.sh leave libvpx.txt beside them.
+# build.sh and fetch-prebuilt.sh leave libvpx.txt beside them. The same goes for the Opus encoder (libopus.txt), without
+# which the apps encode Opus with the slower managed encoder.
 function Get-FfmpegProblem {
     if (-not (Test-Path (Join-Path $ffmpegDir '*avcodec*'))) {
         return "FFmpeg isn't in $ffmpegDir."
@@ -62,6 +63,9 @@ function Get-FfmpegProblem {
     }
     if (-not (Test-Path (Join-Path $ffmpegDir 'libvpx.txt'))) {
         return "The FFmpeg in $ffmpegDir has no libvpx.txt, so it predates the VP8 encoder the video optimizer needs."
+    }
+    if (-not (Test-Path (Join-Path $ffmpegDir 'libopus.txt'))) {
+        return "The FFmpeg in $ffmpegDir has no libopus.txt, so it predates the Opus encoder."
     }
     return $null
 }

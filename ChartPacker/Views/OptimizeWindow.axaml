@@ -6,13 +6,15 @@
         xmlns:vm="using:ChartPacker.ViewModels"
         xmlns:res="using:ChartPacker.Resources"
         xmlns:ctl="using:ChartShared.UI.Controls"
-        mc:Ignorable="d" d:DesignWidth="1040" d:DesignHeight="760"
+        xmlns:pc="using:ChartPacker.Controls"
+        xmlns:chrome="using:Avalonia.Controls.Chrome"
+        mc:Ignorable="d" d:DesignWidth="1120" d:DesignHeight="760"
         x:Class="ChartPacker.Views.OptimizeWindow"
         x:DataType="vm:OptimizeWindowViewModel"
         Title="{x:Static res:Strings.OptimizeWindowTitle}"
         Background="{DynamicResource AppBackgroundBrush}"
-        Width="1040" Height="760"
-        MinWidth="780" MinHeight="520"
+        Width="1120" Height="760"
+        MinWidth="920" MinHeight="520"
         ShowInTaskbar="False"
         CanMinimize="False"
         ExtendClientAreaToDecorationsHint="True"
@@ -24,32 +26,38 @@
          owner disabled. -->
 
     <Window.Styles>
-        <Style Selector="TextBlock.warning">
-            <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}" />
-            <Setter Property="TextWrapping" Value="Wrap" />
-        </Style>
-        <Style Selector="TextBlock.problem">
-            <Setter Property="Foreground" Value="{DynamicResource InvalidBrush}" />
-        </Style>
-        <Style Selector="TextBlock.heading">
-            <Setter Property="FontSize" Value="12" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Opacity" Value="0.85" />
-            <Setter Property="Margin" Value="0,0,0,6" />
-        </Style>
+        <!-- The inspector's section headings, for the settings. -->
+        <StyleInclude Source="avares://ChartShared.UI/Styles/Inspector.axaml" />
+
         <Style Selector="TextBlock.note">
             <Setter Property="FontSize" Value="12" />
             <Setter Property="Opacity" Value="0.7" />
             <Setter Property="TextWrapping" Value="Wrap" />
         </Style>
+        <Style Selector="TextBlock.warning">
+            <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style Selector="TextBlock.number">
+            <Setter Property="FontFeatures" Value="tnum" />
+        </Style>
 
-        <!-- A section: a surface with a subtle outline, as the main window's panels are. -->
-        <Style Selector="Border.card">
-            <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="6" />
-            <Setter Property="Padding" Value="12" />
+        <!-- A strategy: its switch, with what it saves at the right; under it, what it does, and its settings once it's on. -->
+        <Style Selector="StackPanel.strategy">
+            <Setter Property="Margin" Value="0,0,0,12" />
+        </Style>
+        <Style Selector="StackPanel.strategy CheckBox.switch">
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style Selector="StackPanel.strategy TextBlock.saving">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontFeatures" Value="tnum" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+        </Style>
+        <Style Selector="StackPanel.strategy > TextBlock.note, StackPanel.strategy > TextBlock.warning">
+            <Setter Property="Margin" Value="26,0,0,0" />
         </Style>
         <Style Selector="StackPanel.detail">
             <Setter Property="Margin" Value="26,8,0,0" />
@@ -58,57 +66,266 @@
         <Style Selector="Grid.setting > TextBlock.caption">
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
+
+        <!-- An amber notice, as the theme's banner is in the accent. -->
+        <Style Selector="Border.banner.warning">
+            <Setter Property="BorderBrush" Value="{DynamicResource WarningBorderBrush}" />
+            <Setter Property="Background" Value="{DynamicResource WarningTintBrush}" />
+        </Style>
+
+        <!-- The size bar: what's kept in grey, what's saved in the accent, what's only predicted in a faint accent. -->
+        <Style Selector="pc|SizeBarView">
+            <Setter Property="TrackBrush" Value="{DynamicResource ToolHoverBrush}" />
+            <Setter Property="KeptBrush" Value="{DynamicResource WaveformBrush}" />
+            <Setter Property="SavedBrush" Value="{DynamicResource AccentBrush}" />
+            <Setter Property="PredictedBrush" Value="{DynamicResource AccentTintStrongBrush}" />
+        </Style>
+
+        <!-- How far through a file a run is, where the chart's size bar was. -->
+        <Style Selector="ProgressBar.file">
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="Height" Value="6" />
+            <Setter Property="CornerRadius" Value="3" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+        </Style>
+
+        <!-- While a run goes, the spinner takes the icon's place, and cancels under the pointer, as the job window's does. -->
+        <Style Selector="Border.title-bar.busy > Grid > Image">
+            <Setter Property="Opacity" Value="0" />
+        </Style>
+        <Style Selector="Button.cancel">
+            <Setter Property="Width" Value="34" />
+            <Setter Property="Padding" Value="6,0,0,0" />
+            <Setter Property="CornerRadius" Value="0" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+            <Setter Property="VerticalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.cancel ctl|LineIcon">
+            <Setter Property="Opacity" Value="0" />
+        </Style>
+        <Style Selector="Button.cancel:pointerover Arc, Button.cancel:focus-visible Arc">
+            <Setter Property="Opacity" Value="0" />
+        </Style>
+        <Style Selector="Button.cancel:pointerover ctl|LineIcon, Button.cancel:focus-visible ctl|LineIcon">
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+        <Style Selector="Button.cancel:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+        </Style>
+
+        <!-- The charts: hover and selection as in the library list (a tint, and a bar in the accent at the left). -->
+        <Style Selector="ListBox.charts">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="ListBox.charts ListBoxItem">
+            <Setter Property="Padding" Value="12,0" />
+            <Setter Property="BorderThickness" Value="3,0,0,0" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+        </Style>
+        <Style Selector="ListBox.charts ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+        </Style>
+        <Style Selector="ListBox.charts ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentTintFaintBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+        </Style>
+        <Style Selector="ListBox.charts ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentTintBrush}" />
+        </Style>
+        <Style Selector="Border.chart-row">
+            <Setter Property="Padding" Value="0,7" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+        </Style>
+
+        <!-- What a chart saves: in the accent, as its bar is; quieter while it's a prediction or nothing; amber or red when
+             it wants a look. -->
+        <Style Selector="TextBlock.saved">
+            <Setter Property="FontFeatures" Value="tnum" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+            <Setter Property="HorizontalAlignment" Value="Right" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
+        <Style Selector="TextBlock.saved.predicted">
+            <Setter Property="FontWeight" Value="Normal" />
+        </Style>
+        <Style Selector="TextBlock.saved.quiet">
+            <Setter Property="FontWeight" Value="Normal" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+            <Setter Property="Opacity" Value="0.55" />
+        </Style>
+        <Style Selector="TextBlock.saved.attention">
+            <Setter Property="FontWeight" Value="Normal" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Opacity" Value="1" />
+            <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}" />
+        </Style>
+        <Style Selector="TextBlock.saved.failed">
+            <Setter Property="Opacity" Value="1" />
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlErrorTextForegroundBrush}" />
+        </Style>
+        <Style Selector="TextBlock.detail.failed, TextBlock.action.failed">
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlErrorTextForegroundBrush}" />
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+        <Style Selector="TextBlock.detail.attention">
+            <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}" />
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+        <Style Selector="TextBlock.action.kept">
+            <Setter Property="Opacity" Value="0.6" />
+        </Style>
+
+        <!-- A before or after picture: a tile, as the inspector's art is, that keeps its place while the picture is made. -->
+        <Style Selector="Border.picture">
+            <Setter Property="Background" Value="{DynamicResource ToolbarGroupBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="ClipToBounds" Value="True" />
+            <Setter Property="MinHeight" Value="120" />
+        </Style>
+
+        <Style Selector="TextBlock.chip-label.problem">
+            <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}" />
+        </Style>
     </Window.Styles>
 
     <Window.DataTemplates>
-        <!-- One strategy's estimate: its codecs, the sample it was made from, and what it comes to. -->
-        <DataTemplate DataType="vm:OptimizeEstimateSection">
-            <StackPanel Spacing="4" Margin="0,0,0,14">
-                <TextBlock FontWeight="SemiBold" Text="{Binding Title}" />
-                <TextBlock Classes="note" Text="{Binding Sample}" />
-                <ItemsControl ItemsSource="{Binding Rows}" IsVisible="{Binding HasRows}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="vm:OptimizeEstimateRow">
-                            <Grid ColumnDefinitions="*,Auto,150,150" ColumnSpacing="10" Margin="0,3">
-                                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
-                                    <TextBlock FontSize="12" Text="{Binding Codec}" />
-                                    <Border Classes="chip" IsVisible="{Binding IsCompatibility}"
-                                            ToolTip.Tip="{x:Static res:Strings.OptimizeCompatibilityToolTip}">
-                                        <TextBlock Text="{x:Static res:Strings.OptimizeCompatibilityChip}" />
-                                    </Border>
-                                </StackPanel>
-                                <TextBlock Grid.Column="1" FontSize="12" Classes="muted" Text="{Binding Assets}" />
-                                <TextBlock Grid.Column="2" FontSize="12" Classes.warning="{Binding IsCost}" Text="{Binding Saving}" />
-                                <TextBlock Grid.Column="3" FontSize="12" Classes="muted" Text="{Binding PerChart}" />
-                            </Grid>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-                <TextBlock Classes="note" IsVisible="{Binding HasNoRows}" Text="{x:Static res:Strings.OptimizeSavingsNone}" />
-                <TextBlock FontSize="12" FontWeight="SemiBold" Text="{Binding Total}" />
-                <TextBlock Classes="warning" FontSize="12" IsVisible="{Binding HasCompatibilityNote}" Text="{Binding CompatibilityNote}" />
+        <!-- One chart: its name and what happens to it, its size, the size as a bar, and what it saves. Selected, its
+             files are listed under it. -->
+        <DataTemplate DataType="vm:OptimizeChartRow">
+            <Border Classes="chart-row" ToolTip.Tip="{Binding ToolTip}">
+                <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*,68,90,118,38" ColumnSpacing="10">
+                    <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                        <TextBlock FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Text="{Binding Name}" />
+                        <TextBlock Classes="muted detail"
+                                   Classes.failed="{Binding IsFailed}"
+                                   Classes.attention="{Binding IsAttention}"
+                                   FontSize="11"
+                                   MinHeight="15"
+                                   TextTrimming="CharacterEllipsis"
+                                   Text="{Binding Detail}" />
+                    </StackPanel>
+
+                    <TextBlock Grid.Column="1" Classes="muted number" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center"
+                               Text="{Binding SizeText}" />
+
+                    <Panel Grid.Column="2" VerticalAlignment="Center">
+                        <pc:SizeBarView Height="6"
+                                        IsVisible="{Binding IsNotWorking}"
+                                        Kept="{Binding BarKept}" Saved="{Binding BarSaved}" Predicted="{Binding BarPredicted}" />
+                        <ProgressBar Classes="file" Minimum="0" Maximum="1"
+                                     IsVisible="{Binding IsWorking}"
+                                     Value="{Binding WorkingFraction}" />
+                    </Panel>
+
+                    <TextBlock Grid.Column="3" Classes="saved"
+                               Classes.predicted="{Binding IsPredicted}"
+                               Classes.quiet="{Binding IsQuiet}"
+                               Classes.attention="{Binding IsAttention}"
+                               Classes.failed="{Binding IsFailed}"
+                               Text="{Binding SavingText}" />
+                    <TextBlock Grid.Column="4" Classes="muted number" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center"
+                               Text="{Binding PercentText}" />
+
+                    <!-- The breakdown: a click in it is the breakdown's own, and doesn't close the row. -->
+                    <pc:QuietBorder Grid.Row="1" Grid.ColumnSpan="5"
+                                    Margin="2,8,0,2" Padding="10,0,0,0"
+                                    BorderThickness="2,0,0,0"
+                                    BorderBrush="{DynamicResource SubtleBorderBrush}"
+                                    IsVisible="{Binding IsExpanded}">
+                      <StackPanel>
+                        <ItemsControl ItemsSource="{Binding Files}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:OptimizeFileRow">
+                                    <Grid ColumnDefinitions="190,*,Auto" ColumnSpacing="12" Margin="0,2">
+                                        <TextBlock Grid.Column="0" FontSize="12" TextTrimming="CharacterEllipsis" Text="{Binding Name}" ToolTip.Tip="{Binding Name}" />
+                                        <TextBlock Grid.Column="1" Classes="action"
+                                                   Classes.kept="{Binding IsKept}"
+                                                   Classes.failed="{Binding IsFailed}"
+                                                   FontSize="12" TextWrapping="Wrap" Text="{Binding Action}" />
+                                        <TextBlock Grid.Column="2" Classes="muted number" FontSize="12" Text="{Binding Sizes}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <ItemsControl ItemsSource="{Binding Previews}" IsVisible="{Binding HasPreviews}" />
+                      </StackPanel>
+                    </pc:QuietBorder>
+                </Grid>
+            </Border>
+        </DataTemplate>
+
+        <!-- One of a chart's pictures as it is beside as it would be: an image, or a video a frame at a time. -->
+        <DataTemplate DataType="vm:OptimizeMediaPreviewViewModel">
+            <StackPanel Margin="0,12,0,4" Spacing="6">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                    <TextBlock Grid.Column="0" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Text="{Binding Title}" />
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" IsVisible="{Binding IsVideo}">
+                        <TextBlock Classes="muted number" FontSize="12" VerticalAlignment="Center" Margin="0,0,4,0" Text="{Binding FrameText}" />
+                        <Button Classes="tool" Command="{Binding PreviousFrameCommand}"
+                                ToolTip.Tip="{x:Static res:Strings.OptimizePreviewPreviousFrame}"
+                                AutomationProperties.Name="{x:Static res:Strings.OptimizePreviewPreviousFrame}">
+                            <ctl:LineIcon Data="{StaticResource ArrowLeftStroke}" />
+                        </Button>
+                        <Button Classes="tool" Command="{Binding NextFrameCommand}"
+                                ToolTip.Tip="{x:Static res:Strings.OptimizePreviewNextFrame}"
+                                AutomationProperties.Name="{x:Static res:Strings.OptimizePreviewNextFrame}">
+                            <ctl:LineIcon Data="{StaticResource ArrowRightStroke}" />
+                        </Button>
+                    </StackPanel>
+                </Grid>
+                <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="8" RowSpacing="4">
+                    <Border Grid.Column="0" Classes="picture">
+                        <Panel>
+                            <Image Source="{Binding Before}" Stretch="Uniform" MaxHeight="300" />
+                            <Arc Classes="spinner" Classes.active="{Binding IsLoading}" Width="18" Height="18" StrokeThickness="2" IsVisible="{Binding IsLoading}" />
+                        </Panel>
+                    </Border>
+                    <Border Grid.Column="1" Classes="picture">
+                        <Panel>
+                            <Image Source="{Binding After}" Stretch="Uniform" MaxHeight="300" />
+                            <Arc Classes="spinner" Classes.active="{Binding IsLoading}" Width="18" Height="18" StrokeThickness="2" IsVisible="{Binding IsLoading}" />
+                        </Panel>
+                    </Border>
+                    <TextBlock Grid.Row="1" Grid.Column="0" Classes="muted number" FontSize="11" Text="{Binding BeforeCaption}" />
+                    <TextBlock Grid.Row="1" Grid.Column="1" Classes="muted number" FontSize="11" Text="{Binding AfterCaption}" />
+                </Grid>
+                <TextBlock Classes="warning" IsVisible="{Binding HasError}" Text="{Binding ErrorText}" />
             </StackPanel>
         </DataTemplate>
     </Window.DataTemplates>
 
     <Grid RowDefinitions="Auto,*,Auto">
         <!-- The title bar, as the main window's is, over the progress of what's going on. Layered: the progress, then the
-             title bar, see-through so the progress shows. -->
+             title bar, see-through so the progress shows, then, while a run goes, the spinner that stops it. -->
         <Panel Grid.Row="0" Height="31">
             <ProgressBar Classes="fill"
                          Margin="0,0,0,1"
                          Minimum="0" Maximum="100"
                          Value="{Binding ProgressValue}"
                          IsIndeterminate="{Binding IsProgressIndeterminate}"
-                         IsVisible="{Binding IsBusy}"
+                         IsVisible="{Binding IsWorking}"
                          IsHitTestVisible="False"
-                         AutomationProperties.Name="{Binding ProgressText}" />
+                         AutomationProperties.Name="{Binding StatusText}" />
 
             <ctl:TitleBar x:Name="WindowTitleBar"
                           HelpPage="{x:Static help:HelpPages.Optimize}"
                           Background="Transparent"
                           BorderThickness="0,0,0,1"
                           BorderBrush="{DynamicResource SubtleBorderBrush}"
+                          Classes.busy="{Binding IsRunning}"
                           AppName="{x:Static res:Strings.AppName}">
                 <TextBlock Margin="8,0,12,0"
                            FontSize="12"
@@ -116,240 +333,329 @@
                            TextTrimming="CharacterEllipsis"
                            Text="{x:Static res:Strings.OptimizeWindowTitle}" />
             </ctl:TitleBar>
+
+            <Button Classes="cancel"
+                    Margin="0,0,0,1"
+                    chrome:WindowDecorationProperties.ElementRole="User"
+                    Command="{Binding StopCommand}"
+                    IsVisible="{Binding IsRunning}"
+                    ToolTip.Tip="{x:Static res:Strings.OptimizeStopToolTip}"
+                    AutomationProperties.Name="{x:Static res:Strings.OptimizeStopButton}">
+                <Panel>
+                    <Arc Classes="spinner" Classes.active="{Binding IsRunning}" Width="14" Height="14" StrokeThickness="2" />
+                    <ctl:LineIcon Data="{StaticResource ClearStroke}" />
+                </Panel>
+            </Button>
         </Panel>
 
-        <Grid Grid.Row="1" ColumnDefinitions="440,*">
-            <!-- What to do, and how. -->
-            <ScrollViewer Grid.Column="0" HorizontalScrollBarVisibility="Disabled" IsEnabled="{Binding IsIdle}">
-                <StackPanel Margin="12" Spacing="10">
-                    <Border Classes="card">
-                        <StackPanel Spacing="6">
-                            <TextBlock Classes="heading" Text="{x:Static res:Strings.OptimizeScopeLabel}" />
-                            <StackPanel Spacing="4" IsVisible="{Binding HasSelection}">
-                                <RadioButton GroupName="Scope" IsChecked="{Binding UseSelection}" Content="{Binding SelectedScopeText}" />
-                                <RadioButton GroupName="Scope" IsChecked="{Binding UseWholeLibrary}" Content="{x:Static res:Strings.OptimizeScopeLibrary}"
-                                             ToolTip.Tip="{x:Static res:Strings.OptimizeScopeLibraryToolTip}" />
-                            </StackPanel>
-                            <TextBlock Classes="note" Text="{Binding ScopeText}" />
+        <Grid Grid.Row="1" ColumnDefinitions="344,*">
+            <!-- What to shrink and how, and where the changed charts go. It can't change under a run. -->
+            <Border Grid.Column="0" BorderThickness="0,0,1,0" BorderBrush="{DynamicResource SubtleBorderBrush}">
+                <ScrollViewer HorizontalScrollBarVisibility="Disabled" IsEnabled="{Binding IsNotRunning}">
+                    <StackPanel Margin="12,0,14,16">
+                        <TextBlock Classes="section" Margin="0,12,0,8" Text="{x:Static res:Strings.OptimizeScopeLabel}" />
+                        <StackPanel Spacing="4" IsVisible="{Binding HasSelection}">
+                            <RadioButton GroupName="Scope" IsChecked="{Binding UseSelection}" Content="{Binding SelectedScopeText}" />
+                            <RadioButton GroupName="Scope" IsChecked="{Binding UseWholeLibrary}" Content="{Binding LibraryScopeText}" />
                         </StackPanel>
-                    </Border>
+                        <TextBlock Classes="note" IsVisible="{Binding HasNoSelection}" Text="{Binding OnlyLibraryScopeText}" />
 
-                    <!-- Metadata cleanup. -->
-                    <Border Classes="card">
-                        <StackPanel>
-                            <CheckBox IsChecked="{Binding Metadata.IsOn}" IsEnabled="{Binding Metadata.IsAvailable}" Content="{Binding Metadata.Title}" FontWeight="SemiBold" />
-                            <TextBlock Classes="note" Margin="26,0,0,0" Text="{Binding Metadata.Description}" />
-                            <StackPanel Classes="detail" IsEnabled="{Binding Metadata.IsOn}">
+                        <TextBlock Classes="section" Text="{x:Static res:Strings.OptimizeShrinkLabel}" />
+
+                        <!-- Audio. -->
+                        <StackPanel Classes="strategy" DataContext="{Binding Settings}" x:DataType="vm:OptimizeSettingsViewModel">
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                <CheckBox Classes="switch" IsChecked="{Binding Audio.IsOn}" IsEnabled="{Binding Audio.IsAvailable}" Content="{Binding Audio.Title}" />
+                                <TextBlock Grid.Column="1" Classes="saving" Text="{Binding Audio.SavingText}" ToolTip.Tip="{x:Static res:Strings.OptimizeStrategySavingToolTip}" />
+                            </Grid>
+                            <TextBlock Classes="note" Text="{Binding Audio.Description}" />
+                            <TextBlock Classes="warning" IsVisible="{Binding Audio.IsUnavailable}" Text="{Binding Audio.UnavailableText}" />
+                            <StackPanel Classes="detail" IsVisible="{Binding Audio.IsOn}">
+                                <Grid Classes="setting" ColumnDefinitions="84,*" ColumnSpacing="8">
+                                    <TextBlock Grid.Column="0" Classes="caption" Text="{x:Static res:Strings.OptimizeAudioBitrateLabel}" />
+                                    <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding BitrateChoices}" SelectedItem="{Binding SelectedBitrate}"
+                                              AutomationProperties.Name="{x:Static res:Strings.OptimizeAudioBitrateLabel}" />
+                                </Grid>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- Stem mixdown. -->
+                        <StackPanel Classes="strategy" DataContext="{Binding Settings}" x:DataType="vm:OptimizeSettingsViewModel">
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                <CheckBox Classes="switch" IsChecked="{Binding StemMixdown.IsOn}" IsEnabled="{Binding StemMixdown.IsAvailable}" Content="{Binding StemMixdown.Title}" />
+                                <TextBlock Grid.Column="1" Classes="saving" Text="{Binding StemMixdown.SavingText}" ToolTip.Tip="{x:Static res:Strings.OptimizeStrategySavingToolTip}" />
+                            </Grid>
+                            <TextBlock Classes="note" Text="{Binding StemMixdown.Description}" />
+                            <StackPanel Classes="detail" IsVisible="{Binding StemMixdown.IsOn}">
+                                <Grid Classes="setting" ColumnDefinitions="84,*" ColumnSpacing="8">
+                                    <TextBlock Grid.Column="0" Classes="caption" Text="{x:Static res:Strings.OptimizeAudioBitrateLabel}" />
+                                    <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding MixdownBitrateChoices}" SelectedItem="{Binding SelectedMixdownBitrate}"
+                                              AutomationProperties.Name="{x:Static res:Strings.OptimizeMixdownBitrateLabel}" />
+                                </Grid>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- Video. -->
+                        <StackPanel Classes="strategy" DataContext="{Binding Settings}" x:DataType="vm:OptimizeSettingsViewModel">
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                <CheckBox Classes="switch" IsChecked="{Binding Video.IsOn}" IsEnabled="{Binding Video.IsAvailable}" Content="{Binding Video.Title}" />
+                                <TextBlock Grid.Column="1" Classes="saving" Text="{Binding Video.SavingText}" ToolTip.Tip="{x:Static res:Strings.OptimizeStrategySavingToolTip}" />
+                            </Grid>
+                            <TextBlock Classes="note" Text="{Binding Video.Description}" />
+                            <TextBlock Classes="warning" IsVisible="{Binding Video.IsUnavailable}" Text="{Binding Video.UnavailableText}" />
+                            <StackPanel Classes="detail" IsVisible="{Binding Video.IsOn}">
+                                <Grid Classes="setting" ColumnDefinitions="84,*" ColumnSpacing="8">
+                                    <TextBlock Grid.Column="0" Classes="caption" Text="{x:Static res:Strings.OptimizeVideoTargetLabel}" />
+                                    <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding VideoTargets}" SelectedItem="{Binding SelectedVideoTarget}"
+                                              AutomationProperties.Name="{x:Static res:Strings.OptimizeVideoTargetLabel}" />
+                                </Grid>
+                                <Grid Classes="setting" ColumnDefinitions="84,*,Auto" ColumnSpacing="8" ToolTip.Tip="{x:Static res:Strings.OptimizeVideoCqDescription}">
+                                    <TextBlock Grid.Column="0" Classes="caption" Text="{x:Static res:Strings.OptimizeVideoCqLabel}" />
+                                    <Slider Grid.Column="1" Minimum="4" Maximum="63" TickFrequency="1" IsSnapToTickEnabled="True"
+                                            Value="{Binding VideoCq}" AutomationProperties.Name="{x:Static res:Strings.OptimizeVideoCqLabel}" />
+                                    <TextBlock Grid.Column="2" Classes="caption number" MinWidth="44" Text="{Binding VideoCqText}" />
+                                </Grid>
+                                <CheckBox IsChecked="{Binding VideoConvertUnsupported}" Content="{x:Static res:Strings.OptimizeVideoConvertLabel}" />
+                                <TextBlock Classes="note" Margin="26,-4,0,0" Text="{x:Static res:Strings.OptimizeVideoConvertDescription}" />
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- Album art. -->
+                        <StackPanel Classes="strategy" DataContext="{Binding Settings}" x:DataType="vm:OptimizeSettingsViewModel">
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                <CheckBox Classes="switch" IsChecked="{Binding AlbumArt.IsOn}" IsEnabled="{Binding AlbumArt.IsAvailable}" Content="{Binding AlbumArt.Title}" />
+                                <TextBlock Grid.Column="1" Classes="saving" Text="{Binding AlbumArt.SavingText}" ToolTip.Tip="{x:Static res:Strings.OptimizeStrategySavingToolTip}" />
+                            </Grid>
+                            <TextBlock Classes="note" Text="{Binding AlbumArt.Description}" />
+                            <TextBlock Classes="warning" IsVisible="{Binding AlbumArt.IsUnavailable}" Text="{Binding AlbumArt.UnavailableText}" />
+                            <StackPanel Classes="detail" IsVisible="{Binding AlbumArt.IsOn}">
+                                <Grid Classes="setting" ColumnDefinitions="84,*,Auto" ColumnSpacing="8">
+                                    <TextBlock Grid.Column="0" Classes="caption" Text="{x:Static res:Strings.OptimizeImageQualityLabel}" />
+                                    <Slider Grid.Column="1" Minimum="1" Maximum="100" TickFrequency="1" IsSnapToTickEnabled="True"
+                                            Value="{Binding AlbumArtQuality}" AutomationProperties.Name="{x:Static res:Strings.OptimizeImageQualityLabel}" />
+                                    <TextBlock Grid.Column="2" Classes="caption number" MinWidth="44" Text="{Binding AlbumArtQualityText}" />
+                                </Grid>
+                                <Grid Classes="setting" ColumnDefinitions="84,*" ColumnSpacing="8">
+                                    <TextBlock Grid.Column="0" Classes="caption" Text="{x:Static res:Strings.OptimizeImageLimitLabel}" />
+                                    <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding AlbumArtLimits}" SelectedItem="{Binding SelectedAlbumArtLimit}"
+                                              AutomationProperties.Name="{x:Static res:Strings.OptimizeImageLimitLabel}" />
+                                </Grid>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- Background images. -->
+                        <StackPanel Classes="strategy" DataContext="{Binding Settings}" x:DataType="vm:OptimizeSettingsViewModel">
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                <CheckBox Classes="switch" IsChecked="{Binding BackgroundArt.IsOn}" IsEnabled="{Binding BackgroundArt.IsAvailable}" Content="{Binding BackgroundArt.Title}" />
+                                <TextBlock Grid.Column="1" Classes="saving" Text="{Binding BackgroundArt.SavingText}" ToolTip.Tip="{x:Static res:Strings.OptimizeStrategySavingToolTip}" />
+                            </Grid>
+                            <TextBlock Classes="note" Text="{Binding BackgroundArt.Description}" />
+                            <TextBlock Classes="warning" IsVisible="{Binding BackgroundArt.IsUnavailable}" Text="{Binding BackgroundArt.UnavailableText}" />
+                            <StackPanel Classes="detail" IsVisible="{Binding BackgroundArt.IsOn}">
+                                <Grid Classes="setting" ColumnDefinitions="84,*,Auto" ColumnSpacing="8">
+                                    <TextBlock Grid.Column="0" Classes="caption" Text="{x:Static res:Strings.OptimizeImageQualityLabel}" />
+                                    <Slider Grid.Column="1" Minimum="1" Maximum="100" TickFrequency="1" IsSnapToTickEnabled="True"
+                                            Value="{Binding BackgroundArtQuality}" AutomationProperties.Name="{x:Static res:Strings.OptimizeImageQualityLabel}" />
+                                    <TextBlock Grid.Column="2" Classes="caption number" MinWidth="44" Text="{Binding BackgroundArtQualityText}" />
+                                </Grid>
+                                <Grid Classes="setting" ColumnDefinitions="84,*" ColumnSpacing="8">
+                                    <TextBlock Grid.Column="0" Classes="caption" Text="{x:Static res:Strings.OptimizeImageLimitLabel}" />
+                                    <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding BackgroundArtLimits}" SelectedItem="{Binding SelectedBackgroundArtLimit}"
+                                              AutomationProperties.Name="{x:Static res:Strings.OptimizeImageLimitLabel}" />
+                                </Grid>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- Metadata cleanup: last, as it saves next to nothing. -->
+                        <StackPanel Classes="strategy" Margin="0" DataContext="{Binding Settings}" x:DataType="vm:OptimizeSettingsViewModel">
+                            <CheckBox Classes="switch" IsChecked="{Binding Metadata.IsOn}" IsEnabled="{Binding Metadata.IsAvailable}" Content="{Binding Metadata.Title}" />
+                            <TextBlock Classes="note" Text="{Binding Metadata.Description}" />
+                            <StackPanel Classes="detail" Spacing="2" IsVisible="{Binding Metadata.IsOn}">
                                 <CheckBox IsChecked="{Binding PruneEmptyParts}" Content="{x:Static res:Strings.OptimizePruneEmptyPartsLabel}" />
                                 <CheckBox IsChecked="{Binding StripEditorEvents}" Content="{x:Static res:Strings.OptimizeStripEditorEventsLabel}" />
                                 <CheckBox IsChecked="{Binding DropEmptyValues}" Content="{x:Static res:Strings.OptimizeDropEmptyValuesLabel}" />
                                 <CheckBox IsChecked="{Binding ReplaceLegacyKeys}" Content="{x:Static res:Strings.OptimizeReplaceLegacyKeysLabel}" />
                             </StackPanel>
                         </StackPanel>
-                    </Border>
 
-                    <!-- Audio. -->
-                    <Border Classes="card">
-                        <StackPanel>
-                            <CheckBox IsChecked="{Binding Audio.IsOn}" IsEnabled="{Binding Audio.IsAvailable}" Content="{Binding Audio.Title}" FontWeight="SemiBold" />
-                            <TextBlock Classes="note" Margin="26,0,0,0" Text="{Binding Audio.Description}" />
-                            <TextBlock Classes="warning" FontSize="12" Margin="26,2,0,0" IsVisible="{Binding Audio.IsUnavailable}" Text="{Binding Audio.UnavailableText}" />
-                            <StackPanel Classes="detail" IsEnabled="{Binding Audio.IsOn}">
-                                <Grid Classes="setting" ColumnDefinitions="120,*,Auto" ColumnSpacing="8">
-                                    <TextBlock Grid.Column="0" Classes="caption" Text="{x:Static res:Strings.OptimizeAudioBitrateLabel}" />
-                                    <ComboBox Grid.Column="1" MinWidth="170" ItemsSource="{Binding BitrateChoices}" SelectedItem="{Binding SelectedBitrate}"
-                                              AutomationProperties.Name="{x:Static res:Strings.OptimizeAudioBitrateLabel}" />
-                                </Grid>
-                            </StackPanel>
-                            <CheckBox Margin="0,10,0,0" IsChecked="{Binding StemMixdown.IsOn}" IsEnabled="{Binding StemMixdown.IsAvailable}" Content="{Binding StemMixdown.Title}" FontWeight="SemiBold" />
-                            <TextBlock Classes="note" Margin="26,0,0,0" Text="{Binding StemMixdown.Description}" />
-                            <StackPanel Classes="detail" IsEnabled="{Binding StemMixdown.IsOn}">
-                                <Grid Classes="setting" ColumnDefinitions="120,*,Auto" ColumnSpacing="8">
-                                    <TextBlock Grid.Column="0" Classes="caption" Text="{x:Static res:Strings.OptimizeMixdownBitrateLabel}" />
-                                    <ComboBox Grid.Column="1" MinWidth="170" ItemsSource="{Binding MixdownBitrateChoices}" SelectedItem="{Binding SelectedMixdownBitrate}"
-                                              AutomationProperties.Name="{x:Static res:Strings.OptimizeMixdownBitrateLabel}" />
-                                </Grid>
-                            </StackPanel>
-                        </StackPanel>
-                    </Border>
+                        <!-- How small a saving is still worth acting on. -->
+                        <TextBlock Classes="section" Text="{x:Static res:Strings.OptimizeMarginLabel}" />
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" DataContext="{Binding Settings}" x:DataType="vm:OptimizeSettingsViewModel">
+                            <Slider Grid.Column="0" Minimum="0" Maximum="90" TickFrequency="1" IsSnapToTickEnabled="True"
+                                    Value="{Binding MarginPercent}" AutomationProperties.Name="{x:Static res:Strings.OptimizeMarginLabel}" />
+                            <TextBlock Grid.Column="1" Classes="caption number" MinWidth="36" VerticalAlignment="Center" TextAlignment="Right" Text="{Binding MarginText}" />
+                        </Grid>
+                        <TextBlock Classes="note" Text="{x:Static res:Strings.OptimizeMarginDescription}" />
 
-                    <!-- Video. -->
-                    <Border Classes="card">
-                        <StackPanel>
-                            <CheckBox IsChecked="{Binding Video.IsOn}" IsEnabled="{Binding Video.IsAvailable}" Content="{Binding Video.Title}" FontWeight="SemiBold" />
-                            <TextBlock Classes="note" Margin="26,0,0,0" Text="{Binding Video.Description}" />
-                            <TextBlock Classes="warning" FontSize="12" Margin="26,2,0,0" IsVisible="{Binding Video.IsUnavailable}" Text="{Binding Video.UnavailableText}" />
-                            <StackPanel Classes="detail" IsEnabled="{Binding Video.IsOn}">
-                                <Grid Classes="setting" ColumnDefinitions="120,*,Auto" ColumnSpacing="8">
-                                    <TextBlock Grid.Column="0" Classes="caption" Text="{x:Static res:Strings.OptimizeVideoTargetLabel}" />
-                                    <ComboBox Grid.Column="1" MinWidth="170" ItemsSource="{Binding VideoTargets}" SelectedItem="{Binding SelectedVideoTarget}"
-                                              AutomationProperties.Name="{x:Static res:Strings.OptimizeVideoTargetLabel}" />
-                                </Grid>
-                                <Grid Classes="setting" ColumnDefinitions="120,*,Auto" ColumnSpacing="8" ToolTip.Tip="{x:Static res:Strings.OptimizeVideoCqDescription}">
-                                    <TextBlock Grid.Column="0" Classes="caption" Text="{x:Static res:Strings.OptimizeVideoCqLabel}" />
-                                    <Slider Grid.Column="1" Minimum="4" Maximum="63" TickFrequency="1" IsSnapToTickEnabled="True"
-                                            Value="{Binding VideoCq}" AutomationProperties.Name="{x:Static res:Strings.OptimizeVideoCqLabel}" />
-                                    <TextBlock Grid.Column="2" Classes="caption" MinWidth="48" Text="{Binding VideoCqText}" />
-                                </Grid>
-                                <CheckBox IsChecked="{Binding VideoConvertUnsupported}" Content="{x:Static res:Strings.OptimizeVideoConvertLabel}"
-                                          ToolTip.Tip="{x:Static res:Strings.OptimizeVideoConvertDescription}" />
-                                <TextBlock Classes="note" Margin="26,0,0,0" Text="{x:Static res:Strings.OptimizeVideoConvertDescription}" />
-                            </StackPanel>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- Images. -->
-                    <Border Classes="card">
-                        <StackPanel>
-                            <CheckBox IsChecked="{Binding AlbumArt.IsOn}" IsEnabled="{Binding AlbumArt.IsAvailable}" Content="{Binding AlbumArt.Title}" FontWeight="SemiBold" />
-                            <TextBlock Classes="note" Margin="26,0,0,0" Text="{Binding AlbumArt.Description}" />
-                            <TextBlock Classes="warning" FontSize="12" Margin="26,2,0,0" IsVisible="{Binding AlbumArt.IsUnavailable}" Text="{Binding AlbumArt.UnavailableText}" />
-                            <StackPanel Classes="detail" IsEnabled="{Binding AlbumArt.IsOn}">
-                                <Grid Classes="setting" ColumnDefinitions="120,*,Auto" ColumnSpacing="8">
-                                    <TextBlock Grid.Column="0" Classes="caption" Text="{x:Static res:Strings.OptimizeImageQualityLabel}" />
-                                    <Slider Grid.Column="1" Minimum="1" Maximum="100" TickFrequency="1" IsSnapToTickEnabled="True"
-                                            Value="{Binding AlbumArtQuality}" AutomationProperties.Name="{x:Static res:Strings.OptimizeImageQualityLabel}" />
-                                    <TextBlock Grid.Column="2" Classes="caption" MinWidth="48" Text="{Binding AlbumArtQualityText}" />
-                                </Grid>
-                                <Grid Classes="setting" ColumnDefinitions="120,*,Auto" ColumnSpacing="8">
-                                    <TextBlock Grid.Column="0" Classes="caption" Text="{x:Static res:Strings.OptimizeImageLimitLabel}" />
-                                    <ComboBox Grid.Column="1" MinWidth="170" ItemsSource="{Binding AlbumArtLimits}" SelectedItem="{Binding SelectedAlbumArtLimit}"
-                                              AutomationProperties.Name="{x:Static res:Strings.OptimizeImageLimitLabel}" />
-                                </Grid>
-                            </StackPanel>
-
-                            <CheckBox Margin="0,10,0,0" IsChecked="{Binding BackgroundArt.IsOn}" IsEnabled="{Binding BackgroundArt.IsAvailable}" Content="{Binding BackgroundArt.Title}" FontWeight="SemiBold" />
-                            <TextBlock Classes="note" Margin="26,0,0,0" Text="{Binding BackgroundArt.Description}" />
-                            <TextBlock Classes="warning" FontSize="12" Margin="26,2,0,0" IsVisible="{Binding BackgroundArt.IsUnavailable}" Text="{Binding BackgroundArt.UnavailableText}" />
-                            <StackPanel Classes="detail" IsEnabled="{Binding BackgroundArt.IsOn}">
-                                <Grid Classes="setting" ColumnDefinitions="120,*,Auto" ColumnSpacing="8">
-                                    <TextBlock Grid.Column="0" Classes="caption" Text="{x:Static res:Strings.OptimizeImageQualityLabel}" />
-                                    <Slider Grid.Column="1" Minimum="1" Maximum="100" TickFrequency="1" IsSnapToTickEnabled="True"
-                                            Value="{Binding BackgroundArtQuality}" AutomationProperties.Name="{x:Static res:Strings.OptimizeImageQualityLabel}" />
-                                    <TextBlock Grid.Column="2" Classes="caption" MinWidth="48" Text="{Binding BackgroundArtQualityText}" />
-                                </Grid>
-                                <Grid Classes="setting" ColumnDefinitions="120,*,Auto" ColumnSpacing="8">
-                                    <TextBlock Grid.Column="0" Classes="caption" Text="{x:Static res:Strings.OptimizeImageLimitLabel}" />
-                                    <ComboBox Grid.Column="1" MinWidth="170" ItemsSource="{Binding BackgroundArtLimits}" SelectedItem="{Binding SelectedBackgroundArtLimit}"
-                                              AutomationProperties.Name="{x:Static res:Strings.OptimizeImageLimitLabel}" />
-                                </Grid>
-                            </StackPanel>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- Savings margin, and where the changed charts go. -->
-                    <Border Classes="card">
-                        <StackPanel Spacing="10">
-                            <Grid Classes="setting" ColumnDefinitions="120,*,Auto" ColumnSpacing="8" ToolTip.Tip="{x:Static res:Strings.OptimizeMarginDescription}">
-                                <TextBlock Grid.Column="0" Classes="caption" Text="{x:Static res:Strings.OptimizeMarginLabel}" />
-                                <Slider Grid.Column="1" Minimum="0" Maximum="50" TickFrequency="1" IsSnapToTickEnabled="True"
-                                        Value="{Binding MarginPercent}" AutomationProperties.Name="{x:Static res:Strings.OptimizeMarginLabel}" />
-                                <TextBlock Grid.Column="2" Classes="caption" MinWidth="48" Text="{Binding MarginText}" />
-                            </Grid>
-
-                            <StackPanel Spacing="6">
-                                <TextBlock Classes="heading" Text="{x:Static res:Strings.OptimizeOutputLabel}" />
-                                <CheckBox IsChecked="{Binding UseOutputFolder}" Content="{x:Static res:Strings.OptimizeToFolder}"
-                                          ToolTip.Tip="{x:Static res:Strings.OptimizeToFolderDescription}" />
-                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" IsEnabled="{Binding UseOutputFolder}">
-                                    <TextBox Grid.Column="0" Text="{Binding OutputFolder}" PlaceholderText="{x:Static res:Strings.OptimizeOutputFolderPlaceholder}"
-                                             AutomationProperties.Name="{x:Static res:Strings.OptimizeOutputLabel}" />
+                        <!-- Where the changed charts go. -->
+                        <TextBlock Classes="section" Text="{x:Static res:Strings.OptimizeOutputLabel}" />
+                        <StackPanel Spacing="6">
+                            <RadioButton GroupName="Output" IsChecked="{Binding Settings.UseOutputFolder}" Content="{x:Static res:Strings.OptimizeToFolder}" />
+                            <StackPanel Margin="26,0,0,0" Spacing="6">
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" IsEnabled="{Binding Settings.UseOutputFolder}">
+                                    <TextBox Grid.Column="0" Text="{Binding Settings.OutputFolder}" PlaceholderText="{x:Static res:Strings.OptimizeOutputFolderPlaceholder}"
+                                             AutomationProperties.Name="{x:Static res:Strings.OptimizeToFolder}" />
                                     <Button Grid.Column="1" Content="{x:Static res:Strings.OptimizeBrowseButton}" Command="{Binding BrowseOutputCommand}" />
                                 </Grid>
-                                <TextBlock Classes="warning" FontSize="12" IsVisible="{Binding HasOutputFolderProblem}" Text="{Binding OutputFolderProblemText}" />
-                                <TextBlock Classes="warning" FontSize="12" IsVisible="{Binding IsInPlace}" Text="{x:Static res:Strings.OptimizeInPlaceWarning}" />
+                                <TextBlock Classes="note" Text="{x:Static res:Strings.OptimizeToFolderDescription}" />
+                                <TextBlock Classes="warning" IsVisible="{Binding HasOutputFolderProblem}" Text="{Binding OutputFolderProblemText}" />
                             </StackPanel>
+                            <RadioButton GroupName="Output" IsChecked="{Binding Settings.IsInPlace}" Content="{x:Static res:Strings.OptimizeInPlaceOption}" />
+                            <Border Classes="banner warning" Margin="26,0,0,0" IsVisible="{Binding Settings.IsInPlace}">
+                                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                                    <ctl:LineIcon Grid.Column="0" Width="12" Height="12" Margin="0,3,0,0" VerticalAlignment="Top"
+                                                  Foreground="{DynamicResource WarningTextBrush}" Data="{StaticResource WarningStroke}" />
+                                    <TextBlock Grid.Column="1" FontSize="12" TextWrapping="Wrap" Text="{x:Static res:Strings.OptimizeInPlaceWarning}" />
+                                </Grid>
+                            </Border>
                         </StackPanel>
-                    </Border>
-                </StackPanel>
-            </ScrollViewer>
 
-            <!-- The estimate, and what a run did. -->
-            <Grid Grid.Column="1" RowDefinitions="Auto,*" Margin="0,12,12,12" RowSpacing="10">
-                <Border Grid.Row="0" Classes="card">
-                    <StackPanel Spacing="8">
-                        <Grid Classes="setting" ColumnDefinitions="120,*,Auto" ColumnSpacing="8" IsEnabled="{Binding IsIdle}">
-                            <TextBlock Grid.Column="0" Classes="caption" Text="{x:Static res:Strings.OptimizeSamplingLabel}" />
-                            <ComboBox Grid.Column="1" MinWidth="200" ItemsSource="{Binding SamplingChoices}" SelectedItem="{Binding SelectedSampling}"
-                                      ToolTip.Tip="{x:Static res:Strings.OptimizeSamplingDescription}"
-                                      AutomationProperties.Name="{x:Static res:Strings.OptimizeSamplingLabel}" />
+                        <Button Classes="labelled" Margin="0,22,0,0" HorizontalAlignment="Left"
+                                Command="{Binding ResetCommand}"
+                                ToolTip.Tip="{x:Static res:Strings.OptimizeResetToolTip}"
+                                AutomationProperties.Name="{x:Static res:Strings.OptimizeResetButton}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <ctl:LineIcon Data="{StaticResource RevertStroke}" />
+                                <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.OptimizeResetButton}" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+
+            <Grid Grid.Column="1" RowDefinitions="Auto,Auto,*">
+                <!-- What it all comes to: the charts' size before and after, the saving, the size as a bar, and how much of
+                     the figure is measured. -->
+                <Border Grid.Row="0" Padding="16,12,16,12" BorderThickness="0,0,0,1" BorderBrush="{DynamicResource SubtleBorderBrush}">
+                    <StackPanel>
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+                            <TextBlock Grid.Column="0" Classes="number" FontSize="18" FontWeight="SemiBold" Text="{Binding SizesText}" />
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" IsVisible="{Binding HasSaving}">
+                                <TextBlock Classes="number" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource AccentTextBrush}" Text="{Binding SavingText}" />
+                                <Border Classes="chip large" VerticalAlignment="Center"
+                                        IsVisible="{Binding PercentText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                    <TextBlock Classes="number" Text="{Binding PercentText}" />
+                                </Border>
+                            </StackPanel>
                         </Grid>
-                        <Grid Classes="setting" ColumnDefinitions="120,*,Auto" ColumnSpacing="8" IsVisible="{Binding IsSingleChartMode}" IsEnabled="{Binding IsIdle}">
-                            <TextBlock Grid.Column="0" Classes="caption" Text="{x:Static res:Strings.OptimizeSingleChartLabel}" />
-                            <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding ChartChoices}" SelectedItem="{Binding SelectedChart}"
-                                      AutomationProperties.Name="{x:Static res:Strings.OptimizeSingleChartLabel}" />
-                        </Grid>
+                        <pc:SizeBarView Height="8" Margin="0,10,0,8"
+                                        Kept="{Binding BarKept}" Saved="{Binding BarSaved}" Predicted="{Binding BarPredicted}"
+                                        AutomationProperties.Name="{x:Static res:Strings.OptimizeSummaryBarName}" />
+                        <TextBlock Classes="note" Text="{Binding CoverageText}" />
+                        <Border Classes="banner error" Margin="0,10,0,0" IsVisible="{Binding HasError}">
+                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                                <ctl:LineIcon Grid.Column="0" Width="12" Height="12" Margin="0,3,0,0" VerticalAlignment="Top" Data="{StaticResource WarningStroke}" />
+                                <SelectableTextBlock Grid.Column="1" FontSize="12" TextWrapping="Wrap" Text="{Binding ErrorText}" />
+                            </Grid>
+                        </Border>
                     </StackPanel>
                 </Border>
 
-                <Border Grid.Row="1" Classes="card">
-                    <Grid RowDefinitions="Auto,*">
-                        <TextBlock Grid.Row="0" Classes="note" Margin="0,0,0,8"
-                                   IsVisible="{Binding !HasEstimate}"
-                                   Text="{x:Static res:Strings.OptimizeNoEstimateYet}" />
-                        <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled">
-                            <StackPanel>
-                                <StackPanel IsVisible="{Binding HasEstimate}">
-                                    <TextBlock Classes="heading" Text="{x:Static res:Strings.OptimizeSavingsLabel}" />
-                                    <Grid ColumnDefinitions="*,Auto,150,150" ColumnSpacing="10" Margin="0,0,0,4">
-                                        <TextBlock Grid.Column="0" Classes="caption" Text="{x:Static res:Strings.OptimizeSavingsCodecHeader}" />
-                                        <TextBlock Grid.Column="1" Classes="caption" Text="{x:Static res:Strings.OptimizeSavingsFilesHeader}" />
-                                        <TextBlock Grid.Column="2" Classes="caption" Text="{x:Static res:Strings.OptimizeSavingsSavesHeader}" />
-                                        <TextBlock Grid.Column="3" Classes="caption" Text="{x:Static res:Strings.OptimizeSavingsPerChartHeader}" />
-                                    </Grid>
-                                    <ItemsControl ItemsSource="{Binding EstimateSections}" />
-                                </StackPanel>
+                <!-- Search, the order, and a chip per group of charts, as the library's search strip is. With no chip on,
+                     every chart is shown; with some on, only theirs. -->
+                <Border Grid.Row="1" Padding="6" BorderThickness="0,0,0,1" BorderBrush="{DynamicResource SubtleBorderBrush}">
+                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                        <TextBox Grid.Column="0"
+                                 Classes="clearButton"
+                                 VerticalContentAlignment="Center"
+                                 Text="{Binding SearchText}"
+                                 PlaceholderText="{x:Static res:Strings.OptimizeSearchWatermark}"
+                                 AutomationProperties.Name="{x:Static res:Strings.OptimizeSearchWatermark}">
+                            <TextBox.InnerLeftContent>
+                                <ctl:LineIcon Data="{StaticResource SearchStroke}" Margin="8,0,0,0" Opacity="0.6" />
+                            </TextBox.InnerLeftContent>
+                            <TextBox.KeyBindings>
+                                <KeyBinding Gesture="Escape" Command="{Binding ClearSearchCommand}" />
+                            </TextBox.KeyBindings>
+                        </TextBox>
 
-                                <StackPanel IsVisible="{Binding HasResults}">
-                                    <TextBlock Classes="heading" Text="{x:Static res:Strings.OptimizeResultsLabel}" />
-                                    <ItemsControl ItemsSource="{Binding Results}">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate x:DataType="vm:OptimizeResultRow">
-                                                <Grid ColumnDefinitions="*,2*" ColumnSpacing="10" Margin="0,2">
-                                                    <TextBlock Grid.Column="0" FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
-                                                               Text="{Binding Name}" ToolTip.Tip="{Binding Name}" />
-                                                    <TextBlock Grid.Column="1" FontSize="12" TextWrapping="Wrap" Classes.warning="{Binding IsProblem}" Text="{Binding Status}" />
-                                                </Grid>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </StackPanel>
-                            </StackPanel>
-                        </ScrollViewer>
+                        <ComboBox Grid.Column="1" MinWidth="130" VerticalAlignment="Center"
+                                  ItemsSource="{Binding SortChoices}" SelectedItem="{Binding SelectedSort}"
+                                  ToolTip.Tip="{x:Static res:Strings.OptimizeSortLabel}"
+                                  AutomationProperties.Name="{x:Static res:Strings.OptimizeSortLabel}" />
+
+                        <ItemsControl Grid.Column="2" VerticalAlignment="Center" ItemsSource="{Binding Chips}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" Spacing="6" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:OptimizeFilterChip">
+                                    <ToggleButton Classes="filterChip" IsChecked="{Binding IsOn}" AutomationProperties.Name="{Binding Label}">
+                                        <TextBlock Classes="chip-label number" Classes.problem="{Binding IsAlert}" VerticalAlignment="Center" Text="{Binding Label}" />
+                                    </ToggleButton>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
                     </Grid>
+                </Border>
+
+                <!-- Every chart, or why there are none to show. -->
+                <Border Grid.Row="2" Background="{DynamicResource SurfaceBrush}">
+                    <Panel>
+                        <ListBox x:Name="ChartList"
+                                 Classes="charts"
+                                 SelectionMode="Single,Toggle"
+                                 ItemsSource="{Binding Rows}"
+                                 SelectedItem="{Binding SelectedRow}"
+                                 AutomationProperties.Name="{x:Static res:Strings.OptimizeChartListName}" />
+                        <TextBlock Classes="muted centered"
+                                   VerticalAlignment="Center"
+                                   Margin="24"
+                                   TextWrapping="Wrap"
+                                   IsHitTestVisible="False"
+                                   Text="{x:Static res:Strings.OptimizeNoCharts}"
+                                   IsVisible="{Binding HasNoCharts}" />
+                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="10" IsVisible="{Binding HasNoMatches}">
+                            <TextBlock Classes="muted centered" Text="{x:Static res:Strings.OptimizeNoMatches}" />
+                            <Button HorizontalAlignment="Center" Content="{x:Static res:Strings.OptimizeClearFilters}" Command="{Binding ClearFiltersCommand}" />
+                        </StackPanel>
+                    </Panel>
                 </Border>
             </Grid>
         </Grid>
 
-        <!-- Defaults on the left; what's going on in the middle; Estimate, Optimize, Stop and Close on the right. -->
+        <!-- What's going on at the left, with the switch that pauses measuring; Optimize or Stop, and Close, at the right. -->
         <Border Grid.Row="2" Classes="toolbar" BorderThickness="0,1,0,0">
-            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="16">
-                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
-                    <Button Content="{x:Static res:Strings.OptimizeResetButton}" Command="{Binding ResetCommand}"
-                            ToolTip.Tip="{x:Static res:Strings.OptimizeResetToolTip}" />
-                    <Button Content="{x:Static res:Strings.OptimizeSaveDefaultsButton}" Command="{Binding SaveDefaultsCommand}"
-                            ToolTip.Tip="{x:Static res:Strings.OptimizeSaveDefaultsToolTip}" />
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" Margin="4,0,0,0" VerticalAlignment="Center">
+                    <Arc Classes="spinner" Classes.active="{Binding IsWorking}" Width="14" Height="14" StrokeThickness="2" IsVisible="{Binding IsWorking}" />
+                    <TextBlock Classes="number" FontSize="12" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="420"
+                               Text="{Binding StatusText}" ToolTip.Tip="{Binding StatusText}" />
+                    <Button Classes="labelled"
+                            Content="{Binding PauseLabel}"
+                            Command="{Binding TogglePauseCommand}"
+                            IsVisible="{Binding IsMeasuring}"
+                            ToolTip.Tip="{x:Static res:Strings.OptimizePauseToolTip}" />
                 </StackPanel>
 
-                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                    <Arc Classes="spinner active" Width="14" Height="14" StrokeThickness="2" IsVisible="{Binding IsBusy}" />
-                    <TextBlock FontSize="12" TextTrimming="CharacterEllipsis" IsVisible="{Binding IsBusy}" Text="{Binding ProgressText}" />
-                    <TextBlock FontSize="12" TextTrimming="CharacterEllipsis" IsVisible="{Binding IsIdle}"
-                               Classes.warning="{Binding StatusIsProblem}" Text="{Binding StatusText}" ToolTip.Tip="{Binding StatusText}" />
-                </StackPanel>
-
-                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
-                    <Button Content="{x:Static res:Strings.OptimizeEstimateButton}" Command="{Binding EstimateCommand}"
-                            ToolTip.Tip="{x:Static res:Strings.OptimizeEstimateToolTip}" ToolTip.ShowOnDisabled="True" />
-                    <Button Classes="accent" Content="{x:Static res:Strings.OptimizeButton}" Command="{Binding OptimizeCommand}"
-                            ToolTip.Tip="{x:Static res:Strings.OptimizeButtonToolTip}" ToolTip.ShowOnDisabled="True" />
-                    <Button Content="{x:Static res:Strings.OptimizeStopButton}" Command="{Binding StopCommand}" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                    <TextBlock Classes="muted" FontSize="12" VerticalAlignment="Center" MaxWidth="360" TextTrimming="CharacterEllipsis"
+                               IsVisible="{Binding IsNotRunning}"
+                               Text="{Binding BlockedText}" ToolTip.Tip="{Binding BlockedText}" />
+                    <Button Content="{x:Static res:Strings.OptimizeOpenOutputButton}"
+                            Command="{Binding OpenOutputCommand}"
+                            IsVisible="{Binding CanOpenOutput}" />
+                    <Button Classes="accent"
+                            MinWidth="120"
+                            HorizontalContentAlignment="Center"
+                            Content="{Binding OptimizeLabel}"
+                            Command="{Binding OptimizeCommand}"
+                            ToolTip.Tip="{Binding OptimizeToolTip}"
+                            ToolTip.ShowOnDisabled="True" />
                     <Button MinWidth="80"
                             HorizontalContentAlignment="Center"
-                            Content="{Binding CloseLabel}"
+                            Content="{x:Static res:Strings.OptimizeStopButton}"
+                            Command="{Binding StopCommand}"
+                            IsVisible="{Binding IsRunning}"
+                            ToolTip.Tip="{x:Static res:Strings.OptimizeStopToolTip}" />
+                    <Button MinWidth="80"
+                            HorizontalContentAlignment="Center"
+                            Content="{x:Static res:Strings.CloseButton}"
                             Command="{Binding CloseCommand}"
                             IsCancel="True"
-                            AutomationProperties.Name="{Binding CloseLabel}" />
+                            AutomationProperties.Name="{x:Static res:Strings.CloseButton}" />
                 </StackPanel>
             </Grid>
         </Border>

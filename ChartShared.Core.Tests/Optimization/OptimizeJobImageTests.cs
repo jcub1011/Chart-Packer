@@ -387,7 +387,7 @@ public sealed class OptimizeJobImageTests
     // ---- Estimates -------------------------------------------------------------------------------------------------
 
     [TestMethod]
-    public async Task ImageEstimatesAreGroupedBySourceFormatAndNeverNeedAChart()
+    public async Task ImagesAreTypedBySourceFormat()
     {
         var charts = new List<ChartAssets>();
         var probes = new AssetProbes(null, null, new ImageHeaderProbe());
@@ -401,14 +401,16 @@ public sealed class OptimizeJobImageTests
             charts.Add(await AssetInspector.InspectAsync(entry, probes, TestContext.CancellationToken));
         }
 
-        var estimate = await SavingsEstimator.EstimateAsync(
-            OptimizeStrategy.AlbumArt, charts, Art(true, false), new OptimizerSet(null, null, new FakeOptimizer { Estimate = ToJpg(0.5) }),
-            SamplingMode.AllCharts, cancellationToken: TestContext.CancellationToken);
+        var options = Art(true, false);
+        var optimizers = new OptimizerSet(null, null, new FakeOptimizer { Estimate = ToJpg(0.5) });
+        var model = new SavingsModel(options);
+        foreach (var chart in charts)
+            model.Add(await OptimizationPlanner.PlanAsync(chart, options, optimizers, TestContext.CancellationToken));
 
-        Assert.AreSequenceEqual(["image/jpeg", "image/png"], estimate.Codecs.Select(c => c.CodecKey));
-        Assert.AreEqual(2, estimate.Codecs.Single(c => c.CodecKey == "image/jpeg").AssetsTotal);
-        Assert.AreEqual(1, estimate.Codecs.Single(c => c.CodecKey == "image/png").AssetsTotal);
-        Assert.AreEqual(500, estimate.Codecs.Single(c => c.CodecKey == "image/png").EstimatedSavingBytes);
+        // .jpg and .jpeg are one type; .png is another.
+        Assert.AreEqual(2, model.MeasuredFiles(new MediaType(OptimizeStrategy.AlbumArt, "image/jpeg")));
+        Assert.AreEqual(1, model.MeasuredFiles(new MediaType(OptimizeStrategy.AlbumArt, "image/png")));
+        Assert.AreEqual(0.5, model.RatioOf(new MediaType(OptimizeStrategy.AlbumArt, "image/png")));
     }
 
     private static byte[] Pad(byte[] header, int length)

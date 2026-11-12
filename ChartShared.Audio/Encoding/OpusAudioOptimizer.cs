@@ -6,7 +6,8 @@ namespace ChartShared.Audio.Encoding;
 
 /// <summary>
 /// The Library Optimization Tool's audio optimizer: transcodes a stem to Ogg Opus at the chosen bitrate, or mixes
-/// several stems down to one Opus stem, with <see cref="OpusTranscoder"/> (managed, AOT-safe, no native dependency).
+/// several stems down to one Opus stem, with <see cref="OpusTranscoder"/> (libopus through FFmpeg when it's bundled,
+/// the managed Concentus encoder otherwise, so it's always available).
 /// </summary>
 /// <remarks>
 /// <para><b>Bitrate.</b> <see cref="AudioOptimizeOptions.BitrateKbps"/> is per stereo stem and a mono stem gets half:

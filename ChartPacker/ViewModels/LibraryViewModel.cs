@@ -787,8 +787,9 @@ namespace ChartPacker.ViewModels
         private bool CanOptimize() => _optimizeWindow is not null && FolderPath is not null && HasScanned && !IsScanning && !Job.IsRunning;
 
         /// <summary>
-        /// Opens the Optimize window for the selected songs, or for the whole library when none is selected, which is
-        /// scanned again first as for Deduplicate. Once it closes, charts it rewrote in place are scanned again.
+        /// Opens the Optimize window for the selected songs, or for the whole library when none is selected. The window
+        /// reads the charts itself, so the library isn't scanned for it and the list stays as it is. Once it closes, charts
+        /// it rewrote in place are scanned again.
         /// </summary>
         [RelayCommand(CanExecute = nameof(CanOptimize))]
         private async Task OptimizeAsync()
@@ -796,19 +797,7 @@ namespace ChartPacker.ViewModels
             if (_optimizeWindow is null || FolderPath is not { } folder)
                 return;
 
-            var selected = SelectedEntries;
-            // With nothing selected the scan starts now, which also clears the selection; with songs selected it starts
-            // only if the window is asked for the whole library. Each later ask is a fresh scan, to see what a run changed.
-            Task<bool>? pending = selected.Count == 0 ? StartScan(folder, _settings.Settings.ScanMaxDepth) : null;
-            var request = new OptimizeRequest(
-                selected,
-                (progress, ct) =>
-                {
-                    var scan = pending ?? StartScan(folder, _settings.Settings.ScanMaxDepth);
-                    pending = null;
-                    return WaitForScanAsync(scan, progress, ct);
-                });
-
+            var request = new OptimizeRequest(SelectedEntries, [.. _allItems.Select(i => i.Entry)]);
             var result = await _optimizeWindow.ShowAsync(request);
             // A scan starts with the output folder as unchanged, so it's flagged after it.
             if (result.ChangedInPlace)

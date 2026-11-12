@@ -78,7 +78,9 @@ internal sealed class FakeOptimizer : IAudioOptimizer, IVideoOptimizer, IImageOp
 
     private Task<OptimizeEstimate> EstimateCore(IReadOnlyList<AssetFile> sources)
     {
-        Estimated.Add(string.Join("+", sources.Select(s => s.Asset.StoredName)));
+        // Charts are measured several at once.
+        lock (Estimated)
+            Estimated.Add(string.Join("+", sources.Select(s => s.Asset.StoredName)));
         if (FailEstimateWhen?.Invoke(sources) == true)
             throw new IOException("Can't read the file to estimate it.");
         foreach (var source in sources)

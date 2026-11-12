@@ -3,8 +3,6 @@ using ChartShared.Core.Jobs;
 using ChartShared.Core.Packing;
 using ChartShared.Core.Scanning;
 using ChartShared.Core.Sng;
-using Concentus;
-using Concentus.Enums;
 
 namespace ChartShared.Audio.Encoding;
 
@@ -13,7 +11,7 @@ namespace ChartShared.Audio.Encoding;
 /// <param name="Fraction">How far its transcode has got.</param>
 public sealed record TranscodeFileProgress(string Stem, double Fraction);
 
-/// <summary>Transcodes song audio to Ogg Opus at 48 kHz with Concentus (managed, AOT-safe).</summary>
+/// <summary>Transcodes song audio to Ogg Opus at 48 kHz, with libopus through FFmpeg when it's bundled and Concentus (managed, AOT-safe) otherwise.</summary>
 /// <remarks>
 /// Sources decode through <see cref="AudioDecoder"/> (whatever the extension says: wav, ogg,
 /// mp3 or opus); more than two channels fold to stereo as the playback mixer folds them;
@@ -24,7 +22,7 @@ public static class OpusTranscoder
     /// <summary>Opus always encodes at 48 kHz.</summary>
     public const int OutputRate = 48000;
 
-    /// <summary>Whether transcoding can run: the managed encoder is always bundled.</summary>
+    /// <summary>Whether transcoding can run: the managed encoder is always bundled, and stands in when FFmpeg has no libopus.</summary>
     public static bool IsAvailable => true;
 
     private const int FrameSize = 960;
@@ -80,7 +78,20 @@ public static class OpusTranscoder
         string name,
         IProgress<TranscodeFileProgress>? progress = null,
         CancellationToken cancellationToken = default,
-        string? stem = null)
+        string? stem = null) =>
+        Transcode(source, output, bitrateKbps, name, progress, cancellationToken, stem, OpusEncoderBackend.Auto);
+
+    /// <inheritdoc cref="Transcode(IPcmSource, Stream, int, string, IProgress{TranscodeFileProgress}?, CancellationToken, string?)"/>
+    /// <param name="backend">Which encoder to use, for tests that compare them.</param>
+    internal static void Transcode(
+        IPcmSource source,
+        Stream output,
+        int bitrateKbps,
+        string name,
+        IProgress<TranscodeFileProgress>? progress,
+        CancellationToken cancellationToken,
+        string? stem,
+        OpusEncoderBackend backend)
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(output);
@@ -94,16 +105,7 @@ public static class OpusTranscoder
         // Widened before the multiply, so a huge request is clamped to the encoder's maximum rather than wrapping negative.
         int bitrate = OpusBitrates.ForStereoBps((int)Math.Clamp((long)bitrateKbps * 1000, int.MinValue, int.MaxValue), channels);
 
-        IOpusEncoder encoder;
-        try
-        {
-            encoder = OpusCodecFactory.CreateEncoder(OutputRate, channels, OpusApplication.OPUS_APPLICATION_AUDIO);
-            encoder.Bitrate = bitrate;
-        }
-        catch (Exception ex) when (AudioDecoder.IsDecoderFault(ex))
-        {
-            throw AudioDecoder.Damaged(ex);
-        }
+        using IOpusPacketEncoder encoder = OpusPacketEncoders.Create(channels, bitrate, backend);
 
         int lookahead = encoder.Lookahead;
 
@@ -192,22 +194,8 @@ public static class OpusTranscoder
         void Report(double fraction) => progress?.Report(new TranscodeFileProgress(stem, Math.Clamp(fraction, 0, 1)));
     }
 
-    private static int EncodeSilence(float[] silence, byte[] packet, IOpusEncoder encoder)
-    {
-        int length;
-        try
-        {
-            length = encoder.Encode(silence.AsSpan(), FrameSize, packet.AsSpan(), packet.Length);
-        }
-        catch (Exception ex) when (AudioDecoder.IsDecoderFault(ex))
-        {
-            throw AudioDecoder.Damaged(ex);
-        }
-
-        if (length <= 0)
-            throw new InvalidDataException("An audio frame couldn't be encoded to Opus.");
-        return length;
-    }
+    private static int EncodeSilence(float[] silence, byte[] packet, IOpusPacketEncoder encoder) =>
+        encoder.EncodeFrame(silence, packet);
 
     private static void TryDelete(string path)
     {
@@ -219,22 +207,10 @@ public static class OpusTranscoder
         {
         }
     }
-    private static int EncodeFrame(List<float> pending, byte[] packet, IOpusEncoder encoder, int channels)
+    private static int EncodeFrame(List<float> pending, byte[] packet, IOpusPacketEncoder encoder, int channels)
     {
         float[] frame = [.. pending.GetRange(0, FrameSize * channels)];
-        int length;
-        try
-        {
-            length = encoder.Encode(frame.AsSpan(), FrameSize, packet.AsSpan(), packet.Length);
-        }
-        catch (Exception ex) when (AudioDecoder.IsDecoderFault(ex))
-        {
-            throw AudioDecoder.Damaged(ex);
-        }
-
-        if (length <= 0)
-            throw new InvalidDataException("An audio frame couldn't be encoded to Opus.");
-        return length;
+        return encoder.EncodeFrame(frame, packet);
     }
 
     /// <summary>Mono passes through, stereo passes through, more channels fold even/odd as playback folds them.</summary>

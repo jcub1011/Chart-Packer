@@ -14,13 +14,16 @@ the library.
 ## The FFmpeg build
 
 1. `build/ffmpeg/build.sh win-x64` from Git Bash (or `build/publish.ps1`, which offers to), in a
-   shell that has MSYS2 with `mingw-w64-ucrt-x86_64-libvpx` (the script offers to install it).
-2. It must finish. If it stops at "needs `libvpx-1.dll`" (or any DLL that isn't on the allowed list),
-   libvpx was linked as a shared library: it has to be the static `libvpx.a`. See the README.
-3. `ChartShared.Ffmpeg/runtimes/win-x64/native/` has the five DLLs and `libvpx.txt`.
-4. `dotnet test --project ChartShared.Core.Tests` runs the video tests rather than skipping them.
-5. An FFmpeg built before this (no `libvpx.txt`) is refused by `build/publish.ps1`, which offers to
-   rebuild it.
+   shell that has MSYS2 with `mingw-w64-ucrt-x86_64-libvpx` and `mingw-w64-ucrt-x86_64-opus` (the
+   script offers to install them).
+2. It must finish. If it stops at "needs `libvpx-1.dll`" or "needs `libopus-0.dll`" (or any DLL that
+   isn't on the allowed list), that library was linked as a shared library: it has to be the static
+   `libvpx.a` or `libopus.a`. See the README.
+3. `ChartShared.Ffmpeg/runtimes/win-x64/native/` has the five DLLs, `libvpx.txt` and `libopus.txt`.
+4. `dotnet test --project ChartShared.Core.Tests` runs the video tests and the libopus encoder tests
+   (`OpusEncoderBackendTests`) rather than skipping them.
+5. An FFmpeg built before this (no `libvpx.txt` or `libopus.txt`) is refused by `build/publish.ps1`,
+   which offers to rebuild it.
 
 ## The games
 
@@ -45,7 +48,7 @@ Play each result in Clone Hero and in YARG, on the platforms you have.
 | 16 | Speed set to Fast, Balanced (the default), Slow and Best on one video | Each plays. Fast is about twice as fast as Slow and 10 to 20% larger for the same picture; Best is the slowest and smallest. An estimate at a speed matches the size that speed writes. |
 | 17 | A library of videos with parallelism 1, then 2, then 4 | The same results each time, in the same order. Total time falls (about 2x at 4 on a 16-core machine); the CPU is shared, not oversubscribed, and the UI stays responsive. |
 | 18 | Cancel with several videos encoding at once | All stop; no `.webm`, `.*.webm` or `*.chartpacker-tmp` is left, and each chart is as it was. |
-| 15 | Estimate with single chart, then random sample, then all charts | All are grouped by source codec; a sampled estimate of a long video is within about 25% of the real size, and all charts is the slowest. |
+| 15 | Switch video on, and select a chart with a long video once it's measured | Its breakdown shows the video's size before and after. After a run, the size written is within about 25% of that estimate. |
 
 After every run: no `*.chartpacker-tmp` files or folders, and no `.*.webm` temp files, anywhere in
 the library or output folder, including after cancelling mid-run.

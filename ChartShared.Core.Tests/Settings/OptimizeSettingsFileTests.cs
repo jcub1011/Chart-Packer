@@ -30,6 +30,8 @@ public sealed class OptimizeSettingsFileTests
         Assert.AreEqual(32, settings.VideoCq);
         Assert.AreEqual(VideoTarget.Fhd, settings.VideoTarget);
         Assert.AreEqual(0.10, settings.SavingsMargin);
+        Assert.IsTrue(settings.UseOutputFolder, "the library isn't overwritten until the user chooses that");
+        Assert.IsNull(settings.OutputFolder);
         Assert.IsFalse(File.Exists(_path));
     }
 
@@ -47,7 +49,8 @@ public sealed class OptimizeSettingsFileTests
             AlbumArtMaxWidth = null,
             BackgroundArtQuality = 70,
             SavingsMargin = 0.25,
-            Sampling = SamplingMode.AllCharts,
+            UseOutputFolder = false,
+            OutputFolder = @"D:\Optimized",
             Parallelism = 3,
         };
         Assert.IsTrue(new OptimizeSettingsFile(_path).Save(saved));
@@ -63,7 +66,8 @@ public sealed class OptimizeSettingsFileTests
         Assert.AreEqual(512, read.AlbumArtMaxHeight);
         Assert.AreEqual(70, read.BackgroundArtQuality);
         Assert.AreEqual(0.25, read.SavingsMargin);
-        Assert.AreEqual(SamplingMode.AllCharts, read.Sampling);
+        Assert.IsFalse(read.UseOutputFolder);
+        Assert.AreEqual(@"D:\Optimized", read.OutputFolder);
         Assert.AreEqual(3, read.Parallelism);
         StringAssert.Contains(File.ReadAllText(_path), "\"Uhd\"", "enums are written by name");
     }

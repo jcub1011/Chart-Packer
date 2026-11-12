@@ -88,7 +88,7 @@ Generate lower difficulties for songs across your entire library.
 
 ### Library Optimization
 
-Make your library smaller. Recompress audio to Opus, background videos to VP8 WebM, and album art and background images to JPEG, mix stems down, and clean up metadata no game needs. Estimate the savings from a sample first, then optimize the selected songs or the whole library. Optimizing in place can't be undone, so back up your charts first or write the changed charts to an output folder. See the [Optimize Library help page](docs/help/Optimize.md).
+Make your library smaller. Recompress audio to Opus, background videos to VP8 WebM, and album art and background images to JPEG, mix stems down, and clean up metadata no game needs. Every chart is listed with what it would save before anything is changed; then optimize the selected songs or the whole library. Changed charts are written to a separate folder unless you choose to overwrite the originals, which can't be undone, so back up your charts first. See the [Optimize Library help page](docs/help/Optimize.md).
 
 ## Good to Know
 

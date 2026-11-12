@@ -9,6 +9,7 @@ using ChartShared.Core.Optimization;
 using ChartShared.Core.Scanning;
 using ChartShared.Core.Settings;
 using ChartShared.UI.Services;
+using ChartShared.UI.Theming;
 using ChartShared.UI.Views;
 using ChartShared.Video;
 
@@ -20,7 +21,11 @@ namespace ChartPacker.Services
     /// shows them again afterwards.
     /// </param>
     /// <param name="songFiles">Keeps rewriting a song apart from copies of it being downloaded.</param>
-    /// <param name="defaults">The defaults the window starts from; the path is <see cref="UserConfigPaths.OptimizerSettingsFile"/>.</param>
+    /// <param name="defaults">The settings the window was last left with; the path is <see cref="UserConfigPaths.OptimizerSettingsFile"/>.</param>
+    /// <param name="estimatesPath">
+    /// Where what's been measured is kept between sessions, <see cref="UserConfigPaths.OptimizerEstimatesFile"/>. It's read
+    /// the first time the window opens, not at startup.
+    /// </param>
     /// <param name="locks">The songs this process holds and watches, shared with the main window (charter-spec §4.8).</param>
     public sealed class AvaloniaOptimizeWindowService(
         Func<Window?> owner,
@@ -28,13 +33,11 @@ namespace ChartPacker.Services
         SongDetailViewModel mainDetail,
         SongFileGate songFiles,
         OptimizeSettingsFile defaults,
+        string estimatesPath,
         SongLocks? locks = null) : IOptimizeWindowService
     {
-        // The backends are made fresh for each run's parallelism, but what they can do is the same throughout.
-        private static readonly OptimizeBackends Backends = new(
-            parallelism => new OptimizerSet(new OpusAudioOptimizer(), new VideoOptimizer(expectedConcurrency: parallelism), new AvaloniaImageOptimizer()),
-            new AssetProbes(Video: new FfmpegVideoProbe(), Image: new ImageHeaderProbe()),
-            UnavailableReason);
+        // What's been measured, shared by every opening of the window.
+        private EstimateCache? _estimates;
 
         public async Task<OptimizeWindowResult> ShowAsync(OptimizeRequest request)
         {
@@ -43,17 +46,29 @@ namespace ChartPacker.Services
 
             var dialog = new OptimizeWindow();
             var services = new OptimizeJobServices(locks?.Set, songFiles, drafts.HasDrafts);
+            _estimates ??= await Task.Run(() => new EstimateCache(estimatesPath));
+
+            // The optimizers are made fresh for each run's parallelism, but what they can do is the same throughout.
+            var backends = new OptimizeBackends(
+                parallelism => new OptimizerSet(new OpusAudioOptimizer(), new VideoOptimizer(expectedConcurrency: parallelism), new AvaloniaImageOptimizer()),
+                new AssetProbes(new AudioHeaderProbe(), new FfmpegVideoProbe(), new ImageHeaderProbe()),
+                UnavailableReason,
+                _estimates,
+                new MediaPreviewer(new AvaloniaImageOptimizer()));
 
             // The prompts and the folder picker belong to this window, so they come up over it.
             var viewModel = new OptimizeWindowViewModel(
-                request, defaults, Backends, services, new AvaloniaConfirmationService(() => dialog), new AvaloniaFolderPickerService(() => dialog));
+                request, defaults, backends, services, new AvaloniaConfirmationService(() => dialog), new AvaloniaFolderPickerService(() => dialog),
+                new FileRevealService(() => dialog));
             dialog.DataContext = viewModel;
+            // It takes the main window's colours, as they are for the song it shows.
+            DynamicTheme.InheritFrom(window, dialog);
 
             // The main panel lets go of its songs' files, as the window rewrites them, and its player stops.
             await mainDetail.SuspendAsync();
             try
             {
-                _ = viewModel.LoadAsync();
+                viewModel.Load();
                 WindowChrome.UseOwnerIcon(dialog, window);
                 await dialog.ShowDialog(window);
                 await viewModel.ShutdownAsync();

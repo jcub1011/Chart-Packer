@@ -167,9 +167,9 @@ public sealed record ImageOptimizeOptions(bool Enabled = false, int Quality = Im
 /// that fails is not copied, so the folder is not a full copy of the library.
 /// </param>
 /// <param name="Parallelism">
-/// How many charts are worked on at once, by <see cref="OptimizeJob"/>, <see cref="OptimizationPlanner.PlanAllAsync"/> and
-/// <see cref="SavingsEstimator"/>; 1 does them one at a time. Videos take far longer than anything else, so this is mostly
-/// how many encode at once; the video optimizer shares the machine's cores between those running. Below 1 counts as 1.
+/// How many charts are worked on at once, by <see cref="OptimizeJob"/> and <see cref="OptimizationPlanner.PlanAllAsync"/>;
+/// 1 does them one at a time. Videos take far longer than anything else, so this is mostly how many encode at once; the
+/// video optimizer shares the machine's cores between those running. Below 1 counts as 1.
 /// </param>
 public sealed record OptimizeOptions(
     MetadataCleanupOptions Metadata,
@@ -184,6 +184,13 @@ public sealed record OptimizeOptions(
 {
     /// <summary>A number of charts to work on at once that suits this machine: a quarter of its cores, at least 2 where it has them.</summary>
     public static int RecommendedParallelism => Math.Max(1, Math.Max(Environment.ProcessorCount >= 4 ? 2 : 1, Environment.ProcessorCount / 4));
+
+    /// <summary>
+    /// A number of charts to measure at once that suits this machine: all but one of its cores. Measuring audio and images
+    /// takes one core each, so far more charts can be measured at once than encoded; videos, which take every core they're
+    /// given, are held to <see cref="RecommendedParallelism"/> by <see cref="PlanServices.VideoGate"/>.
+    /// </summary>
+    public static int RecommendedMeasuringParallelism => Math.Max(1, Environment.ProcessorCount - 1);
 
     /// <summary>Every strategy off, in place, with a 10% margin.</summary>
     public static OptimizeOptions Default { get; } = new(

@@ -109,7 +109,7 @@ namespace ChartPacker
                 var lowerDifficultiesWindow = new AvaloniaLowerDifficultiesWindowService(
                     () => window, drafts, settings, audio.Open, detail, songFiles, generated, reductionRules, locks, latency);
                 var optimizeWindow = new AvaloniaOptimizeWindowService(
-                    () => window, drafts, detail, songFiles, new OptimizeSettingsFile(UserConfigPaths.OptimizerSettingsFile), locks);
+                    () => window, drafts, detail, songFiles, new OptimizeSettingsFile(UserConfigPaths.OptimizerSettingsFile), UserConfigPaths.OptimizerEstimatesFile, locks);
                 var chartBuilder = new ChartBuilderLauncher();
                 var library = new LibraryViewModel(
                     folderPicker, settings, drafts, job, player, mergeWindowFor(() => window), dedupWindow, validatorWindow, reveal, downloads, chartBuilder, notice,

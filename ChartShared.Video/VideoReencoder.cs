@@ -125,7 +125,8 @@ public static class VideoReencoder
     /// <summary>
     /// Estimates the size of <see cref="Reencode"/>'s output without writing it, by encoding <paramref name="windowCount"/>
     /// windows of <paramref name="windowFrames"/> frames, equally spaced through the video, and scaling what they weigh per
-    /// frame to the whole video. Each window starts at its time (the frames from the keyframe the seek lands on up to it are
+    /// frame to the whole video, with the windows' keyframes counted at the rate the whole encode has them, whatever the
+    /// windows' length. Each window starts at its time (the frames from the keyframe the seek lands on up to it are
     /// decoded and dropped, so the windows are where they're spaced, however long the source's keyframe interval) and is a
     /// stream of its own, so it has the keyframe a whole encode has once per <see cref="VideoReencodeSettings.GopFrames"/>. A video short enough that the
     /// windows would cover it (or of unknown length) is encoded whole, which makes its estimate exact.
@@ -135,7 +136,7 @@ public static class VideoReencoder
     /// <exception cref="IOException">The file can't be read.</exception>
     /// <exception cref="OperationCanceledException">The estimate was cancelled.</exception>
     public static unsafe long EstimateSize(
-        string sourcePath, VideoReencodeSettings settings, int windowCount = 5, int windowFrames = VideoReencodeSettings.GopFrames, CancellationToken cancellationToken = default)
+        string sourcePath, VideoReencodeSettings settings, int windowCount = DefaultWindowCount, int windowFrames = DefaultWindowFrames, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sourcePath);
         ArgumentNullException.ThrowIfNull(settings);
@@ -176,8 +177,116 @@ public static class VideoReencoder
             throw new InvalidDataException("The video has no frames that can be decoded.");
 
         // Bytes per frame of what was sampled, over every frame, with the container's overhead per packet; the header once.
-        double perFrame = (counter.Bytes + (counter.Packets * (double)WebmBytesPerPacket)) / frames;
-        return WebmFixedBytes + (long)Math.Round(perFrame * totalFrames);
+        return WebmFixedBytes + (long)Math.Round(counter.BytesPerFrame(frames) * totalFrames);
+    }
+
+    /// <summary>
+    /// How many windows an estimate encodes, unless asked otherwise. Few, and long (<see cref="DefaultWindowFrames"/>):
+    /// the encoder spends differently once it has been running a while, so a short window, however many there are,
+    /// says what the start of an encode weighs rather than the middle of one. Measured against whole encodes of four real
+    /// 1080p videos, two windows of 512 frames were within 14% of the size written on each (6.5% on average), where five of
+    /// 128 and twenty of 12 were out by up to 53% and 32%.
+    /// </summary>
+    public const int DefaultWindowCount = 2;
+
+    /// <summary>How many frames each of an estimate's windows is, unless asked otherwise: four keyframe intervals.</summary>
+    public const int DefaultWindowFrames = 4 * VideoReencodeSettings.GopFrames;
+
+    /// <summary>How many frames lead up to the one <see cref="PreviewFrame"/> shows.</summary>
+    public const int PreviewLeadFrames = 12;
+
+    /// <summary>
+    /// One frame of the video at <paramref name="sourcePath"/> as it is and as <see cref="Reencode"/> would leave it, for
+    /// comparing by eye. A short run of frames leading up to it is encoded, to a temp file that's deleted, and the last is
+    /// the one shown: the first frame of an encode is a keyframe, which looks better than the frames a video is mostly
+    /// made of.
+    /// </summary>
+    /// <param name="position">Where in the video the frame is, 0 at its start to 1 at its end.</param>
+    /// <param name="maxWidth">The widest either picture is given; a wider frame is scaled down to it.</param>
+    /// <exception cref="InvalidOperationException">FFmpeg isn't available, or has no VP8 encoder.</exception>
+    /// <exception cref="InvalidDataException">The video can't be decoded, or has no frame there.</exception>
+    /// <exception cref="IOException">A file can't be read or written.</exception>
+    /// <exception cref="OperationCanceledException">It was cancelled.</exception>
+    public static unsafe VideoFramePreview PreviewFrame(
+        string sourcePath, VideoReencodeSettings settings, double position, int maxWidth, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sourcePath);
+        ArgumentNullException.ThrowIfNull(settings);
+        ArgumentOutOfRangeException.ThrowIfLessThan(maxWidth, 1);
+        settings.Validate();
+        EnsureAvailable();
+
+        string temp = Path.Combine(Path.GetTempPath(), $"chartpacker-preview-{Guid.NewGuid():N}.webm");
+        try
+        {
+            TimeSpan shown = TimeSpan.Zero;
+            using (var decoder = OpenDecoder(sourcePath))
+            using (var pipeline = new Pipeline(decoder, settings))
+            {
+                double duration = decoder.Duration.TotalSeconds;
+                TimeSpan? from = null;
+                if (duration > 0)
+                {
+                    double at = Math.Clamp(position, 0, 1) * duration;
+                    from = TimeSpan.FromSeconds(Math.Max(0, Math.Min(at, duration - (1 / pipeline.FrameRate)) - (PreviewLeadFrames / pipeline.FrameRate)));
+                    decoder.Seek(from.Value);
+                }
+
+                WebmWriter? writer = null;
+                try
+                {
+                    int frames = pipeline.Run(
+                        PreviewLeadFrames + 1, null, encoder => writer = new WebmWriter(temp, encoder), packet => writer!.Write(packet), time => shown = time,
+                        cancellationToken, notBefore: from);
+                    if (frames == 0)
+                        throw new InvalidDataException("The video has no frame that can be decoded there.");
+
+                    writer!.Finish();
+                }
+                finally
+                {
+                    writer?.Dispose();
+                }
+            }
+
+            // The source's frame at the time of the last one encoded.
+            int width, height;
+            byte[] before;
+            using (var source = VideoDecoder.Open(new FileStream(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete, IoBufferSize), maxWidth))
+            {
+                source.Seek(shown);
+                while (source.Next(out var time))
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    source.Keep();
+                    if (time >= shown)
+                        break;
+                }
+
+                (width, height) = (source.Width, source.Height);
+                before = new byte[width * height * 4];
+                if (!source.CopyKept(before))
+                    throw new InvalidDataException("The video's frame can't be shown.");
+            }
+
+            // The last frame of what was encoded.
+            using var encoded = VideoDecoder.Open(new FileStream(temp, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete, IoBufferSize), maxWidth);
+            while (encoded.Next(out _))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                encoded.Keep();
+            }
+
+            byte[] after = new byte[encoded.Width * encoded.Height * 4];
+            if (!encoded.CopyKept(after))
+                throw new InvalidDataException("The re-encoded frame can't be shown.");
+
+            return new VideoFramePreview(shown, width, height, before, encoded.Width, encoded.Height, after);
+        }
+        finally
+        {
+            TryDelete(temp);
+        }
     }
 
     private static void EnsureAvailable()
@@ -201,9 +310,15 @@ public static class VideoReencoder
         }
     }
 
-    /// <summary>Adds up the bytes of the packets an estimate's encodes produce.</summary>
+    /// <summary>Adds up the bytes of the packets an estimate's encodes produce, the keyframes' apart from the rest.</summary>
     private sealed unsafe class PacketCounter
     {
+        // AV_PKT_FLAG_KEY (libavcodec/packet.h).
+        private const int KeyFlag = 1;
+
+        private long _keyBytes;
+        private long _keyPackets;
+
         public long Bytes { get; private set; }
 
         public long Packets { get; private set; }
@@ -212,6 +327,33 @@ public static class VideoReencoder
         {
             Bytes += packet->size;
             Packets++;
+            if ((packet->flags & KeyFlag) != 0)
+            {
+                _keyBytes += packet->size;
+                _keyPackets++;
+            }
+        }
+
+        /// <summary>
+        /// What a frame of the whole encode weighs, from the <paramref name="frames"/> frames sampled in windows, with the
+        /// container's overhead per packet.
+        /// </summary>
+        /// <remarks>
+        /// Each window opens with a keyframe, which weighs many times what the frames after it do, so windows shorter than
+        /// a GOP hold more keyframes for their length than the whole encode will. The two kinds are averaged apart and put
+        /// back together in the whole encode's proportion, one keyframe per <see cref="VideoReencodeSettings.GopFrames"/>:
+        /// that's what lets the windows be short, and so many, for the same work.
+        /// </remarks>
+        public double BytesPerFrame(long frames)
+        {
+            double overhead = Packets * (double)WebmBytesPerPacket / frames;
+            long others = frames - _keyPackets;
+            if (_keyPackets == 0 || others <= 0)
+                return ((double)Bytes / frames) + overhead;
+
+            double key = (double)_keyBytes / _keyPackets;
+            double other = (double)(Bytes - _keyBytes) / others;
+            return other + ((key - other) / VideoReencodeSettings.GopFrames) + overhead;
         }
     }
 
@@ -415,3 +557,13 @@ public static class VideoReencoder
         }
     }
 }
+
+/// <summary>One frame of a video before and after re-encoding, each as BGRA with its rows packed.</summary>
+/// <param name="Time">When the frame is shown, from the start of the video.</param>
+/// <param name="Width">The width of <paramref name="Before"/>.</param>
+/// <param name="Height">The height of <paramref name="Before"/>.</param>
+/// <param name="Before">The source's frame.</param>
+/// <param name="AfterWidth">The width of <paramref name="After"/>, which is smaller when the video is brought down to a target size.</param>
+/// <param name="AfterHeight">The height of <paramref name="After"/>.</param>
+/// <param name="After">The re-encoded frame.</param>
+public sealed record VideoFramePreview(TimeSpan Time, int Width, int Height, byte[] Before, int AfterWidth, int AfterHeight, byte[] After);

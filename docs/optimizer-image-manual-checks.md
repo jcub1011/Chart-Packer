@@ -28,7 +28,7 @@ size that's written) and at the written file.
 | 12 | `album.png` and `album.jpg` both in one chart | The PNG's rename is skipped (the name is taken), the JPG is recompressed in place. |
 | 13 | Remove option on a strategy | The image is deleted and nothing is encoded. The other strategy is unaffected. |
 | 14 | Each strategy switched off alone | Only the other one runs. |
-| 15 | A transparent PNG and an opaque PNG in different charts, estimate set to a random sample, then all charts | Estimate groups by source format (`image/png`, `image/jpeg`). Single chart isn't offered for images. |
+| 15 | A transparent PNG and an opaque PNG in different charts, album art switched on | Each chart's breakdown shows its own image: the opaque one recompressed with its size before and after, the transparent one kept or recompressed as PNG. |
 | 16 | An oversized image whose resized result would be *larger* (a small, tightly compressed PNG or JPEG over the limit, such as 600x600 palette art) | Reported as **would grow**, not already optimal, and left as it is. The original is never taken as already within the limits. |
 | 17 | An opaque PNG saved with an alpha channel (RGBA, every pixel 255) | Still becomes a JPEG: the alpha is found to be unused. A PNG with a real see-through pixel stays PNG. |
 | 18 | `song.ini` with `name = album.png` (or another non-image key naming a renamed file) next to `cover = album.png` | Only `cover` and `background` are rewritten; `name` and the rest keep the old text. |

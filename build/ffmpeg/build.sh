@@ -16,11 +16,12 @@
 # and the decoders their videos use, and the decoders of the registered audio formats (Vorbis, Opus,
 # MPEG audio), whose packets the app reads itself, so they need no demuxers. AAC is built too, for a
 # background video's audio track, which is read through avformat (so the container demuxer supplies
-# it). The Opus decoder needs swresample. The one encoder is libvpx's VP8, which the Library
+# it). The Opus decoder needs swresample. The encoders are libvpx's VP8, which the Library
 # Optimization Tool writes background videos with (WebM is the only video format that plays on every
-# platform in both games); libvpx is BSD-3 and is linked in statically, so no libvpx library ships
-# beside FFmpeg's. Nothing GPL or non-free is enabled (libx264 is GPL, so there's no H.264 output),
-# so the result is LGPL 2.1+.
+# platform in both games), and libopus, which writes Opus audio for packing and for the optimizer
+# (without it the app encodes Opus with the slower managed Concentus). libvpx and libopus are BSD-3 and
+# are linked in statically, so no libvpx or libopus library ships beside FFmpeg's. Nothing GPL or
+# non-free is enabled (libx264 is GPL, so there's no H.264 output), so the result is LGPL 2.1+.
 set -euo pipefail
 
 yes=
@@ -116,30 +117,30 @@ install_command() {
   local nasm=; [[ "$rid" == *-x64 ]] && nasm=1
   if [[ -n "$msys" ]]; then
     local p="${MINGW_PACKAGE_PREFIX:-mingw-w64-ucrt-x86_64}"
-    echo "pacman -S --needed --noconfirm git make diffutils $p-$cc $p-pkgconf $p-libvpx${nasm:+ $p-nasm}"
+    echo "pacman -S --needed --noconfirm git make diffutils $p-$cc $p-pkgconf $p-libvpx $p-opus${nasm:+ $p-nasm}"
   elif [[ "$(uname -s)" == Darwin ]]; then
     if ! command -v clang >/dev/null 2>&1 || ! command -v make >/dev/null 2>&1 || ! command -v git >/dev/null 2>&1; then
       echo "xcode-select --install"
     elif command -v brew >/dev/null 2>&1; then
-      echo "brew install pkg-config libvpx${nasm:+ nasm}"
+      echo "brew install pkg-config libvpx opus${nasm:+ nasm}"
     fi
   else
     local sudo=; (( EUID != 0 )) && sudo="sudo "
     local mingw=
     if [[ "$rid" == win-* ]]; then
       # Distributions package gcc for x86-64 Windows only; win-arm64 needs llvm-mingw. Neither has a libvpx
-      # for Windows to install: see check_libvpx.
+      # or libopus for Windows to install: see check_pkg.
       [[ "$rid" == win-arm64 ]] && return 0
       mingw=1
     fi
-    # Distributions have no libvpx for mingw-w64 to install: see check_libvpx.
-    local vpx=; [[ -z "$mingw" ]] && vpx=1
+    # Distributions have no libvpx or libopus for mingw-w64 to install: see check_pkg.
+    local libs=; [[ -z "$mingw" ]] && libs=1
     if command -v apt-get >/dev/null 2>&1; then
-      echo "${sudo}apt-get update && ${sudo}apt-get install -y git make pkg-config build-essential${nasm:+ nasm}${mingw:+ mingw-w64}${vpx:+ libvpx-dev}"
+      echo "${sudo}apt-get update && ${sudo}apt-get install -y git make pkg-config build-essential${nasm:+ nasm}${mingw:+ mingw-w64}${libs:+ libvpx-dev libopus-dev}"
     elif command -v dnf >/dev/null 2>&1; then
-      echo "${sudo}dnf install -y git make pkgconf-pkg-config gcc${nasm:+ nasm}${mingw:+ mingw64-gcc}${vpx:+ libvpx-devel}"
+      echo "${sudo}dnf install -y git make pkgconf-pkg-config gcc${nasm:+ nasm}${mingw:+ mingw64-gcc}${libs:+ libvpx-devel opus-devel}"
     elif command -v pacman >/dev/null 2>&1; then
-      echo "${sudo}pacman -S --needed --noconfirm git make pkgconf gcc${nasm:+ nasm}${mingw:+ mingw-w64-gcc}${vpx:+ libvpx}"
+      echo "${sudo}pacman -S --needed --noconfirm git make pkgconf gcc${nasm:+ nasm}${mingw:+ mingw-w64-gcc}${libs:+ libvpx opus}"
     fi
   fi
 }
@@ -168,40 +169,46 @@ if (( ${#missing[@]} > 0 )); then
   fi
 fi
 
-# FFmpeg needs libvpx's headers and library, found through pkg-config. Windows has none to install when
-# cross-compiling (and win-arm64 has no package at all): build libvpx for it, static, and point
-# PKG_CONFIG_PATH at its lib/pkgconfig. Elsewhere, and in MSYS2, it's installed above.
-check_libvpx() {
-  pkg-config --exists vpx && return 0
-  echo "libvpx isn't found by pkg-config (vpx.pc), and FFmpeg needs it for the VP8 encoder." >&2
+# FFmpeg needs the headers and library of libvpx (the VP8 encoder) and libopus (the Opus encoder), found through
+# pkg-config. Windows has none to install when cross-compiling (and win-arm64 has no package at all): build the library
+# for it, static, and point PKG_CONFIG_PATH at its lib/pkgconfig. Elsewhere, and in MSYS2, they're installed above.
+#   check_pkg <pkg-config name> <library> <what FFmpeg needs it for> <project URL> <package names>
+check_pkg() {
+  local pc="$1" lib="$2" purpose="$3" url="$4" packages="$5"
+  pkg-config --exists "$pc" && return 0
+  echo "$lib isn't found by pkg-config ($pc.pc), and FFmpeg needs it for $purpose." >&2
   if [[ -z "$msys" && "$rid" == win-* ]]; then
-    echo "Build libvpx (https://chromium.googlesource.com/webm/libvpx) for $rid as a static library with the mingw toolchain, and set PKG_CONFIG_PATH to its lib/pkgconfig; see build/ffmpeg/README.md." >&2
+    echo "Build $lib ($url) for $rid as a static library with the mingw toolchain, and set PKG_CONFIG_PATH to its lib/pkgconfig; see build/ffmpeg/README.md." >&2
     return 1
   fi
   local install
   install="$(install_command)"
   if [[ -n "$install" && "$install" != "xcode-select --install" ]] && confirm "It can be installed with: $install"; then
     eval "$install"
-    pkg-config --exists vpx && return 0
+    pkg-config --exists "$pc" && return 0
   fi
-  echo "Install libvpx with your package manager (libvpx-dev, libvpx-devel, libvpx, or brew's libvpx), and run this again." >&2
+  echo "Install $lib with your package manager ($packages), and run this again." >&2
   return 1
 }
-check_libvpx || exit 1
+check_pkg vpx libvpx "the VP8 encoder" https://chromium.googlesource.com/webm/libvpx "libvpx-dev, libvpx-devel, libvpx, or brew's libvpx" || exit 1
+check_pkg opus libopus "the Opus encoder" https://opus-codec.org/downloads/ "libopus-dev, opus-devel, opus, or brew's opus" || exit 1
 
-# FFmpeg's libraries must not need libvpx beside them when they run, so libvpx has to be linked in. In MSYS2's
-# -static link that's what happens; elsewhere a libvpx.so or .dylib next to libvpx.a would win the link, so pkg-config
-# is given a vpx.pc of our own that names the .a. (Debian, Fedora and Homebrew's libvpx.a are position-independent.)
+# FFmpeg's libraries must not need libvpx or libopus beside them when they run, so both have to be linked in. In MSYS2's
+# -static link that's what happens; elsewhere a .so or .dylib next to the .a would win the link, so pkg-config is
+# given a .pc of our own that names the .a. (Debian, Fedora and Homebrew's static libraries are position-independent.)
 if [[ -z "$msys" && "$rid" != win-* ]]; then
-  vpx_libdir="$(pkg-config --variable=libdir vpx)"
-  if [[ ! -f "$vpx_libdir/libvpx.a" ]]; then
-    echo "libvpx has no static library ($vpx_libdir/libvpx.a), which FFmpeg's libraries are linked with so they don't need libvpx beside them." >&2
-    exit 1
-  fi
   pc="$work/pkgconfig-$rid"
   rm -rf "$pc"
   mkdir -p "$pc"
-  sed "s|^Libs:.*|Libs: $vpx_libdir/libvpx.a|" "$(pkg-config --variable=pcfiledir vpx)/vpx.pc" > "$pc/vpx.pc"
+  for entry in vpx:libvpx opus:libopus; do
+    name="${entry%%:*}"; lib="${entry##*:}"
+    libdir="$(pkg-config --variable=libdir "$name")"
+    if [[ ! -f "$libdir/$lib.a" ]]; then
+      echo "$lib has no static library ($libdir/$lib.a), which FFmpeg's libraries are linked with so they don't need $lib beside them." >&2
+      exit 1
+    fi
+    sed "s|^Libs:.*|Libs: $libdir/$lib.a|" "$(pkg-config --variable=pcfiledir "$name")/$name.pc" > "$pc/$name.pc"
+  done
   export PKG_CONFIG_PATH="$pc${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
 fi
 
@@ -223,13 +230,13 @@ cd "$build"
   --disable-programs --disable-doc --disable-network --disable-autodetect --disable-debug \
   --disable-everything \
   --disable-avdevice --disable-avfilter \
-  --pkg-config-flags=--static --enable-libvpx \
+  --pkg-config-flags=--static --enable-libvpx --enable-libopus \
   --enable-avformat --enable-avcodec --enable-swscale --enable-swresample \
   --enable-demuxer=mov,avi,matroska,ogg,mpegps,mpegvideo,m4v,h264,hevc,ivf \
   --enable-muxer=mov,mp4,matroska,webm,avi,ogg,ivf,mpeg \
   --enable-decoder=h264,hevc,vp8,vp9,theora,mpeg1video,mpeg2video,mpeg4,msmpeg4v1,msmpeg4v2,msmpeg4v3,mjpeg,aac,vorbis,opus,mp1float,mp2float,mp3float \
   --enable-parser=h264,hevc,vp8,vp9,mpegvideo,mpeg4video,mjpeg \
-  --enable-encoder=libvpx_vp8 \
+  --enable-encoder=libvpx_vp8,libopus \
   --enable-bsf=h264_mp4toannexb,hevc_mp4toannexb,vp9_superframe_split,aac_adtstoasc,pgs_frame_merge \
   --enable-protocol=file
 
@@ -250,15 +257,15 @@ case "$rid" in
     fi
     cp "$prefix"/bin/av*-*.dll "$prefix"/bin/sw*-*.dll "$out/" ;;
   osx-*)
-    # libvpx must be inside libavcodec, not a library it loads: it isn't shipped.
-    if command -v otool >/dev/null 2>&1 && otool -L "$prefix"/lib/libavcodec.*.dylib | grep -qi vpx; then
-      echo "libavcodec needs a libvpx library, which won't be on users' machines: it should have been linked in statically." >&2
+    # libvpx and libopus must be inside libavcodec, not libraries it loads: they aren't shipped.
+    if command -v otool >/dev/null 2>&1 && otool -L "$prefix"/lib/libavcodec.*.dylib | grep -qi -E 'vpx|opus'; then
+      echo "libavcodec needs a libvpx or libopus library, which won't be on users' machines: they should have been linked in statically." >&2
       exit 1
     fi
     for f in "$prefix"/lib/lib*.[0-9]*.dylib; do [[ "$f" =~ \.[0-9]+\.dylib$ ]] && cp -L "$f" "$out/"; done ;;
   *)
-    if command -v readelf >/dev/null 2>&1 && readelf -d "$prefix"/lib/libavcodec.so.[0-9]* | grep -i NEEDED | grep -qi vpx; then
-      echo "libavcodec needs a libvpx library, which won't be on users' machines: it should have been linked in statically." >&2
+    if command -v readelf >/dev/null 2>&1 && readelf -d "$prefix"/lib/libavcodec.so.[0-9]* | grep -i NEEDED | grep -qi -E 'vpx|opus'; then
+      echo "libavcodec needs a libvpx or libopus library, which won't be on users' machines: they should have been linked in statically." >&2
       exit 1
     fi
     for f in "$prefix"/lib/lib*.so.[0-9]*; do [[ "$f" =~ \.so\.[0-9]+$ ]] && cp -L "$f" "$out/"; done ;;
@@ -266,6 +273,8 @@ esac
 
 # Says this build has the VP8 encoder: Get-FfmpegProblem in build/publish.ps1 looks for it, as the DLLs alone don't say.
 echo "libvpx VP8 encoder (BSD-3-Clause), linked into libavcodec." > "$out/libvpx.txt"
+# The same for the Opus encoder, which Get-FfmpegProblem also looks for.
+echo "libopus Opus encoder (BSD-3-Clause), linked into libavcodec." > "$out/libopus.txt"
 
 echo "FFmpeg $tag for $rid is in $out:"
 ls -l "$out"

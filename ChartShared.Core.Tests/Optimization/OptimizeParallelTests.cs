@@ -208,20 +208,26 @@ public sealed class OptimizeParallelTests
     }
 
     [TestMethod]
-    public async Task EstimatingInParallelGivesTheSameEstimate()
+    public async Task MeasuringInParallelGivesTheSameSavings()
     {
         var charts = await ChartsAsync(9);
-        var fake = new FakeOptimizer { Estimate = FakeOptimizer.DefaultEstimate(0.6) };
-        var set = new OptimizerSet(null, fake);
-        var one = await SavingsEstimator.EstimateAsync(OptimizeStrategy.Video, charts, VideoOptions(1), set, SamplingMode.AllCharts, cancellationToken: TestContext.CancellationToken);
-        var progress = new SyncProgress<(int Done, int Total)>();
+        var options = VideoOptions(1);
 
-        var several = await SavingsEstimator.EstimateAsync(OptimizeStrategy.Video, charts, VideoOptions(4), set, SamplingMode.AllCharts, progress: progress, cancellationToken: TestContext.CancellationToken);
+        async Task<(Dictionary<string, long> Savings, List<ChartEstimate> Reports)> MeasureAsync(int parallelism)
+        {
+            var set = new OptimizerSet(null, new FakeOptimizer());
+            var progress = new SyncProgress<ChartEstimate>();
+            await new LibraryEstimator(charts, options, set, parallelism: parallelism).RunAsync(progress, TestContext.CancellationToken);
+            return (progress.Reports.ToDictionary(r => r.Chart.Entry.FullPath, r => SavingsModel.Measured(r.Plan!).TotalBytes), progress.Reports);
+        }
 
-        Assert.AreEqual(one.EstimatedSavingBytes, several.EstimatedSavingBytes);
-        Assert.AreSequenceEqual(one.Codecs, several.Codecs);
-        Assert.AreEqual(9, progress.Reports.Count);
-        Assert.AreEqual((9, 9), progress.Reports[^1]);
+        var one = await MeasureAsync(1);
+        var several = await MeasureAsync(4);
+
+        Assert.HasCount(9, several.Reports);
+        Assert.AreSequenceEqual(Enumerable.Range(1, 9).ToList(), several.Reports.Select(r => r.Done).ToList());
+        foreach (var (path, saving) in one.Savings)
+            Assert.AreEqual(saving, several.Savings[path], path);
     }
 
     [TestMethod]

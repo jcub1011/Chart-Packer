@@ -59,6 +59,7 @@ public enum AssetOutcome
 /// <param name="Outcome">What happened.</param>
 /// <param name="OutputName">The name it was written under.</param>
 /// <param name="Detail">The plan's skip reason, or the failure's message.</param>
+/// <param name="EstimatedBytesAfter">What the plan expected its size after to be, to compare with what it came to; null when the plan had no estimate.</param>
 public sealed record AssetResult(
     string StoredName,
     OptimizeStrategy Strategy,
@@ -67,7 +68,8 @@ public sealed record AssetResult(
     long BytesAfter,
     AssetOutcome Outcome,
     string? OutputName = null,
-    string? Detail = null);
+    string? Detail = null,
+    long? EstimatedBytesAfter = null);
 
 /// <summary>How optimizing one chart went.</summary>
 /// <param name="Entry">The chart.</param>

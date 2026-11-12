@@ -278,13 +278,13 @@ public sealed class VideoReencoderTests
         Assert.IsLessThan(0.1, Math.Abs(estimate - actual) / (double)actual, $"Estimated {estimate} bytes, wrote {actual}");
     }
 
-    // Stated tolerance: a sampled estimate of a long video (five windows of one keyframe interval, so about 70% of this
-    // 900-frame video is left out) is within 25% of what encoding all of it weighs.
+    // Stated tolerance: a sampled estimate of a long video (two windows of 512 frames, so nearly a third of this
+    // 1500-frame video is left out) is within 25% of what encoding all of it weighs.
     [TestMethod]
     public void ASampledEstimateIsWithinTwentyFivePercentOfTheRealSize()
     {
         string source = Temp("long.webm");
-        SyntheticVideo.Write(source, 320, 180, frames: 900, fps: 30, cq: 20);
+        SyntheticVideo.Write(source, 320, 180, frames: 1500, fps: 30, cq: 20);
         string output = Temp("out.webm");
         var settings = new VideoReencodeSettings(Cq: 20, MaxBitrateKbps: 100_000);
 
@@ -293,6 +293,70 @@ public sealed class VideoReencoderTests
 
         long actual = new FileInfo(output).Length;
         Assert.IsLessThan(0.25, Math.Abs(estimate - actual) / (double)actual, $"Estimated {estimate} bytes, wrote {actual}");
+    }
+
+    // Each window opens with a keyframe, so short windows hold far more of them for their length than the encode does.
+    // Counted at the encode's own rate, short windows agree with windows a whole keyframe interval long, on a video whose
+    // frames all weigh much the same. (Real videos are why the default windows are long: see DefaultWindowCount.)
+    [TestMethod]
+    public void ShortWindowsEstimateWhatLongOnesDo()
+    {
+        string source = Temp("long.webm");
+        SyntheticVideo.Write(source, 320, 180, frames: 1500, fps: 30, cq: 20);
+        var settings = new VideoReencodeSettings(Cq: 20, MaxBitrateKbps: 100_000);
+
+        long longWindows = VideoReencoder.EstimateSize(source, settings, windowCount: 5, windowFrames: VideoReencodeSettings.GopFrames);
+        long shortWindows = VideoReencoder.EstimateSize(source, settings, windowCount: 20, windowFrames: 12);
+
+        Assert.IsLessThan(0.15, Math.Abs(shortWindows - longWindows) / (double)longWindows, $"Short windows {shortWindows} bytes, long windows {longWindows}");
+    }
+
+    [TestMethod]
+    public void APreviewIsTheSameFrameBeforeAndAfter()
+    {
+        string source = Temp("source.webm");
+        SyntheticVideo.Write(source, 320, 180, frames: 120, fps: 30);
+
+        var preview = VideoReencoder.PreviewFrame(source, new VideoReencodeSettings(), position: 0.5, maxWidth: 160);
+
+        Assert.AreEqual((160, 90), (preview.Width, preview.Height));
+        Assert.AreEqual((160, 90), (preview.AfterWidth, preview.AfterHeight));
+        Assert.HasCount(160 * 90 * 4, preview.Before);
+        Assert.HasCount(160 * 90 * 4, preview.After);
+        Assert.IsTrue(preview.Time > TimeSpan.FromSeconds(1.5) && preview.Time < TimeSpan.FromSeconds(2.5), preview.Time.ToString());
+
+        // The same picture, give or take what the encoder lost: nothing like a frame from elsewhere, or a blank one.
+        double difference = 0;
+        for (int i = 0; i < preview.Before.Length; i++)
+            difference += Math.Abs(preview.Before[i] - preview.After[i]);
+        Assert.IsLessThan(24, difference / preview.Before.Length);
+        Assert.IsGreaterThan(1, preview.Before.Distinct().Count());
+        Assert.HasCount(1, Directory.GetFiles(_root.FullName), "only the source: the encoded frames went to a temp file that's gone");
+    }
+
+    [TestMethod]
+    [DataRow(0.0)]
+    [DataRow(1.0)]
+    public void APreviewAtEitherEndOfTheVideoIsAFrame(double position)
+    {
+        string source = Temp("source.webm");
+        SyntheticVideo.Write(source, 160, 90, frames: 40, fps: 20);
+
+        var preview = VideoReencoder.PreviewFrame(source, new VideoReencodeSettings(), position, maxWidth: 1280);
+
+        Assert.AreEqual((160, 90), (preview.Width, preview.Height));
+        Assert.IsTrue(preview.Time >= TimeSpan.Zero && preview.Time <= TimeSpan.FromSeconds(2));
+    }
+
+    [TestMethod]
+    public void APreviewCanBeCancelled()
+    {
+        string source = Temp("source.webm");
+        SyntheticVideo.Write(source, 160, 90, frames: 60, fps: 30);
+        using var cancelled = new CancellationTokenSource();
+        cancelled.Cancel();
+
+        Assert.Throws<OperationCanceledException>(() => VideoReencoder.PreviewFrame(source, new VideoReencodeSettings(), 0.5, 160, cancelled.Token));
     }
 
     [TestMethod]

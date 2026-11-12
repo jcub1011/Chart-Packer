@@ -9,7 +9,8 @@ namespace ChartShared.Core.Settings;
 /// </summary>
 /// <remarks>
 /// A flat, mutable class, not <see cref="OptimizeOptions"/>' records, so the file has one property per setting and a
-/// missing one reads as its default. Every strategy is off until the user turns it on and saves it as a default.
+/// missing one reads as its default. Every strategy is off until the user turns it on; the window keeps what it was
+/// last set to.
 /// </remarks>
 public sealed class OptimizeSettings
 {
@@ -103,8 +104,14 @@ public sealed class OptimizeSettings
     /// <summary>The smallest saving, as a fraction of a file's size, worth acting on; 0 to 0.9.</summary>
     public double SavingsMargin { get; set; } = 0.10;
 
-    /// <summary>How a savings estimate chooses its charts.</summary>
-    public SamplingMode Sampling { get; set; } = SamplingMode.RandomSample;
+    /// <summary>
+    /// Whether optimized charts are written to <see cref="OutputFolder"/>, leaving the library as it is. On as shipped, so
+    /// the originals are only overwritten when the user chooses that.
+    /// </summary>
+    public bool UseOutputFolder { get; set; } = true;
+
+    /// <summary>The folder optimized charts were last written to; null when none has been chosen.</summary>
+    public string? OutputFolder { get; set; }
 
     /// <summary>How many charts are worked on at once; 0 takes <see cref="OptimizeOptions.RecommendedParallelism"/>.</summary>
     public int Parallelism { get; set; }
@@ -135,7 +142,8 @@ public sealed class OptimizeSettings
         BackgroundArtMaxWidth = Limit(BackgroundArtMaxWidth),
         BackgroundArtMaxHeight = Limit(BackgroundArtMaxHeight),
         SavingsMargin = double.IsFinite(SavingsMargin) ? Math.Clamp(SavingsMargin, 0, 0.9) : 0.10,
-        Sampling = Enum.IsDefined(Sampling) ? Sampling : SamplingMode.RandomSample,
+        UseOutputFolder = UseOutputFolder,
+        OutputFolder = string.IsNullOrWhiteSpace(OutputFolder) ? null : OutputFolder.Trim(),
         Parallelism = Math.Clamp(Parallelism, 0, 64),
     };
 
