@@ -2882,39 +2882,36 @@ Each song is rechecked first. Changed songs, or ones whose kept copy is missing,
     <comment>Title of the Optimize window.</comment>
   </data>
   <data name="OptimizeScopeLabel" xml:space="preserve">
-    <value>Charts</value>
+    <value>Scope</value>
     <comment>Heading of the section that says which charts the Optimize window works on.</comment>
   </data>
   <data name="OptimizeScopeSelectedFormat" xml:space="preserve">
-    <value>Selected charts ({0})</value>
+    <value>Selected ({0})</value>
     <comment>{0} is how many charts are selected.</comment>
   </data>
-  <data name="OptimizeScopeLibraryFormat" xml:space="preserve">
-    <value>Every chart in the library: {0:N0}</value>
-  </data>
   <data name="OptimizeMetadataLabel" xml:space="preserve">
-    <value>Clean up metadata</value>
+    <value>Metadata</value>
   </data>
   <data name="OptimizeMetadataDescription" xml:space="preserve">
-    <value>Leaves out song.ini keys and chart events that no game needs. It's done whatever it saves.</value>
+    <value>Removes song.ini keys and chart events no game reads.</value>
   </data>
   <data name="OptimizePruneEmptyPartsLabel" xml:space="preserve">
-    <value>Drop the keys of parts the chart has no notes for</value>
+    <value>Remove Keys for Unused Parts</value>
   </data>
   <data name="OptimizeStripEditorEventsLabel" xml:space="preserve">
-    <value>Drop the tempo anchors only Chart Builder reads</value>
+    <value>Remove Chart Builder Tempo Anchors</value>
   </data>
   <data name="OptimizeDropEmptyValuesLabel" xml:space="preserve">
-    <value>Drop keys with an empty value</value>
+    <value>Remove Empty Keys</value>
   </data>
   <data name="OptimizeReplaceLegacyKeysLabel" xml:space="preserve">
-    <value>Rename legacy keys to their replacements</value>
+    <value>Rename Legacy Keys</value>
   </data>
   <data name="OptimizeAudioLabel" xml:space="preserve">
-    <value>Compress audio to Opus</value>
+    <value>Audio</value>
   </data>
   <data name="OptimizeAudioDescription" xml:space="preserve">
-    <value>Transcodes each audio stem to Opus. Stems that are already Opus are left alone.</value>
+    <value>Stems already in Opus are skipped.</value>
   </data>
   <data name="OptimizeAudioBitrateLabel" xml:space="preserve">
     <value>Bitrate</value>
@@ -2928,31 +2925,23 @@ Each song is rechecked first. Changed songs, or ones whose kept copy is missing,
     <value>{0} kbps</value>
     <comment>{0} is an Opus bitrate.</comment>
   </data>
-  <data name="OptimizeBitrateDefaultFormat" xml:space="preserve">
-    <value>{0} kbps (default)</value>
-    <comment>{0} is an Opus bitrate.</comment>
-  </data>
-  <data name="OptimizeBitrateSmallerFormat" xml:space="preserve">
-    <value>{0} kbps (smaller)</value>
-    <comment>{0} is an Opus bitrate.</comment>
-  </data>
   <data name="OptimizeStemMixdownLabel" xml:space="preserve">
-    <value>Mix stems down to one</value>
+    <value>Stems</value>
   </data>
   <data name="OptimizeStemMixdownDescription" xml:space="preserve">
-    <value>Replaces a chart's separate stems with a single song stem, so the stems can no longer be heard apart.</value>
+    <value>Replaces the separate stems with one song stem. Can't be reversed.</value>
   </data>
   <data name="OptimizeMixdownBitrateLabel" xml:space="preserve">
-    <value>Bitrate of the mix</value>
+    <value>Stem Mix Bitrate</value>
   </data>
   <data name="OptimizeVideoLabel" xml:space="preserve">
-    <value>Recompress background video</value>
+    <value>Video</value>
   </data>
   <data name="OptimizeVideoDescription" xml:space="preserve">
-    <value>Re-encodes the video as VP8 in WebM, which plays in every game. The result has no audio track.</value>
+    <value>The result has no audio track.</value>
   </data>
   <data name="OptimizeVideoTargetLabel" xml:space="preserve">
-    <value>Size</value>
+    <value>Resolution</value>
     <comment>Label of the drop-down that picks the size a video is brought down to.</comment>
   </data>
   <data name="OptimizeVideoSd" xml:space="preserve">
@@ -2971,7 +2960,7 @@ Each song is rechecked first. Changed songs, or ones whose kept copy is missing,
     <value>Ultra HD (3840×2160)</value>
   </data>
   <data name="OptimizeVideoCqLabel" xml:space="preserve">
-    <value>Quality (CQ)</value>
+    <value>Quality</value>
     <comment>Label of the constant-quality slider for video.</comment>
   </data>
   <data name="OptimizeVideoCqFormat" xml:space="preserve">
@@ -2979,17 +2968,17 @@ Each song is rechecked first. Changed songs, or ones whose kept copy is missing,
     <comment>{0} is the constant-quality value.</comment>
   </data>
   <data name="OptimizeVideoCqDescription" xml:space="preserve">
-    <value>Lower is better quality and a larger file. 32 is the default.</value>
+    <value>Lower is better quality and a larger file.</value>
   </data>
   <data name="OptimizeVideoSpeedLabel" xml:space="preserve">
     <value>Speed</value>
     <comment>Label of the drop-down that picks how hard the video encoder works.</comment>
   </data>
   <data name="OptimizeVideoSpeedDescription" xml:space="preserve">
-    <value>How long the encoder spends on each video. Slower gives a smaller file for the same picture. Balanced is the default.</value>
+    <value>Slower gives a smaller file for the same picture. Fastest is about 3× quicker than Balanced.</value>
   </data>
   <data name="OptimizeVideoSpeedFastest" xml:space="preserve">
-    <value>Fastest (about 3× quicker, rougher picture)</value>
+    <value>Fastest</value>
     <comment>A video encoding speed, compared with Balanced.</comment>
   </data>
   <data name="OptimizeVideoSpeedFast" xml:space="preserve">
@@ -2997,7 +2986,7 @@ Each song is rechecked first. Changed songs, or ones whose kept copy is missing,
     <comment>A video encoding speed.</comment>
   </data>
   <data name="OptimizeVideoSpeedBalanced" xml:space="preserve">
-    <value>Balanced (default)</value>
+    <value>Balanced</value>
     <comment>A video encoding speed.</comment>
   </data>
   <data name="OptimizeVideoSpeedSlow" xml:space="preserve">
@@ -3005,34 +2994,34 @@ Each song is rechecked first. Changed songs, or ones whose kept copy is missing,
     <comment>A video encoding speed.</comment>
   </data>
   <data name="OptimizeVideoSpeedBest" xml:space="preserve">
-    <value>Best (slowest, smallest)</value>
+    <value>Best</value>
     <comment>A video encoding speed.</comment>
   </data>
   <data name="OptimizeVideoConvertLabel" xml:space="preserve">
-    <value>Convert unsupported codecs for compatibility</value>
+    <value>Always Convert VP9, AV1 and HEVC</value>
   </data>
   <data name="OptimizeVideoConvertDescription" xml:space="preserve">
-    <value>Also converts VP9, AV1 and HEVC videos, which some games can't play, to VP8 WebM, whatever it saves. The result may be larger.</value>
+    <value>Some games can't play these. Converted even if the file gets larger.</value>
   </data>
   <data name="OptimizeAlbumArtLabel" xml:space="preserve">
-    <value>Recompress album art</value>
+    <value>Album Art</value>
   </data>
   <data name="OptimizeBackgroundArtLabel" xml:space="preserve">
-    <value>Recompress background images</value>
+    <value>Backgrounds</value>
   </data>
   <data name="OptimizeImageQualityLabel" xml:space="preserve">
-    <value>JPEG quality</value>
+    <value>Quality</value>
   </data>
   <data name="OptimizeImageQualityFormat" xml:space="preserve">
-    <value>Quality {0}</value>
+    <value>{0}</value>
     <comment>{0} is a JPEG quality, 1 to 100.</comment>
   </data>
   <data name="OptimizeImageLimitLabel" xml:space="preserve">
-    <value>Size limit</value>
+    <value>Size Limit</value>
     <comment>Label of the drop-down that picks the largest size an image is left at.</comment>
   </data>
   <data name="OptimizeNoLimit" xml:space="preserve">
-    <value>No limit</value>
+    <value>No Limit</value>
   </data>
   <data name="OptimizeSizeLimitFormat" xml:space="preserve">
     <value>{0}×{1}</value>
@@ -3047,60 +3036,46 @@ Each song is rechecked first. Changed songs, or ones whose kept copy is missing,
     <comment>{0} says why a strategy can't run.</comment>
   </data>
   <data name="OptimizeMarginLabel" xml:space="preserve">
-    <value>Skip small savings</value>
+    <value>Minimum Saving</value>
   </data>
   <data name="OptimizeMarginDescription" xml:space="preserve">
-    <value>A file that would shrink by less than this is left as it is. Metadata cleanup ignores it.</value>
+    <value>Files that would shrink by less are left alone. Metadata ignores this.</value>
   </data>
   <data name="OptimizeOutputLabel" xml:space="preserve">
-    <value>Write to</value>
+    <value>Output</value>
   </data>
   <data name="OptimizeToFolder" xml:space="preserve">
-    <value>A separate folder</value>
+    <value>New Folder</value>
   </data>
   <data name="OptimizeToFolderDescription" xml:space="preserve">
-    <value>The library stays as it is. Only the charts that change are written, in the same layout.</value>
+    <value>Only charts that change are written, in the library's layout.</value>
   </data>
   <data name="OptimizeOutputFolderPlaceholder" xml:space="preserve">
-    <value>Choose a folder…</value>
+    <value>Choose a Folder…</value>
   </data>
   <data name="OptimizeBrowseButton" xml:space="preserve">
     <value>Browse…</value>
   </data>
   <data name="OptimizeBrowseOutputTitle" xml:space="preserve">
-    <value>Choose the output folder</value>
+    <value>Choose Output Folder</value>
   </data>
   <data name="OptimizeInPlaceWarning" xml:space="preserve">
-    <value>The charts are changed where they are, which can't be undone. Back them up first.</value>
-  </data>
-  <data name="OptimizeSavesFormat" xml:space="preserve">
-    <value>Saves {0}</value>
-    <comment>{0} is a size.</comment>
-  </data>
-  <data name="OptimizeCostsFormat" xml:space="preserve">
-    <value>Costs {0}</value>
-    <comment>{0} is a size; the files get larger.</comment>
+    <value>Can't be undone. Back up the charts first.</value>
   </data>
   <data name="OptimizeButton" xml:space="preserve">
     <value>Optimize</value>
-  </data>
-  <data name="OptimizeButtonToolTip" xml:space="preserve">
-    <value>Optimizes the charts with what's switched on under Shrink.</value>
   </data>
   <data name="OptimizeStopButton" xml:space="preserve">
     <value>Stop</value>
   </data>
   <data name="OptimizeResetButton" xml:space="preserve">
-    <value>Reset</value>
-  </data>
-  <data name="OptimizeResetToolTip" xml:space="preserve">
-    <value>Puts every setting back to the shipped one. Where the charts are written stays as it is.</value>
+    <value>Reset to Defaults</value>
   </data>
   <data name="OptimizeConfirmTitle" xml:space="preserve">
-    <value>Optimize in place?</value>
+    <value>Optimize in Place?</value>
   </data>
   <data name="OptimizeConfirmMessageFormat" xml:space="preserve">
-    <value>This changes {0} charts where they are, and can't be undone. Back them up first, or write the changed charts to a folder instead.</value>
+    <value>This changes {0} charts where they are and can't be undone. Back them up first.</value>
     <comment>{0} is how many charts.</comment>
   </data>
   <data name="OptimizeConfirmButton" xml:space="preserve">
@@ -3117,17 +3092,17 @@ Each song is rechecked first. Changed songs, or ones whose kept copy is missing,
     <comment>{0} is a chart's name and {1} the file being optimized.</comment>
   </data>
   <data name="OptimizeStopped" xml:space="preserve">
-    <value>Stopped.</value>
+    <value>Stopped:</value>
   </data>
   <data name="OptimizeNoCharts" xml:space="preserve">
-    <value>There are no charts to work on. Scan a library in the main window first.</value>
+    <value>No charts. Scan a library first.</value>
   </data>
   <data name="OptimizeFailedFormat" xml:space="preserve">
     <value>Something went wrong: {0}</value>
     <comment>{0} is the error.</comment>
   </data>
   <data name="OptimizeResultSummaryFormat" xml:space="preserve">
-    <value>{0:N0} optimized, {1:N0} left alone, {2:N0} failed.</value>
+    <value>{0:N0} Optimized, {1:N0} Left Alone, {2:N0} Failed</value>
   </data>
   <data name="OptimizeStatusSavedFormat" xml:space="preserve">
     <value>Saved {0}</value>
@@ -3138,19 +3113,19 @@ Each song is rechecked first. Changed songs, or ones whose kept copy is missing,
     <comment>{0} is why.</comment>
   </data>
   <data name="OptimizeSkipHasUnsavedChanges" xml:space="preserve">
-    <value>Skipped: it has unsaved changes in Chart Packer</value>
+    <value>Skipped: unsaved changes in Chart Packer</value>
   </data>
   <data name="OptimizeSkipInUse" xml:space="preserve">
-    <value>Skipped: it's in use elsewhere</value>
+    <value>Skipped: in use elsewhere</value>
   </data>
   <data name="OptimizeSkipChartChanged" xml:space="preserve">
-    <value>Skipped: it changed since it was read</value>
+    <value>Skipped: changed since it was read</value>
   </data>
   <data name="OptimizeSkipOutputExists" xml:space="preserve">
-    <value>Skipped: it's already in the output folder</value>
+    <value>Skipped: already in the output folder</value>
   </data>
   <data name="OptimizeUnreadableFormat" xml:space="preserve">
-    <value>{0:N0} couldn't be read and are left out.</value>
+    <value>{0:N0} Unreadable</value>
     <comment>{0} is a number of charts.</comment>
   </data>
   <data name="OptimizeOutputFolderNotFullPath" xml:space="preserve">
@@ -3160,27 +3135,18 @@ Each song is rechecked first. Changed songs, or ones whose kept copy is missing,
     <value>The output folder can't be a chart, or inside one.</value>
   </data>
   <data name="OptimizeScopeLibraryCountFormat" xml:space="preserve">
-    <value>Whole library ({0:N0})</value>
+    <value>Whole Library ({0:N0})</value>
     <comment>{0} is a number of charts.</comment>
   </data>
   <data name="OptimizeShrinkLabel" xml:space="preserve">
-    <value>Shrink</value>
+    <value>Optimizations</value>
     <comment>The heading over the strategies: what to shrink.</comment>
-  </data>
-  <data name="OptimizeAlbumArtDescription" xml:space="preserve">
-    <value>Recompresses the album art as JPEG, fitted inside the size limit and never scaled up.</value>
-  </data>
-  <data name="OptimizeBackgroundArtDescription" xml:space="preserve">
-    <value>Recompresses the background image as JPEG, fitted inside the size limit and never scaled up.</value>
   </data>
   <data name="OptimizePercentFormat" xml:space="preserve">
     <value>{0}%</value>
   </data>
   <data name="OptimizeInPlaceOption" xml:space="preserve">
-    <value>Over the originals</value>
-  </data>
-  <data name="OptimizeStrategySavingToolTip" xml:space="preserve">
-    <value>What this saves across the charts. A figure starting with ~ still leans on predictions.</value>
+    <value>In Place</value>
   </data>
   <data name="OptimizeStrategySavingPredictedFormat" xml:space="preserve">
     <value>~ {0}</value>
@@ -3194,29 +3160,26 @@ Each song is rechecked first. Changed songs, or ones whose kept copy is missing,
     <value>How much of the charts' size is kept, saved and predicted to be saved</value>
   </data>
   <data name="OptimizeCoverageReadingFormat" xml:space="preserve">
-    <value>Reading the charts' files: {0:N0} of {1:N0}.</value>
-  </data>
-  <data name="OptimizeCoverageSamplingFormat" xml:space="preserve">
-    <value>Measuring a few files of each type, to predict the rest from: {0:N0} of {1:N0} charts measured.</value>
+    <value>Reading {0:N0} of {1:N0}</value>
   </data>
   <data name="OptimizeCoverageMeasuringFormat" xml:space="preserve">
-    <value>{0:N0} of {1:N0} charts measured. The rest are predicted from measured files of the same type.</value>
+    <value>{0:N0} of {1:N0} Measured</value>
   </data>
   <data name="OptimizeCoverageDone" xml:space="preserve">
-    <value>Every chart is measured.</value>
+    <value>All Measured</value>
   </data>
   <data name="OptimizeNothingOn" xml:space="preserve">
-    <value>Switch something on under Shrink to see what it would save.</value>
+    <value>No Optimizations On</value>
   </data>
   <data name="OptimizeDoneEstimateFormat" xml:space="preserve">
-    <value>The estimate for those charts was {0}.</value>
+    <value>Estimate Was {0}</value>
     <comment>{0} is a size.</comment>
   </data>
   <data name="OptimizeSearchWatermark" xml:space="preserve">
-    <value>Search charts</value>
+    <value>Search Charts</value>
   </data>
   <data name="OptimizeSortLabel" xml:space="preserve">
-    <value>Sort by</value>
+    <value>Sort By</value>
   </data>
   <data name="OptimizeSortSaving" xml:space="preserve">
     <value>Saving</value>
@@ -3228,14 +3191,14 @@ Each song is rechecked first. Changed songs, or ones whose kept copy is missing,
     <value>Name</value>
   </data>
   <data name="OptimizeSortProblems" xml:space="preserve">
-    <value>Problems first</value>
+    <value>Problems First</value>
   </data>
   <data name="OptimizeChipShrinksFormat" xml:space="preserve">
     <value>Shrinks {0:N0}</value>
     <comment>{0} is a number of charts.</comment>
   </data>
   <data name="OptimizeChipNothingFormat" xml:space="preserve">
-    <value>Nothing to shrink {0:N0}</value>
+    <value>Nothing to Shrink {0:N0}</value>
     <comment>{0} is a number of charts.</comment>
   </data>
   <data name="OptimizeChipProblemsFormat" xml:space="preserve">
@@ -3247,7 +3210,7 @@ Each song is rechecked first. Changed songs, or ones whose kept copy is missing,
     <comment>{0} is a number of charts.</comment>
   </data>
   <data name="OptimizeChipLeftFormat" xml:space="preserve">
-    <value>Left alone {0:N0}</value>
+    <value>Left Alone {0:N0}</value>
     <comment>{0} is a number of charts.</comment>
   </data>
   <data name="OptimizeChartListName" xml:space="preserve">
@@ -3257,22 +3220,22 @@ Each song is rechecked first. Changed songs, or ones whose kept copy is missing,
     <value>No charts match.</value>
   </data>
   <data name="OptimizeClearFilters" xml:space="preserve">
-    <value>Clear search and filters</value>
+    <value>Clear Filters</value>
   </data>
   <data name="OptimizeRowReading" xml:space="preserve">
     <value>Reading…</value>
   </data>
   <data name="OptimizeRowUnreadable" xml:space="preserve">
-    <value>Can't be read</value>
+    <value>Unreadable</value>
   </data>
   <data name="OptimizeRowNotMeasured" xml:space="preserve">
-    <value>Not measured yet</value>
+    <value>Not Measured</value>
   </data>
   <data name="OptimizeRowNothing" xml:space="preserve">
-    <value>Nothing to shrink</value>
+    <value>Nothing to Shrink</value>
   </data>
   <data name="OptimizeRowNoBytes" xml:space="preserve">
-    <value>No smaller</value>
+    <value>No Smaller</value>
     <comment>A chart that is changed (its metadata cleaned, say) without getting smaller.</comment>
   </data>
   <data name="OptimizeRowFailed" xml:space="preserve">
@@ -3295,10 +3258,10 @@ Each song is rechecked first. Changed songs, or ones whose kept copy is missing,
     <comment>{0} is a size.</comment>
   </data>
   <data name="OptimizeRowPredictedDetail" xml:space="preserve">
-    <value>Predicted from measured files of the same type</value>
+    <value>Predicted from similar files</value>
   </data>
   <data name="OptimizeRowPredictedToolTip" xml:space="preserve">
-    <value>This chart hasn't been measured yet. Its figure is predicted from measured files of the same type, and is replaced by its own once it's measured. Select it to measure it next.</value>
+    <value>Not measured yet. This figure is predicted from similar files. Select the chart to measure it next.</value>
   </data>
   <data name="OptimizeDetailSeparator" xml:space="preserve">
     <value>, </value>
@@ -3334,7 +3297,7 @@ Each song is rechecked first. Changed songs, or ones whose kept copy is missing,
     <value>Metadata</value>
   </data>
   <data name="OptimizeFileNotMeasured" xml:space="preserve">
-    <value>Not measured yet</value>
+    <value>Not Measured</value>
   </data>
   <data name="OptimizeFileToOpus" xml:space="preserve">
     <value>To Opus</value>
@@ -3343,45 +3306,45 @@ Each song is rechecked first. Changed songs, or ones whose kept copy is missing,
     <value>Recompressed</value>
   </data>
   <data name="OptimizeFileConverted" xml:space="preserve">
-    <value>Converted to VP8, which every game plays</value>
+    <value>Converted to VP8</value>
   </data>
   <data name="OptimizeFileRemoved" xml:space="preserve">
     <value>Removed</value>
   </data>
   <data name="OptimizeFileMixdownFormat" xml:space="preserve">
-    <value>Mixed down to {0}</value>
+    <value>Mixed Down to {0}</value>
     <comment>{0} is a file name.</comment>
   </data>
   <data name="OptimizeFileCleaned" xml:space="preserve">
-    <value>Cleaned up</value>
+    <value>Cleaned Up</value>
   </data>
   <data name="OptimizeFileKept" xml:space="preserve">
-    <value>Kept as it is</value>
+    <value>Kept</value>
   </data>
   <data name="OptimizeFileKeptBelowMargin" xml:space="preserve">
-    <value>Kept: it would save too little</value>
+    <value>Kept: saving too small</value>
   </data>
   <data name="OptimizeFileKeptWouldGrow" xml:space="preserve">
-    <value>Kept: it would get larger</value>
+    <value>Kept: would get larger</value>
   </data>
   <data name="OptimizeFileKeptOptimal" xml:space="preserve">
-    <value>Kept: it's already as small as this makes it</value>
+    <value>Kept: already small enough</value>
   </data>
   <data name="OptimizeFileKeptUnavailable" xml:space="preserve">
-    <value>Kept: its encoder isn't available</value>
+    <value>Kept: encoder unavailable</value>
   </data>
   <data name="OptimizeFileKeptNameTakenFormat" xml:space="preserve">
     <value>Kept: the chart already has a {0}</value>
     <comment>{0} is a file name.</comment>
   </data>
   <data name="OptimizeFileKeptUnreadable" xml:space="preserve">
-    <value>Kept: it couldn't be read</value>
+    <value>Kept: couldn't be read</value>
   </data>
   <data name="OptimizeFileKeptUnsupported" xml:space="preserve">
-    <value>Kept: converting its codec is switched off</value>
+    <value>Kept: codec conversion is off</value>
   </data>
   <data name="OptimizeFileNothingToClean" xml:space="preserve">
-    <value>Nothing to clean up</value>
+    <value>Nothing to Clean Up</value>
   </data>
   <data name="OptimizeFileSizesFormat" xml:space="preserve">
     <value>{0} → {1}</value>
@@ -3395,49 +3358,49 @@ Each song is rechecked first. Changed songs, or ones whose kept copy is missing,
     <value>Measuring… {0:N0} of {1:N0}</value>
   </data>
   <data name="OptimizeStatusPausedFormat" xml:space="preserve">
-    <value>Measuring is paused at {0:N0} of {1:N0}.</value>
+    <value>Paused at {0:N0} of {1:N0}</value>
   </data>
   <data name="OptimizePauseButton" xml:space="preserve">
-    <value>Pause measuring</value>
+    <value>Pause Measuring</value>
   </data>
   <data name="OptimizeResumeButton" xml:space="preserve">
-    <value>Resume measuring</value>
+    <value>Resume Measuring</value>
   </data>
   <data name="OptimizePauseToolTip" xml:space="preserve">
-    <value>Measuring uses most of the processor. Pausing it keeps what's measured so far.</value>
+    <value>Measuring uses most of the processor. Pausing keeps what's measured so far.</value>
   </data>
   <data name="OptimizeButtonOne" xml:space="preserve">
-    <value>Optimize 1 chart</value>
+    <value>Optimize 1 Chart</value>
   </data>
   <data name="OptimizeButtonFormat" xml:space="preserve">
-    <value>Optimize {0:N0} charts</value>
+    <value>Optimize {0:N0} Charts</value>
   </data>
   <data name="OptimizeStopToolTip" xml:space="preserve">
     <value>Stops after the charts being worked on. Charts already optimized stay optimized.</value>
   </data>
   <data name="OptimizeOpenOutputButton" xml:space="preserve">
-    <value>Open output folder</value>
+    <value>Open Output Folder</value>
   </data>
   <data name="OptimizeBlockedNothingOn" xml:space="preserve">
-    <value>Switch something on under Shrink first.</value>
+    <value>Turn on an optimization first.</value>
   </data>
   <data name="OptimizeBlockedReading" xml:space="preserve">
     <value>The charts are still being read.</value>
   </data>
   <data name="OptimizeBlockedNoFolder" xml:space="preserve">
-    <value>Choose a folder to write to, or write over the originals.</value>
+    <value>Choose an output folder, or optimize in place.</value>
   </data>
   <data name="OptimizeBlockedNothingToDo" xml:space="preserve">
     <value>Nothing in these charts would change with these settings.</value>
   </data>
   <data name="OptimizeRowLeft" xml:space="preserve">
-    <value>Left alone</value>
+    <value>Left Alone</value>
   </data>
   <data name="OptimizeBlockedDone" xml:space="preserve">
     <value>Everything that would change has been optimized.</value>
   </data>
   <data name="OptimizeRowNothingDone" xml:space="preserve">
-    <value>Nothing done</value>
+    <value>Nothing Done</value>
     <comment>Under a chart's name, when nothing that's switched on changes it.</comment>
   </data>
   <data name="OptimizeRowMeasuring" xml:space="preserve">
@@ -3448,7 +3411,7 @@ Each song is rechecked first. Changed songs, or ones whose kept copy is missing,
     <comment>Shown from the moment Optimize is pressed until the first chart starts.</comment>
   </data>
   <data name="OptimizeRunMeasuringFormat" xml:space="preserve">
-    <value>Measuring charts before optimizing them… {0:N0} of {1:N0} done</value>
+    <value>Measuring before optimizing… {0:N0} of {1:N0}</value>
   </data>
   <data name="OptimizePreviewBefore" xml:space="preserve">
     <value>Before</value>
@@ -3472,20 +3435,49 @@ Each song is rechecked first. Changed songs, or ones whose kept copy is missing,
     <comment>{2} is a time in the video.</comment>
   </data>
   <data name="OptimizePreviewPreviousFrame" xml:space="preserve">
-    <value>Previous frame</value>
+    <value>Previous Frame</value>
   </data>
   <data name="OptimizePreviewNextFrame" xml:space="preserve">
-    <value>Next frame</value>
+    <value>Next Frame</value>
   </data>
   <data name="OptimizePreviewFailedFormat" xml:space="preserve">
     <value>The preview couldn't be made: {0}</value>
     <comment>{0} is the error.</comment>
   </data>
-  <data name="OptimizePreviewMaking" xml:space="preserve">
-    <value>Making the preview…</value>
-  </data>
   <data name="OptimizeBusy" xml:space="preserve">
     <value>Busy…</value>
     <comment>The Optimize button while a run is going, when it can't be pressed.</comment>
+  </data>
+  <data name="OptimizeAudioFormatTag" xml:space="preserve">
+    <value>Opus</value>
+    <comment>What audio becomes, on a chip beside the Audio optimization.</comment>
+  </data>
+  <data name="OptimizeStemMixdownFormatTag" xml:space="preserve">
+    <value>Single Mix</value>
+    <comment>What stems become, on a chip beside the Stems optimization.</comment>
+  </data>
+  <data name="OptimizeVideoFormatTag" xml:space="preserve">
+    <value>VP8 WebM</value>
+    <comment>What video becomes, on a chip beside the Video optimization.</comment>
+  </data>
+  <data name="OptimizeImageFormatTag" xml:space="preserve">
+    <value>JPEG</value>
+    <comment>What images become, on a chip beside the image optimizations.</comment>
+  </data>
+  <data name="OptimizeLegendKept" xml:space="preserve">
+    <value>Kept</value>
+    <comment>Legend of the size bar: the part of the charts' size that stays.</comment>
+  </data>
+  <data name="OptimizeLegendSaved" xml:space="preserve">
+    <value>Saved</value>
+    <comment>Legend of the size bar: the part measured to be saved.</comment>
+  </data>
+  <data name="OptimizeLegendPredicted" xml:space="preserve">
+    <value>Predicted</value>
+    <comment>Legend of the size bar: the part predicted to be saved, not yet measured.</comment>
+  </data>
+  <data name="OptimizeColumnChart" xml:space="preserve">
+    <value>Chart</value>
+    <comment>Column header of the chart list.</comment>
   </data>
 </root>

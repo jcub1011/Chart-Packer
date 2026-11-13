@@ -232,8 +232,6 @@ namespace ChartPacker.ViewModels
 
         public string LibraryScopeText => string.Format(CultureInfo.CurrentCulture, Strings.OptimizeScopeLibraryCountFormat, _request.Library.Count);
 
-        public string OnlyLibraryScopeText => string.Format(CultureInfo.CurrentCulture, Strings.OptimizeScopeLibraryFormat, _request.Library.Count);
-
         // ---- The list -----------------------------------------------------------------------------------------
 
         [ObservableProperty]
@@ -259,7 +257,7 @@ namespace ChartPacker.ViewModels
         [ObservableProperty]
         public partial string SizesText { get; set; } = string.Empty;
 
-        /// <summary>What's saved: "Saves 13.3 GB", or "Saved" once a run has.</summary>
+        /// <summary>What's saved: "−13.3 GB", or "Saved 13.3 GB" once a run has.</summary>
         [ObservableProperty]
         public partial string SavingText { get; set; } = string.Empty;
 
@@ -280,7 +278,11 @@ namespace ChartPacker.ViewModels
         public partial double BarSaved { get; set; }
 
         [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasPredicted))]
         public partial double BarPredicted { get; set; }
+
+        /// <summary>Part of the saving is still a prediction, so the bar's legend names that part.</summary>
+        public bool HasPredicted => BarPredicted > 0;
 
         /// <summary>What went wrong, for the banner; empty when nothing has.</summary>
         [ObservableProperty]
@@ -316,7 +318,7 @@ namespace ChartPacker.ViewModels
         public bool IsMeasuring => Phase == OptimizePhase.Measuring;
 
         /// <summary>Something is going on in the background: reading, measuring or a run.</summary>
-        public bool IsWorking => Phase is OptimizePhase.Reading or OptimizePhase.Measuring or OptimizePhase.Running && !IsPaused;
+        public bool IsWorking => Phase is OptimizePhase.Reading or OptimizePhase.Running || (IsMeasuring && !IsPaused);
 
         public bool IsDone => Phase == OptimizePhase.Done;
 
@@ -346,7 +348,8 @@ namespace ChartPacker.ViewModels
         [NotifyPropertyChangedFor(nameof(OptimizeToolTip))]
         public partial string BlockedText { get; set; } = string.Empty;
 
-        public string OptimizeToolTip => BlockedText.Length > 0 ? BlockedText : Strings.OptimizeButtonToolTip;
+        /// <summary>Why Optimize can't be used, for its tooltip; <see langword="null"/>, and so no tooltip, when it can.</summary>
+        public string? OptimizeToolTip => BlockedText.Length > 0 ? BlockedText : null;
 
         /// <summary>Why the output folder can't be used, or empty when it can, or hasn't been chosen yet.</summary>
         [ObservableProperty]
@@ -659,13 +662,16 @@ namespace ChartPacker.ViewModels
                 if (generation != _generation)
                     return;
 
+                // A pause is kept: the work starting again, after a setting changed, isn't the user carrying on.
                 var ct = cts.Token;
                 ErrorText = string.Empty;
-                IsPaused = false;
                 await ReadAsync(ct);
                 await MeasureAsync(ct);
                 if (generation == _generation)
+                {
                     Phase = OptimizePhase.Ready;
+                    IsPaused = false;
+                }
             }
             catch (OperationCanceledException)
             {
@@ -676,7 +682,10 @@ namespace ChartPacker.ViewModels
                 System.Diagnostics.Trace.TraceError($"Optimize window measuring failed: {ex}");
                 ErrorText = string.Format(CultureInfo.CurrentCulture, Strings.OptimizeFailedFormat, ex.Message);
                 if (generation == _generation)
+                {
                     Phase = OptimizePhase.Ready;
+                    IsPaused = false;
+                }
             }
             finally
             {
@@ -805,6 +814,9 @@ namespace ChartPacker.ViewModels
             var estimator = await Task.Run(
                 () => new LibraryEstimator(charts, options, optimizers, services, model, OptimizeOptions.RecommendedMeasuringParallelism), cancellationToken);
             _estimator = estimator;
+            // Measuring that was paused stays paused, though it's a new estimator's to do.
+            if (IsPaused)
+                estimator.Pause();
             if (SelectedRow is { Plan: null } looking)
                 estimator.Prioritize(looking.Entry);
 
@@ -908,7 +920,7 @@ namespace ChartPacker.ViewModels
         private void RefreshSummary()
         {
             long before = 0, measured = 0, predicted = 0;
-            int unreadable = 0, unknown = 0, known = 0, shrinks = 0, nothing = 0, problems = 0;
+            int unreadable = 0, known = 0, shrinks = 0, nothing = 0, problems = 0;
             var byStrategy = new long[Settings.Toggles.Count];
             var predictedStrategy = new bool[Settings.Toggles.Count];
             foreach (var row in _rows)
@@ -928,8 +940,6 @@ namespace ChartPacker.ViewModels
                 }
 
                 before += row.SizeBytes;
-                if (row.State == OptimizeRowState.Unknown)
-                    unknown++;
                 if (row.State == OptimizeRowState.Saved)
                 {
                     measured += row.Result?.BytesSaved ?? 0;
@@ -964,8 +974,8 @@ namespace ChartPacker.ViewModels
                 : string.Empty;
             SavingText = !any ? string.Empty
                 : IsDone ? string.Format(CultureInfo.CurrentCulture, Strings.OptimizeStatusSavedFormat, Size(saving))
-                : saving >= 0 ? string.Format(CultureInfo.CurrentCulture, Strings.OptimizeSavesFormat, Size(saving))
-                : string.Format(CultureInfo.CurrentCulture, Strings.OptimizeCostsFormat, Size(-saving));
+                : saving >= 0 ? string.Format(CultureInfo.CurrentCulture, Strings.OptimizeRowSavesFormat, Size(saving))
+                : string.Format(CultureInfo.CurrentCulture, Strings.OptimizeRowGrowsFormat, Size(-saving));
             PercentText = any && saving > 0
                 ? string.Format(CultureInfo.CurrentCulture, Strings.OptimizePercentFormat, Math.Max(1, (int)Math.Round(100.0 * saving / before)))
                 : string.Empty;
@@ -992,11 +1002,11 @@ namespace ChartPacker.ViewModels
             Chips[2].Label = string.Format(CultureInfo.CurrentCulture, Strings.OptimizeChipProblemsFormat, problems);
             Chips[2].IsAlert = problems > 0;
 
-            CoverageText = Coverage(unreadable, unknown);
+            CoverageText = Coverage(unreadable);
             RefreshProgress();
         }
 
-        private string Coverage(int unreadable, int unknown)
+        private string Coverage(int unreadable)
         {
             string text;
             switch (Phase)
@@ -1012,7 +1022,7 @@ namespace ChartPacker.ViewModels
                 case OptimizePhase.Done:
                     text = string.Format(CultureInfo.CurrentCulture, Strings.OptimizeResultSummaryFormat, _applied, _skipped, _failed);
                     if (_applied > 0)
-                        text += " " + string.Format(CultureInfo.CurrentCulture, Strings.OptimizeDoneEstimateFormat, Size(_bytesEstimated));
+                        text += Strings.OptimizeDetailSeparator + string.Format(CultureInfo.CurrentCulture, Strings.OptimizeDoneEstimateFormat, Size(_bytesEstimated));
                     if (_stopped)
                         text = Strings.OptimizeStopped + " " + text;
                     break;
@@ -1024,14 +1034,12 @@ namespace ChartPacker.ViewModels
                         text = Strings.OptimizeNothingOn;
                     else if (_measured >= _toMeasure)
                         text = Strings.OptimizeCoverageDone;
-                    else if (unknown > 0 && _measured < _toMeasure)
-                        text = string.Format(CultureInfo.CurrentCulture, Strings.OptimizeCoverageSamplingFormat, _measured, _toMeasure);
                     else
                         text = string.Format(CultureInfo.CurrentCulture, Strings.OptimizeCoverageMeasuringFormat, _measured, _toMeasure);
                     break;
             }
 
-            return unreadable == 0 ? text : text + " " + string.Format(CultureInfo.CurrentCulture, Strings.OptimizeUnreadableFormat, unreadable);
+            return unreadable == 0 ? text : text + Strings.OptimizeDetailSeparator + string.Format(CultureInfo.CurrentCulture, Strings.OptimizeUnreadableFormat, unreadable);
         }
 
         private void RefreshProgress()

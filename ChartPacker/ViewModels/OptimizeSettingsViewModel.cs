@@ -21,10 +21,12 @@ namespace ChartPacker.ViewModels
     /// <summary>One strategy's switch: whether it's on, whether its backend can run at all, and what it's expected to save.</summary>
     public sealed partial class OptimizeStrategyToggle : ObservableObject
     {
-        public OptimizeStrategyToggle(OptimizeStrategy strategy, string title, string description, string? unavailableReason)
+        public OptimizeStrategyToggle(OptimizeStrategy strategy, string title, string iconKey, string? formatTag, string? description, string? unavailableReason)
         {
             Strategy = strategy;
             Title = title;
+            IconKey = iconKey;
+            FormatTag = formatTag;
             Description = description;
             UnavailableReason = unavailableReason;
         }
@@ -33,7 +35,18 @@ namespace ChartPacker.ViewModels
 
         public string Title { get; }
 
-        public string Description { get; }
+        /// <summary>The key of the line icon beside the title.</summary>
+        public string IconKey { get; }
+
+        /// <summary>What the files become ("Opus"), for the chip beside the title; <see langword="null"/> when there's no one format.</summary>
+        public string? FormatTag { get; }
+
+        public bool HasFormatTag => FormatTag is not null;
+
+        /// <summary>What isn't plain from the title, for the tooltip; <see langword="null"/> when the title says it all.</summary>
+        public string? Description { get; }
+
+        public bool HasDescription => Description is not null;
 
         /// <summary>Why the strategy can't run, or <see langword="null"/> when it can.</summary>
         public string? UnavailableReason { get; }
@@ -73,15 +86,15 @@ namespace ChartPacker.ViewModels
         /// <param name="unavailableReason">Why a strategy can't run, or null when it can.</param>
         public OptimizeSettingsViewModel(OptimizeSettings settings, Func<OptimizeStrategy, string?> unavailableReason)
         {
-            OptimizeStrategyToggle Toggle(OptimizeStrategy strategy, string title, string description) =>
-                new(strategy, title, description, unavailableReason(strategy));
+            OptimizeStrategyToggle Toggle(OptimizeStrategy strategy, string title, string iconKey, string? formatTag, string? description) =>
+                new(strategy, title, iconKey, formatTag, description, unavailableReason(strategy));
 
-            Metadata = Toggle(OptimizeStrategy.Metadata, Strings.OptimizeMetadataLabel, Strings.OptimizeMetadataDescription);
-            Audio = Toggle(OptimizeStrategy.Audio, Strings.OptimizeAudioLabel, Strings.OptimizeAudioDescription);
-            StemMixdown = Toggle(OptimizeStrategy.StemMixdown, Strings.OptimizeStemMixdownLabel, Strings.OptimizeStemMixdownDescription);
-            Video = Toggle(OptimizeStrategy.Video, Strings.OptimizeVideoLabel, Strings.OptimizeVideoDescription);
-            AlbumArt = Toggle(OptimizeStrategy.AlbumArt, Strings.OptimizeAlbumArtLabel, Strings.OptimizeAlbumArtDescription);
-            BackgroundArt = Toggle(OptimizeStrategy.BackgroundArt, Strings.OptimizeBackgroundArtLabel, Strings.OptimizeBackgroundArtDescription);
+            Metadata = Toggle(OptimizeStrategy.Metadata, Strings.OptimizeMetadataLabel, "InfoStroke", null, Strings.OptimizeMetadataDescription);
+            Audio = Toggle(OptimizeStrategy.Audio, Strings.OptimizeAudioLabel, "AudioStroke", Strings.OptimizeAudioFormatTag, Strings.OptimizeAudioDescription);
+            StemMixdown = Toggle(OptimizeStrategy.StemMixdown, Strings.OptimizeStemMixdownLabel, "MergeStroke", Strings.OptimizeStemMixdownFormatTag, Strings.OptimizeStemMixdownDescription);
+            Video = Toggle(OptimizeStrategy.Video, Strings.OptimizeVideoLabel, "VideoStroke", Strings.OptimizeVideoFormatTag, Strings.OptimizeVideoDescription);
+            AlbumArt = Toggle(OptimizeStrategy.AlbumArt, Strings.OptimizeAlbumArtLabel, "AlbumArtStroke", Strings.OptimizeImageFormatTag, null);
+            BackgroundArt = Toggle(OptimizeStrategy.BackgroundArt, Strings.OptimizeBackgroundArtLabel, "ImageStroke", Strings.OptimizeImageFormatTag, null);
             Toggles = [Metadata, Audio, StemMixdown, Video, AlbumArt, BackgroundArt];
             foreach (var toggle in Toggles)
                 toggle.PropertyChanged += OnToggleChanged;
@@ -318,12 +331,8 @@ namespace ChartPacker.ViewModels
         // A strategy whose backend is missing stays off, whatever was saved.
         private static void Set(OptimizeStrategyToggle toggle, bool on) => toggle.IsOn = on && toggle.IsAvailable;
 
-        private static OptimizeChoice<int> BitrateChoice(int kbps) => new(kbps, kbps switch
-        {
-            AudioOptimizeOptions.DefaultBitrateKbps => string.Format(CultureInfo.CurrentCulture, Strings.OptimizeBitrateDefaultFormat, kbps),
-            AudioOptimizeOptions.SmallerBitrateKbps => string.Format(CultureInfo.CurrentCulture, Strings.OptimizeBitrateSmallerFormat, kbps),
-            _ => string.Format(CultureInfo.CurrentCulture, Strings.OptimizeBitrateFormat, kbps),
-        });
+        private static OptimizeChoice<int> BitrateChoice(int kbps) =>
+            new(kbps, string.Format(CultureInfo.CurrentCulture, Strings.OptimizeBitrateFormat, kbps));
 
         private static OptimizeChoice<(int? W, int? H)> LimitChoice((int? W, int? H) limit) => new(limit, limit is { W: { } w, H: { } h }
             ? string.Format(CultureInfo.CurrentCulture, Strings.OptimizeSizeLimitFormat, w, h)
