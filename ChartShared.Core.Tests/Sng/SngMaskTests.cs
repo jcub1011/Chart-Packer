@@ -69,4 +69,30 @@ public sealed class SngMaskTests
     {
         Assert.HasCount(SngMask.MaskSize, SngMask.Generate());
     }
+
+    [TestMethod]
+    public void EveryLengthAndStartMatchesTheSpecFormula()
+    {
+        // Lengths either side of a vector's width and of the key's 256 bytes, from starts all round the key.
+        byte[] mask = [0x5A, 0x01, 0xFF, 0x10, 0x80, 0x7E, 0x33, 0xC4, 0x09, 0xE2, 0x48, 0x91, 0x6D, 0xB7, 0x2C, 0xF0];
+        var random = new Random(7);
+        foreach (int length in (int[])[0, 1, 15, 16, 17, 31, 32, 33, 63, 64, 65, 255, 256, 257, 1000])
+        {
+            foreach (long start in (long[])[0, 1, 15, 16, 200, 255, 256, 300, 70_000_000_001])
+            {
+                byte[] data = new byte[length];
+                random.NextBytes(data);
+                byte[] expected = new byte[length];
+                for (int i = 0; i < length; i++)
+                {
+                    long at = start + i;
+                    expected[i] = (byte)(data[i] ^ mask[at % 16] ^ (byte)(at & 0xFF));
+                }
+
+                SngMask.Apply(data, mask, start);
+
+                CollectionAssert.AreEqual(expected, data, $"length {length} from {start}");
+            }
+        }
+    }
 }

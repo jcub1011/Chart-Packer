@@ -17,6 +17,7 @@
   <ItemGroup>
     <!-- The decoder tests simulate FFmpeg lacking a decoder, through an internal overload. -->
     <InternalsVisibleTo Include="ChartShared.Core.Tests" />
+    <InternalsVisibleTo Include="PlaybackBench" />
   </ItemGroup>
 
   <ItemGroup>

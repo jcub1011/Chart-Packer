@@ -322,4 +322,66 @@ public sealed class StemMixerTests
         Assert.AreEqual(frames, mixer.Mix(buffer));
         return buffer;
     }
+
+    [TestMethod]
+    public void AddingAStemAVectorAtATimeGivesWhatOneSampleAtATimeDoes()
+    {
+        var random = new Random(3);
+        foreach (int length in (int[])[0, 1, 3, 4, 7, 8, 9, 15, 16, 17, 31, 33, 1763])
+        {
+            float[] into = Samples(random, length);
+            float[] from = Samples(random, length);
+            float[] expected = [.. into];
+            for (int i = 0; i < length; i++)
+                expected[i] += from[i] * 0.37f;
+
+            StemMixer.AddScaled(into, from, 0.37f);
+
+            CollectionAssert.AreEqual(expected, into, $"length {length}");
+        }
+    }
+
+    [TestMethod]
+    public void ClippingAVectorAtATimeGivesWhatOneSampleAtATimeDoes()
+    {
+        var random = new Random(4);
+        foreach (int length in (int[])[0, 1, 7, 8, 9, 16, 17, 33, 1763])
+        {
+            float[] samples = Samples(random, length);
+            float[] expected = [.. samples.Select(s => Math.Clamp(s, -1f, 1f))];
+
+            StemMixer.Clip(samples);
+
+            CollectionAssert.AreEqual(expected, samples, $"length {length}");
+            Assert.IsTrue(samples.All(s => s is >= -1f and <= 1f));
+        }
+    }
+
+    [TestMethod]
+    public void MonoGoesToBothSidesAtEveryLength()
+    {
+        var random = new Random(5);
+        foreach (int length in (int[])[0, 1, 3, 4, 5, 8, 9, 1024])
+        {
+            float[] mono = Samples(random, length);
+            float[] stereo = new float[length * 2];
+
+            StemReader.MonoToStereo(mono, stereo);
+
+            for (int i = 0; i < length; i++)
+            {
+                Assert.AreEqual(mono[i], stereo[i * 2]);
+                Assert.AreEqual(mono[i], stereo[(i * 2) + 1]);
+            }
+        }
+    }
+
+    /// <summary>Samples from -3 to 3, so that some are past what clipping lets through.</summary>
+    private static float[] Samples(Random random, int length)
+    {
+        float[] samples = new float[length];
+        for (int i = 0; i < length; i++)
+            samples[i] = (random.NextSingle() * 6f) - 3f;
+        return samples;
+    }
 }

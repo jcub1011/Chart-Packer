@@ -1,3 +1,4 @@
+using System.Numerics;
 using ChartShared.Audio.Decoding;
 
 namespace ChartShared.Audio.Mixing;
@@ -215,14 +216,11 @@ public sealed class StemMixer
             allEnded &= stem.Reader.IsEnded;
             if (anySolo ? stem.IsSolo : !stem.IsMuted)
             {
-                float volume = stem.Volume;
-                for (int i = 0; i < output.Length; i++)
-                    output[i] += scratch[i] * volume;
+                AddScaled(output, scratch, stem.Volume);
             }
         }
 
-        foreach (ref float sample in output)
-            sample = Math.Clamp(sample, -1f, 1f);
+        Clip(output);
 
         PositionFrames += frames;
         if (LengthFrames < 0 && allEnded)
@@ -233,6 +231,50 @@ public sealed class StemMixer
         }
 
         return frames;
+    }
+
+    /// <summary>Adds <paramref name="from"/>, <paramref name="volume"/> times as loud, onto <paramref name="into"/>, which is as long.</summary>
+    /// <remarks>
+    /// A vector of samples at a time where the processor has them. Each sample is multiplied and then added, as one
+    /// at a time would be, rather than fused into one step, so the sum is the same to the bit either way.
+    /// </remarks>
+    internal static void AddScaled(Span<float> into, ReadOnlySpan<float> from, float volume)
+    {
+        from = from[..into.Length];
+        int i = 0;
+        if (Vector.IsHardwareAccelerated)
+        {
+            int width = Vector<float>.Count;
+            var scale = new Vector<float>(volume);
+            for (; i <= into.Length - width; i += width)
+            {
+                var slot = into.Slice(i, width);
+                (new Vector<float>(slot) + (new Vector<float>(from.Slice(i, width)) * scale)).CopyTo(slot);
+            }
+        }
+
+        for (; i < into.Length; i++)
+            into[i] += from[i] * volume;
+    }
+
+    /// <summary>Clips every sample of <paramref name="samples"/> to [-1, 1].</summary>
+    internal static void Clip(Span<float> samples)
+    {
+        int i = 0;
+        if (Vector.IsHardwareAccelerated)
+        {
+            int width = Vector<float>.Count;
+            var low = new Vector<float>(-1f);
+            var high = new Vector<float>(1f);
+            for (; i <= samples.Length - width; i += width)
+            {
+                var slot = samples.Slice(i, width);
+                Vector.Clamp(new Vector<float>(slot), low, high).CopyTo(slot);
+            }
+        }
+
+        for (; i < samples.Length; i++)
+            samples[i] = Math.Clamp(samples[i], -1f, 1f);
     }
 
     /// <summary>Moves every stem to <paramref name="frame"/>; past a stem's end, it plays silence from there.</summary>
