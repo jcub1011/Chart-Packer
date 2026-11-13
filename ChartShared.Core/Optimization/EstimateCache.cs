@@ -31,7 +31,7 @@ public sealed class EstimateCache
     // the old way aren't taken for the new: 2 is two windows of 512 frames, with keyframes counted apart.
     private const int VideoMethod = 3;
 
-    private readonly object _sync = new();
+    private readonly Lock _sync = new();
     private readonly Dictionary<string, Chart> _charts = new(OutputPaths.PathComparer);
     private readonly JsonSettingsFile<EstimateCacheData>? _file;
     private long _clock;

@@ -27,7 +27,7 @@ public sealed record ChartEstimate(ChartAssets Chart, ChartPlan? Plan, string? E
 /// </remarks>
 public sealed class LibraryEstimator
 {
-    private readonly object _sync = new();
+    private readonly Lock _sync = new();
     private readonly OptimizeOptions _options;
     private readonly OptimizerSet _optimizers;
     private readonly PlanServices _services;
