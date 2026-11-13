@@ -11,6 +11,8 @@
   <ItemGroup>
     <!-- The video decoder calls the bindings directly; audio uses FfmpegAudioDecoder. -->
     <InternalsVisibleTo Include="ChartShared.Video" />
+    <!-- The tests write synthetic videos with the encoder bindings. -->
+    <InternalsVisibleTo Include="ChartShared.Core.Tests" />
   </ItemGroup>
 
   <!-- FFmpeg's I/O callbacks can't let an exception escape, so what they catch unexpectedly is logged. -->
@@ -20,14 +22,17 @@
 
   <!-- FFmpeg's shared libraries, built by build/ffmpeg (see its README), ship beside the
        executable like SDL's. Without them the app still runs: videos just aren't previewed,
-       and audio is decoded by the managed decoders. -->
+       and audio is decoded by the managed decoders. libvpx.txt, which says the build has the VP8
+       encoder, is for build/publish.ps1 and isn't copied. -->
   <ItemGroup>
     <None Include="runtimes\$(NETCoreSdkPortableRuntimeIdentifier)\native\*"
+          Exclude="runtimes\$(NETCoreSdkPortableRuntimeIdentifier)\native\*.txt"
           Condition="'$(RuntimeIdentifier)' == ''"
           Link="%(Filename)%(Extension)"
           CopyToOutputDirectory="PreserveNewest"
           CopyToPublishDirectory="PreserveNewest" />
     <None Include="runtimes\$(RuntimeIdentifier)\native\*"
+          Exclude="runtimes\$(RuntimeIdentifier)\native\*.txt"
           Condition="'$(RuntimeIdentifier)' != ''"
           Link="%(Filename)%(Extension)"
           CopyToOutputDirectory="PreserveNewest"

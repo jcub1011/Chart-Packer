@@ -108,10 +108,12 @@ namespace ChartPacker
                     () => window, drafts, job, settings, audio.Open, detail, videoProbe, notice, songFiles, locks, latency, generated);
                 var lowerDifficultiesWindow = new AvaloniaLowerDifficultiesWindowService(
                     () => window, drafts, settings, audio.Open, detail, songFiles, generated, reductionRules, locks, latency);
+                var optimizeWindow = new AvaloniaOptimizeWindowService(
+                    () => window, drafts, detail, songFiles, new OptimizeSettingsFile(UserConfigPaths.OptimizerSettingsFile), UserConfigPaths.OptimizerEstimatesFile, locks);
                 var chartBuilder = new ChartBuilderLauncher();
                 var library = new LibraryViewModel(
                     folderPicker, settings, drafts, job, player, mergeWindowFor(() => window), dedupWindow, validatorWindow, reveal, downloads, chartBuilder, notice,
-                    lowerDifficultiesWindow);
+                    lowerDifficultiesWindow, optimizeWindow);
 
                 // Settings' Calibrate… opens the calibration tool (charter-spec C11) over the window in front, pausing the
                 // song; the latency it saves is read again once it closes. The tool starts on the device the song plays on,

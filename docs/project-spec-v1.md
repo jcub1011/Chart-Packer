@@ -135,7 +135,13 @@ through `IProgress<T>`.
   (MIT) for warm-up, iterations and statistics, on the JIT and on Native AOT as the app ships.
   It's a developer tool that's never shipped or referenced by the app, so the trim and AOT rule
   below doesn't apply to it.
-- Image preview uses Avalonia's built-in Skia `Bitmap`.
+- Image preview uses Avalonia's built-in Skia `Bitmap`. So does the Library Optimization Tool's
+  image optimizer (`AvaloniaImageOptimizer` in `ChartShared.UI`): a scaled decode
+  (`Bitmap.DecodeToWidth`/`DecodeToHeight`), `CopyPixels` to a known pixel format to find
+  transparency, and `Save` with `JpegBitmapEncoderOptions` or `PngBitmapEncoderOptions`. No image
+  package is added. Skia must be initialised, which it is in the apps and isn't in the test
+  projects, so tests use a fake `IImageOptimizer` and the decisions (fit, format, rename) live in
+  `ChartShared.Core` as pure code (`ImageOptimization`, `ImageHeader`).
 - The one exception to Core's budget: it uses `z440.atl.core` (ATL.NET, MIT) to read audio
   durations from file headers, for the library list's length when a song has no `song_length`.
 - `ChartShared.Audio` plays audio (F7). It keeps codecs and native code out of Core, and uses:
@@ -160,12 +166,23 @@ through `IProgress<T>`.
 - `ChartShared.Ffmpeg` binds, by hand with `[LibraryImport]`, the few functions Video and Audio
   need from FFmpeg 9.0's shared libraries (`avformat`, `avcodec`, `avutil`, `swscale` and
   `swresample`, LGPL 2.1+), and has no packages. Audio uses it through a safe wrapper,
-  `FfmpegAudioDecoder`; Video calls the bindings directly.
+  `FfmpegAudioDecoder`; Video calls the bindings directly. Video also encodes: the Library
+  Optimization Tool's `VideoReencoder` writes VP8 in WebM, with no audio track, through libvpx (the
+  `libvpx` encoder; its codec context stays opaque and is set up with codec parameters and the
+  option API). Every scale or colour conversion is `sws_scale_frame` into a frame FFmpeg allocated,
+  never into a managed array.
   - The libraries are built by `build/ffmpeg/build.sh` with only the registered video formats'
     demuxers and decoders, the registered audio formats' decoders, AAC (which a background video's
-    audio track can carry, read through `avformat`), and swresample (which the Opus decoder needs),
-    nothing GPL or non-free. They ship beside the executable like SDL's. Without them the app still
-    runs: videos aren't previewed, and audio is decoded by the managed decoders.
+    audio track can carry, read through `avformat`), swresample (which the Opus decoder needs), and
+    the encoders, libvpx's VP8 (BSD-3, linked in statically; libx264 is GPL, so there is no
+    H.264 output) and libopus (BSD-3, linked in statically), nothing GPL or non-free. They ship
+    beside the executable like SDL's. Without them the app still runs: videos aren't previewed or
+    optimized, audio is decoded by the managed decoders, and Opus is encoded by the managed
+    Concentus encoder (`OpusPacketEncoders` picks libopus through `FfmpegOpusEncoder` when it's
+    there, and the rest of the transcode, including the Ogg Opus framing, is the same on both). A
+    build without libvpx still plays video; `VideoReencoder.IsAvailable` says whether this one can
+    encode, and `build/publish.ps1` refuses libraries without the `libvpx.txt` and `libopus.txt`
+    markers that `build.sh` writes.
   - The bindings are written for one major version of each library, which is checked at load.
 - Any new dependency must be trim- and AOT-compatible, and the reason for it must be added to
   this section.
@@ -598,6 +615,85 @@ Acceptance criteria:
 
 ---
 
+### F9. Library optimization
+
+**Input:** the songs selected in the library, or the whole library, and the strategies the user turns on. **Tools → Optimize
+Library…** and the library's right-click menu open the window. With no songs selected it works on the whole library as it
+was last scanned; with songs selected it offers the choice. The window reads each chart's files itself, so the main
+window's list and selection stay as they are. The main window's inspector lets go of the songs' files while the window is
+open.
+
+Behaviour:
+
+1. **Strategies.** Each is off until switched on, and each has its own settings:
+   - *Metadata cleanup*: drops `song.ini` keys of parts with no notes, tempo anchors only Chart Builder reads, keys with
+     an empty value, and legacy keys' old names (each step optional). It is done whatever it saves.
+   - *Audio to Opus*: each stem at a bitrate per stereo stem, 128 kbps by default, with an 80 kbps "smaller" preset.
+   - *Stem mixdown*: a chart's stems become one `song` stem, at its own bitrate.
+   - *Background video*: re-encoded as VP8 in WebM with no audio track, fitted inside 480p, 720p, Full HD (the default),
+     1440p or Ultra HD, at a CQ (4 to 63, 32 by default). **Convert unsupported codecs for compatibility** (off by default) also converts VP9, AV1 and HEVC videos,
+     whatever it saves; the result may be larger.
+   - *Album art* and *background image*: recompressed as JPEG at a quality (1 to 100, 80 by default) and fitted inside a size
+     limit, never scaled up. Art with transparency stays PNG.
+2. **Savings margin** (10% by default): a file that would shrink by less is left alone. Metadata cleanup and compatibility
+   conversions are exempt.
+3. **Estimate.** Nothing is changed, and nothing has to be asked for: the window lists every chart with its size and what
+   optimizing it saves, and the total.
+   - A chart's estimate is the plan a run would carry out, so every rule of the run is in it: a file under the margin, one
+     that would grow, one already optimal, and one whose output name is taken save nothing, and stems a mixdown takes
+     aren't counted again as audio.
+   - *Media types.* Files are grouped by strategy and source codec (Vorbis, MP3, each video codec, PNG, JPEG). An `.ogg`
+     is told apart by its header, so Opus in Ogg is left alone as `.opus` is.
+   - *The sample.* A few files of each media type (8) are measured first, or all of a type that has fewer. The charts are
+     chosen by a hash of their relative paths, so the sample is the same every time. A chart is measured whole, and counts
+     towards every type it holds.
+   - *Predictions.* Once a type has measured files, every chart not yet measured is predicted from them: its size in that
+     type times the share the measured files are planned to save. A predicted figure is marked as one. A type with nothing
+     measured yet is unknown, never nought.
+   - *The rest.* Every other chart is then measured in the background, largest first, and its own figure replaces the
+     prediction. A selected chart is measured next. Measuring can be paused.
+   - What's measured is kept in `optimizer-estimates.json` (§8), by chart, file and the settings that shape the output, so
+     a chart is measured once: a changed setting measures only its own strategy again, and a changed margin measures nothing.
+   - A chart's files are listed under it when it's selected, each with what happens to it and its size before and after.
+     Images and the video that would be recompressed are also shown as they are beside as they would be, made with the
+     run's own encoders and settings: an image whole, the video through five frames the user steps between.
+   - A video's size is estimated from two windows of 512 frames, a quarter and three quarters of the way through it,
+     with the windows' keyframes counted at the rate a whole encode has them. Long windows, as the encoder spends
+     differently once it has been running a while; a video the windows would cover is encoded whole.
+4. **Run.** Charts already measured are optimized as their plans say, without being measured again; the rest are planned a
+   batch at a time as the run reaches them. Each chart shows its own progress, and the window the run's, a few charts at a
+   time. **Stop** cancels: charts finished keep their changes, and nothing is left half written. Afterwards each chart
+   shows what it saved beside what was estimated, or why it was left alone or failed, and the summary counts them.
+5. **In place or to a folder.** An output folder, the shipped choice, leaves the library alone and receives only the charts
+   that changed, in the same layout. In place rewrites the charts where they are and can't be undone, so the window warns
+   and asks to confirm; the help page recommends a backup.
+6. **Skips.** A chart with unsaved changes, one another app holds, one that changed since it was read, and one already in
+   the output folder are skipped, and say so.
+7. **Unavailable backends.** A strategy whose backend is missing (video without the libvpx encoder, say) is shown disabled
+   with the reason, and is never run.
+8. **Settings.** The window starts from `optimizer-settings.json` (§8), and keeps there what it was last set to, the
+   output folder included. **Reset** puts every setting but where the charts are written back to the shipped one.
+
+Acceptance criteria:
+
+- **AC9.1** With three songs selected, Tools → Optimize Library… and the right-click menu both open the window on those three.
+  With none selected the window works on the whole library, and the main window's list is not scanned again.
+- **AC9.2** Switching on Audio to Opus changes no file and gives every chart a saving; the charts measured first are the
+  same on every run, and every media type the library has is among them.
+- **AC9.3** A chart's measured saving is what a run then plans for it: the run measures no file the estimate already measured.
+- **AC9.4** With VP9 videos in the library and the compatibility option off, they are shown as kept and save nothing, and a
+  run leaves them alone; with it on, they are measured, and a conversion that grows shows as a cost.
+- **AC9.5** Optimizing a song folder and a `.sng` in place makes both smaller, and they still open and play; with an output
+  folder, the library is unchanged and only the changed charts appear there.
+- **AC9.6** Stopping a run midway leaves every chart either fully optimized or exactly as it was, and no `*.chartpacker-tmp`
+  files.
+- **AC9.7** Without the libvpx encoder the video strategy is disabled and says why.
+- **AC9.8** The settings and the output folder are as they were left the next time the window opens, including after a
+  restart; Reset restores the shipped settings.
+- **AC9.9** A song with unsaved metadata changes is skipped, and the results say so.
+
+---
+
 `<a id="validation-rules"></a>`
 
 ## 6. Validation rule catalogue
@@ -754,6 +850,7 @@ Settings are stored as JSON (source-generated serialization) in the per-user con
 | Library sort ([F8](#f8-library-search-sort-and-filter)) | Scan order, first to last |
 | Scan on launch | On. The songs folder from last time is scanned as the app starts. When off, the empty list shows a Scan button instead. |
 | Scan on folder change | On. Choosing a songs folder, with Browse or by dropping it on the window, scans it straight away. When off, the folder is set but not scanned until you use Scan. |
+| Library optimization ([F9](#f9-library-optimization)) | Every strategy off. Opus 128 kbps, video Full HD at CQ 32 with compatibility conversion off, JPEG quality 80 with album art fitted inside 512×512 and background images 1920×1080, savings margin 10%, writing to a separate folder. Kept in its own file, `optimizer-settings.json`, as the window was last set; what it has measured is in `optimizer-estimates.json`, which is safe to delete. |
 
 ## 9. Non-functional requirements
 
@@ -778,6 +875,7 @@ Settings are stored as JSON (source-generated serialization) in the per-user con
 | Validation | At least one fixture per rule ID that triggers it, and a clean fixture that triggers nothing |
 | Fuzzing | Randomly mutated and truncated `.sng` inputs never throw an unhandled exception and never allocate more than the real file size |
 | Path safety | Traversal, absolute paths, reserved names and mixed-case collisions on each OS |
+| Optimization | The planner, estimator, job and each strategy against fake optimizers (savings margin, skips, grouping by codec, cancellation, no leftover temp files); the settings file (defaults, round trip, clamping, mapping to options); the savings table (rows by codec, per-chart saving, compatibility cost). The real encoders are checked by hand: `optimizer-image-manual-checks.md`, `optimizer-video-manual-checks.md` and `optimizer-ui-manual-checks.md`. |
 | AOT smoke | CI runs `dotnet publish -c Release -r <rid>` on each OS. The build must produce **zero** trim or AOT warnings, then CI launches the published binary with `--self-test` (a headless mode that packs, validates and unpacks the §11 example and exits 0). |
 
 UI view models are unit-tested against Core using fake services. v1 has no automated UI tests.
@@ -807,9 +905,6 @@ temp files and folders only. Two things enforce this:
 
 ## 12. Future (after v1)
 
-- Opus audio transcoding and JPEG image re-encoding, plus album-art resizing, like
-  SngCli's `--opusEncode`, `--jpegEncode` and `--albumResize`. This needs AOT-compatible
-  codecs or a bundled native encoder.
 - A `ChartPacker.Cli` front end built on Core.
 - Sniffing audio and image content to catch extensions that don't match
   ([sng-spec §9.4](sng-spec.md#reference-behaviour)).

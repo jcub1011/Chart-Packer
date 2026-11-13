@@ -14,13 +14,16 @@ public sealed class SongFileGate
     private readonly List<Holder> _holders = [];
 
     /// <summary>Waits until <paramref name="songPaths"/> aren't being written, then holds them for reading until the result is disposed.</summary>
-    public Task<IDisposable> ReadAsync(IEnumerable<string> songPaths) => EnterAsync(songPaths, write: false);
+    /// <exception cref="OperationCanceledException">Cancelled while waiting; nothing is held.</exception>
+    public Task<IDisposable> ReadAsync(IEnumerable<string> songPaths, CancellationToken cancellationToken = default) => EnterAsync(songPaths, write: false, cancellationToken);
 
     /// <summary>Waits until <paramref name="songPaths"/> aren't being read or written, then holds them for writing until the result is disposed.</summary>
-    public Task<IDisposable> WriteAsync(IEnumerable<string> songPaths) => EnterAsync(songPaths, write: true);
+    /// <exception cref="OperationCanceledException">Cancelled while waiting; nothing is held.</exception>
+    public Task<IDisposable> WriteAsync(IEnumerable<string> songPaths, CancellationToken cancellationToken = default) => EnterAsync(songPaths, write: true, cancellationToken);
 
-    private async Task<IDisposable> EnterAsync(IEnumerable<string> songPaths, bool write)
+    private async Task<IDisposable> EnterAsync(IEnumerable<string> songPaths, bool write, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullException.ThrowIfNull(songPaths);
 
         var holder = new Holder(this, songPaths, write);
@@ -34,7 +37,17 @@ public sealed class SongFileGate
             _holders.Add(holder);
         }
 
-        await Task.WhenAll(earlier).ConfigureAwait(false);
+        try
+        {
+            await Task.WhenAll(earlier).WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // Leaves the queue, so whoever asked after this isn't kept waiting on a turn that won't be taken.
+            holder.Dispose();
+            throw;
+        }
+
         return holder;
     }
 

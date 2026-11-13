@@ -393,6 +393,10 @@
                                   Command="{Binding GenerateLowerDifficultiesCommand}">
                             <MenuItem.Icon><ui:LineIcon Data="{StaticResource SortDescendingStroke}" /></MenuItem.Icon>
                         </MenuItem>
+                        <MenuItem Header="{x:Static res:Strings.MenuOptimizeContext}"
+                                  Command="{Binding OptimizeCommand}">
+                            <MenuItem.Icon><ui:LineIcon Data="{StaticResource SqueezeStroke}" /></MenuItem.Icon>
+                        </MenuItem>
                         <Separator />
                         <MenuItem Header="{x:Static vm:LibraryViewModel.RevealLabel}" Command="{Binding RevealCommand}">
                             <MenuItem.Icon><ui:LineIcon Data="{StaticResource InputFolderStroke}" /></MenuItem.Icon>

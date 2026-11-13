@@ -3,6 +3,8 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Synthetic test videos are made through the FFmpeg bindings. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <!-- MSTest.Sdk picks its packages' versions; this raises code coverage's. -->
     <MicrosoftTestingExtensionsCodeCoverageVersion>18.11.2</MicrosoftTestingExtensionsCodeCoverageVersion>
   </PropertyGroup>

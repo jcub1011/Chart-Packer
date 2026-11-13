@@ -59,7 +59,7 @@ public sealed unsafe class VideoDecoder : IDisposable
     private bool _hasNext;
     private TimeSpan _lastTime;
 
-    private VideoDecoder(Stream stream, int maxWidth)
+    private VideoDecoder(Stream stream, int maxWidth, int threads)
     {
         _input = FfmpegStreamInput.Open(stream);
         _format = _input.Format;
@@ -80,7 +80,7 @@ public sealed unsafe class VideoDecoder : IDisposable
             Check(Native.avcodec_parameters_to_context(_codec, videoStream->codecpar), "The video's codec can't be set up");
 
             void* options = null;
-            Native.av_dict_set(&options, "threads", "auto", 0);
+            Native.av_dict_set(&options, "threads", threads > 0 ? threads.ToString(System.Globalization.CultureInfo.InvariantCulture) : "auto", 0);
             result = Native.avcodec_open2(_codec, decoder, &options);
             Native.av_dict_free(&options);
             Check(result, "The video's codec can't be opened");
@@ -92,6 +92,9 @@ public sealed unsafe class VideoDecoder : IDisposable
                 throw new OutOfMemoryException();
 
             var parameters = videoStream->codecpar;
+            SourceWidth = parameters->width;
+            SourceHeight = parameters->height;
+            FrameRate = Native.av_guess_frame_rate(_format, videoStream, null);
             (Width, Height) = FitWidth(parameters->width, parameters->height, maxWidth);
             if (Width <= 0 || Height <= 0)
                 throw new InvalidDataException("The video has no picture size.");
@@ -114,6 +117,22 @@ public sealed unsafe class VideoDecoder : IDisposable
     /// <summary>The video's length, or zero when the file doesn't say.</summary>
     public TimeSpan Duration { get; }
 
+    /// <summary>The coded width of the video's frames, before <see cref="Width"/> fits it.</summary>
+    internal int SourceWidth { get; }
+
+    /// <summary>The coded height of the video's frames, before <see cref="Height"/> fits it.</summary>
+    internal int SourceHeight { get; }
+
+    /// <summary>The video's frame rate as FFmpeg guesses it; 0/1 when it can't.</summary>
+    internal AVRational FrameRate { get; }
+
+    /// <summary>
+    /// The frame <see cref="Next"/> just decoded, as the decoder produced it, or <see langword="null"/> when there is none.
+    /// It's the decoder's own, valid until the next call to <see cref="Next"/> or <see cref="Seek"/>; the re-encoder reads
+    /// whole frames rather than the BGRA copies <see cref="CopyKept"/> makes.
+    /// </summary>
+    internal AVFrame* CurrentFrame => _hasNext ? _next : null;
+
     /// <summary>Whether a frame has been kept with <see cref="Keep"/> since opening or the last <see cref="Seek"/>.</summary>
     public bool HasKept { get; private set; }
 
@@ -122,16 +141,20 @@ public sealed unsafe class VideoDecoder : IDisposable
     /// owns it from here on: disposing the decoder disposes it, and so does a failed open.
     /// </summary>
     /// <param name="maxWidth">Frames wider than this are scaled down to it, keeping their shape.</param>
+    /// <param name="threads">
+    /// How many threads it decodes with; 0 or less leaves it to FFmpeg, which takes one per core. A caller that runs several
+    /// decoders at once, as the optimizer does, gives each its share.
+    /// </param>
     /// <exception cref="InvalidOperationException">FFmpeg isn't available; see <see cref="FfmpegLibrary"/>.</exception>
     /// <exception cref="InvalidDataException">The stream isn't a video that can be decoded.</exception>
-    public static VideoDecoder Open(Stream stream, int maxWidth)
+    public static VideoDecoder Open(Stream stream, int maxWidth, int threads = 0)
     {
         ArgumentNullException.ThrowIfNull(stream);
         ArgumentOutOfRangeException.ThrowIfLessThan(maxWidth, 1);
         try
         {
             FfmpegLibrary.EnsureAvailable();
-            return new VideoDecoder(stream, maxWidth);
+            return new VideoDecoder(stream, maxWidth, threads);
         }
         catch
         {

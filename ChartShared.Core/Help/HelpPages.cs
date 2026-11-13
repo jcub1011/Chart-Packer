@@ -25,6 +25,7 @@ public static class HelpPages
     public const string Merge = "Merge";
     public const string MergeCompare = "Merge-Compare";
     public const string MessageDialog = "Message-Dialog";
+    public const string Optimize = "Optimize";
     public const string Validator = "Validator";
     public const string ValidatorProgress = "Validator-Progress";
 

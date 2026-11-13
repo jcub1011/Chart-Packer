@@ -11,7 +11,11 @@ namespace ChartShared.Audio.Encoding;
 /// <remarks>
 /// Each packet fits one page (Opus packets are at most a few KB). The last audio page is
 /// marked end-of-stream when <see cref="Finish"/> patches it, since only then is it known
-/// to be last. output must be readable, writable and seekable.
+/// to be last: each audio page is held back until the next one (or <see cref="Finish"/>)
+/// so the patch is made in memory, and output only has to be writable, not seekable.
+/// <see cref="Finish"/> is therefore part of the contract: a writer disposed without it
+/// discards the held-back page, and what it has written is a truncated stream. A caller that
+/// fails part-way is expected to discard the output, as <see cref="OpusTranscoder"/> does.
 /// </remarks>
 internal sealed class OggOpusWriter : IDisposable
 {
@@ -24,11 +28,10 @@ internal sealed class OggOpusWriter : IDisposable
     private readonly int _channels;
     private readonly int _preSkip;
     private uint _sequence;
-    private long _lastPageStart = -1;
+    private byte[]? _pending;
     private bool _finished;
-    private bool _hasAudio;
 
-    /// <param name="output">Where the stream is written. Owned by the caller.</param>
+    /// <param name="output">Where the stream is written. Owned by the caller; it only has to be writable.</param>
     /// <param name="channels">1 for mono, 2 for stereo.</param>
     /// <param name="preSkip">Encoder lookahead in 48 kHz samples, stored in <c>OpusHead</c>.</param>
     /// <param name="inputSampleRate">The original sample rate, stored in <c>OpusHead</c>.</param>
@@ -57,9 +60,8 @@ internal sealed class OggOpusWriter : IDisposable
         ObjectDisposedException.ThrowIf(_finished, this);
         ArgumentOutOfRangeException.ThrowIfNegative(decodedFrames);
 
-        _lastPageStart = _output.Position;
-        WritePage(headerType: 0x00, granule: decodedFrames, packet);
-        _hasAudio = true;
+        FlushPending();
+        _pending = BuildPage(headerType: 0x00, granule: decodedFrames, packet);
     }
 
     /// <summary>
@@ -72,44 +74,37 @@ internal sealed class OggOpusWriter : IDisposable
     {
         if (_finished)
             return;
-        if (!_hasAudio)
+        if (_pending is not { } page)
             throw new InvalidOperationException("An Ogg Opus stream needs at least one audio packet.");
 
         // Patch the last page: its final granule position, the end-of-stream flag, and a fresh checksum.
-        _output.Position = _lastPageStart;
-        byte[] header = new byte[HeaderLength];
-        _output.ReadExactly(header);
-        int segments = header[26];
-        byte[] lacing = new byte[segments];
-        _output.ReadExactly(lacing);
-        int bodyLength = 0;
-        foreach (byte segment in lacing)
-            bodyLength += segment;
-        byte[] body = new byte[bodyLength];
-        _output.ReadExactly(body);
-
-        byte[] page = new byte[HeaderLength + segments + bodyLength];
-        header.CopyTo(page, 0);
-        lacing.CopyTo(page, HeaderLength);
-        body.CopyTo(page, HeaderLength + segments);
         BinaryPrimitives.WriteInt64LittleEndian(page.AsSpan(6), finalGranule);
         page[5] |= 0x04;
         BinaryPrimitives.WriteUInt32LittleEndian(page.AsSpan(22), 0);
         BinaryPrimitives.WriteUInt32LittleEndian(page.AsSpan(22), Checksum(page));
 
-        _output.Position = _lastPageStart;
-        _output.Write(page, 0, page.Length);
+        FlushPending();
         _finished = true;
     }
 
-    public void Dispose()
-    {
-    }
+    /// <summary>Discards the audio page still held back if <see cref="Finish"/> wasn't called; the output is the caller's and stays open.</summary>
+    public void Dispose() => _pending = null;
+
+    private const int OpusHeadLength = 19;
+
+    private const string Vendor = "ChartPacker";
+
+    /// <summary>
+    /// How many bytes the two header pages take, the same for every stream: what a stream costs before its first audio
+    /// packet, for sizing a whole stream from samples of it.
+    /// </summary>
+    public static int StreamHeaderBytes { get; } =
+        (HeaderLength + 1 + OpusHeadLength) + (HeaderLength + 1 + 8 + 4 + System.Text.Encoding.UTF8.GetByteCount(Vendor) + 4);
 
     private void WriteHeaders(int inputSampleRate)
     {
         // RFC 7845 §5.1: the identification header.
-        byte[] head = new byte[19];
+        byte[] head = new byte[OpusHeadLength];
         System.Text.Encoding.ASCII.GetBytes("OpusHead").CopyTo(head, 0);
         head[8] = 1; // Version.
         head[9] = (byte)_channels;
@@ -120,7 +115,7 @@ internal sealed class OggOpusWriter : IDisposable
         WritePage(headerType: 0x02, granule: 0, head);
 
         // RFC 7845 §5.2: the comment header, with no user comments.
-        byte[] vendor = System.Text.Encoding.UTF8.GetBytes("ChartPacker");
+        byte[] vendor = System.Text.Encoding.UTF8.GetBytes(Vendor);
         byte[] tags = new byte[8 + 4 + vendor.Length + 4];
         System.Text.Encoding.ASCII.GetBytes("OpusTags").CopyTo(tags, 0);
         BinaryPrimitives.WriteInt32LittleEndian(tags.AsSpan(8), vendor.Length);
@@ -129,8 +124,23 @@ internal sealed class OggOpusWriter : IDisposable
         WritePage(headerType: 0x00, granule: 0, tags);
     }
 
-    /// <summary>Writes one packet as one page, with <paramref name="headerType"/> flags and <paramref name="granule"/>.</summary>
+    private void FlushPending()
+    {
+        if (_pending is null)
+            return;
+
+        _output.Write(_pending, 0, _pending.Length);
+        _pending = null;
+    }
+
     private void WritePage(byte headerType, long granule, ReadOnlySpan<byte> packet)
+    {
+        byte[] page = BuildPage(headerType, granule, packet);
+        _output.Write(page, 0, page.Length);
+    }
+
+    /// <summary>Builds one packet as one page, with <paramref name="headerType"/> flags and <paramref name="granule"/>.</summary>
+    private byte[] BuildPage(byte headerType, long granule, ReadOnlySpan<byte> packet)
     {
         // A packet is runs of 255-byte segments ended by a smaller one; a multiple of 255
         // needs a zero-length segment to say where it ends (RFC 3533 §6).
@@ -153,8 +163,7 @@ internal sealed class OggOpusWriter : IDisposable
         page[HeaderLength + full] = (byte)(packet.Length % 255);
         packet.CopyTo(page.AsSpan(HeaderLength + segments));
         BinaryPrimitives.WriteUInt32LittleEndian(page.AsSpan(22), Checksum(page));
-
-        _output.Write(page, 0, page.Length);
+        return page;
     }
 
     private static uint Checksum(byte[] page)
