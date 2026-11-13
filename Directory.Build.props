@@ -1,6 +1,23 @@
 <Project>
   <!-- Shared by every project. Chart Packer and Chart Builder ship together, so they carry one version. -->
   <PropertyGroup>
+    <!-- The .NET version every project targets. This is the only place it is defined. -->
+    <TargetFramework>net11.0</TargetFramework>
+    <!--
+      Runtime Async: the runtime suspends and resumes async methods itself, instead of the compiler writing a state
+      machine class for each one. The .NET libraries are built this way already; this builds ours the same.
+    -->
+    <Features>$(Features);runtime-async=on</Features>
+  </PropertyGroup>
+  <!--
+    Native AOT builds for x64 may use AVX2, FMA and BMI (x86-64-v3) wherever the compiler finds a use for them, rather
+    than only the SSE4.2 every .NET 11 machine has. A build made this way doesn't start on a processor without them:
+    Intel before Haswell (2013), AMD before Excavator (2015).
+  -->
+  <PropertyGroup Condition="$(RuntimeIdentifier.EndsWith('-x64'))">
+    <IlcInstructionSet>x86-64-v3</IlcInstructionSet>
+  </PropertyGroup>
+  <PropertyGroup>
     <!-- The program version. This is the only place it is defined; everything else reads it from the build. -->
     <Version>1.3.0</Version>
     <!-- Keep the informational version a plain semver, without the SDK's "+<commit sha>" suffix. -->

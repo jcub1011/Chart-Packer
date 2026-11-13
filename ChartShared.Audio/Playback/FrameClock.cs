@@ -14,7 +14,7 @@ namespace ChartShared.Audio.Playback;
 public static class FrameClock
 {
     private static readonly ConditionalWeakTable<TimeProvider, FramePacer> Pacers = [];
-    private static readonly object Gate = new();
+    private static readonly Lock Gate = new();
 
     /// <summary>The moment the frame being drawn is for, as a timestamp of <paramref name="clock"/>.</summary>
     public static long Timestamp(TimeProvider clock)

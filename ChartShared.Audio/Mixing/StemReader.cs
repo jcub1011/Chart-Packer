@@ -1,3 +1,4 @@
+using System.Runtime.Intrinsics;
 using ChartShared.Audio.Decoding;
 
 namespace ChartShared.Audio.Mixing;
@@ -117,8 +118,7 @@ internal sealed class StemReader(IPcmSource source, int outputRate)
         switch (channels)
         {
             case 1:
-                for (int i = 0; i < frames; i++)
-                    dest[i * 2] = dest[(i * 2) + 1] = raw[i];
+                MonoToStereo(raw, dest);
                 break;
             case 2:
                 raw.CopyTo(dest);
@@ -146,6 +146,27 @@ internal sealed class StemReader(IPcmSource source, int outputRate)
 
         _stereoFrames += frames;
         return true;
+    }
+
+    /// <summary>Writes each sample of <paramref name="mono"/> to both sides of <paramref name="stereo"/>, which is twice as long.</summary>
+    internal static void MonoToStereo(ReadOnlySpan<float> mono, Span<float> stereo)
+    {
+        stereo = stereo[..(mono.Length * 2)];
+        int i = 0;
+        if (Vector128.IsHardwareAccelerated)
+        {
+            var firstPair = Vector128.Create(0, 0, 1, 1);
+            var secondPair = Vector128.Create(2, 2, 3, 3);
+            for (; i <= mono.Length - Vector128<float>.Count; i += Vector128<float>.Count)
+            {
+                var four = Vector128.Create(mono.Slice(i, Vector128<float>.Count));
+                Vector128.Shuffle(four, firstPair).CopyTo(stereo.Slice(i * 2, Vector128<float>.Count));
+                Vector128.Shuffle(four, secondPair).CopyTo(stereo.Slice((i * 2) + Vector128<float>.Count, Vector128<float>.Count));
+            }
+        }
+
+        for (; i < mono.Length; i++)
+            stereo[i * 2] = stereo[(i * 2) + 1] = mono[i];
     }
 
     private void Consume(int frames)

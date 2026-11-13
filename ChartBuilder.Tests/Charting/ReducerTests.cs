@@ -1189,4 +1189,34 @@ public sealed class ReducerTests
         EditableChart.CreateNew(new NewChartSettings("Song", 480, 120, 4, 4, new HashSet<ChartInstrument> { Drums }, variant));
 
     private static List<int> LanesAt(IReadOnlyList<EditableNote> notes, long tick) => [.. notes.Where(n => n.Tick == tick).Select(n => n.Lane).Order()];
+
+    [TestMethod]
+    public void TheNextStrongerPositionIsTheFirstTickAfterThatIsStronger()
+    {
+        // Every tick, in fours, in sixes over eight and in sevens, at resolutions that halve and third differently:
+        // the first tick after it that's stronger, found one tick at a time, or the next time signature if that's sooner.
+        foreach (int resolution in (int[])[192, 480, 100])
+        {
+            TimeSignature[] signatures = [new(0, 4, 4), new(resolution * 8L, 6, 8), new(resolution * 14L, 7, 4), new((resolution * 21L) + 7, 3, 4)];
+            var map = new TempoMap(resolution, [new TempoChange(0, 500_000)], signatures);
+            long end = resolution * 30L;
+            for (long tick = 0; tick < end; tick++)
+            {
+                int own = Reducer.BeatStrength(tick, map);
+                (long Tick, int Strength)? expected = null;
+                if (own is > 0 and not Reducer.OffGrid)
+                {
+                    for (long at = tick + 1; expected is null; at++)
+                    {
+                        if (signatures.Any(s => s.Tick == at))
+                            expected = (at, 0);
+                        else if (Reducer.BeatStrength(at, map) < own)
+                            expected = (at, Reducer.BeatStrength(at, map));
+                    }
+                }
+
+                Assert.AreEqual(expected, Reducer.NextStronger(tick, map), $"tick {tick} at resolution {resolution}");
+            }
+        }
+    }
 }

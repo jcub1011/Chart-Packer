@@ -54,17 +54,48 @@ public static class SongFile
             return path is null ? null : await ReadFileAsync(path, maxBytes, cancellationToken).ConfigureAwait(false);
         }
 
-        return await Task.Run(() =>
-        {
-            // The delete is shared, so reading the art doesn't hold up a save that replaces the .sng.
-            using SafeFileHandle handle = File.OpenHandle(entry.FullPath, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
-            var read = SngReader.Read(handle, cancellationToken);
-            if (read.Header is not { } header)
-                return null;
+        return await Task.Run(() => ReadSng(entry.FullPath, storedName, maxBytes, cancellationToken), cancellationToken).ConfigureAwait(false);
+    }
 
-            var file = read.Files.FirstOrDefault(f => f.Name.Equals(storedName, StringComparison.OrdinalIgnoreCase));
-            return file is null ? null : ReadFromSng(handle, header, file, maxBytes, cancellationToken);
-        }, cancellationToken).ConfigureAwait(false);
+    /// <summary>
+    /// As <see cref="ReadAsync"/>, on the calling thread: for work already off the UI thread, which would otherwise wait
+    /// on another thread for the read.
+    /// </summary>
+    /// <returns>Its bytes, or <see langword="null"/> when there's no such file or it's larger than <paramref name="maxBytes"/>.</returns>
+    /// <exception cref="IOException">The file can't be read, or a stored file runs past the end of the <c>.sng</c>.</exception>
+    /// <exception cref="UnauthorizedAccessException">Access is denied.</exception>
+    /// <exception cref="OperationCanceledException">The read was cancelled.</exception>
+    public static byte[]? Read(SongEntry entry, string storedName, long maxBytes, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        ArgumentException.ThrowIfNullOrEmpty(storedName);
+        ArgumentOutOfRangeException.ThrowIfNegative(maxBytes);
+
+        cancellationToken.ThrowIfCancellationRequested();
+        if (entry.Kind == SongEntryKind.SngFile)
+            return ReadSng(entry.FullPath, storedName, maxBytes, cancellationToken);
+        return FindInFolder(entry.FullPath, storedName) is { } path ? ReadFile(path, maxBytes, cancellationToken) : null;
+    }
+
+    /// <summary>The file at <paramref name="path"/>, read on the calling thread; <see langword="null"/> when it's larger than <paramref name="maxBytes"/>.</summary>
+    internal static byte[]? ReadFile(string path, long maxBytes, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return new FileInfo(path).Length > maxBytes ? null : File.ReadAllBytes(path);
+    }
+
+    // The stored file of the .sng at path, matched ignoring case; null when there's none, or it's too large, or the .sng
+    // can't be parsed.
+    private static byte[]? ReadSng(string path, string storedName, long maxBytes, CancellationToken cancellationToken)
+    {
+        // The delete is shared, so reading the art doesn't hold up a save that replaces the .sng.
+        using SafeFileHandle handle = File.OpenHandle(path, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
+        var read = SngReader.Read(handle, cancellationToken);
+        if (read.Header is not { } header)
+            return null;
+
+        var file = read.Files.FirstOrDefault(f => f.Name.Equals(storedName, StringComparison.OrdinalIgnoreCase));
+        return file is null ? null : ReadFromSng(handle, header, file, maxBytes, cancellationToken);
     }
 
     /// <summary>

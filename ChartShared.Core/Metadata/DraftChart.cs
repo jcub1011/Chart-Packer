@@ -38,4 +38,17 @@ public readonly record struct DraftChart(string Name, string? StagedPath)
             ? SongFile.ReadFileAsync(path, ChartReader.MaxBytes, cancellationToken)
             : SongFile.ReadAsync(entry, Name, ChartReader.MaxBytes, cancellationToken);
     }
+
+    /// <summary>As <see cref="ReadAsync"/>, on the calling thread, for work already off the UI thread.</summary>
+    /// <returns>Its bytes, or <see langword="null"/> when it's gone or larger than <see cref="ChartReader.MaxBytes"/>.</returns>
+    /// <exception cref="IOException">The file can't be read.</exception>
+    /// <exception cref="UnauthorizedAccessException">Access is denied.</exception>
+    /// <exception cref="OperationCanceledException">The read was cancelled.</exception>
+    public byte[]? Read(SongEntry entry, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        return StagedPath is { } path
+            ? SongFile.ReadFile(path, ChartReader.MaxBytes, cancellationToken)
+            : SongFile.Read(entry, Name, ChartReader.MaxBytes, cancellationToken);
+    }
 }

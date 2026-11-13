@@ -245,7 +245,7 @@ builds only) aren't part of a release and aren't listed.
 
 | Component | Version | License | Copyright |
 | --------- | ------- | ------- | --------- |
-| [.NET runtime and libraries](https://github.com/dotnet/runtime) | 10.0 | MIT | © .NET Foundation and Contributors |
+| [.NET runtime and libraries](https://github.com/dotnet/runtime) | 11.0 | MIT | © .NET Foundation and Contributors |
 | [Avalonia](https://github.com/AvaloniaUI/Avalonia): `Avalonia`, `.Desktop`, `.Themes.Fluent`, `.Fonts.Inter`, `.Skia`, `.HarfBuzz`, `.Win32`, `.X11`, `.Native`, `.FreeDesktop`, `.FreeDesktop.AtSpi`, `.Remote.Protocol` | 12.0.5 | MIT | © AvaloniaUI OÜ and The AvaloniaUI Project |
 | [CommunityToolkit.Mvvm](https://github.com/CommunityToolkit/dotnet) | 8.4.1 | MIT | © .NET Foundation and Contributors |
 | [Serilog](https://github.com/serilog/serilog) | 4.4.0 | Apache 2.0 | © Serilog Contributors |

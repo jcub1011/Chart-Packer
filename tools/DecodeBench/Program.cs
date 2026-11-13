@@ -85,7 +85,7 @@ if (waveforms)
         .AddLogicalGroupRules(BenchmarkLogicalGroupRule.ByMethod)
         .WithArtifactsPath(Path.Combine(AppContext.BaseDirectory, "BenchmarkDotNet.Artifacts"));
     if (aot)
-        waveformConfig = waveformConfig.AddJob(job.WithRuntime(NativeAotRuntime.Net10_0).WithId("NativeAOT"));
+        waveformConfig = waveformConfig.AddJob(job.WithRuntime(NativeAotRuntime.Net11_0).WithId("NativeAOT"));
 
     BenchmarkRunner.Run<WaveformBenchmarks>(waveformConfig);
     return 0;
@@ -101,7 +101,7 @@ var config = ManualConfig.Create(DefaultConfig.Instance)
     .WithArtifactsPath(Path.Combine(AppContext.BaseDirectory, "BenchmarkDotNet.Artifacts"));
 
 if (aot)
-    config = config.AddJob(job.WithRuntime(NativeAotRuntime.Net10_0).WithId("NativeAOT"));
+    config = config.AddJob(job.WithRuntime(NativeAotRuntime.Net11_0).WithId("NativeAOT"));
 
 // A stem FFmpeg can't decode is timed on the managed decoders alone.
 config = config.AddFilter(new SimpleFilter(c =>

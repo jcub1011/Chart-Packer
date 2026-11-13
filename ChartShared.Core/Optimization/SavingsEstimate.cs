@@ -139,7 +139,7 @@ public sealed class ChartSavings
 /// </remarks>
 public sealed class SavingsModel
 {
-    private readonly object _sync = new();
+    private readonly Lock _sync = new();
     private readonly Dictionary<MediaType, (int Files, long InputBytes, long SavingBytes)> _types = [];
     private readonly OptimizeOptions _options;
     private int _version;

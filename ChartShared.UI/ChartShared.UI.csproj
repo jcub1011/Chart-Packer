@@ -3,7 +3,6 @@
        window, and the highway's and waveforms' drawing. Code moves here from an app when the other app first
        needs it. -->
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <IsAotCompatible>true</IsAotCompatible>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>

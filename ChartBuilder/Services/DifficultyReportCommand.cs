@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using ChartShared.Core.Charting.Difficulty;
 using ChartShared.Core.Launching;
@@ -89,7 +90,7 @@ namespace ChartBuilder.Services
         /// </summary>
         private sealed class ConsoleProgress : IProgress<(int Done, int Total)>
         {
-            private readonly object _gate = new();
+            private readonly Lock _gate = new();
             private int _last = -1;
 
             public void Report((int Done, int Total) value)

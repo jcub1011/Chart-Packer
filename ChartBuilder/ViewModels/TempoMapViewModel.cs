@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Avalonia.Collections;
 using Avalonia.Threading;
 using ChartBuilder.Resources;
+using ChartShared.Core;
 using ChartShared.Core.Charting;
 using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charts;
@@ -373,14 +374,14 @@ namespace ChartBuilder.ViewModels
         /// A tempo in beats per minute for the BPM box, to three decimals as it's shown, e.g. 120 or 96.5.
         /// </summary>
         internal static decimal BpmValueOf(long microsecondsPerQuarter) =>
-            Math.Round((decimal)EditableTempoMap.BpmOf(microsecondsPerQuarter), 3, MidpointRounding.AwayFromZero);
+            Math.Round(DecimalConversion.ToDecimal(EditableTempoMap.BpmOf(microsecondsPerQuarter)), 3, MidpointRounding.AwayFromZero);
 
         /// <summary>
         /// The slowest tempo the BPM box offers, in beats per minute: a beat as long as MIDI can hold, rounded up to the
         /// three decimals it shows, so that what it holds can always be applied.
         /// </summary>
         public static decimal MinBpm =>
-            Math.Ceiling((decimal)(60_000_000.0 / EditableTempoMap.MaxMicrosecondsPerQuarter * 1000)) / 1000;
+            Math.Ceiling(DecimalConversion.ToDecimal(60_000_000.0 / EditableTempoMap.MaxMicrosecondsPerQuarter * 1000)) / 1000;
 
         public void Dispose()
         {
