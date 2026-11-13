@@ -95,6 +95,7 @@ Make your library smaller. Recompress audio to Opus, background videos to VP8 We
 - Chart Builder opens `.sng` files directly and converts `.chart` to `.mid` on save. Back up the original first, because that conversion loses information.
 - Lower difficulties are generated as drafts. Treat them as a starting point, not a finished chart.
 - The installer isn't code-signed. Windows SmartScreen shows "Windows protected your PC" the first time; choose **More info → Run anyway**.
+- On a 64-bit Intel or AMD PC, the processor needs AVX2: Intel from 2013 (Haswell) or AMD from 2015 (Excavator) onwards. The apps don't start on anything older.
 
 ## Building from Source
 

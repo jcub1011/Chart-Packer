@@ -3,7 +3,6 @@
        on synthetic data only (see README.md). To compare two versions of the code, run it in each (compare.py). Never shipped. -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <!-- A copy of this tool run in an older tree sets -p:Before=true: it leaves out the benchmarks of what that tree lacks. -->

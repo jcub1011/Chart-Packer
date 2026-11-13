@@ -3,7 +3,6 @@
        (ChartShared.Core/Charting). The rest of the shared libraries' code is tested in
        ChartShared.Core.Tests. -->
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <!-- MSTest.Sdk picks its packages' versions; this raises code coverage's. -->

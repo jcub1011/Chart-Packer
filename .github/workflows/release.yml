@@ -119,7 +119,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: 11.0.x
 
       # FFmpeg takes several minutes to build under MSYS2, so it's rebuilt only when build.sh (which pins the tag) changes.
       - name: Restore FFmpeg
