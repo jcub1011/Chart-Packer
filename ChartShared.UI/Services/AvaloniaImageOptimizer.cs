@@ -109,7 +109,7 @@ public sealed class AvaloniaImageOptimizer : IImageOptimizer
     /// <summary>Encodes held for <see cref="OptimizeAsync"/>, oldest dropped first once their bytes pass the budget.</summary>
     private sealed class EncodeCache(long budgetBytes)
     {
-        private readonly object _gate = new();
+        private readonly Lock _gate = new();
         private readonly Dictionary<string, Encoded> _items = [];
         private readonly Queue<string> _order = new();
         private long _bytes;

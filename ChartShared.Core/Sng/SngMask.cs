@@ -1,3 +1,4 @@
+using System.Numerics;
 using System.Security.Cryptography;
 
 namespace ChartShared.Core.Sng;
@@ -14,6 +15,9 @@ public static class SngMask
     public const int MaskSize = 16;
 
     private const int Period = 256;
+
+    // The widest vector there is (AVX-512's), so the key's buffer can be a constant size.
+    private const int MaxVectorBytes = 64;
 
     /// <summary>Returns a fresh random mask. Any value is valid (sng-spec §5).</summary>
     public static byte[] Generate()
@@ -34,12 +38,28 @@ public static class SngMask
             throw new ArgumentException($"The mask must be {MaskSize} bytes.", nameof(mask));
         ArgumentOutOfRangeException.ThrowIfNegative(startIndex);
 
-        Span<byte> key = stackalloc byte[Period];
-        for (int i = 0; i < Period; i++)
-            key[i] = (byte)(i ^ mask[i & 0xF]);
-
+        // The key as data[0] meets it, with enough of its start again on the end that a whole vector can be read from
+        // any place in it without wrapping.
         int phase = (int)(startIndex & 0xFF);
-        for (int j = 0; j < data.Length; j++)
-            data[j] ^= key[(phase + j) & 0xFF];
+        Span<byte> key = stackalloc byte[Period + MaxVectorBytes];
+        for (int i = 0; i < key.Length; i++)
+        {
+            int at = (phase + i) & 0xFF;
+            key[i] = (byte)(at ^ mask[at & 0xF]);
+        }
+
+        int j = 0;
+        if (Vector.IsHardwareAccelerated && Vector<byte>.Count <= MaxVectorBytes)
+        {
+            int width = Vector<byte>.Count;
+            for (; j <= data.Length - width; j += width)
+            {
+                var slot = data.Slice(j, width);
+                (new Vector<byte>(slot) ^ new Vector<byte>(key.Slice(j & 0xFF, width))).CopyTo(slot);
+            }
+        }
+
+        for (; j < data.Length; j++)
+            data[j] ^= key[j & 0xFF];
     }
 }

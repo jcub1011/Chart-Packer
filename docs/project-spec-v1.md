@@ -44,7 +44,7 @@ Goals:
 | | |
 | --- | --- |
 | **Users** | Chart authors preparing releases, and players converting or inspecting their libraries |
-| **Runtime** | .NET 10 (LTS), published as **Native AOT**: a self-contained native executable with no .NET runtime to install |
+| **Runtime** | .NET 11, published as **Native AOT**: a self-contained native executable with no .NET runtime to install |
 | **Platforms / RIDs** | `win-x64`, `win-arm64`, `osx-x64`, `osx-arm64`, `linux-x64`, `linux-arm64` |
 | **UI framework** | [Avalonia](https://avaloniaui.net/) 12.x, Fluent theme, Inter font |
 | **Language** | English for v1. All user-facing strings live in `.resx` resources so they can be localised later. |

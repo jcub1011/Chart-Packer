@@ -1,4 +1,5 @@
 using System;
+using ChartShared.Core;
 
 namespace ChartShared.UI.Controls
 {
@@ -13,7 +14,7 @@ namespace ChartShared.UI.Controls
         internal static decimal DraggedValue(decimal start, double moved, double step)
         {
             double stepped = step > 0 ? Math.Round(moved / step, MidpointRounding.AwayFromZero) * step : moved;
-            return start + (decimal)stepped;
+            return start + DecimalConversion.ToDecimal(stepped);
         }
     }
 }

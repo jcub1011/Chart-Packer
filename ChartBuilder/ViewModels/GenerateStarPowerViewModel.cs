@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using ChartBuilder.Controls;
 using ChartBuilder.Resources;
+using ChartShared.Core;
 using ChartShared.Core.Charting;
 using ChartShared.Core.Charting.Authoring;
 using ChartShared.Core.Charting.Editing;
@@ -31,7 +32,7 @@ namespace ChartBuilder.ViewModels
         public GenerateStarPowerViewModel(ChartEditorViewModel editor, ChartInstrument part, StarPowerOptions start, bool overSelection, GenerationMode mode)
             : base(editor, part, overSelection, mode)
         {
-            Spacing = (decimal)start.SpacingSeconds;
+            Spacing = DecimalConversion.ToDecimal(start.SpacingSeconds);
             PlanForSpikes = start.PlanForSpikes;
             Initialize();
         }
@@ -46,7 +47,7 @@ namespace ChartBuilder.ViewModels
 
         /// <summary>The options as picked, an emptied box taking the default.</summary>
         public StarPowerOptions Options => new(
-            (double)Math.Clamp(Spacing ?? (decimal)StarPowerOptions.Default.SpacingSeconds, (decimal)StarPowerOptions.MinSpacingSeconds, (decimal)StarPowerOptions.MaxSpacingSeconds),
+            (double)Math.Clamp(Spacing ?? DecimalConversion.ToDecimal(StarPowerOptions.Default.SpacingSeconds), DecimalConversion.ToDecimal(StarPowerOptions.MinSpacingSeconds), DecimalConversion.ToDecimal(StarPowerOptions.MaxSpacingSeconds)),
             PlanForSpikes);
 
         protected override string TitleFormat => Strings.GenerateStarPowerTitleFormat;

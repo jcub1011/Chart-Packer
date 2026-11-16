@@ -10,7 +10,7 @@ namespace ChartShared.Core.Scanning;
 /// </remarks>
 public sealed class SongFileGate
 {
-    private readonly object _lock = new();
+    private readonly Lock _lock = new();
     private readonly List<Holder> _holders = [];
 
     /// <summary>Waits until <paramref name="songPaths"/> aren't being written, then holds them for reading until the result is disposed.</summary>

@@ -99,7 +99,7 @@ public static class OptimizeJob
     /// </summary>
     private sealed class Reporter(IProgress<OptimizeProgress>? inner)
     {
-        private readonly object _sync = new();
+        private readonly Lock _sync = new();
         private readonly Queue<OptimizeProgress> _pending = new();
         private int _finished;
         private bool _delivering;

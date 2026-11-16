@@ -1,4 +1,5 @@
 using System.Runtime;
+using System.Threading;
 
 namespace ChartBuilder.Services
 {
@@ -9,7 +10,7 @@ namespace ChartBuilder.Services
     /// <remarks>Counted, as more than one player can play at once; on the UI thread or not, so locked.</remarks>
     internal static class PlayingLatency
     {
-        private static readonly object Gate = new();
+        private static readonly Lock Gate = new();
         private static int s_playing;
         private static GCLatencyMode s_before;
 

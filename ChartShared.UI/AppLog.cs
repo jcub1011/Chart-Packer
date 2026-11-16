@@ -257,10 +257,12 @@ namespace ChartShared.UI
             {
                 Directory.CreateDirectory(folder);
 
-                // Windows opens a folder through the shell; macOS and Linux through their own openers.
-                var start = OperatingSystem.IsWindows() ? new ProcessStartInfo(folder) { UseShellExecute = true }
-                    : new ProcessStartInfo(OperatingSystem.IsMacOS() ? "open" : "xdg-open") { UseShellExecute = false, ArgumentList = { folder } };
-                Process.Start(start)?.Dispose();
+                // Windows opens a folder through the shell, which may start no process of its own; macOS and Linux through
+                // their own openers, started and left to it.
+                if (OperatingSystem.IsWindows())
+                    Process.Start(new ProcessStartInfo(folder) { UseShellExecute = true })?.Dispose();
+                else
+                    Process.StartAndForget(OperatingSystem.IsMacOS() ? "open" : "xdg-open", [folder]);
             }
             catch (Exception ex) when (ex is Win32Exception or InvalidOperationException or IOException or UnauthorizedAccessException)
             {

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using ChartBuilder.Resources;
+using ChartShared.Core;
 using ChartShared.Core.Charting;
 using ChartShared.Core.Charting.Analysis;
 using ChartShared.Core.Charting.Editing;
@@ -124,7 +125,7 @@ namespace ChartBuilder.ViewModels
 
         /// <summary>How far, in milliseconds, a beat can be from its segment's tempo before it needs a marker of its own.</summary>
         [ObservableProperty]
-        public partial decimal? MergeMs { get; set; } = (decimal)ProposalOptions.Default.MergeToleranceMs;
+        public partial decimal? MergeMs { get; set; } = DecimalConversion.ToDecimal(ProposalOptions.Default.MergeToleranceMs);
 
         /// <summary>Whether beats are being proposed or a downbeat found.</summary>
         [ObservableProperty]

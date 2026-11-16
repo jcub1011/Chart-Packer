@@ -49,7 +49,7 @@ public static class OptimizationPlanner
         ArgumentNullException.ThrowIfNull(optimizers);
 
         var plans = new ChartPlan[charts.Count];
-        var sync = new object();
+        var sync = new Lock();
         int done = 0;
 
         async ValueTask PlanOneAsync(int i, CancellationToken token)

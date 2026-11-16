@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using Avalonia.Threading;
 using ChartBuilder.Resources;
 using ChartBuilder.Services;
+using ChartShared.Core;
 using ChartShared.Core.Charting;
 using ChartShared.Core.Charting.Commands;
 using ChartShared.Core.Charting.Difficulty;
@@ -232,9 +233,9 @@ namespace ChartBuilder.ViewModels
         [ObservableProperty]
         public partial ResolutionChoice SelectedResolution { get; set; }
 
-        public static decimal MinBpm => (decimal)NewChartSettings.MinBpm;
+        public static decimal MinBpm => DecimalConversion.ToDecimal(NewChartSettings.MinBpm);
 
-        public static decimal MaxBpm => (decimal)NewChartSettings.MaxBpm;
+        public static decimal MaxBpm => DecimalConversion.ToDecimal(NewChartSettings.MaxBpm);
 
         public static decimal MaxNumerator => NewChartSettings.MaxNumerator;
 
@@ -317,7 +318,7 @@ namespace ChartBuilder.ViewModels
                     return;
                 }
 
-                Bpm = Math.Clamp((decimal)bpm, MinBpm, MaxBpm);
+                Bpm = Math.Clamp(DecimalConversion.ToDecimal(bpm), MinBpm, MaxBpm);
                 ApplyNow();
             }
             finally
@@ -646,7 +647,7 @@ namespace ChartBuilder.ViewModels
             {
                 SelectedResolution = Resolutions.First(r => r.Value == values.Resolution);
                 _chartMicroseconds = values.MicrosecondsPerQuarter;
-                _chartBpm = Math.Round((decimal)EditableTempoMap.BpmOf(_chartMicroseconds), 3);
+                _chartBpm = Math.Round(DecimalConversion.ToDecimal(EditableTempoMap.BpmOf(_chartMicroseconds)), 3);
                 Bpm = _chartBpm;
                 _chartNumerator = values.Numerator;
                 Numerator = values.Numerator;
