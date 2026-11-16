@@ -47,6 +47,7 @@ namespace ChartBuilder.ViewModels
         private readonly HashSet<Spectrogram> _followed = [];
         private readonly HashSet<string> _overBudget = [];
         private long _budget;
+        private bool _sharpen;
         private int _changePending;
         private bool _disposed;
 
@@ -55,11 +56,13 @@ namespace ChartBuilder.ViewModels
         private AnalysisWorkers? _workers;
         private SpectrogramCache? _spectrograms;
 
-        public AudioAnalysis(SongEntry? entry, IReadOnlyList<SongTrack> tracks, long budgetBytes, EditorMessages? messages)
+        /// <param name="sharpenSpectrograms">Whether spectrograms are sharpened (<see cref="Spectrogram.IsSharpened"/>).</param>
+        public AudioAnalysis(SongEntry? entry, IReadOnlyList<SongTrack> tracks, long budgetBytes, EditorMessages? messages, bool sharpenSpectrograms = true)
         {
             _entry = entry;
             _tracks = tracks;
             _budget = budgetBytes;
+            _sharpen = sharpenSpectrograms;
             _messages = messages;
             _changed = new DispatcherTimer(DispatcherPriority.Background) { Interval = ChangedInterval };
             _changed.Tick += (_, _) => RaiseChanged();
@@ -77,6 +80,19 @@ namespace ChartBuilder.ViewModels
             if (_spectrograms is { } spectrograms)
                 spectrograms.BudgetBytes = bytes;
             _overBudget.Clear();
+        }
+
+        /// <summary>
+        /// Whether spectrograms are sharpened. Changing it releases those there are, and they're computed again the
+        /// other way as they're next drawn.
+        /// </summary>
+        public void SetSharpening(bool sharpen)
+        {
+            if (_disposed)
+                return;
+            _sharpen = sharpen;
+            if (_spectrograms is { } spectrograms)
+                spectrograms.Sharpen = sharpen;
         }
 
         /// <summary>
@@ -298,7 +314,7 @@ namespace ChartBuilder.ViewModels
                     {
                         _audio = SongAudio.Open(_entry, _tracks, token);
                         _workers = new AnalysisWorkers();
-                        _spectrograms = new SpectrogramCache(_workers, _budget) { KeepInUse = TimeSpan.FromSeconds(2) };
+                        _spectrograms = new SpectrogramCache(_workers, _budget) { KeepInUse = TimeSpan.FromSeconds(2), Sharpen = _sharpen };
                     }
 
                     audio = _audio;

@@ -2431,6 +2431,18 @@ Saving also changes song.ini:
   <data name="SpectrogramBudgetKeywords" xml:space="preserve">
     <value>spectrogram memory budget ram megabytes</value>
   </data>
+  <data name="SpectrogramSharpeningLabel" xml:space="preserve">
+    <value>Sharpen Spectrograms</value>
+    <comment>Settings: the switch for drawing spectrograms sharpened.</comment>
+  </data>
+  <data name="SpectrogramSharpeningDescription" xml:space="preserve">
+    <value>Draws each part of the sound at the pitch and the time it's really at, so notes are thin lines and hits are thin columns. Off, they're as blurred as the analysis is, which can read more smoothly on a dense mix. Changing it computes the spectrograms again.</value>
+    <comment>Settings: what the Sharpen spectrograms switch does.</comment>
+  </data>
+  <data name="SpectrogramSharpeningKeywords" xml:space="preserve">
+    <value>spectrogram sharpen sharp blurry blur detail resolution reassign crisp pitch vocals</value>
+    <comment>Settings: search words for the Sharpen spectrograms switch, separated by spaces.</comment>
+  </data>
   <data name="LaneAudioToolTip" xml:space="preserve">
     <value>The lane's audio: waveform or spectrogram, and onsets</value>
   </data>

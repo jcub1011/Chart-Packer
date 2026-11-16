@@ -22,8 +22,8 @@ public readonly record struct SpectrogramResult(Spectrogram? Spectrogram, long N
 /// </remarks>
 public sealed class SpectrogramCache : IDisposable
 {
-    /// <summary>The <b>Spectrogram memory budget</b> setting's default: 256 MB.</summary>
-    public const long DefaultBudgetBytes = 256L * 1024 * 1024;
+    /// <summary>The <b>Spectrogram memory budget</b> setting's default: 512 MB.</summary>
+    public const long DefaultBudgetBytes = 512L * 1024 * 1024;
 
     private readonly AnalysisWorkers _workers;
     private readonly Lock _lock = new();
@@ -32,6 +32,7 @@ public sealed class SpectrogramCache : IDisposable
     private readonly Dictionary<Spectrogram, long> _used = [];
     private long _budget;
     private long _size;
+    private bool _sharpen = true;
 
     public SpectrogramCache(AnalysisWorkers workers, long budgetBytes = DefaultBudgetBytes)
     {
@@ -70,6 +71,31 @@ public sealed class SpectrogramCache : IDisposable
     /// Lowering the budget releases them regardless.
     /// </summary>
     public TimeSpan KeepInUse { get; set; }
+
+    /// <summary>
+    /// Whether the spectrograms started are sharpened (<see cref="Spectrogram.IsSharpened"/>); they are at first. Changing
+    /// it releases every spectrogram, which were made the other way.
+    /// </summary>
+    public bool Sharpen
+    {
+        get
+        {
+            lock (_lock)
+                return _sharpen;
+        }
+
+        set
+        {
+            lock (_lock)
+            {
+                if (_sharpen == value)
+                    return;
+                _sharpen = value;
+            }
+
+            Clear();
+        }
+    }
 
     /// <summary>How much memory the spectrograms kept take.</summary>
     public long SizeBytes
@@ -115,7 +141,7 @@ public sealed class SpectrogramCache : IDisposable
                 return new SpectrogramResult(null, needed, IsCrowded: true);
 
             released = MakeRoom(needed);
-            started = SpectrogramBuilder.Start(audio, _workers, focusSeconds);
+            started = SpectrogramBuilder.Start(audio, _workers, focusSeconds, _sharpen);
             _entries[key] = _recency.AddFirst((key, started));
             _used[started] = Environment.TickCount64;
             _size += started.SizeBytes;

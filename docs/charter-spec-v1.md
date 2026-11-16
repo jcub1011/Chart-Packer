@@ -2008,18 +2008,34 @@ Acceptance criteria:
 **Behaviour:**
 
 1. **What is drawn.** A short-time Fourier transform of the chosen stem or the mix:
-   - a 2048-sample Hann window with a 256-sample hop (about 5.8 ms at 44.1 kHz);
-   - mapped to 256 logarithmic frequency bins from 30 Hz to 16 kHz;
+   - a column every 256 samples (about 5.8 ms at 44.1 kHz);
+   - mapped to 768 logarithmic frequency rows from 30 Hz to 16 kHz, about seven to a semitone;
    - shown in dB through a perceptually even colour map.
 
    The contrast (dB floor and ceiling) can be adjusted.
 
+   **Three bands, three windows.** Low notes are a few hertz apart, and high sounds are told
+   apart by when they start, so each band of the rows has a Hann window of its own (lengths at
+   44.1 kHz):
+
+   | Band | Rows | Window | Bins Apart |
+   |---|---|---|---|
+   | Low | below 500 Hz | 186 ms | 5.4 Hz |
+   | Middle | 500 Hz to 2.2 kHz | 93 ms | 10.8 Hz |
+   | High | above 2.2 kHz | 23 ms | 43 Hz |
+
+   A quarter of an octave either side of where two bands meet, the rows are a blend of both.
+
+   **Sharpening** (Settings, on by default). Each bin's energy is drawn at the frequency and the
+   time it's really at (the reassignment method) rather than at the bin's own, so a steady note
+   is a line a row or two thick and a hit is a column or two wide, where unsharpened they're as
+   blurred as the window is wide. Changing the setting computes the spectrograms again.
+
    **Limits of these settings.**
-   - At 44.1 kHz the FFT's bins are 21.5 Hz apart. Below about 870 Hz, the log bins are narrower
-     than that, so they repeat or interpolate a few FFT bins: the Kick band (30–120 Hz) shows
-     about four distinct bands.
-   - The 46 ms window also blurs the start of a hit by up to half its length, even though the
-     columns are 5.8 ms apart.
+   - Two sounds less than about two bins apart in the same band are one sound to the analysis,
+     sharpened or not: two bass notes a semitone apart below about 180 Hz, for one.
+   - Sharpened, noise (cymbals, breath, a dense mix) looks grainier than unsharpened.
+   - Unsharpened, the low band's window blurs the start of a hit by up to 93 ms either way.
    - The spectrogram is for seeing where a sound is, not for timing it. Onsets
      ([C14](#c14-onset-and-beat-assist)) are for timing.
 2. **Computed off the UI thread**, at low priority, starting near the view and spreading outwards.
@@ -2027,8 +2043,8 @@ Acceptance criteria:
 3. **Held in memory only.**
    - Nothing is written to disk, and closing the chart releases it.
    - Reopening a song computes it again.
-   - Columns are stored as bytes, about 26 MB per stem for a 10-minute song at the settings above.
-   - A **memory budget** (Settings, 256 MB by default) caps every stem's spectrogram together. The
+   - Columns are stored as bytes, about 79 MB per stem for a 10-minute song at the settings above.
+   - A **memory budget** (Settings, 512 MB by default) caps every stem's spectrogram together. The
      stems used least recently are released first.
 4. **Band presets** emphasise a range and dim the rest, to help pick out drum hits and bass notes:
    - **Kick:** 30–120 Hz
@@ -2044,21 +2060,40 @@ Acceptance criteria:
 - **Levels.** Each byte is an absolute level, −120 dB plus half a decibel a step, a full-scale sine
   reading 0 dB. The contrast is applied as it's drawn, so changing it computes nothing again; the
   floor and ceiling are each lane's own (default −80 dB and 0 dB).
-- **Low rows.** A row that holds an FFT bin takes the loudest of its bins. Below about 870 Hz the
-  rows hold none, and each is read off a parabola through the levels of the louder bin either side
-  and its neighbours.
+- **The bands.** The low and middle bands are analysed at a sixteenth and a quarter of the sample
+  rate (`HalfBandDecimator`), which makes their long windows cheap. At other sample rates the
+  windows are as long in time, to the nearest power of two (`SpectrogramTiers`).
+- **Unsharpened rows.** A row that holds a bin takes the loudest of its bins. A row narrower than
+  its band's bins holds none, and is read off a parabola through the levels of the louder bin
+  either side and its neighbours.
+- **Sharpened rows.** A frame is analysed at every other column. Each bin's power is spread over
+  the rows between where it points and halfway to where the bins either side point, and over the
+  columns between when it points to and halfway to when the same bin points to in the frames
+  before and after: a tone's bins all point at one frequency and a click's frames at one time, so
+  those stay thin, and noise, whose bins point all over, leaves hardly a cell empty. Half a
+  percent of each bin's power is put where the bin itself is, a faint bed that fills the cells
+  nothing points at. A sharpened sine reads 0 dB in the middle of a row, and up to 3 dB less
+  between two (`ReassignedPair`, `SpectrogramBuilder`).
 - **Colours** run from black through violet, magenta and orange to pale yellow, blended in OKLab with
   lightness rising evenly (`SpectrogramColors`). A band preset dims the rows outside it to 30%.
 - **Computing.** Columns are computed in chunks of 256 on threads below normal priority
   (`AnalysisWorkers`), the chunk nearest the middle of the view first, and frames two to an FFT.
-  Chunks near the view come before onsets; the rest of the song after.
+  Chunks near the view come before onsets; the rest of the song after. A chunk's columns are the
+  same to the byte however the song is cut into chunks: a sharpened chunk also analyses the few
+  columns either side that can put energy in its own.
 - **The budget.** A spectrogram counts at its full size from the moment it's started. One used in
   the last 2 s isn't released to make room for another: the newcomer is refused, and the editor
   says so, so two lanes that don't both fit don't take turns releasing each other. The budget is
   64 MB to 4096 MB.
-- **Drawing.** As the waveform's, in pictures of 256 columns, each a column or the loudest of a
-  power of two of them, drawn within the same budget, and drawn again as more of their columns are
-  ready, at most every 100 ms. Behind the lanes it's at 45% opacity.
+- **Drawing.** As the waveform's, in pictures drawn within the same budget, and drawn again as
+  more of their columns are ready, at most every 100 ms. A picture is drawn at the size it's shown
+  at: 256 pixels along the time axis, each a column, the loudest of a power of two of them, or,
+  zoomed in, a half or a quarter of one; and across it as many pixels as the rows shown take on
+  the screen (to the next 32, at most 1024), each the loudest of the rows it covers or between the
+  two it's between. What's between is worked out on the levels, before they're coloured. On the
+  vocal piano roll a picture is of the pitches shown only, so zooming the keyboard draws it again
+  at the new size; until it's drawn, the last picture of that stretch stands in, stretched. Up to
+  96 MB of pictures are kept. Behind the lanes it's at 45% opacity.
 
 Acceptance criteria:
 
@@ -3172,7 +3207,8 @@ tool.
 | Wheel scroll direction | Wheel up moves later, in both lane views and on the timeline along the bottom |
 | Notes keep ticks or times when the tempo changes | Keep ticks |
 | Waveform or spectrogram behind the lanes (**Lanes show**, under Audio assist) | Waveform |
-| Spectrogram memory budget (under Audio assist) | 256 MB (64 to 4096) |
+| Spectrogram memory budget (under Audio assist) | 512 MB (64 to 4096) |
+| Sharpen spectrograms (under Audio assist) | On ([C13](#c13-spectrogram)) |
 | Metronome volume / hit-sound volume | 50% / 50%. At 50%, each sound plays at the level `Synth` makes it. A change applies from the next time playback starts. |
 | Audio/visual latency | Per output device, plus a global fallback of 0 ms ([C11](#c11-calibration-tool)) |
 | Detect output latency | On. The latency detected from the device is added to its calibrated latency. Kept in `audio-latency.json`, shared by both apps (issue #140) |

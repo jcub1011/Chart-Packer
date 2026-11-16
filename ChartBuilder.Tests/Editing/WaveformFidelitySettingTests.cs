@@ -72,6 +72,12 @@ public sealed class WaveformFidelitySettingTests
         Assert.AreEqual("playback.audio", catalog.Definitions.Single(d => d.Id == "playback.masterVolume").Category.Id);
         Assert.AreEqual("playback.visualizers", catalog.Definitions.Single(d => d.Id == "playback.laneBackdrop").Category.Id);
         Assert.AreEqual("playback.visualizers", catalog.Definitions.Single(d => d.Id == "playback.spectrogramBudget").Category.Id);
+
+        var sharpening = catalog.Definitions.Single(d => d.Id == "playback.spectrogramSharpening") as ToggleSetting;
+        Assert.IsNotNull(sharpening);
+        Assert.AreEqual("playback.visualizers", sharpening.Category.Id);
+        Assert.IsTrue(sharpening.DefaultValue && new BuilderSettings().SpectrogramSharpening, "Spectrograms are sharpened until it's switched off.");
+        Assert.AreEqual(BuilderSettings.DefaultSpectrogramBudgetMb, new BuilderSettings().SpectrogramBudgetMb);
         Assert.IsFalse(catalog.Definitions.Any(d => d.Id == "audio.masterVolume" || d.Id == "charter.laneBackdrop" || d.Id == "charter.spectrogramBudget"));
     }
 }
