@@ -43,6 +43,26 @@ namespace ChartShared.UI.Controls
         private static readonly int[] Pixels = new int[TileColumns * Rows];
         private static long s_drawn;
 
+        /// <summary>
+        /// Where the picture's rows go across a timeline: a picture's y, counted in rows from its top, is drawn at
+        /// <see cref="Offset"/> plus <see cref="Scale"/> times it.
+        /// </summary>
+        /// <param name="Scale">How many pixels a row of the picture is.</param>
+        /// <param name="Offset">Where the picture's top edge is across the lane.</param>
+        public readonly record struct PitchFrame(double Scale, double Offset)
+        {
+            /// <summary>
+            /// The frame that puts each note's frequency on its row of a piano roll: the row of <paramref name="topPitch"/> is
+            /// the first, starting <paramref name="firstRowTop"/> across the lane, each <paramref name="rowSize"/> pixels, one
+            /// to a semitone, with the pitches below it following.
+            /// </summary>
+            public static PitchFrame Of(int topPitch, double firstRowTop, double rowSize)
+            {
+                double scale = rowSize / SpectrogramRows.RowsPerSemitone;
+                return new PitchFrame(scale, firstRowTop + (rowSize / 2) - (scale * SpectrogramRows.PictureYOfPitch(topPitch)));
+            }
+        }
+
         /// <summary>Drops every picture kept, as when the audio they're of is closed.</summary>
         public static void Clear()
         {
@@ -60,9 +80,13 @@ namespace ChartShared.UI.Controls
         /// <param name="floorDb">Levels at or below this are black.</param>
         /// <param name="ceilingDb">Levels at or above this are the ramp's lightest.</param>
         /// <param name="pixel">How long a pixel of the screen is, in the lane's coordinates.</param>
+        /// <param name="frame">
+        /// Where the frequency rows go across a timeline, when they're not stretched over all of <paramref name="bounds"/>: as
+        /// a piano roll's rows line up with the notes' frequencies, which crops the picture to <paramref name="bounds"/>. Ignored down a lane.
+        /// </param>
         /// <returns>Whether all of it was drawn as it is now: <see langword="false"/> when a picture had to wait for the budget.</returns>
         public static bool Draw(DrawingContext context, Spectrogram spectrogram, Rect bounds, bool isVertical, double from, double to, Func<double, double> position,
-            double floorDb, double ceilingDb, SpectrogramBand band, double pixel = 1)
+            double floorDb, double ceilingDb, SpectrogramBand band, double pixel = 1, PitchFrame? frame = null)
         {
             double origin = position(0);
             double perColumn = (position(1) - origin) * spectrogram.SecondsPerColumn;
@@ -130,7 +154,9 @@ namespace ChartShared.UI.Controls
                 double step = perColumn * (1 << tileLevel);
                 var matrix = isVertical
                     ? new Matrix(0, step, -bounds.Width / Rows, 0, bounds.Right, along)
-                    : new Matrix(step, 0, 0, bounds.Height / Rows, along, bounds.Top);
+                    : frame is { } pitched
+                        ? new Matrix(step, 0, 0, pitched.Scale, along, pitched.Offset)
+                        : new Matrix(step, 0, 0, bounds.Height / Rows, along, bounds.Top);
                 using (context.PushTransform(matrix))
                     context.DrawImage(bitmap, new Rect(0, 0, TileColumns, Rows), new Rect(0, 0, TileColumns, Rows));
             }

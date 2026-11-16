@@ -403,11 +403,20 @@ namespace ChartBuilder.Controls.Editing
         /// </summary>
         protected virtual LaneProjection? ProjectVocals(Size size, LaneSlots slots, EditorViewport viewport, HighwayLength length) => null;
 
+        /// <summary>How wide the piano keyboard is down a vocal part's left edge, in pixels; none for a view that has no keyboard.</summary>
+        protected virtual double VocalGutterWidth => 0;
+
+        /// <summary>Whether the canvas is showing a vocal part's lane.</summary>
+        protected bool IsVocalLane => _lane?.Vocal is not null;
+
         /// <summary>Where a vocal part's lyrics are drawn, under its pitch rows.</summary>
         protected virtual Rect LyricsArea(Size size, LaneProjection projection) => default;
 
         /// <summary>Where a vocal part's phrases are drawn as bars to select and drag, above its pitch rows.</summary>
         protected virtual Rect VocalPhraseArea(Size size, LaneProjection projection) => default;
+
+        /// <summary>Where a vocal part's star power is drawn as bars to select and drag, between its phrases and its pitch rows.</summary>
+        protected virtual Rect VocalStarPowerArea(Size size, LaneProjection projection) => default;
 
         /// <summary>How thick the phrase rail of <paramref name="phraseRows"/> rows is across the view, in pixels.</summary>
         protected static double PhraseRailSize(int phraseRows) =>
@@ -1104,6 +1113,15 @@ namespace ChartBuilder.Controls.Editing
                 return;
             }
 
+            // A vocal part's keyboard takes no press, so a click on it never edits a note or moves the song.
+            if (IsOnVocalKeyboard(current.Position))
+            {
+                Focus();
+                ShowTip(null);
+                e.Handled = true;
+                return;
+            }
+
             _pressButton = button;
             _pressedAt = current.Position;
             _pressDragged = false;
@@ -1311,6 +1329,13 @@ namespace ChartBuilder.Controls.Editing
             base.OnPointerWheelChanged(e);
             if (Session is not { } session || _lane is not { HasCanvas: true } lane)
                 return;
+
+            // Over a vocal part's keyboard the wheel scrolls the notes shown and Ctrl zooms them, rather than moving the song.
+            if (IsOnVocalKeyboard(e.GetPosition(this)))
+            {
+                WheelVocalKeyboard(e, lane);
+                return;
+            }
 
             // The song moves past the strike line a grid step a notch, through the tempo map, so the strike line stays on the
             // grid across tempo and time-signature changes; Ctrl zooms, turned up the lane looking less far ahead. A turn of none
@@ -1748,6 +1773,8 @@ namespace ChartBuilder.Controls.Editing
         {
             if (e.PropertyName == nameof(EditorLaneViewModel.Track) && IsFocused && Session is { } session && _lane?.Track is { } key)
                 session.Focused = key;
+            if (e.PropertyName == nameof(EditorLaneViewModel.Vocal) && _lane is { } shown)
+                shown.SetExtent(TimeAxisLength(_arranged));
             _longest = null;
             _ghostLongest = null;
             InvalidateLayers();
@@ -1886,13 +1913,13 @@ namespace ChartBuilder.Controls.Editing
         private Func<double, double> AlongOf(LaneProjection projection) => _alongOf.For(projection);
 
         /// <returns>Whether all of it was drawn as it is now.</returns>
-        private bool DrawSpectrogram(DrawingContext context, LaneAudioViewModel audio, Spectrogram spectrogram, Rect area, LaneProjection projection)
+        private bool DrawSpectrogram(DrawingContext context, LaneAudioViewModel audio, Spectrogram spectrogram, Rect area, LaneProjection projection, SpectrogramPainter.PitchFrame? frame = null)
         {
             if (area.Width <= 1 || area.Height <= 1)
                 return true;
             double scaling = 1 / (TopLevel.GetTopLevel(this)?.RenderScaling ?? 1);
             return SpectrogramPainter.Draw(context, spectrogram, area, View == LaneView.Highway, projection.Start, projection.End, AlongOf(projection),
-                audio.Options.FloorDb, audio.Options.CeilingDb, audio.Options.Band, scaling);
+                audio.Options.FloorDb, audio.Options.CeilingDb, audio.Options.Band, scaling, frame);
         }
 
         /// <returns>Whether all of it was drawn.</returns>
@@ -2078,7 +2105,7 @@ namespace ChartBuilder.Controls.Editing
             if (Session is not { } session || _lane is null)
                 return null;
             if (_lane.Vocal is { } vocal)
-                return session.VocalsOf(vocal) is { } vocals ? ProjectVocals(Bounds.Size, VocalSlotsOf(vocals), session.Viewport, _lane.Length) : null;
+                return session.VocalsOf(vocal) is not null ? ProjectVocals(Bounds.Size, VocalSlotsOf(_lane), session.Viewport, _lane.Length) : null;
             if (_lane.Track is not { } key || session.TrackOf(key) is null)
                 return null;
             var slots = session.SlotsOf(key.Instrument, View);

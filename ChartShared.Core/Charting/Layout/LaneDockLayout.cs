@@ -1,3 +1,4 @@
+using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charts;
 
 namespace ChartShared.Core.Charting.Layout;
@@ -63,6 +64,9 @@ public sealed class DockLane : DockNode
 
     /// <summary>How the lane shows its audio (charter-spec C12–C14).</summary>
     public LaneAudioOptions Audio { get; internal set; } = LaneAudioOptions.Default;
+
+    /// <summary>The pitches a vocal lane's piano roll shows, as the user scrolled and zoomed its keyboard; null for every pitch.</summary>
+    public VocalPitchView? Pitches { get; internal set; }
 }
 
 /// <summary>Two or more nodes side by side or stacked, each given a share of the room in proportion to its weight.</summary>
@@ -263,6 +267,16 @@ public sealed class LaneDockLayout
         ArgumentNullException.ThrowIfNull(options);
         RequireOpen(lane);
         lane.Audio = options.Clamped();
+    }
+
+    /// <summary>
+    /// Sets the pitches <paramref name="lane"/>'s piano roll shows, or null for every pitch. Kept with the layout like
+    /// <see cref="SetLookAhead"/>, and raises no <see cref="Changed"/>. The view is brought into range.
+    /// </summary>
+    public void SetPitches(DockLane lane, VocalPitchView? pitches)
+    {
+        RequireOpen(lane);
+        lane.Pitches = pitches is { } view && !view.IsFull ? VocalPitchView.Of(view.Top, view.Span) : null;
     }
 
     /// <summary>
@@ -477,6 +491,8 @@ public sealed class LaneDockLayout
                 PixelsPerSecond = lane.PixelsPerSecond,
                 Perspective = lane.Perspective,
                 Audio = lane.Audio == LaneAudioOptions.Default ? null : LaneAudioState.Of(lane.Audio),
+                PitchTop = lane.Pitches?.Top,
+                PitchSpan = lane.Pitches?.Span,
             };
         }
 
@@ -500,6 +516,7 @@ public sealed class LaneDockLayout
             lane.PixelsPerSecond = state.PixelsPerSecond is { } pixels && IsWeight(pixels) ? pixels : null;
             lane.Perspective = state.Perspective;
             lane.Audio = state.Audio?.ToOptions() ?? LaneAudioOptions.Default;
+            lane.Pitches = state.PitchTop is not null && state.PitchSpan is not null && VocalPitchView.FromSaved(state.PitchTop, state.PitchSpan) is { IsFull: false } pitches ? pitches : null;
             return lane;
         }
 

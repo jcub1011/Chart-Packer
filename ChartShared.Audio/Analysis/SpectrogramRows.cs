@@ -23,6 +23,19 @@ public static class SpectrogramRows
     /// <summary>The row <paramref name="hz"/> is in, counted fractionally from the middle of row 0.</summary>
     public static double RowOf(double hz) => (Count * Math.Log(hz / LowHz) / LogRatio) - 0.5;
 
+    /// <summary>How many rows a semitone spans: the rows are evenly spaced in pitch, so every semitone is as many.</summary>
+    public static readonly double RowsPerSemitone = Count * Math.Log(2) / 12 / LogRatio;
+
+    /// <summary>The frequency of the note <paramref name="pitch"/>, a MIDI number, in equal temperament with A4 (69) at 440 Hz.</summary>
+    public static double HzOfPitch(double pitch) => 440 * Math.Pow(2, (pitch - 69) / 12);
+
+    /// <summary>
+    /// Where the middle of <paramref name="pitch"/>'s note is down the spectrogram's picture, counted in rows from its top edge,
+    /// which is the top edge of the highest row: the picture is drawn with the lowest row at the bottom, so this is
+    /// <see cref="Count"/> less the pitch's fractional row from the picture's bottom edge.
+    /// </summary>
+    public static double PictureYOfPitch(double pitch) => Count - (RowOf(HzOfPitch(pitch)) + 0.5);
+
     /// <summary>The rows whose middles are between <paramref name="lowHz"/> and <paramref name="highHz"/>, clamped to the rows there are.</summary>
     public static (int First, int Last) RowsOf(double lowHz, double highHz)
     {

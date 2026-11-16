@@ -74,15 +74,16 @@ internal static class EditorSessions
 
     /// <summary>
     /// An empty Lead guitar chart, as <see cref="Guitar"/>, with the vocal part <paramref name="track"/> holding
-    /// <paramref name="notes"/>, <paramref name="lyrics"/> and <paramref name="phrases"/>.
+    /// <paramref name="notes"/>, <paramref name="lyrics"/>, <paramref name="phrases"/> and <paramref name="starPower"/>.
     /// </summary>
     public static EditableChart WithVocals(
-        VocalNoteEvent[] notes, VocalLyricEvent[]? lyrics = null, VocalPhraseEvent[]? phrases = null, VocalTrack track = VocalTrack.Vocals, EditableChart? chart = null)
+        VocalNoteEvent[] notes, VocalLyricEvent[]? lyrics = null, VocalPhraseEvent[]? phrases = null, VocalTrack track = VocalTrack.Vocals, EditableChart? chart = null,
+        VocalStarPowerEvent[]? starPower = null)
     {
         chart ??= Guitar();
         new AddVocalPart(track).Apply(chart);
         var content = VocalTrackContent.Of(chart.Passthrough[VocalTracks.IndexIn(chart, track)]);
-        var edited = content.With(notes, lyrics ?? [], phrases ?? []);
+        var edited = content.With(notes, lyrics ?? [], phrases ?? [], starPower ?? []);
         if (!ReferenceEquals(edited, content))
             new ChangeVocals(track, edited).Apply(chart);
         return chart;
@@ -95,6 +96,10 @@ internal static class EditorSessions
     /// <summary>The point at <paramref name="tick"/> in the phrase strip of <paramref name="track"/>'s lane.</summary>
     public static VocalPoint PhraseStripAt(double tick, VocalTrack track = VocalTrack.Vocals, double tolerance = 10) =>
         new(track, tick, null, tolerance, InPhrases: true);
+
+    /// <summary>The point at <paramref name="tick"/> in the star power rail of <paramref name="track"/>'s lane.</summary>
+    public static VocalPoint StarPowerRailAt(double tick, VocalTrack track = VocalTrack.Vocals, double tolerance = 10) =>
+        new(track, tick, null, tolerance, InStarPower: true);
 
     /// <summary>Clicks at a point in a vocal part's lane.</summary>
     public static void Click(EditorSession session, VocalPoint point, EditorModifiers modifiers = EditorModifiers.None)

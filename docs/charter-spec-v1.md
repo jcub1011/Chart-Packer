@@ -50,11 +50,11 @@ This spec **supersedes** the "editing charts" non-goal in
 
 ## 2. Non-goals for v1
 
-- **Vocal percussion, overdrive and lyric shifts.** The editor's vocal lanes edit the notes, lyrics
-  and phrases of `PART VOCALS` and `HARM1`–`HARM3` ([C3](#c3-editor-layout) item 7). Their
-  percussion notes (96, 97), overdrive (116), lyric and range shifts and any other events are kept
-  as they are ([§4.2](#lossless-passthrough)), and a `.chart`'s lyrics are imported only. The
-  existing vocals tools (`VocalsEditor`, lyrics lane) are unchanged.
+- **Vocal percussion and lyric shifts.** The editor's vocal lanes edit the notes, lyrics, phrases
+  and star power (overdrive, note 116) of `PART VOCALS` and `HARM1`–`HARM3`
+  ([C3](#c3-editor-layout) item 7). Their percussion notes (96, 97), lyric and range shifts and any
+  other events are kept as they are ([§4.2](#lossless-passthrough)), and a `.chart`'s lyrics are
+  imported only. The existing vocals tools (`VocalsEditor`, lyrics lane) are unchanged.
 - **Pro keys, pro guitar/bass, dance, Elite drums.** Their tracks are kept as they are. (5-lane
   `PART KEYS` is edited as a 5-fret part, *revised for #116*.)
 - **Venue, lighting, camera and crowd events.** Kept as they are.
@@ -224,8 +224,8 @@ The tracks Chart Builder does edit are rebuilt from the model:
 
 **Vocal tracks.** `PART VOCALS` and `HARM1`–`HARM3` are passthrough tracks that the vocal lanes edit
 ([C3](#c3-editor-layout) item 7). An edit replaces the track with one written again
-(`VocalTrackContent`): its sung notes (36–84), phrases (105, 106) and lyrics are written from what
-was edited, and every other event (its name, percussion, overdrive, animations) is kept with its
+(`VocalTrackContent`): its sung notes (36–84), phrases (105, 106), star power (116) and lyrics are
+written from what was edited, and every other event (its name, percussion, animations) is kept with its
 bytes, at its tick, in its order. A vocal track that hasn't been edited is still written byte for
 byte. One that has reads back as what was edited, though its bytes differ: running status isn't
 kept, the notes are on the first channel, and at a tick the kept events come first, then the
@@ -911,12 +911,25 @@ Acceptance criteria:
    Problems list and Clear ([C19](#c19-playtest-and-instrument-input)).
 7. **Vocal lanes.** A lane showing `PART VOCALS` or `HARM1`–`HARM3` is always drawn along a
    timeline, as a piano roll:
-   - one row per semitone, every pitch a part sings (36 to 84) whatever its notes, so any pitch can
-     be placed and the rows never move as notes are edited, with black keys' rows darker and each C
-     named at the left edge;
+   - a piano keyboard down the left edge, a key to each row, with the note names on the keys (only
+     the Cs' while the rows are too short for them all). Over it the wheel scrolls the pitches shown
+     rather than the song, two semitones a notch and an octave with Shift, and Ctrl and the wheel
+     zooms them, about the pitch under the pointer, between an octave and every pitch. Both are kept
+     with the lane's layout. A press on the keyboard edits nothing;
+   - one row per semitone of the pitches shown, from every pitch a part sings (36 to 84), the lane's
+     choice, so any pitch can be placed and the rows never move as notes are edited, with black keys'
+     rows darker and a line under each C. Where notes in view lie above or below the pitches shown, a
+     badge at the rows' top or bottom says how many, and a press on it scrolls to the nearest;
    - each sung note a bar on its pitch's row; a slide (`+`) a line from the note before; a spoken
      note (`#`, `^`) an outline along the middle row, middle C's;
-   - the phrases shaded behind the rows, and as bars in a strip above them; and the lyrics in a band
+   - the part's audio behind the rows, as the lane's audio button sets it (C12, C13): a waveform,
+     always centred on the rows whatever the pitches shown, or a spectrogram with each key's row
+     across the band of its note's frequency, so a note placed on the roll sits on the sound at its
+     pitch, and moving with the rows as the keyboard is scrolled and zoomed. The audio is the part's
+     own stem (`vocals`, or `vocals_1` and `vocals_2` for the first two harmonies), the lead's or
+     the mix when it has none, or the stem the button picks;
+   - the phrases shaded behind the rows, and as bars in a strip above them, with the star power
+     (overdrive, note 116) as bars in a rail under that strip, in a highway's star power colour; and the lyrics in a band
      under the rows, each syllable at its tick, with a hyphen where it joins the next. A syllable
      that would run into the one before is left out, as the lane is zoomed out;
    - the beats, sections, tempo markers, loop and selection as a highway's lane has them;
@@ -939,12 +952,24 @@ Acceptance criteria:
    - **Place** puts a note a grid step long on the grid step and row pressed, and a drag stretches
      it, never past the next note's start; Shift places a slide. On a note, it moves it.
    - **Erase** removes each note passed over, **Sustain** drags the selected notes' end, **Phrase**
-     draws a phrase from the grid step pressed, and **Tempo** adds and drags tempo and time-signature
-     changes as in a highway's lane.
+     draws a phrase from the grid step pressed (in the rows, as in the strip), and **Tempo** adds and
+     drags tempo and time-signature changes as in a highway's lane.
    - **The phrase strip** works with any tool, as a highway's phrase rail does: a press on a bar
      selects its phrase (Shift adds it or takes it away), and a drag moves the selected phrases, or
-     resizes one by the end grabbed. A part's phrases never overlap. A new phrase is written as
+     resizes one by the end grabbed. A drag in an empty part of the strip draws a new phrase, from
+     the grid step pressed, with the Select, Place or Phrase tool (not with Shift held, which lends
+     the press to the selection). Over the strip the pointer shows what a press would do, as it does
+     over the star power rail (below). A part's phrases never overlap. A new phrase is written as
      105, or as 105 and 106 when every phrase the part has is.
+   - **The star power rail** works as a highway's phrase rail does, for the part's star power, which
+     is written as note 116 and, unlike a phrase, may lie over phrases and notes; one part's star
+     power never overlaps itself. A press on a bar selects it, and a drag moves it, or resizes it by
+     the end grabbed. A drag in an empty part of the rail draws new star power, from the grid step
+     pressed, with the Select, Place or Phrase tool (not with Shift held, which lends the press to
+     the selection). Over the rail the pointer shows what a press would do: a line across the rows
+     and a mark in the rail at the grid step star power would start at, and a cross there, or an
+     outline of the bar a press would grab, with a move or resize arrow. The middle button erases
+     the star power passed over, and Delete removes what's selected.
    - **Lyrics** belong to the notes that start on their tick: a note moved or deleted takes its
      lyric with it, unless a note that stays starts there. A lyric on no note's start stays where
      it is.
@@ -953,9 +978,10 @@ Acceptance criteria:
      end. **Type lyrics…** gives a typed line's syllables to the selected notes in turn, a slide
      skipped, split at spaces and after hyphens (`Hel-lo world`).
    - **Keys** ([§9](#9-keyboard-shortcuts)): Alt and the arrows move the selected notes a grid step or
-     a semitone, an octave with Shift; Ctrl+A selects the part's notes; Delete and Ctrl+X, C and V
-     work on its notes, with their lyrics. A vocal part's notes paste only into a vocal lane, and a
-     highway's never into one. The keys that change a highway's notes or a part's audio do nothing.
+     a semitone, an octave with Shift; Ctrl+A selects the part's notes; `S` puts star power over the
+     selected notes, or takes away the star power that's over them; `W` switches the part's audio
+     between the waveform and the spectrogram; Delete and Ctrl+X, C and V work on its notes, with their lyrics. A vocal part's notes paste only into a vocal lane, and a
+     highway's never into one. The keys that change a highway's notes do nothing.
    - The vocal findings ([§6](#lint-rules)) name their part, and going to one opens its lane and
      selects the notes on its tick.
 
@@ -3230,7 +3256,7 @@ fails the run if anything there changes anyway.
 
 ## 14. Future (after v1)
 
-- Vocal percussion and overdrive, lyric and range shifts, and pitch detection from the vocals stem,
+- Vocal percussion, lyric and range shifts, and pitch detection from the vocals stem,
   building on the vocal lanes' editing ([C3](#c3-editor-layout) item 7).
 - Pro keys, pro guitar/bass and Elite drums.
 - Venue, lighting and camera events.

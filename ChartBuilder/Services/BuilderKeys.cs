@@ -101,6 +101,8 @@ namespace ChartBuilder.Services
         public const string MouseScroll = "builder.mouse.scroll";
         public const string MouseFastScroll = "builder.mouse.fastScroll";
         public const string MouseZoom = "builder.mouse.zoom";
+        public const string MousePitchScroll = "builder.mouse.pitchScroll";
+        public const string MousePitchZoom = "builder.mouse.pitchZoom";
         public const string MouseSync = "builder.mouse.sync";
         public const string PreviewFullScreen = "builder.preview.fullScreen";
         public const string PreviewExitFullScreen = "builder.preview.exitFullScreen";
@@ -237,6 +239,8 @@ namespace ChartBuilder.Services
             yield return Make(MouseScroll, Strings.KeyActionMouseScroll, mouse, Canvas, "", locked: true, display: "Wheel");
             yield return Make(MouseFastScroll, Strings.KeyActionMouseFastScroll, mouse, Canvas, "", locked: true, display: "Shift+Wheel");
             yield return Make(MouseZoom, Strings.KeyActionMouseZoom, mouse, Canvas, "", locked: true, display: "Ctrl+Wheel");
+            yield return Make(MousePitchScroll, Strings.KeyActionMousePitchScroll, mouse, Canvas, "", locked: true, display: "Wheel over piano keys");
+            yield return Make(MousePitchZoom, Strings.KeyActionMousePitchZoom, mouse, Canvas, "", locked: true, display: "Ctrl+Wheel over piano keys");
             yield return Make(MouseSync, Strings.KeyActionMouseSync, mouse, Canvas, "", locked: true, display: "Ctrl+Shift (held)");
 
             yield return Make(PreviewFullScreen, Strings.KeyActionPreviewFullScreen, preview, Preview, "F11", bare: true);

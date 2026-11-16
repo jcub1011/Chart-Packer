@@ -22,6 +22,7 @@ public static class VocalEdits
     private const string Symbols = "-=#^*%$/";
 
     private const string PhrasesOverlap = "A vocal part's phrases can't overlap.";
+    private const string StarPowerOverlapMessage = "A vocal part's star power can't overlap.";
 
     /// <summary>The notes of <paramref name="content"/> at <paramref name="places"/>, in tick order; places with no note are skipped.</summary>
     public static IReadOnlyList<VocalNoteEvent> NotesAt(VocalTrackContent content, IEnumerable<VocalNotePlace> places)
@@ -291,6 +292,62 @@ public static class VocalEdits
         var to = content.Phrases.Where(wanted.Contains).Select(change).ToList();
         changed = to;
         return WithPhrases(content, content.Phrases.Where(p => !wanted.Contains(p)).Concat(to));
+    }
+
+    /// <summary><paramref name="content"/> with <paramref name="starPower"/> added.</summary>
+    /// <exception cref="ArgumentException">It would overlap star power the part has.</exception>
+    public static VocalTrackContent AddStarPower(VocalTrackContent content, VocalStarPowerEvent starPower)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+        return WithStarPower(content, content.StarPower.Append(starPower));
+    }
+
+    /// <summary>Whether any two of <paramref name="starPower"/> overlap, which a part's star power never does.</summary>
+    public static bool StarPowerOverlaps(IEnumerable<VocalStarPowerEvent> starPower)
+    {
+        ArgumentNullException.ThrowIfNull(starPower);
+        long end = long.MinValue;
+        foreach (var phrase in starPower.OrderBy(static p => p.Tick))
+        {
+            if (phrase.Tick < end)
+                return true;
+            end = Math.Max(end, phrase.EndTick);
+        }
+
+        return false;
+    }
+
+    /// <summary><paramref name="content"/> with <paramref name="starPower"/> taken out.</summary>
+    public static VocalTrackContent RemoveStarPower(VocalTrackContent content, IEnumerable<VocalStarPowerEvent> starPower)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+        ArgumentNullException.ThrowIfNull(starPower);
+        var gone = starPower.ToHashSet();
+        return content.With(starPower: content.StarPower.Where(p => !gone.Contains(p)));
+    }
+
+    /// <summary>
+    /// <paramref name="content"/> with each of <paramref name="starPower"/> changed by <paramref name="change"/>.
+    /// </summary>
+    /// <param name="changed">The star power as it is now.</param>
+    /// <exception cref="ArgumentException">A phrase would overlap another.</exception>
+    public static VocalTrackContent ChangeStarPower(
+        VocalTrackContent content, IEnumerable<VocalStarPowerEvent> starPower, Func<VocalStarPowerEvent, VocalStarPowerEvent> change, out IReadOnlyList<VocalStarPowerEvent> changed)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+        ArgumentNullException.ThrowIfNull(starPower);
+        ArgumentNullException.ThrowIfNull(change);
+        var wanted = starPower.ToHashSet();
+        var to = content.StarPower.Where(wanted.Contains).Select(change).ToList();
+        changed = to;
+        return WithStarPower(content, content.StarPower.Where(p => !wanted.Contains(p)).Concat(to));
+    }
+
+    // The content with star power, which mustn't overlap: With would cut it short where it does.
+    private static VocalTrackContent WithStarPower(VocalTrackContent content, IEnumerable<VocalStarPowerEvent> starPower)
+    {
+        var list = starPower.ToList();
+        return StarPowerOverlaps(list) ? throw new ArgumentException(StarPowerOverlapMessage) : content.With(starPower: list);
     }
 
     // The content with phrases, which mustn't overlap: With would cut them short where they do.

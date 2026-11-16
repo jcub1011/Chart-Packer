@@ -32,6 +32,42 @@ public sealed class SpectrogramTests
     }
 
     [TestMethod]
+    public void ASemitoneIsTheSameNumberOfRowsAnywhere()
+    {
+        Assert.AreEqual(SpectrogramRows.RowsPerSemitone, SpectrogramRows.RowOf(SpectrogramRows.HzOfPitch(61)) - SpectrogramRows.RowOf(SpectrogramRows.HzOfPitch(60)), 1e-9);
+        Assert.AreEqual(SpectrogramRows.RowsPerSemitone, SpectrogramRows.RowOf(SpectrogramRows.HzOfPitch(85)) - SpectrogramRows.RowOf(SpectrogramRows.HzOfPitch(84)), 1e-9);
+        Assert.AreEqual(2.355, SpectrogramRows.RowsPerSemitone, 0.001);
+    }
+
+    [TestMethod]
+    public void ANoteIsAtItsFrequencyAndTheHigherOnesAreHigherUpThePicture()
+    {
+        Assert.AreEqual(440, SpectrogramRows.HzOfPitch(69), 1e-9);
+        Assert.AreEqual(261.6256, SpectrogramRows.HzOfPitch(60), 1e-3);
+        Assert.IsLessThan(SpectrogramRows.PictureYOfPitch(60), SpectrogramRows.PictureYOfPitch(61), "A higher note is nearer the picture's top, which is y 0.");
+        Assert.AreEqual(SpectrogramRows.RowsPerSemitone, SpectrogramRows.PictureYOfPitch(60) - SpectrogramRows.PictureYOfPitch(61), 1e-9);
+    }
+
+    [TestMethod]
+    [DataRow(36)]
+    [DataRow(48)]
+    [DataRow(60)]
+    [DataRow(72)]
+    [DataRow(84)]
+    public void ASungNoteLightsTheRowsAcrossItsKey(int pitch)
+    {
+        double hz = SpectrogramRows.HzOfPitch(pitch);
+        var spectrogram = Compute(AnalysisSignals.Sine(hz, 1, 44100), 44100);
+        var column = spectrogram.Column(spectrogram.ColumnAt(0.5)).ToArray();
+        byte max = column.Max();
+        double loudest = Enumerable.Range(0, column.Length).Where(r => column[r] == max).Average();
+
+        // The loudest row, as the picture is drawn, is on the pitch's key: within half a semitone of its middle.
+        double pictureY = SpectrogramRows.Count - (loudest + 0.5);
+        Assert.AreEqual(SpectrogramRows.PictureYOfPitch(pitch), pictureY, SpectrogramRows.RowsPerSemitone / 2);
+    }
+
+    [TestMethod]
     public void ASineThirtyDecibelsQuieterIsSixtyStepsLower()
     {
         var loud = Compute(AnalysisSignals.Sine(1000, 1, 44100));

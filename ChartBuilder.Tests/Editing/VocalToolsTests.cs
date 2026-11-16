@@ -266,6 +266,78 @@ public sealed class VocalToolsTests
         Assert.AreEqual(both, Vocals(session).Phrases[1].Markers);
     }
 
+    [TestMethod]
+    [DataRow(EditorTool.Select)]
+    [DataRow(EditorTool.Place)]
+    [DataRow(EditorTool.Phrase)]
+    public void TheSelectPlaceAndPhraseToolsDrawAPhraseInAnEmptyPartOfTheStrip(EditorTool tool)
+    {
+        var session = Of(WithVocals([new(0, 100, 60)]));
+        session.Tool = tool;
+
+        DragFromTo(session, PhraseStripAt(5), PhraseStripAt(950));
+
+        Assert.AreEqual(new VocalPhraseEvent(0, 960), Vocals(session).Phrases.Single());
+        Assert.AreSequenceEqual([new VocalPhraseEvent(0, 960)], [.. session.Selection.VocalPhrases]);
+        Assert.AreEqual(1, session.UndoStack.UndoCount);
+    }
+
+    [TestMethod]
+    [DataRow(EditorTool.Erase)]
+    [DataRow(EditorTool.Tempo)]
+    public void OtherToolsDrawNoPhraseInTheStrip(EditorTool tool)
+    {
+        var session = Of(WithVocals([new(0, 100, 60)]));
+        session.Tool = tool;
+
+        DragFromTo(session, PhraseStripAt(5), PhraseStripAt(950));
+
+        Assert.IsEmpty(Vocals(session).Phrases);
+        Assert.AreEqual(0, session.UndoStack.UndoCount);
+    }
+
+    [TestMethod]
+    public void ShiftLendsNoDrawingToTheStrip()
+    {
+        var session = Of(WithVocals([new(0, 100, 60)]));
+        session.Tool = EditorTool.Select;
+
+        DragFromTo(session, PhraseStripAt(5), PhraseStripAt(950), EditorModifiers.Shift);
+
+        Assert.IsEmpty(Vocals(session).Phrases);
+    }
+
+    [TestMethod]
+    public void AClickInAnEmptyPartOfTheStripAddsNothingAndClearsThePhraseSelection()
+    {
+        var session = Of(WithVocals([], phrases: [new(0, 480)]));
+        session.Tool = EditorTool.Select;
+        Click(session, PhraseStripAt(240));
+        Assert.HasCount(1, session.Selection.VocalPhrases);
+
+        Click(session, PhraseStripAt(4800));
+
+        Assert.IsEmpty(session.Selection.VocalPhrases);
+        Assert.HasCount(1, Vocals(session).Phrases);
+        Assert.AreEqual(0, session.UndoStack.UndoCount);
+    }
+
+    [TestMethod]
+    public void TheHoverShowsWhereAPressWouldStartDrawingAPhraseOnTheGrid()
+    {
+        var session = Of(WithVocals([], phrases: [new(960, 480)]));
+        session.Tool = EditorTool.Select;
+
+        Assert.AreEqual(session.Snap.Nearest(485, session.TempoMap), session.Tools.VocalPhraseDrawStart(PhraseStripAt(485)));
+        Assert.IsNull(session.Tools.VocalPhraseDrawStart(PhraseStripAt(1000)), "A press on a bar grabs it.");
+        Assert.IsNull(session.Tools.VocalPhraseDrawStart(PhraseStripAt(485), EditorModifiers.Shift), "Shift lends the press to the selection.");
+        Assert.IsNull(session.Tools.VocalPhraseDrawStart(VocalAt(485, 60)), "Only the strip draws phrases.");
+        Assert.IsNull(session.Tools.VocalPhraseDrawStart(StarPowerRailAt(485)));
+
+        session.Tool = EditorTool.Erase;
+        Assert.IsNull(session.Tools.VocalPhraseDrawStart(PhraseStripAt(485)), "The erase tool draws none.");
+    }
+
     // The tempo tool.
 
     [TestMethod]

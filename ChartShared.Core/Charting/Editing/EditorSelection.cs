@@ -30,6 +30,7 @@ public sealed class EditorSelection
     private readonly List<ChartTrackKey> _rangeTracks = [];
     private readonly HashSet<VocalNotePlace> _vocalNotes = [];
     private readonly HashSet<VocalPhraseEvent> _vocalPhrases = [];
+    private readonly HashSet<VocalStarPowerEvent> _vocalStarPower = [];
     private readonly Func<VocalTrack, VocalTrackContent?> _vocals;
 
     public EditorSelection(EditableChart chart)
@@ -72,7 +73,7 @@ public sealed class EditorSelection
 
     public bool IsEmpty =>
         _notes.Count == 0 && _tempos.Count == 0 && _phrases.Count == 0 && _discoFlips.Count == 0 && Range is null
-        && _vocalNotes.Count == 0 && _vocalPhrases.Count == 0;
+        && _vocalNotes.Count == 0 && _vocalPhrases.Count == 0 && _vocalStarPower.Count == 0;
 
     /// <summary>The vocal part the selected vocal notes and phrases are of, or null when none are selected.</summary>
     public VocalTrack? Vocal { get; private set; }
@@ -84,12 +85,17 @@ public sealed class EditorSelection
 
     public bool HasVocalPhrases => _vocalPhrases.Count > 0;
 
+    public bool HasVocalStarPower => _vocalStarPower.Count > 0;
+
     /// <summary>The selected vocal notes as the part has them now, in tick order.</summary>
     public IReadOnlyList<VocalNoteEvent> VocalNotes =>
         Vocal is { } track && _vocalNotes.Count > 0 && _vocals(track) is { } content ? VocalEdits.NotesAt(content, _vocalNotes) : [];
 
     /// <summary>The selected vocal phrases, in tick order.</summary>
     public IReadOnlyList<VocalPhraseEvent> VocalPhrases => [.. _vocalPhrases.OrderBy(static p => p.Tick).ThenBy(static p => p.EndTick)];
+
+    /// <summary>The selected vocal star power phrases, in tick order.</summary>
+    public IReadOnlyList<VocalStarPowerEvent> VocalStarPower => [.. _vocalStarPower.OrderBy(static p => p.Tick)];
 
     public bool HasNotes => _notes.Count > 0;
 
@@ -203,11 +209,12 @@ public sealed class EditorSelection
                 return to > from ? (from, to) : null;
             }
 
-            if (_phrases.Count > 0 || _discoFlips.Count > 0 || _vocalPhrases.Count > 0)
+            if (_phrases.Count > 0 || _discoFlips.Count > 0 || _vocalPhrases.Count > 0 || _vocalStarPower.Count > 0)
             {
                 var spans = _phrases.Select(static p => (From: p.Tick, To: p.Tick + p.Length))
                     .Concat(_discoFlips.Select(static s => (From: s.Range.Tick, To: s.Range.EndTick ?? s.Range.Tick)))
                     .Concat(_vocalPhrases.Select(static p => (From: p.Tick, To: p.EndTick)))
+                    .Concat(_vocalStarPower.Select(static p => (From: p.Tick, To: p.EndTick)))
                     .ToList();
                 long from = spans.Min(static s => s.From);
                 long to = spans.Max(static s => s.To);
@@ -239,6 +246,9 @@ public sealed class EditorSelection
 
     /// <summary>Whether <paramref name="phrase"/> of <paramref name="track"/> is selected.</summary>
     public bool Contains(VocalTrack track, VocalPhraseEvent phrase) => Vocal == track && _vocalPhrases.Contains(phrase);
+
+    /// <summary>Whether <paramref name="starPower"/> of <paramref name="track"/> is selected.</summary>
+    public bool Contains(VocalTrack track, VocalStarPowerEvent starPower) => Vocal == track && _vocalStarPower.Contains(starPower);
 
     /// <summary>Selects nothing.</summary>
     public void Clear()
@@ -304,7 +314,7 @@ public sealed class EditorSelection
 
         // The note set is one track's: a vocal part's goes.
         _vocalNotes.Clear();
-        if (_vocalPhrases.Count == 0)
+        if (_vocalPhrases.Count == 0 && _vocalStarPower.Count == 0)
             Vocal = null;
         Track = track;
         _notes.UnionWith(places);
@@ -319,7 +329,7 @@ public sealed class EditorSelection
         if (Track != track)
             _notes.Clear();
         _vocalNotes.Clear();
-        if (_vocalPhrases.Count == 0)
+        if (_vocalPhrases.Count == 0 && _vocalStarPower.Count == 0)
             Vocal = null;
         Track = track;
         var place = NotePlace.Of(note);
@@ -516,10 +526,55 @@ public sealed class EditorSelection
     {
         ArgumentNullException.ThrowIfNull(phrases);
         if (Vocal != track)
+        {
             _vocalNotes.Clear();
+            _vocalStarPower.Clear();
+        }
+
         Vocal = track;
         _vocalPhrases.Clear();
         _vocalPhrases.UnionWith(phrases);
+        EndVocal();
+    }
+
+    /// <summary>
+    /// Selects <paramref name="starPower"/> of <paramref name="track"/>, in place of what was selected or as well as it.
+    /// Either way a highway's notes, and the span, are dropped.
+    /// </summary>
+    /// <param name="add">Whether to keep what's selected; only the notes and phrases of another vocal part are dropped.</param>
+    public void SelectVocalStarPower(VocalTrack track, IEnumerable<VocalStarPowerEvent> starPower, bool add = false)
+    {
+        ArgumentNullException.ThrowIfNull(starPower);
+        StartVocal(track, add);
+        _vocalStarPower.UnionWith(starPower);
+        EndVocal();
+    }
+
+    /// <summary>Selects <paramref name="starPower"/> of <paramref name="track"/> when it isn't, and the other way round, keeping the rest.</summary>
+    public void ToggleVocalStarPower(VocalTrack track, VocalStarPowerEvent starPower)
+    {
+        StartVocal(track, add: true);
+        if (!_vocalStarPower.Remove(starPower))
+            _vocalStarPower.Add(starPower);
+        EndVocal();
+    }
+
+    /// <summary>
+    /// Selects <paramref name="starPower"/> of <paramref name="track"/> in place of the vocal star power selected, keeping the
+    /// notes and phrases: the same phrases as an edit has changed them.
+    /// </summary>
+    public void ReplaceVocalStarPower(VocalTrack track, IEnumerable<VocalStarPowerEvent> starPower)
+    {
+        ArgumentNullException.ThrowIfNull(starPower);
+        if (Vocal != track)
+        {
+            _vocalNotes.Clear();
+            _vocalPhrases.Clear();
+        }
+
+        Vocal = track;
+        _vocalStarPower.Clear();
+        _vocalStarPower.UnionWith(starPower);
         EndVocal();
     }
 
@@ -541,7 +596,7 @@ public sealed class EditorSelection
     /// <returns>Whether anything was dropped.</returns>
     public bool Reconcile()
     {
-        int before = _notes.Count + _tempos.Count + _phrases.Count + _discoFlips.Count + _rangeTracks.Count + _vocalNotes.Count + _vocalPhrases.Count;
+        int before = _notes.Count + _tempos.Count + _phrases.Count + _discoFlips.Count + _rangeTracks.Count + _vocalNotes.Count + _vocalPhrases.Count + _vocalStarPower.Count;
         _rangeTracks.RemoveAll(k => _chart.PartOf(k.Instrument) is null);
         if (Track is { } key && _chart.PartOf(key.Instrument) is { } part)
         {
@@ -572,7 +627,9 @@ public sealed class EditorSelection
             _vocalNotes.RemoveWhere(p => !places.Contains(p));
             var phrases = content.Phrases.ToHashSet();
             _vocalPhrases.RemoveWhere(p => !phrases.Contains(p));
-            if (_vocalNotes.Count == 0 && _vocalPhrases.Count == 0)
+            var starPower = content.StarPower.ToHashSet();
+            _vocalStarPower.RemoveWhere(p => !starPower.Contains(p));
+            if (_vocalNotes.Count == 0 && _vocalPhrases.Count == 0 && _vocalStarPower.Count == 0)
                 Vocal = null;
         }
         else
@@ -580,7 +637,7 @@ public sealed class EditorSelection
             ClearVocalSets();
         }
 
-        bool dropped = _notes.Count + _tempos.Count + _phrases.Count + _discoFlips.Count + _rangeTracks.Count + _vocalNotes.Count + _vocalPhrases.Count != before;
+        bool dropped = _notes.Count + _tempos.Count + _phrases.Count + _discoFlips.Count + _rangeTracks.Count + _vocalNotes.Count + _vocalPhrases.Count + _vocalStarPower.Count != before;
         if (dropped)
             Raise();
         return dropped;
@@ -596,6 +653,7 @@ public sealed class EditorSelection
     {
         _vocalNotes.Clear();
         _vocalPhrases.Clear();
+        _vocalStarPower.Clear();
         Vocal = null;
     }
 
@@ -623,7 +681,7 @@ public sealed class EditorSelection
 
     private void EndVocal()
     {
-        if (_vocalNotes.Count == 0 && _vocalPhrases.Count == 0)
+        if (_vocalNotes.Count == 0 && _vocalPhrases.Count == 0 && _vocalStarPower.Count == 0)
             Vocal = null;
         Raise();
     }

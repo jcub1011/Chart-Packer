@@ -42,6 +42,7 @@ namespace ChartBuilder.ViewModels
             LookAhead = EditorViewport.ClampLookAhead(lane.LookAhead ?? dock.Editor?.DefaultLookAhead ?? 2);
             PixelsPerSecond = HighwayPixelsPerSecond.Clamp(lane.PixelsPerSecond ?? dock.Editor?.DefaultPixelsPerSecond ?? HighwayPixelsPerSecond.Default);
             LengthMode = dock.Editor?.LengthMode ?? HighwayLengthMode.PixelsPerSecond;
+            PitchView = lane.Pitches ?? VocalPitchView.Full;
             Audio = new LaneAudioViewModel(this, lane.Audio, options =>
             {
                 if (_dock.Layout.Find(Lane.Id) is not null)
@@ -125,6 +126,13 @@ namespace ChartBuilder.ViewModels
         public partial HighwayLengthMode LengthMode { get; set; }
 
         public bool IsPixelsPerSecond => LengthMode == HighwayLengthMode.PixelsPerSecond;
+
+        /// <summary>
+        /// The pitches a vocal lane's piano roll shows: every one until its keyboard is scrolled or zoomed. Kept with the
+        /// lanes' layout; a highway has none.
+        /// </summary>
+        [ObservableProperty]
+        public partial VocalPitchView PitchView { get; set; }
 
         /// <summary>How long the lane is, as it's set: what its canvas draws by.</summary>
         public HighwayLength Length => new(LengthMode, LookAhead, PixelsPerSecond);
@@ -499,6 +507,20 @@ namespace ChartBuilder.ViewModels
             if (_dock.Layout.Find(Lane.Id) is not null)
                 _dock.Layout.SetPixelsPerSecond(Lane, clamped);
             Editor?.RefreshVisibleSpan();
+        }
+
+        partial void OnPitchViewChanged(VocalPitchView value)
+        {
+            // Brought into range, as a view made by hand may not be; the lane draws what's kept.
+            var clamped = VocalPitchView.Of(value.Top, value.Span);
+            if (clamped != value)
+            {
+                PitchView = clamped;
+                return;
+            }
+
+            if (_isMade && _dock.Layout.Find(Lane.Id) is not null)
+                _dock.Layout.SetPitches(Lane, clamped);
         }
 
         partial void OnLengthModeChanged(HighwayLengthMode value)

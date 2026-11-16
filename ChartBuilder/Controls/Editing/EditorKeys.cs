@@ -148,7 +148,7 @@ namespace ChartBuilder.Controls.Editing
                     return true;
 
                 // The lane's audio as a waveform or a spectrogram (charter-spec C13 item 5).
-                case BuilderKeys.AudioBackdrop when !lane.IsVocal:
+                case BuilderKeys.AudioBackdrop:
                     lane.Audio.ToggleBackdrop();
                     return true;
 
@@ -182,8 +182,11 @@ namespace ChartBuilder.Controls.Editing
                 case BuilderKeys.NoteGhost when !lane.IsVocal:
                     tools.ToggleDynamics(NoteDynamics.Ghost);
                     return true;
-                case BuilderKeys.NoteStarPower when !lane.IsVocal:
-                    tools.ToggleStarPowerOverSelection();
+                case BuilderKeys.NoteStarPower:
+                    if (lane.IsVocal)
+                        tools.ToggleVocalStarPowerOverSelection();
+                    else
+                        tools.ToggleStarPowerOverSelection();
                     return true;
                 case BuilderKeys.TapTempo:
                     editor.Tap();

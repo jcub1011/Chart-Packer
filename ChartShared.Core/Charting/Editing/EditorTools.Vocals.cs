@@ -8,7 +8,8 @@ namespace ChartShared.Core.Charting.Editing;
 /// <param name="Pitch">The pitch of the row under the pointer, or null outside the rows.</param>
 /// <param name="Tolerance">How many ticks either way the pointer reaches, for hitting what's there.</param>
 /// <param name="InPhrases">Whether the pointer is in the strip the phrases are drawn in, above the rows.</param>
-public readonly record struct VocalPoint(VocalTrack Track, double Tick, int? Pitch, double Tolerance, bool InPhrases = false);
+/// <param name="InStarPower">Whether the pointer is in the rail the star power is drawn in, between that strip and the rows.</param>
+public readonly record struct VocalPoint(VocalTrack Track, double Tick, int? Pitch, double Tolerance, bool InPhrases = false, bool InStarPower = false);
 
 /// <summary>Which part of a vocal note is grabbed: its body, to move it, or its end, to change its length.</summary>
 public enum VocalNoteGrip
@@ -23,13 +24,16 @@ public readonly record struct VocalNoteHit(VocalNoteEvent Note, VocalNoteGrip Gr
 /// <summary>A vocal phrase's bar under the pointer (<see cref="EditorTools.HitTestPhrase(VocalPoint)"/>).</summary>
 public readonly record struct VocalPhraseHit(VocalPhraseEvent Phrase, PhraseGrip Grip);
 
+/// <summary>A vocal star power phrase's bar under the pointer (<see cref="EditorTools.HitTestStarPower(VocalPoint)"/>).</summary>
+public readonly record struct VocalStarPowerHit(VocalStarPowerEvent StarPower, PhraseGrip Grip);
+
 public sealed partial class EditorTools
 {
     private const string VocalsUnreadable = "This vocal track can't be read, so it's kept as it is.";
 
     /// <summary>
     /// Starts a gesture at <paramref name="point"/> in a vocal part's lane with the current tool (charter-spec C3 item 7);
-    /// in the phrase strip, with any tool, a gesture on the phrase there.
+    /// in the phrase strip, with any tool, a gesture on the phrase there, and in the star power rail on its star power.
     /// </summary>
     public void Press(VocalPoint point, EditorModifiers modifiers = EditorModifiers.None)
     {
@@ -41,7 +45,7 @@ public sealed partial class EditorTools
         // and the margins beyond the highest and lowest pitch aren't its business.
         if (LoopActive)
         {
-            _gesture = point.InPhrases || point.Pitch is null ? null : PressLoop(point.Tick, point.Tolerance);
+            _gesture = point.InPhrases || point.InStarPower || point.Pitch is null ? null : PressLoop(point.Tick, point.Tolerance);
             return;
         }
 
@@ -51,6 +55,12 @@ public sealed partial class EditorTools
         if (point.InPhrases)
         {
             _gesture = PressVocalPhrase(point, content, shift);
+            return;
+        }
+
+        if (point.InStarPower)
+        {
+            _gesture = PressVocalStarPower(point, content, shift);
             return;
         }
 
@@ -92,7 +102,7 @@ public sealed partial class EditorTools
     {
         Cancel();
         _modifiers = modifiers;
-        if (point.InPhrases || VocalContentOrSay(point.Track) is not { } content)
+        if (point.InPhrases || point.InStarPower || VocalContentOrSay(point.Track) is not { } content)
             return;
 
         var selection = _session.Selection;
@@ -128,6 +138,71 @@ public sealed partial class EditorTools
     /// <summary>The vocal phrase whose bar is under <paramref name="point"/> in the phrase strip, and which part of it, or null for none.</summary>
     public VocalPhraseHit? HitTestPhrase(VocalPoint point) =>
         _session.VocalContentOf(point.Track) is { } content ? HitTestPhrase(content, point) : null;
+
+    /// <summary>The vocal star power whose bar is under <paramref name="point"/> in the star power rail, and which part of it, or null for none.</summary>
+    public VocalStarPowerHit? HitTestStarPower(VocalPoint point) =>
+        _session.VocalContentOf(point.Track) is { } content ? HitTestStarPower(content, point) : null;
+
+    /// <summary>
+    /// The tick, on the grid, that a press at <paramref name="point"/> in a vocal part's phrase strip would start drawing a
+    /// phrase at, or null where a press does something else: on a bar, with Shift held, with the Loop tool, or with a tool that
+    /// doesn't draw there (the Select, Place and Phrase tools do), or outside the strip.
+    /// </summary>
+    public long? VocalPhraseDrawStart(VocalPoint point, EditorModifiers modifiers = EditorModifiers.None)
+    {
+        if (!point.InPhrases || modifiers.HasFlag(EditorModifiers.Shift) || LoopActive || !DrawsInVocalStrips
+            || _session.VocalContentOf(point.Track) is not { } content || HitTestPhrase(content, point) is not null)
+        {
+            return null;
+        }
+
+        return Snap.Nearest(Math.Max(0, point.Tick), Map);
+    }
+
+    /// <summary>
+    /// The tick, on the grid, that a press at <paramref name="point"/> in a vocal part's star power rail would start drawing
+    /// star power at, or null where a press does something else: on a bar, with Shift held, with the Loop tool, or with a
+    /// tool that doesn't draw there (the Select, Place and Phrase tools do), or outside the rail.
+    /// </summary>
+    public long? VocalStarPowerDrawStart(VocalPoint point, EditorModifiers modifiers = EditorModifiers.None)
+    {
+        if (!point.InStarPower || modifiers.HasFlag(EditorModifiers.Shift) || LoopActive || !DrawsInVocalStrips
+            || _session.VocalContentOf(point.Track) is not { } content || HitTestStarPower(content, point) is not null)
+        {
+            return null;
+        }
+
+        return Snap.Nearest(Math.Max(0, point.Tick), Map);
+    }
+
+    // Whether the tool draws in an empty part of a vocal part's phrase strip and star power rail: the highway's phrase rail's tools.
+    private bool DrawsInVocalStrips => _session.Tool is EditorTool.Select or EditorTool.Place or EditorTool.Phrase;
+
+    /// <summary>
+    /// Puts star power over the selected vocal notes, from the first note's start to the last's end, or takes away the star
+    /// power that's there when some is over them (<c>S</c>), as one step.
+    /// </summary>
+    public void ToggleVocalStarPowerOverSelection()
+    {
+        var selection = _session.Selection;
+        if (selection.Vocal is not { } track || selection.VocalNotes is not { Count: > 0 } notes)
+        {
+            _session.Status = "Select notes to put star power over.";
+            return;
+        }
+
+        long from = notes[0].Tick;
+        long to = Math.Max(from + 1, notes.Max(static n => n.EndTick));
+        var edited = EditVocals(track, c =>
+        {
+            var over = c.StarPower.Where(p => p.Tick < to && p.EndTick > from).ToList();
+            return over.Count > 0
+                ? VocalEdits.RemoveStarPower(c, over)
+                : VocalEdits.AddStarPower(c, new VocalStarPowerEvent(from, to - from));
+        });
+        if (edited is not null)
+            selection.SelectVocalNotes(track, notes.Select(static n => n.Place));
+    }
 
     /// <summary>Selects every note of the vocal part <paramref name="track"/> (Ctrl+A in its lane).</summary>
     public void SelectAllVocals(VocalTrack track)
@@ -242,13 +317,14 @@ public sealed partial class EditorTools
             return null;
         var places = selection.VocalPlaces.ToList();
         var phrases = selection.VocalPhrases;
-        if (places.Count == 0 && phrases.Count == 0)
+        var starPower = selection.VocalStarPower;
+        if (places.Count == 0 && phrases.Count == 0 && starPower.Count == 0)
             return null;
         return () =>
         {
             if (_session.VocalContentOf(track) is not { } content)
                 return (null, VocalsUnreadable);
-            var to = VocalEdits.RemovePhrases(VocalEdits.Remove(content, places), phrases);
+            var to = VocalEdits.RemoveStarPower(VocalEdits.RemovePhrases(VocalEdits.Remove(content, places), phrases), starPower);
             return (ReferenceEquals(to, content) ? null : new ChangeVocals(track, to), null);
         };
     }
@@ -372,6 +448,22 @@ public sealed partial class EditorTools
         return best is { } hit ? new VocalPhraseHit(hit, PhraseRail.GripOf(point.Tick, point.Tolerance, hit.Tick, hit.EndTick)) : null;
     }
 
+    private static VocalStarPowerHit? HitTestStarPower(VocalTrackContent content, VocalPoint point)
+    {
+        VocalStarPowerEvent? best = null;
+        double bestDistance = double.MaxValue;
+        foreach (var phrase in content.StarPower)
+        {
+            if (point.Tick < phrase.Tick - point.Tolerance || point.Tick > phrase.EndTick + point.Tolerance)
+                continue;
+            double distance = point.Tick < phrase.Tick ? phrase.Tick - point.Tick : Math.Max(0, point.Tick - phrase.EndTick);
+            if (distance < bestDistance || (distance == bestDistance && phrase.Length < best!.Value.Length))
+                (best, bestDistance) = (phrase, distance);
+        }
+
+        return best is { } hit ? new VocalStarPowerHit(hit, PhraseRail.GripOf(point.Tick, point.Tolerance, hit.Tick, hit.EndTick)) : null;
+    }
+
     private Gesture? PressVocalSelect(VocalPoint point, VocalTrackContent content, bool shift)
     {
         var selection = _session.Selection;
@@ -422,16 +514,17 @@ public sealed partial class EditorTools
     }
 
     // A press in the phrase strip, with any tool: on a phrase's bar it selects the phrase (Shift adds it or takes it away),
-    // and a drag moves it, or resizes it by the end grabbed. Elsewhere in the strip, the Phrase tool draws, and the others
-    // select no phrases.
+    // and a drag moves it, or resizes it by the end grabbed. Elsewhere in the strip, as in a highway's phrase rail, the Select,
+    // Place and Phrase tools draw a new phrase, and the others, or Shift, leave the strip as a click does, clearing the
+    // selection.
     private Gesture? PressVocalPhrase(VocalPoint point, VocalTrackContent content, bool shift)
     {
         var selection = _session.Selection;
         if (HitTestPhrase(content, point) is not { } hit)
         {
-            if (_session.Tool == EditorTool.Phrase)
+            if (!shift && DrawsInVocalStrips)
                 return new VocalPhraseDrawGesture(this, point, content);
-            if (selection.HasVocalPhrases)
+            if (!shift && selection.HasVocalPhrases)
                 selection.ReplaceVocalPhrases(point.Track, []);
             return null;
         }
@@ -447,6 +540,34 @@ public sealed partial class EditorTools
         return hit.Grip == PhraseGrip.Body
             ? new VocalPhraseMoveGesture(this, point, content, hit.Phrase)
             : new VocalPhraseResizeGesture(this, point, content, hit.Phrase, start: hit.Grip == PhraseGrip.Start);
+    }
+
+    // A press in the star power rail, with any tool: on a bar it selects the star power (Shift adds it or takes it away), and a
+    // drag moves it, or resizes it by the end grabbed. Elsewhere in the rail, as in a highway's phrase rail, the Select, Place
+    // and Phrase tools draw new star power, and the others, or Shift, leave the rail as a click does, clearing the selection.
+    private Gesture? PressVocalStarPower(VocalPoint point, VocalTrackContent content, bool shift)
+    {
+        var selection = _session.Selection;
+        if (HitTestStarPower(content, point) is not { } hit)
+        {
+            if (!shift && DrawsInVocalStrips)
+                return new VocalStarPowerDrawGesture(this, point, content);
+            if (!shift && selection.HasVocalStarPower)
+                selection.ReplaceVocalStarPower(point.Track, []);
+            return null;
+        }
+
+        if (shift)
+        {
+            selection.ToggleVocalStarPower(point.Track, hit.StarPower);
+            return null;
+        }
+
+        if (!selection.Contains(point.Track, hit.StarPower))
+            selection.SelectVocalStarPower(point.Track, [hit.StarPower]);
+        return hit.Grip == PhraseGrip.Body
+            ? new VocalStarPowerMoveGesture(this, point, content, hit.StarPower)
+            : new VocalStarPowerResizeGesture(this, point, content, hit.StarPower, start: hit.Grip == PhraseGrip.Start);
     }
 
     /// <summary>A gesture in a vocal part's lane, worked out from the part as it was pressed.</summary>
@@ -634,11 +755,12 @@ public sealed partial class EditorTools
         }
     }
 
-    /// <summary>Removes each vocal note the pointer passes over, with its lyrics, and in the phrase strip each phrase.</summary>
+    /// <summary>Removes each vocal note the pointer passes over, with its lyrics, and in the phrase strip each phrase, and in the star power rail each star power.</summary>
     private sealed class VocalEraseGesture : VocalGesture
     {
         private readonly HashSet<VocalNotePlace> _erased = [];
         private readonly HashSet<VocalPhraseEvent> _phrases = [];
+        private readonly HashSet<VocalStarPowerEvent> _starPower = [];
 
         public VocalEraseGesture(EditorTools tools, VocalPoint pressed, VocalTrackContent content)
             : base(tools, pressed.Track, content) => Drag(pressed);
@@ -649,9 +771,11 @@ public sealed partial class EditorTools
                 return;
             bool added = point.InPhrases
                 ? HitTestPhrase(Content, point) is { } phrase && _phrases.Add(phrase.Phrase)
-                : HitTest(Content, point) is { } hit && _erased.Add(hit.Note.Place);
+                : point.InStarPower
+                    ? HitTestStarPower(Content, point) is { } starPower && _starPower.Add(starPower.StarPower)
+                    : HitTest(Content, point) is { } hit && _erased.Add(hit.Note.Place);
             if (added)
-                Preview(c => VocalEdits.RemovePhrases(VocalEdits.Remove(c, _erased), _phrases));
+                Preview(c => VocalEdits.RemoveStarPower(VocalEdits.RemovePhrases(VocalEdits.Remove(c, _erased), _phrases), _starPower));
         }
     }
 
@@ -844,5 +968,141 @@ public sealed partial class EditorTools
         }
 
         public override void Cancel() => Session.Selection.ReplaceVocalPhrases(Track, _selected);
+    }
+
+    /// <summary>
+    /// Draws out vocal star power along time, from the grid step pressed to the one the pointer is at, either way. A click
+    /// without a drag adds nothing, and selects no star power.
+    /// </summary>
+    private sealed class VocalStarPowerDrawGesture : VocalGesture
+    {
+        private readonly long _from;
+        private VocalStarPowerEvent? _tried;
+
+        public VocalStarPowerDrawGesture(EditorTools tools, VocalPoint pressed, VocalTrackContent content)
+            : base(tools, pressed.Track, content) => _from = Tools.Snap.Nearest(Math.Max(0, pressed.Tick), Tools.Map);
+
+        public override void Drag(VocalPoint point)
+        {
+            if (point.Track != Track)
+                return;
+            long to = Tools.Snap.Nearest(Math.Max(0, point.Tick), Tools.Map);
+            VocalStarPowerEvent? starPower = to == _from ? null : new VocalStarPowerEvent(Math.Min(_from, to), Math.Abs(to - _from));
+            if (starPower == _tried)
+                return;
+            _tried = starPower;
+            if (starPower is { } added)
+                Preview(c => VocalEdits.AddStarPower(c, added));
+            else
+                Session.Preview(null);
+        }
+
+        public override void Release(VocalPoint point)
+        {
+            Drag(point);
+            if (Session.CommitPreview() is ChangeVocals && _tried is { } added)
+                Session.Selection.SelectVocalStarPower(Track, [added]);
+            else if (_tried is null)
+                Session.Selection.ReplaceVocalStarPower(Track, []);
+        }
+    }
+
+    /// <summary>
+    /// Drags the selected vocal star power in time, by the bar grabbed, to the grid, each keeping its length. Nothing moves
+    /// until the pointer has, so a click only selects.
+    /// </summary>
+    private sealed class VocalStarPowerMoveGesture : VocalGesture
+    {
+        private readonly VocalPoint _pressed;
+        private readonly VocalStarPowerEvent _grabbed;
+        private readonly IReadOnlyList<VocalStarPowerEvent> _starPower;
+        private long _delta;
+        private bool _moved;
+
+        public VocalStarPowerMoveGesture(EditorTools tools, VocalPoint pressed, VocalTrackContent content, VocalStarPowerEvent grabbed)
+            : base(tools, pressed.Track, content)
+        {
+            _pressed = pressed;
+            _grabbed = grabbed;
+            _starPower = Session.Selection.VocalStarPower;
+        }
+
+        public override void Drag(VocalPoint point)
+        {
+            _moved |= Math.Abs(point.Tick - _pressed.Tick) > _pressed.Tolerance;
+            if (!_moved || point.Track != Track || _starPower.Count == 0)
+                return;
+            long tick = Tools.Snap.Nearest(_grabbed.Tick + (point.Tick - _pressed.Tick), Tools.Map);
+            long delta = Math.Max(tick - _grabbed.Tick, -_starPower.Min(static p => p.Tick));
+            if (delta == _delta)
+                return;
+            _delta = delta;
+
+            IReadOnlyList<VocalStarPowerEvent> moved = [];
+            bool previewed = delta != 0 && Preview(c => VocalEdits.ChangeStarPower(c, _starPower, p => p with { Tick = p.Tick + delta }, out moved));
+            if (delta == 0)
+                Session.Preview(null);
+            Session.Selection.ReplaceVocalStarPower(Track, previewed ? moved : _starPower);
+        }
+
+        public override void Cancel() => Session.Selection.ReplaceVocalStarPower(Track, _starPower);
+    }
+
+    /// <summary>
+    /// Drags one end of a vocal star power phrase to the grid, the other staying where it is; it never reaches the other
+    /// end. Nothing changes until the pointer has moved, so a click only selects.
+    /// </summary>
+    private sealed class VocalStarPowerResizeGesture : VocalGesture
+    {
+        private readonly VocalPoint _pressed;
+        private readonly VocalStarPowerEvent _starPower;
+        private readonly bool _start;
+        private readonly IReadOnlyList<VocalStarPowerEvent> _selected;
+        private VocalStarPowerEvent _tried;
+        private bool _moved;
+
+        public VocalStarPowerResizeGesture(EditorTools tools, VocalPoint pressed, VocalTrackContent content, VocalStarPowerEvent starPower, bool start)
+            : base(tools, pressed.Track, content)
+        {
+            _pressed = pressed;
+            _starPower = starPower;
+            _start = start;
+            _selected = Session.Selection.VocalStarPower;
+            _tried = starPower;
+        }
+
+        public override void Drag(VocalPoint point)
+        {
+            _moved |= Math.Abs(point.Tick - _pressed.Tick) > _pressed.Tolerance;
+            if (!_moved || point.Track != Track)
+                return;
+            var snap = Tools.Snap;
+            var map = Tools.Map;
+            long at = snap.Nearest(Math.Max(0, point.Tick), map);
+            long start = _starPower.Tick, end = _starPower.EndTick;
+            if (_start)
+            {
+                if (at >= end)
+                    at = snap.IsOn ? snap.Step(end, -1, map) : end - 1;
+                if (at >= end || at < 0)
+                    return;
+                start = at;
+            }
+            else
+            {
+                end = Math.Max(at, snap.IsOn ? snap.Step(start, 1, map) : start + 1);
+            }
+
+            var resized = _starPower with { Tick = start, Length = end - start };
+            if (resized == _tried)
+                return;
+            _tried = resized;
+
+            bool previewed = Preview(c => VocalEdits.ChangeStarPower(c, [_starPower], _ => resized, out _));
+            var shown = previewed ? resized : _starPower;
+            Session.Selection.ReplaceVocalStarPower(Track, _selected.Select(p => p == _starPower ? shown : p));
+        }
+
+        public override void Cancel() => Session.Selection.ReplaceVocalStarPower(Track, _selected);
     }
 }

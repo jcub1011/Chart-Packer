@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charting.Layout;
 using ChartShared.Core.Charts;
 
@@ -332,6 +333,52 @@ public sealed class LaneDockLayoutTests
         Assert.AreEqual(3.5, Lane(read, Bass).LookAhead, "Each is kept, so changing the mode loses neither.");
         Assert.IsNull(Lane(read, Drums).PixelsPerSecond, "A speed that isn't a positive number is the default.");
         Assert.IsNull(Lane(read, Guitar).PixelsPerSecond);
+    }
+
+    [TestMethod]
+    public void AVocalLanesPitchesAreKeptWithoutChangingTheLayout()
+    {
+        var layout = LaneDockLayout.CreateDefault();
+        int changes = 0;
+        layout.Changed += (_, _) => changes++;
+
+        layout.SetPitches(Lane(layout, Vocals), new VocalPitchView(72, 24));
+        string json = JsonSerializer.Serialize(layout.ToState(), LaneDockTestJsonContext.Default.LaneDockState);
+        var read = LaneDockLayout.FromState(JsonSerializer.Deserialize(json, LaneDockTestJsonContext.Default.LaneDockState))!;
+
+        Assert.AreEqual(0, changes, "The pitches shown aren't a change to the layout's shape.");
+        Assert.AreEqual(new VocalPitchView(72, 24), Lane(read, Vocals).Pitches);
+        Assert.IsNull(Lane(read, Guitar).Pitches);
+    }
+
+    [TestMethod]
+    public void TheFullPitchRangeIsKeptAsNone()
+    {
+        var layout = LaneDockLayout.CreateDefault();
+
+        layout.SetPitches(Lane(layout, Vocals), new VocalPitchView(72, 24));
+        layout.SetPitches(Lane(layout, Vocals), VocalPitchView.Full);
+
+        Assert.IsNull(Lane(layout, Vocals).Pitches);
+        Assert.IsNull(layout.ToState().Root!.Children![1].PitchTop);
+    }
+
+    [TestMethod]
+    public void PitchesSavedOutOfRangeAreBroughtIntoIt()
+    {
+        var read = LaneDockLayout.FromState(JsonSerializer.Deserialize("""{"Root":{"Vocal":"Vocals","PitchTop":200,"PitchSpan":1}}""", LaneDockTestJsonContext.Default.LaneDockState));
+
+        Assert.IsNotNull(read);
+        Assert.AreEqual(VocalPitchView.Of(200, 1), Lane(read, Vocals).Pitches);
+    }
+
+    [TestMethod]
+    public void ALayoutSavedBeforePitchesStillLoadsWithEveryPitch()
+    {
+        var read = LaneDockLayout.FromState(JsonSerializer.Deserialize("""{"Root":{"Vocal":"Vocals"}}""", LaneDockTestJsonContext.Default.LaneDockState));
+
+        Assert.IsNotNull(read);
+        Assert.IsNull(Lane(read, Vocals).Pitches);
     }
 
     [TestMethod]

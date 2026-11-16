@@ -3431,6 +3431,10 @@ Saving also changes song.ini:
     <value>Vocal phrase</value>
     <comment>Shown over a vocal phrase's bar in the phrase strip.</comment>
   </data>
+  <data name="RailVocalStarPowerToolTip" xml:space="preserve">
+    <value>Star power</value>
+    <comment>Shown over a vocal part's star power bar in its star power rail.</comment>
+  </data>
   <data name="LaneDifficultyPickerToolTip" xml:space="preserve">
     <value>Difficulty shown</value>
     <comment>The drop-down that stands in for the difficulty letters in a lane's header when the lane is too narrow for them.</comment>
@@ -4623,6 +4627,14 @@ Saving also changes song.ini:
   <data name="KeyActionMouseZoom" xml:space="preserve">
     <value>Change Look-Ahead</value>
     <comment>Name of the Change the look-ahead shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionMousePitchScroll" xml:space="preserve">
+    <value>Scroll Vocal Pitches</value>
+    <comment>Name of the Scroll the pitches a vocal lane shows shortcut, in the keyboard shortcuts list: the wheel over its piano keyboard.</comment>
+  </data>
+  <data name="KeyActionMousePitchZoom" xml:space="preserve">
+    <value>Zoom Vocal Pitches</value>
+    <comment>Name of the Zoom the pitches a vocal lane shows shortcut, in the keyboard shortcuts list: Ctrl and the wheel over its piano keyboard.</comment>
   </data>
   <data name="KeyActionMouseSync" xml:space="preserve">
     <value>Use Sync Tool While Held</value>

@@ -1,3 +1,4 @@
+using ChartShared.Core.Charting.Layout;
 using ChartShared.Core.Charts;
 using ChartShared.Core.Scanning;
 
@@ -51,6 +52,24 @@ public sealed class LaneStemsTests
     {
         Assert.AreSequenceEqual(["vocals_1"], LaneStems.Pick(LaneStems.Vocals, ["song", "vocals_2", "vocals_1"], null).ToList());
         Assert.AreSequenceEqual(["vocals"], LaneStems.Pick(LaneStems.Vocals, ["vocals_1", "vocals"], null).ToList());
+    }
+
+    [TestMethod]
+    public void AVocalPartPrefersItsOwnStem()
+    {
+        string[] available = ["song", "vocals", "vocals_1", "vocals_2"];
+
+        Assert.AreSequenceEqual(["vocals"], [.. LaneStems.Pick(LaneStems.For(VocalTrack.Vocals), available, null)]);
+        Assert.AreSequenceEqual(["vocals_1"], [.. LaneStems.Pick(LaneStems.For(VocalTrack.Harmony1), available, null)]);
+        Assert.AreSequenceEqual(["vocals_2"], [.. LaneStems.Pick(LaneStems.For(VocalTrack.Harmony2), available, null)]);
+        Assert.AreSequenceEqual(["vocals"], [.. LaneStems.Pick(LaneStems.For(VocalTrack.Harmony3), available, null)]);
+    }
+
+    [TestMethod]
+    public void AHarmonyWithoutItsOwnStemFallsBackToTheLeadsThenTheSong()
+    {
+        Assert.AreSequenceEqual(["vocals"], [.. LaneStems.Pick(LaneStems.For(VocalTrack.Harmony1), ["song", "vocals"], null)]);
+        Assert.AreSequenceEqual(["song"], [.. LaneStems.Pick(LaneStems.For(VocalTrack.Harmony2), ["song", "guitar"], null)]);
     }
 
     [TestMethod]

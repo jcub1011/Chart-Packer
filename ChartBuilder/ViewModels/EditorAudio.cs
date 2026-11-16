@@ -106,6 +106,7 @@ namespace ChartBuilder.ViewModels
             if (!ReferenceEquals(_sourcesFor, Tracks))
             {
                 _sources.Clear();
+                _vocalSources.Clear();
                 _sourcesFor = Tracks;
             }
 
@@ -115,7 +116,25 @@ namespace ChartBuilder.ViewModels
             return source;
         }
 
+        /// <summary>The audio a lane showing the vocal part <paramref name="vocal"/> is drawn over, as <paramref name="options"/> picks it.</summary>
+        public AudioSource? SourceFor(LaneAudioOptions options, VocalTrack vocal)
+        {
+            ArgumentNullException.ThrowIfNull(options);
+            if (!ReferenceEquals(_sourcesFor, Tracks))
+            {
+                _sources.Clear();
+                _vocalSources.Clear();
+                _sourcesFor = Tracks;
+            }
+
+            var key = (options.Source, vocal);
+            if (!_vocalSources.TryGetValue(key, out var source))
+                _vocalSources[key] = source = AudioSource.Resolve(options, LaneStems.For(vocal), Tracks);
+            return source;
+        }
+
         private readonly Dictionary<(string? Source, ChartInstrument Instrument), AudioSource?> _sources = [];
+        private readonly Dictionary<(string? Source, VocalTrack Vocal), AudioSource?> _vocalSources = [];
         private IReadOnlyList<SongTrack>? _sourcesFor;
 
         /// <summary>
@@ -147,6 +166,7 @@ namespace ChartBuilder.ViewModels
             Entry = entry;
             Tracks = tracks;
             _sources.Clear();
+            _vocalSources.Clear();
             (Waveforms, Analysis) = Open(entry, tracks, _fidelity);
             Waveforms.Start();
             if (_settled.Task.IsCompleted)
