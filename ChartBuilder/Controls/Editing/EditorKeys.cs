@@ -188,6 +188,10 @@ namespace ChartBuilder.Controls.Editing
                     else
                         tools.ToggleStarPowerOverSelection();
                     return true;
+
+                // A vocal note's lyric, in the box over it (charter-spec C3 item 7).
+                case BuilderKeys.NoteEditLyric:
+                    return lane.IsVocal && canvas.OpenLyricEditor();
                 case BuilderKeys.TapTempo:
                     editor.Tap();
                     return true;

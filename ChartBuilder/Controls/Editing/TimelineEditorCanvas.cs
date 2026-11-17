@@ -10,7 +10,7 @@ namespace ChartBuilder.Controls.Editing
     /// lane is a row, under a ruler of measure numbers, tempo markers and section names, a strip of the waveform or
     /// spectrogram (C12, C13) and the phrase rail (C8), with the onsets in a strip under the rows (C14). It suits
     /// long-range editing and lining notes up with the audio. It's the view a vocal part is drawn in, as a piano roll with
-    /// its lyrics under it.
+    /// each note's lyric in a bubble above it.
     /// </summary>
     public sealed class TimelineEditorCanvas : EditorCanvas
     {
@@ -19,8 +19,7 @@ namespace ChartBuilder.Controls.Editing
         private const double MaxStripHeight = 48;
         private const double MarkHeight = 14;
 
-        // A vocal part's band of lyrics, under its rows, and its strip of phrases and rail of star power, above them.
-        private const double LyricsHeight = 18;
+        // A vocal part's strip of phrases and rail of star power, above its rows.
         private const double VocalPhraseHeight = 10;
         private const double VocalStarPowerHeight = 10;
 
@@ -69,12 +68,13 @@ namespace ChartBuilder.Controls.Editing
         // Above the forcing marks.
         protected override double PhraseRailFrom(LaneProjection projection, int phraseRows) => projection.LaneFrom - MarkHeight - PhraseRailSize(phraseRows);
 
-        // A vocal part's phrase strip is under the ruler, its star power rail under that, its rows under that, and its lyrics
-        // under them, all after its keyboard.
+        // A vocal part's phrase strip is under the ruler, its star power rail under that, and its rows under that, all after its
+        // keyboard.
         protected override LaneProjection? ProjectVocals(Size size, LaneSlots slots, EditorViewport viewport, HighwayLength length)
         {
-            double height = Math.Max(1, size.Height - RulerHeight - VocalPhraseHeight - VocalStarPowerHeight - LyricsHeight);
-            return LaneProjection.Of(LaneView.Timeline, KeyboardWidth, Math.Max(1, size.Width - KeyboardWidth), RulerHeight + VocalPhraseHeight + VocalStarPowerHeight, height / slots.Slots.Count, slots, viewport, length);
+            double top = RulerHeight + VocalPhraseHeight + VocalStarPowerHeight;
+            double height = Math.Max(1, size.Height - top);
+            return LaneProjection.Of(LaneView.Timeline, KeyboardWidth, Math.Max(1, size.Width - KeyboardWidth), top, height / slots.Slots.Count, slots, viewport, length);
         }
 
         protected override Rect VocalPhraseArea(Size size, LaneProjection projection) =>
@@ -82,9 +82,6 @@ namespace ChartBuilder.Controls.Editing
 
         protected override Rect VocalStarPowerArea(Size size, LaneProjection projection) =>
             new(projection.TimeFrom, RulerHeight + VocalPhraseHeight, projection.TimeLength, VocalStarPowerHeight);
-
-        protected override Rect LyricsArea(Size size, LaneProjection projection) =>
-            new(projection.TimeFrom, projection.LaneFrom + (projection.LaneSize * projection.Slots.Slots.Count), projection.TimeLength, LyricsHeight);
 
         // A fifth of the lane's height, so the rows keep most of it.
         private static double StripHeight(Size size) => Math.Clamp((size.Height - RulerHeight) * 0.2, 0, MaxStripHeight);

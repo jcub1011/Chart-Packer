@@ -929,13 +929,17 @@ Acceptance criteria:
      own stem (`vocals`, or `vocals_1` and `vocals_2` for the first two harmonies), the lead's or
      the mix when it has none, or the stem the button picks;
    - the phrases shaded behind the rows, and as bars in a strip above them, with the star power
-     (overdrive, note 116) as bars in a rail under that strip, in a highway's star power colour; and the lyrics in a band
-     under the rows, each syllable at its tick, with a hyphen where it joins the next. A syllable
-     that would run into the one before is left out, as the lane is zoomed out;
+     (overdrive, note 116) as bars in a rail under that strip, in a highway's star power colour;
+   - the lyrics, each syllable in a bubble hovering above its note, on a line down to the note,
+     with a hyphen where it joins the next. A bubble that would cover another is moved up a level
+     (three at most), so lyrics that run together in time can still be read; a note too near the
+     top of the rows for a bubble above it has the bubble below it instead; one that fits on no
+     level is left out, as the lane is zoomed out. A selected note, or the one under the pointer,
+     that has no lyric shows a faint + bubble;
    - the beats, sections, tempo markers, loop and selection as a highway's lane has them;
    - what's on the strike line lit, as Chart Packer's lyrics lane lights it, wherever the cursor is,
      playing or not: the note being sung near white with a glow where it crosses the line, its
-     syllable in the same tint, and its phrase shaded a little more than the others.
+     syllable's bubble in the same tint, and its phrase shaded a little more than the others.
 
    Scrolling, zoom (look-ahead) and the keys that move the cursor or play work as in any lane. A
    lane whose track the chart hasn't says so, and offers to add it, empty. The part is read from its
@@ -973,12 +977,26 @@ Acceptance criteria:
    - **Lyrics** belong to the notes that start on their tick: a note moved or deleted takes its
      lyric with it, unless a note that stays starts there. A lyric on no note's start stays where
      it is.
+   - **Editing a lyric** is done on its bubble. A double click on a bubble or a note (with the
+     Select tool), a press on a + bubble, **Edit Lyric…** in the note menu, or `F2` opens a box
+     over the first selected note, with its lyric. A spoken note's `#` or `^` is not shown in the box and is
+     written back after what's typed, blank or not, so editing never turns a spoken note sung. A slide's `+` is not a lyric: the box doesn't open on a
+     slide, the status saying so, and Tab skips slides. Enter, or leaving the box,
+     sets the lyric of that note alone, adding one to a note with none; blank takes it away; Esc
+     leaves it as it was; the box is as wide as what's typed, no narrower than its placeholder and no wider than 32
+     characters, past which the text wraps; the note's bubble shows what's typed, as it's typed, in the accent's outline, with the box under the note; Tab goes on to the next note's lyric, and Shift+Tab to the one before,
+     moving the song there when it isn't in view. **Delete Lyric** in the note menu takes the
+     lyric off the selected notes and leaves the notes, a spoken note staying spoken. Each edit is one undoable step, and one
+     that changes nothing makes none. A press on a bubble selects its note and no more.
    - **Properties** shows the selected notes' tick, pitch (a MIDI number, or a name such as `F#3`),
-     length and lyric, symbols included, with Slide and Spoken, and the selected phrases' start and
+     length and lyric, with Slide and Spoken (the lyric field, like the lyric box, leaves out a spoken
+     note's `#` or `^`, which it keeps, and is disabled when every selected note is a slide, which has
+     no lyric; a lyric set there goes to the notes that have one), and the selected phrases' start and
      end. **Type lyrics…** gives a typed line's syllables to the selected notes in turn, a slide
      skipped, split at spaces and after hyphens (`Hel-lo world`).
    - **Keys** ([§9](#9-keyboard-shortcuts)): Alt and the arrows move the selected notes a grid step or
-     a semitone, an octave with Shift; Ctrl+A selects the part's notes; `S` puts star power over the
+     a semitone, an octave with Shift; Ctrl+A selects the part's notes; `F2` edits the first selected
+     note's lyric; `S` puts star power over the
      selected notes, or takes away the star power that's over them; `W` switches the part's audio
      between the waveform and the spectrogram; Delete and Ctrl+X, C and V work on its notes, with their lyrics. A vocal part's notes paste only into a vocal lane, and a
      highway's never into one. The keys that change a highway's notes do nothing.
@@ -2939,7 +2957,7 @@ Editor straight away, with no dialog before it.
 │ Tracks              │              ┃             ┃               │ …                  │
 │ Chart files         ├━━━━━━━━━━━━━━┻━━━━━━━━━━━━━┻━━━━━━━━━━━━━━━┤                    │
 │ Other files         │ Vocals ▾                        2.0 s + ✕  │                    │
-│ Findings            │   piano roll, lyrics under it              │                    │
+│ Findings            │   piano roll, lyric bubbles                │                    │
 │ Metadata            │                                            │                    │
 ╞═════════════════════╧════════════════════════════════════════════╧════════════════════╡
 │ Timeline                                                              1:38.4 / 4:12.0 │
@@ -3124,6 +3142,7 @@ one is picked up by the other when its window is next activated.
 | `C` | Toggle cymbal or tom (Pro drums, every difficulty at that tick) |
 | `A` / `Shift`+`A` | Toggle accent or ghost (drums) |
 | `S` | Star power phrase over the selection |
+| `F2` | Edit the lyric of the first selected vocal note |
 | `Alt`+`1`–`6` | Pick the Select, Place, Erase, Phrase, Tempo or Sync tool, in the toolbar's order; the number row's digits, not the number pad's; works wherever focus is, except in a text box |
 | `L` | Hold for the Loop tool: drag out the loop region, or drag its ends or middle to resize or move it. Tapped briefly, having touched nothing, it turns repeating the region on or off ([C10](#c10-playback)) |
 | `R` | Record mode on or off, and playtest off: on, playing the song records a pass. Space ends a pass, and Esc cancels it |

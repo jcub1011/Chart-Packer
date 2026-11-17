@@ -94,6 +94,7 @@ namespace ChartBuilder.Services
         public const string NoteAccent = "builder.note.accent";
         public const string NoteGhost = "builder.note.ghost";
         public const string NoteStarPower = "builder.note.starPower";
+        public const string NoteEditLyric = "builder.note.editLyric";
         public const string DifficultyEasy = "builder.difficulty.easy";
         public const string DifficultyMedium = "builder.difficulty.medium";
         public const string DifficultyHard = "builder.difficulty.hard";
@@ -230,6 +231,7 @@ namespace ChartBuilder.Services
             yield return Make(NoteAccent, Strings.KeyActionNoteAccent, notes, Canvas, "A", bare: true);
             yield return Make(NoteGhost, Strings.KeyActionNoteGhost, notes, Canvas, "Shift+A");
             yield return Make(NoteStarPower, Strings.KeyActionNoteStarPower, notes, Canvas, "S", bare: true);
+            yield return Make(NoteEditLyric, Strings.KeyActionNoteEditLyric, notes, Canvas, "F2", bare: true);
 
             yield return Make(DifficultyEasy, Strings.KeyActionDifficultyEasy, lane, Canvas, "Ctrl+Digit1");
             yield return Make(DifficultyMedium, Strings.KeyActionDifficultyMedium, lane, Canvas, "Ctrl+Digit2");

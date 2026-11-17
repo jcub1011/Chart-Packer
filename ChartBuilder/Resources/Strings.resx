@@ -501,7 +501,7 @@
     <comment>A Properties field: a vocal note's lyric.</comment>
   </data>
   <data name="PropertiesLyricToolTip" xml:space="preserve">
-    <value>The syllable as written. A trailing hyphen joins it to the next; # marks it spoken; + is a slide from the previous note.</value>
+    <value>The syllable. A trailing hyphen joins it to the next. Whether the note is spoken or a slide is set below, and kept as it is when the lyric changes.</value>
     <comment>The tooltip of Properties' lyric field.</comment>
   </data>
   <data name="PropertiesSungLabel" xml:space="preserve">
@@ -547,6 +547,22 @@
   <data name="PropertiesTypedLyricsLeftFormat" xml:space="preserve">
     <value>{0} syllables had no note to go on.</value>
     <comment>Said after Type lyrics when the line had more syllables than the selected notes, with how many were left.</comment>
+  </data>
+  <data name="VocalNoteLyricTip" xml:space="preserve">
+    <value>Double-click to edit the lyric</value>
+    <comment>The tip over a vocal note's lyric bubble in its lane, as the pointer rests on it.</comment>
+  </data>
+  <data name="LyricEditWatermark" xml:space="preserve">
+    <value>Syllable, symbols included</value>
+    <comment>The watermark of the box that edits a vocal note's lyric in its lane.</comment>
+  </data>
+  <data name="VocalEditLyricNone" xml:space="preserve">
+    <value>Select a vocal note to edit its lyric.</value>
+    <comment>Said when the lyric box is opened with no vocal note selected.</comment>
+  </data>
+  <data name="VocalSlideNoLyric" xml:space="preserve">
+    <value>A slide has no lyric of its own. Turn off Slide in Properties to give the note one.</value>
+    <comment>Said when the lyric box is opened on a slide note, whose + is not a lyric.</comment>
   </data>
   <data name="LaneNoVocalsFormat" xml:space="preserve">
     <value>The chart has no {0} part.</value>
@@ -3411,6 +3427,14 @@ Saving also changes song.ini:
     <value>{0} track</value>
     <comment>{0} is the stem, e.g. "guitar".</comment>
   </data>
+  <data name="NoteMenuEditLyric" xml:space="preserve">
+    <value>Edit Lyric…</value>
+    <comment>The note menu item that opens a vocal note's lyric box, as the Properties lyric field edits it.</comment>
+  </data>
+  <data name="NoteMenuDeleteLyric" xml:space="preserve">
+    <value>Delete Lyric</value>
+    <comment>The note menu item that takes the lyric off the selected vocal notes, leaving the notes.</comment>
+  </data>
   <data name="NoteMenuNatural" xml:space="preserve">
     <value>Natural</value>
     <comment>The note menu: the chords are neither forced nor tapped, so the games decide strum or HOPO.</comment>
@@ -4611,6 +4635,10 @@ Saving also changes song.ini:
   <data name="KeyActionNoteStarPower" xml:space="preserve">
     <value>Star Power</value>
     <comment>Name of the Star power shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionNoteEditLyric" xml:space="preserve">
+    <value>Edit Lyric</value>
+    <comment>Name of the Edit lyric shortcut, in the keyboard shortcuts list.</comment>
   </data>
   <data name="KeyActionDifficultyEasy" xml:space="preserve">
     <value>Show Easy</value>

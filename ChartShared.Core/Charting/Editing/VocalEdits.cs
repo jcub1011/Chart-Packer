@@ -183,6 +183,73 @@ public static class VocalEdits
     }
 
     /// <summary>
+    /// A lyric as written, split into what's edited and the marks that say its note is spoken: the <c>#</c> and <c>^</c>
+    /// among the symbols after its syllable, which are taken out of <c>Shown</c> and returned, in order, as <c>Marks</c>. Its
+    /// other symbols, such as the hyphen that joins it to the next syllable, stay in <c>Shown</c>.
+    /// </summary>
+    public static (string Shown, string Marks) SplitSpokenMarks(string lyric)
+    {
+        ArgumentNullException.ThrowIfNull(lyric);
+        string text = lyric.Trim();
+        int end = text.Length;
+        while (end > 0 && Symbols.Contains(text[end - 1], StringComparison.Ordinal))
+            end--;
+        string tail = text[end..];
+        string marks = string.Concat(tail.Where(static c => c is '#' or '^'));
+        return (marks.Length == 0 ? text : text[..end] + string.Concat(tail.Where(static c => c is not ('#' or '^'))), marks);
+    }
+
+    /// <summary>
+    /// <paramref name="shown"/> with <paramref name="marks"/>, from <see cref="SplitSpokenMarks"/>, put back after it: what an
+    /// edited lyric is written as, so a spoken note stays spoken, as blank as the text may be.
+    /// </summary>
+    public static string WithSpokenMarks(string shown, string marks)
+    {
+        ArgumentNullException.ThrowIfNull(shown);
+        ArgumentNullException.ThrowIfNull(marks);
+        return marks.Length == 0 ? shown : shown.Trim() + marks;
+    }
+
+    /// <summary>
+    /// <paramref name="content"/> with the syllable of the note at each of <paramref name="ticks"/> set to <paramref name="shown"/>,
+    /// as <see cref="SplitSpokenMarks"/> shows it: a spoken note's <c>#</c> or <c>^</c> is kept after it, blank or not, and a
+    /// slide, whose <c>+</c> is no syllable, is left as it is.
+    /// </summary>
+    public static VocalTrackContent SetSyllable(VocalTrackContent content, IEnumerable<long> ticks, string shown)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+        ArgumentNullException.ThrowIfNull(ticks);
+        ArgumentNullException.ThrowIfNull(shown);
+        var lyrics = new List<(long, string)>();
+        foreach (long tick in ticks.Distinct())
+        {
+            string raw = LyricAt(content, tick) ?? string.Empty;
+            if (raw.Trim() != SlideText)
+                lyrics.Add((tick, WithSpokenMarks(shown, SplitSpokenMarks(raw).Marks)));
+        }
+
+        return SetLyrics(content, lyrics);
+    }
+
+    /// <summary>
+    /// <paramref name="content"/> with the lyric at each of <paramref name="ticks"/> taken away but for the marks that
+    /// make its note spoken, so a spoken note stays spoken. A slide's <c>+</c> is left as it is.
+    /// </summary>
+    public static VocalTrackContent ClearLyric(VocalTrackContent content, IEnumerable<long> ticks)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+        ArgumentNullException.ThrowIfNull(ticks);
+        var lyrics = new List<(long, string)>();
+        foreach (long tick in ticks.Distinct())
+        {
+            if (LyricAt(content, tick) is { } text && text.Trim() != SlideText)
+                lyrics.Add((tick, SplitSpokenMarks(text).Marks));
+        }
+
+        return SetLyrics(content, lyrics);
+    }
+
+    /// <summary>
     /// <paramref name="content"/> with the notes at <paramref name="ticks"/> marked spoken (<c>#</c> after the syllable),
     /// or, when <paramref name="on"/> is false, their <c>#</c> and <c>^</c> taken off, keeping their other symbols. A slide
     /// is left as it is.

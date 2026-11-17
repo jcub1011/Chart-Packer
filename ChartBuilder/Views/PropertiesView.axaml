@@ -89,6 +89,7 @@
                     <TextBlock Grid.Row="5" Classes="muted" Text="{x:Static res:Strings.PropertiesLyricLabel}" />
                     <TextBox Grid.Row="5" Grid.Column="1"
                              Text="{Binding LyricText, UpdateSourceTrigger=LostFocus}"
+                             IsEnabled="{Binding CanEditLyric}"
                              ToolTip.Tip="{x:Static res:Strings.PropertiesLyricToolTip}"
                              AutomationProperties.Name="{x:Static res:Strings.PropertiesLyricLabel}" />
                     <TextBlock Grid.Row="6" Classes="muted" Text="{x:Static res:Strings.PropertiesSungLabel}" />
