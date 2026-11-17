@@ -163,4 +163,89 @@ public sealed class LyricImportTests
         Assert.IsFalse(result.Done);
         Assert.AreEqual(0, session.UndoStack.UndoCount);
     }
+
+    [TestMethod]
+    public void APitchedWordIsSungAtItsPitchAndASlideCarriesItOn()
+    {
+        var session = Of(WithVocals([]));
+        var document = new LyricDocument(
+        [
+            new LyricLine(S(1), S(2),
+            [
+                new LyricWord("Hel-", S(1), S(1.25), 65),
+                new LyricWord("+", S(1.25), S(1.5), 67),
+                new LyricWord("lo", S(1.5), S(1.75), 64),
+                new LyricWord("hey", S(1.75), S(2)),
+            ]),
+        ]);
+
+        var result = LyricImport.Apply(session, VocalTrack.Vocals, document, LyricImportMode.Replace);
+
+        Assert.AreEqual(4, result.Words);
+        var content = Vocals(session);
+        Assert.AreSequenceEqual([960L, 1200L, 1440L, 1680L], [.. content.Notes.Select(static n => n.Tick)]);
+        Assert.AreSequenceEqual([65, 67, 64, VocalLane.SpokenPitch], [.. content.Notes.Select(static n => n.Pitch)]);
+        Assert.AreSequenceEqual(["Hel-", "+", "lo", "hey#"], [.. content.Lyrics.Select(static l => l.Text)]);
+        Assert.IsTrue(VocalEdits.IsSlide(content, 1200));
+        Assert.IsFalse(VocalEdits.IsSpoken(content, 1440));
+        Assert.IsTrue(VocalEdits.IsSpoken(content, 1680));
+    }
+
+    [TestMethod]
+    public void PitchesAreMovedByOctavesIntoTheVocalRangeAllTogetherThenEachOnItsOwn()
+    {
+        var session = Of(WithVocals([]));
+
+        // Two octaves down puts two of the three in range; the third, still too low, goes up on its own.
+        var document = new LyricDocument(
+        [
+            new LyricLine(S(1), S(2),
+            [
+                new LyricWord("a", S(1), S(1.25), 96),
+                new LyricWord("b", S(1.25), S(1.5), 98),
+                new LyricWord("c", S(1.5), S(1.75), 30),
+            ]),
+        ]);
+
+        LyricImport.Apply(session, VocalTrack.Vocals, document, LyricImportMode.Replace);
+
+        Assert.AreSequenceEqual([72, 74, 42], [.. Vocals(session).Notes.Select(static n => n.Pitch)]);
+    }
+
+    [TestMethod]
+    public void ASlideWithNoWordBeforeItInItsLineIsLeftOut()
+    {
+        var session = Of(WithVocals([]));
+        var document = new LyricDocument([new LyricLine(S(1), S(2), [new LyricWord("+", S(1), S(1.5), 60), new LyricWord("a", S(1.5), S(2), 62)])]);
+
+        var result = LyricImport.Apply(session, VocalTrack.Vocals, document, LyricImportMode.Replace);
+
+        Assert.AreEqual(1, result.Words);
+        Assert.AreEqual("a", Vocals(session).Lyrics.Single().Text);
+    }
+
+    [TestMethod]
+    public void ADuetGoesIntoTwoPartsInOneStep()
+    {
+        var session = Of(Guitar());
+        var document = new LyricDocument(
+        [
+            new LyricLine(S(1), S(2), [new LyricWord("one", S(1), S(2), 60)], Singer: 1),
+            new LyricLine(S(1), S(2), [new LyricWord("two", S(1), S(2), 64)], Singer: 2),
+            new LyricLine(S(3), S(4), [new LyricWord("both", S(3), S(4), 62)], Singer: 1),
+            new LyricLine(S(3), S(4), [new LyricWord("both", S(3), S(4), 62)], Singer: 2),
+        ]);
+
+        var result = LyricImport.Apply(
+            session, [(VocalTrack.Harmony1, document.ForSinger(1)), (VocalTrack.Harmony2, document.ForSinger(2))], LyricImportMode.Replace);
+
+        Assert.IsTrue(result.Done);
+        Assert.AreEqual(4, result.Words);
+        Assert.AreSequenceEqual(["one", "both"], [.. Vocals(session, VocalTrack.Harmony1).Lyrics.Select(static l => l.Text)]);
+        Assert.AreSequenceEqual(["two", "both"], [.. Vocals(session, VocalTrack.Harmony2).Lyrics.Select(static l => l.Text)]);
+        Assert.AreEqual(1, session.UndoStack.UndoCount);
+        session.Undo();
+        Assert.IsNull(session.VocalContentOf(VocalTrack.Harmony1));
+        Assert.IsNull(session.VocalContentOf(VocalTrack.Harmony2));
+    }
 }

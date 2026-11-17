@@ -24,7 +24,7 @@ public static class LrcWriter
         ArgumentNullException.ThrowIfNull(content);
         ArgumentNullException.ThrowIfNull(secondsOf);
         var output = new StringBuilder();
-        foreach (var line in Lines(content))
+        foreach (var (_, line) in PhraseGroups.By(content.Lyrics, static l => l.Tick, content.Phrases))
         {
             var syllables = line
                 .Select(l => (l.Tick, Syllable: LyricSyllable.Of(l.Text)))
@@ -50,32 +50,6 @@ public static class LrcWriter
         }
 
         return output.ToString();
-    }
-
-    // The lyrics of each phrase, then those outside any phrase, in order.
-    private static List<List<VocalLyricEvent>> Lines(VocalTrackContent content)
-    {
-        var lines = new List<List<VocalLyricEvent>>();
-        var phrases = content.Phrases.OrderBy(static p => p.Tick).ToList();
-        int at = 0;
-
-        // The phrase the line being filled is of, or -1 for lyrics outside every phrase.
-        int current = -2;
-        foreach (var lyric in content.Lyrics)
-        {
-            while (at < phrases.Count && phrases[at].EndTick <= lyric.Tick)
-                at++;
-            int phrase = at < phrases.Count && phrases[at].Tick <= lyric.Tick ? at : -1;
-            if (phrase != current || lines.Count == 0)
-            {
-                lines.Add([]);
-                current = phrase;
-            }
-
-            lines[^1].Add(lyric);
-        }
-
-        return lines;
     }
 
     // Where the note starting at the tick ends, or null when none starts there.

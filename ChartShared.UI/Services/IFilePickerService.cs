@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using ChartShared.Core.Lyrics;
 
 namespace ChartShared.UI.Services
 {
@@ -33,10 +34,12 @@ namespace ChartShared.UI.Services
         Task<string?> PickLyricsFileAsync(string title);
 
         /// <summary>
-        /// Shows a save dialog for an .lrc file, starting with <paramref name="suggestedName"/>, and returns the local path
-        /// chosen, or <see langword="null"/> if cancelled. Overwriting a file is confirmed by the dialog.
+        /// Shows a save dialog for a lyrics file of <paramref name="format"/>, an UltraStar .txt or an .lrc, starting with
+        /// <paramref name="suggestedName"/>, and returns the local path chosen, or <see langword="null"/> if cancelled.
+        /// Overwriting a file is confirmed by the dialog.
         /// </summary>
-        Task<string?> PickLrcSaveAsync(string title, string suggestedName);
+        /// <exception cref="System.ArgumentOutOfRangeException"><paramref name="format"/> isn't one lyrics are written as.</exception>
+        Task<string?> PickLyricsSaveAsync(string title, string suggestedName, LyricFormat format);
 
         /// <summary>
         /// Shows a picker for one song: a .sng, or a song folder's song.ini or chart, which stands for the folder. Returns

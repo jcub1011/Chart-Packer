@@ -36,9 +36,19 @@
                        Text="{Binding Title}" />
         </ui:TitleBar>
 
-        <!-- Import or export lyrics (issue 270): the part, and what the import or the LRC does with the words' times. -->
+        <!-- Import or export lyrics (issue 270): the format exported, the part, and what the import does with the words'
+             times and pitches, or the LRC with their times. -->
         <StackPanel Margin="20" Spacing="14">
             <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap" Text="{Binding Summary}" />
+
+            <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding IsExport}">
+                <TextBlock Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.LyricsFormatLabel}" />
+                <ComboBox Grid.Column="1" Width="160"
+                          ItemsSource="{Binding Formats}"
+                          SelectedItem="{Binding SelectedFormat}"
+                          DisplayMemberBinding="{Binding Label, x:DataType=vm:LyricsFormatChoice}"
+                          AutomationProperties.Name="{x:Static res:Strings.LyricsFormatLabel}" />
+            </Grid>
 
             <Grid ColumnDefinitions="*,Auto">
                 <TextBlock Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.LyricsPartLabel}" />
@@ -54,12 +64,17 @@
                              Content="{x:Static res:Strings.LyricsReplaceOption}" />
                 <RadioButton GroupName="LyricsMode" IsChecked="{Binding IsMerge}"
                              Content="{x:Static res:Strings.LyricsMergeOption}" />
-                <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap" Text="{x:Static res:Strings.LyricsImportNote}" />
+                <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap" Text="{Binding ImportNote}" />
             </StackPanel>
 
             <CheckBox IsVisible="{Binding ShowsWordTimes}"
                       IsChecked="{Binding UseWordTimes}"
                       Content="{Binding WordTimesText}" />
+
+            <CheckBox IsVisible="{Binding ShowsPitches}"
+                      IsEnabled="{Binding UseWordTimes}"
+                      IsChecked="{Binding UsePitches}"
+                      Content="{x:Static res:Strings.LyricsUsePitches}" />
 
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
                 <Button Classes="accent"

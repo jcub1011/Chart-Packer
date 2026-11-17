@@ -94,9 +94,11 @@ written from the formats' published descriptions; no code from any implementatio
   (`TtmlParser.cs`).
 - **KAR:** the Standard MIDI Files specification (as for the chart's MIDI) and the karaoke
   convention of syllables as text or lyric events, `/` and `\` line breaks and `@` header events
-  (`KarParser.cs`).
-- **UltraStar `.txt`:** the [UltraStar song format](https://usdx.eu/format/), with its `#BPM` and
-  `#GAP` header and its note, line-break and duet lines (`UltraStarParser.cs`).
+  (`KarParser.cs`). Matching the syllables to a melody track's notes for their pitches is Chart
+  Builder's own heuristic.
+- **UltraStar `.txt`:** the [UltraStar song format](https://usdx.eu/format/), version 1.1.0, with
+  its header (`#VERSION`, `#BPM`, `#GAP`, `#AUDIO` and the rest), its note kinds and pitches
+  counted from C4, and its line-break and duet lines (`UltraStarParser.cs`, `UltraStarWriter.cs`).
 - **Embedded lyrics:** ID3v2's `SYLT` and `USLT` frames and Vorbis comments' `LYRICS`, read by
   ATL.NET (below) (`EmbeddedLyricsReader.cs`).
 

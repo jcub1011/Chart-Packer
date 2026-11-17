@@ -304,7 +304,7 @@
   </data>
   <data name="MenuExportLyrics" xml:space="preserve">
     <value>Export _Lyrics…</value>
-    <comment>File menu: writes a vocal part's lyrics to an .lrc file.</comment>
+    <comment>File menu: writes a vocal part's lyrics to an UltraStar .txt or an .lrc file.</comment>
   </data>
   <data name="MenuEdit" xml:space="preserve">
     <value>_Edit</value>
@@ -2966,7 +2966,39 @@ Saving also changes song.ini:
   </data>
   <data name="LyricsExportSummary" xml:space="preserve">
     <value>Writes one line for each phrase of the part, timed to the audio.</value>
-    <comment>The Export lyrics dialog's description of what's written.</comment>
+    <comment>The Export lyrics dialog's description of what's written, when the format is LRC.</comment>
+  </data>
+  <data name="LyricsExportUltraStarSummary" xml:space="preserve">
+    <value>Writes an UltraStar song: every note with its pitch and lyric, one line for each phrase, timed to the audio. Save it in the song's folder, beside its audio.</value>
+    <comment>The Export lyrics dialog's description of what's written, when the format is UltraStar.</comment>
+  </data>
+  <data name="LyricsFormatLabel" xml:space="preserve">
+    <value>Format</value>
+    <comment>The Export lyrics dialog's drop-down of the file format: UltraStar or LRC.</comment>
+  </data>
+  <data name="LyricsFormatUltraStar" xml:space="preserve">
+    <value>UltraStar (.txt)</value>
+    <comment>Export lyrics format: an UltraStar song file, with pitches. The default.</comment>
+  </data>
+  <data name="LyricsFormatLrc" xml:space="preserve">
+    <value>LRC (.lrc)</value>
+    <comment>Export lyrics format: LRC lyrics, timed by line or, with A2, by word; no pitches.</comment>
+  </data>
+  <data name="LyricsDuetPart" xml:space="preserve">
+    <value>Harmony 1 + 2 (Duet)</value>
+    <comment>The Import and Export lyrics dialogs' vocal part choice for an UltraStar duet: its first singer is Harmony 1, its second Harmony 2.</comment>
+  </data>
+  <data name="LyricsUsePitches" xml:space="preserve">
+    <value>Use Pitches from the File</value>
+    <comment>Import lyrics option, shown when the file has pitches (UltraStar, or karaoke with a melody): when off, every word is spoken. Needs Use Word Timing from the File.</comment>
+  </data>
+  <data name="LyricsImportPitchedNote" xml:space="preserve">
+    <value>Every imported word is sung at its pitch from the file, moved by octaves into the vocal range; a word with no pitch is spoken. Each line becomes a phrase.</value>
+    <comment>Import lyrics dialog: a note under the replace and merge options, when the file's pitches are used.</comment>
+  </data>
+  <data name="LyricsImportDuetSummaryFormat" xml:space="preserve">
+    <value>{0}: a duet, {1} lines, {2} words.</value>
+    <comment>The Import lyrics dialog's summary of a duet file read. {0} is the file's name, {1} its number of lines, both singers', {2} its number of words.</comment>
   </data>
   <data name="LyricsPartLabel" xml:space="preserve">
     <value>Vocal Part</value>

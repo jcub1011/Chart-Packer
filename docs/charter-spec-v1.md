@@ -1002,16 +1002,39 @@ Acceptance criteria:
      highway's never into one. The keys that change a highway's notes do nothing.
    - **Import and export lyrics** (issue 270) are in the File menu, and need no lane open.
      **Import Lyrics…** picks a file, reads it (`ChartShared.Core/Lyrics/`) and asks which part,
-     replace or merge, and whether the file's word times are used. The formats are LRC (with or
-     without the A2 per-word tags), SRT, WebVTT, TTML, KAR, an UltraStar `.txt`, and the synchronized
-     or LRC lyrics in an audio file's tags (ATL.NET); the last five are import only. Every word
-     becomes a spoken note (middle C, lyric `word#`) and each line a phrase. A word with no time
+     replace or merge, and whether the file's word times and pitches are used. The formats are LRC
+     (with or without the A2 per-word tags), SRT, WebVTT, TTML, KAR, an UltraStar `.txt`, and the
+     synchronized or LRC lyrics in an audio file's tags (ATL.NET); SRT, WebVTT, TTML, KAR and the
+     tags are import only. A word with a pitch becomes a note at it, its lyric as it is; a word
+     with none a spoken note (middle C, lyric `word#`); each line a phrase. An UltraStar normal or
+     golden note's pitch is 60 more than the file's; freestyle and rap notes have none; a `~` at
+     another pitch is a slide (lyric `+`), and at the same pitch only lengthens the syllable
+     before. A KAR's melody is the track, drums aside, with the most notes starting within a 128th
+     of a syllable, taken when it has one for at least half of them: a syllable is sung at the
+     highest such note and held to its end, and melody notes following straight on before the next
+     syllable are slides. A part's pitches move by whole octaves into 36–84, all together by the
+     octaves that put the most in, then each still out on its own. An UltraStar duet's `P1` and
+     `P2` (and `P3`, both) are its singers; the dialog offers them as Harmony 1 and 2, imported in
+     one step. A word with no time
      of its own shares its line's time with the words beside it by their letters. The file's times
      are the audio's, so the song's delay is taken off them. Replace takes out the part's notes,
      lyrics and phrases but keeps its star power; Merge keeps all of it and leaves out a word that
      would start on a note the part has, shortens one that would run into one, and adds no phrase
      that overlaps one the part has. A part the chart hasn't is added in the same step, and the
-     import is one undoable step (`LyricImport.Apply`). **Export Lyrics…** writes one `[mm:ss.xx]`
+     import is one undoable step (`LyricImport.Apply`). **Export Lyrics…** asks the format,
+     UltraStar first. UltraStar (`UltraStarWriter`) writes a format 1.1.0 song: `#TITLE`, `#ARTIST`,
+     `#CREATOR`, `#GENRE` and `#YEAR` from `song.ini`, the `song` stem (or the first track) as
+     `#AUDIO` and `#MP3`, the `vocals` stem as `#VOCALS`; `#GAP` the first note's time, delay
+     included; `#BPM` the first whole multiple (1×, 2×, 3×, …), to the nearest whole number, of the
+     average tempo from the first note to the last that puts every note's start and end within
+     10 ms of the chart's, measured as written. The search ends at the first whose beat is no longer
+     than 20 ms, where rounding can't move a note further unless two notes are under a beat apart.
+     Each note's beats come from its
+     time in the audio; its pitch less 60; `R` when spoken, `:` otherwise; `~` for a slide or a
+     note with no lyric; a syllable ending a word followed by a space; a `- beat` at each phrase's
+     end. Of notes on a tick the lowest is written, and each starts at least a beat after the one
+     before. Harmony 1 and 2, when both have lyrics, may be written as a `P1`/`P2` duet. LRC writes
+     one `[mm:ss.xx]`
      line for each phrase of the chosen part, stamped with the time of its first lyric and timed to
      the audio file, delay included; with A2 each syllable has a `<mm:ss.xx>` tag and the line ends
      with one. The chart's lyric symbols are taken off, and a slide's `+` is dropped.

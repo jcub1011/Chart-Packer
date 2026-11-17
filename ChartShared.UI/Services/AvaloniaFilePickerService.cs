@@ -49,6 +49,8 @@ namespace ChartShared.UI.Services
 
         private static readonly FilePickerFileType Lrc = FileType(SharedStrings.LrcFileTypeFormat, [".lrc"], ["text/plain"]);
 
+        private static readonly FilePickerFileType UltraStar = FileType(SharedStrings.UltraStarFileTypeFormat, [".txt"], ["text/plain"]);
+
         // A folder can't be picked in the same dialog as a file, so a song folder is picked by a file in it.
         private static readonly FilePickerFileType[] Songs =
         [
@@ -124,8 +126,14 @@ namespace ChartShared.UI.Services
 
         public Task<string?> PickLyricsFileAsync(string title) => PickOneAsync(title, LyricsFiles);
 
-        public async Task<string?> PickLrcSaveAsync(string title, string suggestedName)
+        public async Task<string?> PickLyricsSaveAsync(string title, string suggestedName, LyricFormat format)
         {
+            var (type, extension) = format switch
+            {
+                LyricFormat.UltraStar => (UltraStar, "txt"),
+                LyricFormat.Lrc => (Lrc, "lrc"),
+                _ => throw new ArgumentOutOfRangeException(nameof(format), format, "Lyrics are written as UltraStar or LRC."),
+            };
             if (topLevel() is not { } owner)
                 return null;
 
@@ -133,8 +141,8 @@ namespace ChartShared.UI.Services
             {
                 Title = title,
                 SuggestedFileName = suggestedName,
-                DefaultExtension = "lrc",
-                FileTypeChoices = [Lrc],
+                DefaultExtension = extension,
+                FileTypeChoices = [type],
                 ShowOverwritePrompt = true,
             });
 

@@ -38,12 +38,40 @@ public sealed class UltraStarParserTests
     }
 
     [TestMethod]
-    public void OnlyTheFirstSingersLinesOfADuetAreRead()
+    public void NormalAndGoldenNotesArePitchedFromC4AndTheOthersAreNot()
     {
-        var document = UltraStarParser.Parse("#BPM:60\n#GAP:0\nP1\n: 0 4 5 one \n- 8\nP2\n: 0 4 5 other \nE\n");
+        var document = UltraStarParser.Parse(Song);
 
-        Assert.HasCount(1, document.Lines);
-        Assert.AreEqual("one", document.Lines[0].Words[0].Text);
+        Assert.AreSequenceEqual([65, 67, 67], [.. document.Lines[0].Words.Select(static w => w.Pitch!.Value)]);
+        Assert.IsNull(document.Lines[1].Words[0].Pitch);
+        Assert.IsTrue(document.HasPitches);
+
+        var rap = UltraStarParser.Parse("#BPM:60\nR 0 4 0 rap \nG 4 4 0 gold \n: 8 4 -12 low\nE\n");
+        Assert.AreSequenceEqual(new int?[] { null, null, 48 }, [.. rap.Lines[0].Words.Select(static w => w.Pitch)]);
+    }
+
+    [TestMethod]
+    public void ATildeAtAnotherPitchIsASlideAndAtTheSameOneOnlyHoldsItOn()
+    {
+        // At 60 BPM a beat is a quarter of a second.
+        var document = UltraStarParser.Parse("#BPM:60\n#GAP:0\n: 0 4 0 Hel\n: 4 4 2 ~\n: 8 4 2 ~\n: 12 4 4 lo \nE\n");
+
+        var words = document.Lines[0].Words;
+        Assert.AreSequenceEqual(["Hel-", "+", "lo"], [.. words.Select(static w => w.Text)]);
+        Assert.AreSequenceEqual([60, 62, 64], [.. words.Select(static w => w.Pitch!.Value)]);
+        Assert.IsTrue(words[1].IsSlide);
+        Assert.AreEqual(TimeSpan.FromSeconds(1), words[1].Start);
+        Assert.AreEqual(TimeSpan.FromSeconds(3), words[1].End);
+    }
+
+    [TestMethod]
+    public void ADuetsSingersAreReadAsTheirOwnAndP3AsBoths()
+    {
+        var document = UltraStarParser.Parse("#BPM:60\n#GAP:0\nP1\n: 0 4 5 one \n- 8\nP2\n: 0 4 5 other \nP3\n: 16 4 5 both \nE\n");
+
+        Assert.AreSequenceEqual([1, 2], [.. document.Singers]);
+        Assert.AreSequenceEqual(["one", "both"], [.. document.ForSinger(1).Lines.SelectMany(static l => l.Words).Select(static w => w.Text)]);
+        Assert.AreSequenceEqual(["other", "both"], [.. document.ForSinger(2).Lines.SelectMany(static l => l.Words).Select(static w => w.Text)]);
     }
 
     [TestMethod]

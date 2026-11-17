@@ -201,6 +201,10 @@
     <value>LRC lyrics ({0})</value>
     <comment>Save-dialog file type for exporting lyrics. {0} is the extension, "lrc".</comment>
   </data>
+  <data name="UltraStarFileTypeFormat" xml:space="preserve">
+    <value>UltraStar song ({0})</value>
+    <comment>Save-dialog file type for exporting lyrics as an UltraStar song. {0} is the extension, "txt".</comment>
+  </data>
   <data name="SettingsWindowTitle" xml:space="preserve">
     <value>Settings</value>
   </data>
