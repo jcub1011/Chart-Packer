@@ -929,13 +929,17 @@ Acceptance criteria:
      own stem (`vocals`, or `vocals_1` and `vocals_2` for the first two harmonies), the lead's or
      the mix when it has none, or the stem the button picks;
    - the phrases shaded behind the rows, and as bars in a strip above them, with the star power
-     (overdrive, note 116) as bars in a rail under that strip, in a highway's star power colour; and the lyrics in a band
-     under the rows, each syllable at its tick, with a hyphen where it joins the next. A syllable
-     that would run into the one before is left out, as the lane is zoomed out;
+     (overdrive, note 116) as bars in a rail under that strip, in a highway's star power colour;
+   - the lyrics, each syllable in a bubble hovering above its note, on a line down to the note,
+     with a hyphen where it joins the next. A bubble that would cover another is moved up a level
+     (three at most), so lyrics that run together in time can still be read; a note too near the
+     top of the rows for a bubble above it has the bubble below it instead; one that fits on no
+     level is left out, as the lane is zoomed out. A selected note, or the one under the pointer,
+     that has no lyric shows a faint + bubble;
    - the beats, sections, tempo markers, loop and selection as a highway's lane has them;
    - what's on the strike line lit, as Chart Packer's lyrics lane lights it, wherever the cursor is,
      playing or not: the note being sung near white with a glow where it crosses the line, its
-     syllable in the same tint, and its phrase shaded a little more than the others.
+     syllable's bubble in the same tint, and its phrase shaded a little more than the others.
 
    Scrolling, zoom (look-ahead) and the keys that move the cursor or play work as in any lane. A
    lane whose track the chart hasn't says so, and offers to add it, empty. The part is read from its
@@ -973,15 +977,85 @@ Acceptance criteria:
    - **Lyrics** belong to the notes that start on their tick: a note moved or deleted takes its
      lyric with it, unless a note that stays starts there. A lyric on no note's start stays where
      it is.
+   - **Editing a lyric** is done on its bubble. A double click on a bubble or a note (with the
+     Select tool), a press on a + bubble, **Edit Lyric…** in the note menu, or `F2` opens a box
+     over the first selected note, with its lyric. A spoken note's `#` or `^` is not shown in the box and is
+     written back after what's typed, blank or not, so editing never turns a spoken note sung. A slide's `+` is not a lyric: the box doesn't open on a
+     slide, the status saying so, and Tab skips slides. Enter, or leaving the box,
+     sets the lyric of that note alone, adding one to a note with none; blank takes it away; Esc
+     leaves it as it was; the box is as wide as what's typed, no narrower than its placeholder and no wider than 32
+     characters, past which the text wraps; the note's bubble shows what's typed, as it's typed, in the accent's outline, with the box under the note; Tab goes on to the next note's lyric, and Shift+Tab to the one before,
+     moving the song there when it isn't in view. **Delete Lyric** in the note menu takes the
+     lyric off the selected notes and leaves the notes, a spoken note staying spoken. Each edit is one undoable step, and one
+     that changes nothing makes none. A press on a bubble selects its note and no more.
    - **Properties** shows the selected notes' tick, pitch (a MIDI number, or a name such as `F#3`),
-     length and lyric, symbols included, with Slide and Spoken, and the selected phrases' start and
+     length and lyric, with Slide and Spoken (the lyric field, like the lyric box, leaves out a spoken
+     note's `#` or `^`, which it keeps, and is disabled when every selected note is a slide, which has
+     no lyric; a lyric set there goes to the notes that have one), and the selected phrases' start and
      end. **Type lyrics…** gives a typed line's syllables to the selected notes in turn, a slide
      skipped, split at spaces and after hyphens (`Hel-lo world`).
    - **Keys** ([§9](#9-keyboard-shortcuts)): Alt and the arrows move the selected notes a grid step or
-     a semitone, an octave with Shift; Ctrl+A selects the part's notes; `S` puts star power over the
+     a semitone, an octave with Shift; Ctrl+A selects the part's notes; `F2` edits the first selected
+     note's lyric; `S` puts star power over the
      selected notes, or takes away the star power that's over them; `W` switches the part's audio
      between the waveform and the spectrogram; Delete and Ctrl+X, C and V work on its notes, with their lyrics. A vocal part's notes paste only into a vocal lane, and a
      highway's never into one. The keys that change a highway's notes do nothing.
+   - **Vocal Alignment tool** (`Alt`+`7`), in the toolbar only while a vocal lane has focus, for
+     lyrics timed to other audio, which drift as they go. It shifts and stretches the vocal parts in
+     the audio's time, not in ticks, with no snapping (`VocalAlignment`): a time `t` goes to
+     `start + offset + (t − start) / speed`, `start` being the first note or lyric. Each note's start
+     and end, each lyric, and each phrase's and star power phrase's ends go to the nearest tick, never
+     before the song's start; the track's other events stay. While it's picked every note of an
+     aligned part is outlined in the accent, the span from the first note to the last note's end is
+     shaded with a handle at each end, and the offset and speed are drawn over it. Dragging inside
+     the span shifts the parts; dragging the start's handle stretches them with the last note's end
+     kept, and the end's handle with the first note kept; Shift drags a quarter as far. The middle and
+     right buttons do nothing. The toolbar shows **Offset (ms)** and **Speed (%)**, typed or
+     scrubbed (shown at once, one undo step 600 ms after the last change), and **All Vocal Parts**,
+     on by default, off to align only the part in focus. The speed is 50–200%, and the offset keeps
+     the first note at or after the song's start. Each drag or settled field is one undoable step,
+     worked out from the parts as they were when the tool first took them, so a typed speed is that
+     speed of the original, and rounding to ticks doesn't build up; undo and redo bring each step's
+     values back, and an edit made any other way takes the parts as they are as the start again. A
+     highway's lane taking focus puts the tool down for the Select tool.
+   - **Import and export lyrics** (issue 270) are in the File menu, and need no lane open.
+     **Import Lyrics…** picks a file, reads it (`ChartShared.Core/Lyrics/`) and asks which part,
+     replace or merge, and whether the file's word times and pitches are used. The formats are LRC
+     (with or without the A2 per-word tags), SRT, WebVTT, TTML, KAR, an UltraStar `.txt`, and the
+     synchronized or LRC lyrics in an audio file's tags (ATL.NET); SRT, WebVTT, TTML, KAR and the
+     tags are import only. A word with a pitch becomes a note at it, its lyric as it is; a word
+     with none a spoken note (middle C, lyric `word#`); each line a phrase. An UltraStar normal or
+     golden note's pitch is 60 more than the file's; freestyle and rap notes have none; a `~` at
+     another pitch is a slide (lyric `+`), and at the same pitch only lengthens the syllable
+     before. A KAR's melody is the track, drums aside, with the most notes starting within a 128th
+     of a syllable, taken when it has one for at least half of them: a syllable is sung at the
+     highest such note and held to its end, and melody notes following straight on before the next
+     syllable are slides. A part's pitches move by whole octaves into 36–84, all together by the
+     octaves that put the most in, then each still out on its own. An UltraStar duet's `P1` and
+     `P2` (and `P3`, both) are its singers; the dialog offers them as Harmony 1 and 2, imported in
+     one step. A word with no time
+     of its own shares its line's time with the words beside it by their letters. The file's times
+     are the audio's, so the song's delay is taken off them. Replace takes out the part's notes,
+     lyrics and phrases but keeps its star power; Merge keeps all of it and leaves out a word that
+     would start on a note the part has, shortens one that would run into one, and adds no phrase
+     that overlaps one the part has. A part the chart hasn't is added in the same step, and the
+     import is one undoable step (`LyricImport.Apply`). **Export Lyrics…** asks the format,
+     UltraStar first. UltraStar (`UltraStarWriter`) writes a format 1.1.0 song: `#TITLE`, `#ARTIST`,
+     `#CREATOR`, `#GENRE` and `#YEAR` from `song.ini`, the `song` stem (or the first track) as
+     `#AUDIO` and `#MP3`, the `vocals` stem as `#VOCALS`; `#GAP` the first note's time, delay
+     included; `#BPM` the first whole multiple (1×, 2×, 3×, …), to the nearest whole number, of the
+     average tempo from the first note to the last that puts every note's start and end within
+     10 ms of the chart's, measured as written. The search ends at the first whose beat is no longer
+     than 20 ms, where rounding can't move a note further unless two notes are under a beat apart.
+     Each note's beats come from its
+     time in the audio; its pitch less 60; `R` when spoken, `:` otherwise; `~` for a slide or a
+     note with no lyric; a syllable ending a word followed by a space; a `- beat` at each phrase's
+     end. Of notes on a tick the lowest is written, and each starts at least a beat after the one
+     before. Harmony 1 and 2, when both have lyrics, may be written as a `P1`/`P2` duet. LRC writes
+     one `[mm:ss.xx]`
+     line for each phrase of the chosen part, stamped with the time of its first lyric and timed to
+     the audio file, delay included; with A2 each syllable has a `<mm:ss.xx>` tag and the line ends
+     with one. The chart's lyric symbols are taken off, and a slide's `+` is dropped.
    - The vocal findings ([§6](#lint-rules)) name their part, and going to one opens its lane and
      selects the notes on its tick.
 
@@ -2939,7 +3013,7 @@ Editor straight away, with no dialog before it.
 │ Tracks              │              ┃             ┃               │ …                  │
 │ Chart files         ├━━━━━━━━━━━━━━┻━━━━━━━━━━━━━┻━━━━━━━━━━━━━━━┤                    │
 │ Other files         │ Vocals ▾                        2.0 s + ✕  │                    │
-│ Findings            │   piano roll, lyrics under it              │                    │
+│ Findings            │   piano roll, lyric bubbles                │                    │
 │ Metadata            │                                            │                    │
 ╞═════════════════════╧════════════════════════════════════════════╧════════════════════╡
 │ Timeline                                                              1:38.4 / 4:12.0 │
@@ -3124,7 +3198,8 @@ one is picked up by the other when its window is next activated.
 | `C` | Toggle cymbal or tom (Pro drums, every difficulty at that tick) |
 | `A` / `Shift`+`A` | Toggle accent or ghost (drums) |
 | `S` | Star power phrase over the selection |
-| `Alt`+`1`–`6` | Pick the Select, Place, Erase, Phrase, Tempo or Sync tool, in the toolbar's order; the number row's digits, not the number pad's; works wherever focus is, except in a text box |
+| `F2` | Edit the lyric of the first selected vocal note |
+| `Alt`+`1`–`7` | Pick the Select, Place, Erase, Phrase, Tempo, Sync or Vocal Alignment tool, in the toolbar's order; the number row's digits, not the number pad's; works wherever focus is, except in a text box. Vocal Alignment is picked only while a vocal lane has focus ([C3](#c3-editor-layout) item 7) |
 | `L` | Hold for the Loop tool: drag out the loop region, or drag its ends or middle to resize or move it. Tapped briefly, having touched nothing, it turns repeating the region on or off ([C10](#c10-playback)) |
 | `R` | Record mode on or off, and playtest off: on, playing the song records a pass. Space ends a pass, and Esc cancels it |
 | `P` | Playtest on or off, and record mode off: on, playing the song playtests the lane ([C19](#c19-playtest-and-instrument-input)) |

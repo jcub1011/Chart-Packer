@@ -62,6 +62,9 @@ namespace ChartBuilder.ViewModels
         /// <summary>How the lane shows its audio: the header's audio button (charter-spec C12–C14).</summary>
         public LaneAudioViewModel Audio { get; }
 
+        /// <summary>Raised when the note menu's Edit Lyric… is picked, with the first selected note's tick, for the lane's canvas to open its lyric box.</summary>
+        public event Action<long>? LyricEditRequested;
+
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(AddVocalPartText))]
         public partial string Title { get; private set; } = "";

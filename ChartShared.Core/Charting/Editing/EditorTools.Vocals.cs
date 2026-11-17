@@ -49,6 +49,13 @@ public sealed partial class EditorTools
             return;
         }
 
+        // The Vocal Alignment tool takes hold of every part at once, wherever in the lane it's pressed.
+        if (_session.Tool == EditorTool.VocalAlign)
+        {
+            _gesture = PressVocalAlign(point);
+            return;
+        }
+
         if (VocalContentOrSay(point.Track) is not { } content)
             return;
         bool shift = modifiers.HasFlag(EditorModifiers.Shift);
@@ -86,6 +93,8 @@ public sealed partial class EditorTools
         _modifiers = EditorModifiers.None;
         if (LoopActive)
             _session.ClearLoop();
+        else if (_session.Tool == EditorTool.VocalAlign)
+            return;
         else if (_session.Tool == EditorTool.Tempo)
             RemoveTempoNear(point.Tick, point.Tolerance);
         else if (VocalContentOrSay(point.Track) is { } content)
@@ -102,7 +111,7 @@ public sealed partial class EditorTools
     {
         Cancel();
         _modifiers = modifiers;
-        if (point.InPhrases || point.InStarPower || VocalContentOrSay(point.Track) is not { } content)
+        if (_session.Tool == EditorTool.VocalAlign || point.InPhrases || point.InStarPower || VocalContentOrSay(point.Track) is not { } content)
             return;
 
         var selection = _session.Selection;
@@ -233,12 +242,49 @@ public sealed partial class EditorTools
             selection.SelectVocalNotes(track, moved);
     }
 
-    /// <summary>Sets the lyric of each selected vocal note to <paramref name="text"/>, as one step; blank takes it away.</summary>
+    /// <summary>
+    /// Sets the syllable of each selected vocal note to <paramref name="text"/>, as one step; blank takes it away. A spoken
+    /// note's <c>#</c> or <c>^</c> is kept, so it stays spoken, and a slide, which has no syllable, is left as it is.
+    /// </summary>
     public void SetVocalLyric(string text)
     {
         ArgumentNullException.ThrowIfNull(text);
         if (SelectedVocalTicks() is { } selected)
-            EditVocals(selected.Track, c => VocalEdits.SetLyric(c, selected.Ticks, text));
+            EditVocals(selected.Track, c => VocalEdits.SetSyllable(c, selected.Ticks, text));
+    }
+
+    /// <summary>
+    /// Takes the lyric off each selected vocal note, as one step, leaving the notes, and their spoken marks, so a spoken note
+    /// stays spoken; a slide is left as it is. Nothing is done, and no step made, when none has a lyric to take.
+    /// </summary>
+    public void DeleteVocalLyric()
+    {
+        if (SelectedVocalTicks() is not { } selected || VocalContentOrSay(selected.Track) is not { } content)
+            return;
+        if (!selected.Ticks.Any(t => VocalEdits.LyricAt(content, t) is { } text && text.Trim() != VocalEdits.SlideText
+                && VocalEdits.SplitSpokenMarks(text).Shown.Length > 0))
+        {
+            return;
+        }
+
+        EditVocals(selected.Track, c => VocalEdits.ClearLyric(c, selected.Ticks));
+    }
+
+    /// <summary>
+    /// Sets the lyric of the vocal note of <paramref name="track"/> starting at <paramref name="tick"/> to <paramref name="text"/>,
+    /// as one step, whatever's selected: adds one to a note with none, replaces one, and takes it away when blank. Nothing is
+    /// done, and no step made, when the lyric is already what's given, no note starts there, or the note is a slide, whose
+    /// <c>+</c> is no lyric to change: that would make it a sung note.
+    /// </summary>
+    /// <returns>Whether the part was changed.</returns>
+    public bool SetVocalLyric(VocalTrack track, long tick, string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        if (VocalContentOrSay(track) is not { } content || content.Notes.All(n => n.Tick != tick) || VocalEdits.IsSlide(content, tick))
+            return false;
+        if ((VocalEdits.LyricAt(content, tick) ?? "").Trim() == text.Trim())
+            return false;
+        return EditVocals(track, c => VocalEdits.SetLyric(c, [tick], text)) is not null;
     }
 
     /// <summary>

@@ -409,9 +409,6 @@ namespace ChartBuilder.Controls.Editing
         /// <summary>Whether the canvas is showing a vocal part's lane.</summary>
         protected bool IsVocalLane => _lane?.Vocal is not null;
 
-        /// <summary>Where a vocal part's lyrics are drawn, under its pitch rows.</summary>
-        protected virtual Rect LyricsArea(Size size, LaneProjection projection) => default;
-
         /// <summary>Where a vocal part's phrases are drawn as bars to select and drag, above its pitch rows.</summary>
         protected virtual Rect VocalPhraseArea(Size size, LaneProjection projection) => default;
 
@@ -863,7 +860,7 @@ namespace ChartBuilder.Controls.Editing
         /// placement line does too; or, with a synchronized region or the loop region drawn, its X and hover, which do too.
         /// </summary>
         private bool IsHoverShown => _hover is { } hover && !_isPressed
-            && (Session?.Tool is EditorTool.Place or EditorTool.Erase or EditorTool.Phrase or EditorTool.Tempo
+            && (Session?.Tool is EditorTool.Place or EditorTool.Erase or EditorTool.Phrase or EditorTool.Tempo or EditorTool.VocalAlign
                 || Session?.Sync.IsActive == true
                 || Session?.Loop?.Span is not null
                 || (Session?.Tool == EditorTool.Select && PointAt(hover) is { Rail: not null }));
@@ -1281,6 +1278,14 @@ namespace ChartBuilder.Controls.Editing
             else if (_lane is { Vocal: not null })
             {
                 session.Tools.Release(VocalPointAt(e.GetPosition(this), clamp: true) ?? _lastVocalPoint);
+
+                // A double click on a note, once its gesture's done, opens the box its lyric's edited in.
+                if (_lyricOnRelease is { } tick)
+                {
+                    _lyricOnRelease = null;
+                    if (!_pressDragged)
+                        OpenLyricEditor(tick);
+                }
             }
             else
             {
@@ -1309,6 +1314,7 @@ namespace ChartBuilder.Controls.Editing
             _isPressed = false;
             _boxFrom = null;
             _boxFromSeconds = null;
+            _lyricOnRelease = null;
             if (_lane is { Vocal: not null })
                 Session?.Tools.Release(_lastVocalPoint);
             else
@@ -1719,10 +1725,12 @@ namespace ChartBuilder.Controls.Editing
             lane = wanted;
             _editor = lane.Editor;
             lane.PropertyChanged += OnLaneChanged;
+            lane.LyricEditRequested += OnLyricEditRequested;
             if (_editor is { } editor)
             {
                 editor.Session.ChartChanged += OnChartChanged;
                 editor.Session.StateChanged += OnRedraw;
+                editor.Session.VocalAlignment.Changed += OnRedraw;
                 editor.Session.Selection.Changed += OnRedraw;
                 editor.Session.Viewport.Changed += OnViewportChanged;
                 editor.Playback.PropertyChanged += OnPlaybackChanged;
@@ -1745,11 +1753,18 @@ namespace ChartBuilder.Controls.Editing
         private void Detach()
         {
             if (_lane is { } lane)
+            {
                 lane.PropertyChanged -= OnLaneChanged;
+                lane.LyricEditRequested -= OnLyricEditRequested;
+            }
+
+            // A lane going away takes its lyric box with it, without keeping what it said.
+            CloseLyricEditor(apply: false);
             if (_editor is { } editor)
             {
                 editor.Session.ChartChanged -= OnChartChanged;
                 editor.Session.StateChanged -= OnRedraw;
+                editor.Session.VocalAlignment.Changed -= OnRedraw;
                 editor.Session.Selection.Changed -= OnRedraw;
                 editor.Session.Viewport.Changed -= OnViewportChanged;
                 editor.Playback.PropertyChanged -= OnPlaybackChanged;

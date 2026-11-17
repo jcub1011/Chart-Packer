@@ -18,6 +18,10 @@ In the **Art** tab, set the video's **Video start** box to choose where the song
 
 The stopwatch button beside the box, **Auto Align by Waveform**, lines the video up using its own audio track and the song's mix. It's disabled when the video has no audio. Under the row, the chart waveform is drawn above the video waveform: drag either to adjust the start by eye. Both the button and a drag are undoable.
 
+## Importing And Exporting Lyrics
+
+**File → Import Lyrics…** brings lyrics into a vocal part from an `.lrc` file (with or without the A2 word timing), or from `.srt`, `.vtt`, `.ttml`, `.kar`, an UltraStar `.txt`, or the lyrics tags of an audio file. Words from an UltraStar song, or a karaoke file with a melody, are sung at their pitches, and an UltraStar duet goes into Harmony 1 and 2; every other word is spoken. You choose whether the part's own lyrics are replaced or merged with, and the import is undoable. **File → Export Lyrics…** writes a part, or Harmony 1 and 2 as a duet, as an UltraStar `.txt` with its pitches, or a part as an `.lrc`, with or without A2 word timing. Lyrics timed to a different recording can be lined up with the **Vocal Alignment** tool (Alt+7, shown while a vocal lane has focus), which shifts and stretches every vocal part to fit. See [Lyric Import and Export](Lyric-Import-and-Export.md).
+
 ## Typical Workflow
 
 1. Start a new chart (or drop audio onto the window), or open a song.

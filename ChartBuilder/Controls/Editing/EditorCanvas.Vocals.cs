@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Media.Immutable;
+using Avalonia.Media.TextFormatting;
 using ChartBuilder.Resources;
 using ChartBuilder.ViewModels;
 using ChartShared.Core.Charting;
@@ -15,9 +17,9 @@ using ChartShared.UI.Controls.Highway;
 
 namespace ChartBuilder.Controls.Editing
 {
-    // A vocal part's lane (charter-spec C3 item 7): its notes on rows of pitch, as a piano roll, with the lyrics under them,
-    // its phrases shaded behind and as bars in a strip above, over the same beats, sections and tempo markers as a
-    // highway's lane, on the same pages. Only a timeline draws one (ProjectVocals). The rows are slots, one a semitone from
+    // A vocal part's lane (charter-spec C3 item 7): its notes on rows of pitch, as a piano roll, each note's lyric in a bubble
+    // above it on a line down to the note, its phrases shaded behind and as bars in a strip above, over the same beats,
+    // sections and tempo markers as a highway's lane, on the same pages. Only a timeline draws one (ProjectVocals). The rows are slots, one a semitone from
     // the highest sung pitch down, so the pointer maps to a tick and a pitch (VocalPointAt) as it does to a tick and a
     // lane, and the tools edit the part from there.
     public abstract partial class EditorCanvas
@@ -45,7 +47,17 @@ namespace ChartBuilder.Controls.Editing
         // A black key's row, a little darker than a white key's. The line under each C, the phrases' shading and bars, and the
         // key being sung are the accent's, in tints of it (AccentFill, AccentLine), so they follow the theme's.
         private static readonly IBrush BlackKeyBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x50, 0x00, 0x00, 0x00));
-        private static readonly IBrush LyricsBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xFF, 0x0C, 0x0D, 0x14));
+
+        // A lyric's bubble: how tall it is, its text with a little room either side, the line from it down to its note, how far
+        // apart bubbles are kept, how many levels above its note one may be moved to clear the others, and how long a syllable
+        // may be before its text is cut short.
+        private const double BubbleHeight = 16;
+        private const double BubblePaddingX = 5;
+        private const double BubbleLine = 6;
+        private const double BubbleGapX = 3;
+        private const double BubbleGapY = 3;
+        private const int BubbleLevels = 3;
+        private const double BubbleMaxText = 140;
 
         // A vocal part's star power: its bar in the rail, in a highway's star power colour, and the rail's ground.
         private static readonly IBrush VocalStarPowerBrush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(PhraseColors.Of(PhraseKind.StarPower), 0xD0));
@@ -218,10 +230,21 @@ namespace ChartBuilder.Controls.Editing
             if (_pressButton == MouseButton.Left && TakeNotesBadge(position))
                 return;
 
+            // A lyric's bubble is selected by a press, and opens the lyric box with a double click (or a press on a +).
+            if (_pressButton == MouseButton.Left && session.Tool == EditorTool.Select && !session.Tools.LoopActive
+                && TakeLyricBubble(session, position, e.ClickCount))
+            {
+                return;
+            }
+
             if (VocalPointAt(position, clamp: false) is not { } point)
                 return;
             e.Pointer.Capture(this);
             _isPressed = true;
+            _lyricOnRelease = _pressButton == MouseButton.Left && e.ClickCount >= 2 && session.Tool == EditorTool.Select && !point.InPhrases
+                && !point.InStarPower && session.Tools.HitTest(point) is { } doubled
+                    ? doubled.Note.Tick
+                    : null;
             _lastVocalPoint = point;
             _boxFrom = _pressButton == MouseButton.Left && session.Tool == EditorTool.Select && !session.Tools.LoopActive && !point.InPhrases && !point.InStarPower && session.Tools.HitTest(point) is null ? position : null;
             _boxTo = position;
@@ -246,8 +269,15 @@ namespace ChartBuilder.Controls.Editing
         {
             StandardCursorType? wanted = null;
             string? tip = null;
+            if (Session is { } aligning && ShowVocalAlignCursor(aligning, position))
+                return;
             if (_notesAbove is { } above && above.Badge.Contains(position) || _notesBelow is { } below && below.Badge.Contains(position))
                 wanted = StandardCursorType.Hand;
+            else if (Session?.Tool == EditorTool.Select && BubbleAt(position) is not null)
+            {
+                wanted = StandardCursorType.Hand;
+                tip = Strings.VocalNoteLyricTip;
+            }
             else if (Session is { } session && VocalPointAt(position, clamp: false) is { } point)
             {
                 if (point.InPhrases)
@@ -344,7 +374,6 @@ namespace ChartBuilder.Controls.Editing
                 {
                     using (context.PushClip(RowsOf(projection)))
                         DrawVocalNotes(context, session, vocal, vocals, projection, fromTick, toTick);
-                    DrawLyrics(context, session, vocals, projection, fromTick, toTick, size);
                 }
             }
             finally
@@ -478,13 +507,15 @@ namespace ChartBuilder.Controls.Editing
 
         /// <summary>
         /// The notes: a bar on its pitch's row for each sung one, a line from the note before for a slide, and an outline
-        /// along the middle row for a spoken one, which has no pitch. A selected note has the accent's edge around it.
+        /// along the middle row for a spoken one, which has no pitch. A selected note has the accent's edge around it, and so
+        /// does every note while the Vocal Alignment tool aligns the part, as they all move together.
         /// </summary>
         private void DrawVocalNotes(DrawingContext context, EditorSession session, VocalTrack vocal, VocalLane vocals, LaneProjection projection, double fromTick, double toTick)
         {
             int color = (int)vocal;
             var selection = session.Selection;
             var selectedPen = AccentPens().Selected;
+            bool aligning = IsAligning(session, vocal);
             double thickness = VocalNoteThickness(projection);
             var notes = vocals.Notes;
             var (first, last) = vocals.NotesBetween(fromTick, toTick);
@@ -507,7 +538,7 @@ namespace ChartBuilder.Controls.Editing
                     context.DrawRectangle(null, VocalUnpitchedPens[color], bar, radius, radius);
                 else
                     context.DrawRectangle(VocalNoteBrushes[color], VocalEdgePens[color], bar, radius, radius);
-                if (selection.Contains(vocal, new VocalNotePlace(note.Tick, note.Pitch)))
+                if (aligning || selection.Contains(vocal, new VocalNotePlace(note.Tick, note.Pitch)))
                     context.DrawRectangle(null, selectedPen, bar.Inflate(2), radius + 2, radius + 2);
             }
         }
@@ -532,10 +563,10 @@ namespace ChartBuilder.Controls.Editing
         }
 
         /// <summary>
-        /// The note on the strike line, lit over the one drawn on the page, with a glow where it crosses the line; and the
-        /// syllable being sung, lit in the lyrics. Drawn wherever the cursor stops, playing or not.
+        /// The note on the strike line, lit over the one drawn on the page, with a glow where it crosses the line. Drawn
+        /// wherever the cursor stops, playing or not; its syllable is lit in its bubble, as <see cref="DrawLyricBubbles"/> draws it.
         /// </summary>
-        private void DrawVocalSinging(DrawingContext context, EditorSession session, VocalTrack vocal, VocalLane vocals, LaneProjection screen, Size size)
+        private void DrawVocalSinging(DrawingContext context, EditorSession session, VocalTrack vocal, VocalLane vocals, LaneProjection screen)
         {
             double now = session.Viewport.Cursor;
             double tick = session.TickAt(now);
@@ -557,22 +588,6 @@ namespace ChartBuilder.Controls.Editing
                 else
                     context.DrawRectangle(VocalSingingBrushes[color], null, bar, thickness / 2, thickness / 2);
             }
-
-            // The syllable being sung: the last shown at or before the strike line, which a slide carries on.
-            var (_, to) = vocals.LyricsBetween(0, tick);
-            if (to == 0)
-                return;
-            var lyric = vocals.Lyrics[to - 1];
-            var area = LyricsArea(size, screen);
-            if (area.Height <= 0)
-                return;
-            var label = Label(Joined(lyric), 11, VocalSingingBrushes[color]);
-            var at = new Point(screen.AlongOf(session.AudioAt(lyric.Tick)) + 1, area.Y + Math.Max(0, (area.Height - label.Height) / 2));
-            using (context.PushClip(area))
-            {
-                context.FillRectangle(LyricsBrush, new Rect(at, new Size(label.Width, label.Height)).Inflate(1));
-                label.Draw(context, at);
-            }
         }
 
         /// <summary>
@@ -591,30 +606,99 @@ namespace ChartBuilder.Controls.Editing
         /// <summary>How thick a note's bar is: most of a row, within reason.</summary>
         private static double VocalNoteThickness(LaneProjection projection) => Math.Clamp(projection.LaneSize * 0.8, 3, 24);
 
-        /// <summary>
-        /// The lyrics, in their band under the rows: each syllable at its tick, with a hyphen where it runs on into the
-        /// next. One that would run into the one before is left out, as the lane is zoomed out.
-        /// </summary>
-        private void DrawLyrics(DrawingContext context, EditorSession session, VocalLane vocals, LaneProjection projection, double fromTick, double toTick, Size size)
-        {
-            var area = LyricsArea(size, projection);
-            if (area.Height <= 0)
-                return;
-            context.FillRectangle(LyricsBrush, area);
+        // What DrawLyricBubbles worked out for each bubble, kept for the frame: the note, its text, and what it's on.
+        private readonly List<LyricBubbleInput> _bubbleInputs = [];
+        private readonly List<(VocalNotePlace Place, TextLayout Label, bool HasLyric, bool Selected, bool Lit, bool Editing)> _bubbleNotes = [];
 
-            var brush = LabelBrush ?? DefaultLabelBrush;
-            double reached = double.NegativeInfinity;
+        /// <summary>
+        /// The lyrics, each in a bubble above its note, on a line down to it, so syllables that run together in time are still
+        /// read: a bubble that would cover another is moved up a level, and one that fits on none is left out, as the lane is
+        /// zoomed out (<see cref="LyricBubbleLayout"/>); one whose note has no room above it, at the top of the rows, goes
+        /// below it. The syllable being sung is lit; the one being edited shows what's typed, as it's typed, in the accent. A selected note, or the one under the
+        /// pointer, that has no lyric has a faint + bubble, which a press opens the lyric box from. Kept in
+        /// <see cref="_bubbles"/> for the pointer to find.
+        /// </summary>
+        private void DrawLyricBubbles(DrawingContext context, EditorSession session, VocalTrack vocal, VocalLane vocals, LaneProjection screen, Size size)
+        {
+            _bubbles.Clear();
+            var rows = RowsOf(screen);
+            var notes = vocals.Notes;
             var lyrics = vocals.Lyrics;
-            var (first, last) = vocals.LyricsBetween(fromTick, toTick);
+            var (fromTick, toTick) = TicksOf(session, screen);
+            var (first, last) = vocals.NotesBetween(fromTick, toTick);
+            if (first >= last)
+                return;
+
+            var selection = session.Selection;
+            long? hovered = null;
+            if (_hover is { } hover && !_isPressed)
+            {
+                hovered = BubbleAt(hover) is { } over ? over.Place.Tick
+                    : VocalPointAt(hover, clamp: false) is { } point && session.Tools.HitTest(point) is { } hit ? hit.Note.Tick
+                    : null;
+            }
+
+            int color = (int)vocal;
+            var textBrush = LabelBrush ?? DefaultLabelBrush;
+            var litBrush = VocalSingingBrushes[color];
+            double cursorTick = session.TickAt(session.Viewport.Cursor);
+            var (_, upTo) = vocals.LyricsBetween(0, cursorTick);
+            long litTick = vocals.NoteAt(cursorTick) is not null && upTo > 0 ? lyrics[upTo - 1].Tick : -1;
+
+            _bubbleInputs.Clear();
+            _bubbleNotes.Clear();
+            double thickness = VocalNoteThickness(screen);
+            int next = vocals.LyricsBetween(notes[first].Tick, toTick).From;
+            long lastTick = -1;
             for (int i = first; i < last; i++)
             {
-                var lyric = lyrics[i];
-                double along = projection.AlongOf(session.AudioAt(lyric.Tick));
-                if (along < reached)
+                var note = notes[i];
+                if (note.EndTick < fromTick || note.Tick == lastTick)
                     continue;
-                var label = Label(Joined(lyric), 11, brush);
-                label.Draw(context, new Point(along + 1, area.Y + Math.Max(0, (area.Height - label.Height) / 2)));
-                reached = along + 1 + label.Width + 3;
+                lastTick = note.Tick;
+                while (next < lyrics.Count && lyrics[next].Tick < note.Tick)
+                    next++;
+                bool hasLyric = next < lyrics.Count && lyrics[next].Tick == note.Tick;
+                var place = new VocalNotePlace(note.Tick, note.Pitch);
+                bool selected = selection.Contains(vocal, place);
+                bool editing = _lyricOpen && note.Tick == _lyricTick;
+                if (!hasLyric && !editing && (note.IsSlide || !(selected || note.Tick == hovered)))
+                    continue;
+
+                var bar = VocalNoteRect(session, vocals, screen, note, thickness);
+                if (bar.Bottom <= rows.Top || bar.Top >= rows.Bottom)
+                    continue;
+                bool lit = hasLyric && note.Tick == litTick;
+                string text = editing ? (string.IsNullOrEmpty(_lyricBox?.Text) ? "…" : _lyricBox!.Text!) : hasLyric ? Joined(lyrics[next]) : "+";
+                var label = Label(text, 11, lit ? litBrush : textBrush, BubbleMaxText);
+                _bubbleInputs.Add(new LyricBubbleInput(bar, label.Width));
+                _bubbleNotes.Add((place, label, hasLyric || editing, selected, lit, editing));
+            }
+
+            if (_bubbleInputs.Count == 0)
+                return;
+
+            var placed = LyricBubbleLayout.Place(CollectionsMarshal.AsSpan(_bubbleInputs), BubbleHeight, BubblePaddingX, BubbleLine, BubbleGapX, BubbleGapY, BubbleLevels, rows.Top, rows.Bottom);
+            var edge = _gems.Pen(HighwayPalette.WithAlpha(VocalColors[color], 0x90), 1);
+            var selectedPen = AccentPens().Selected;
+            var editPen = AccentLine(0xFF, 2);
+            using (context.PushClip(rows))
+            {
+                // The lines first, so a bubble covers the lines of those moved up behind it.
+                foreach (var bubble in placed)
+                    context.DrawLine(_bubbleNotes[bubble.Index].Editing ? editPen : _bubbleNotes[bubble.Index].Selected ? selectedPen : edge, bubble.LineFrom, bubble.LineTo);
+
+                foreach (var bubble in placed)
+                {
+                    var (place, label, hasLyric, isSelected, lit, isEditing) = _bubbleNotes[bubble.Index];
+                    using (context.PushOpacity(hasLyric ? 1 : 0.55))
+                    {
+                        context.DrawRectangle(BadgeBrush, isEditing ? editPen : lit ? VocalSingingPens[color] : isSelected ? selectedPen : edge, bubble.Bubble, 4, 4);
+                        label.Draw(context, new Point(bubble.Bubble.Left + BubblePaddingX, bubble.Bubble.Top + ((BubbleHeight - label.Height) / 2)));
+                    }
+
+                    _bubbles.Add(new LyricBubbleSpot(bubble.Bubble, place, hasLyric));
+                }
             }
         }
 
@@ -625,16 +709,16 @@ namespace ChartBuilder.Controls.Editing
         /// </summary>
         private void RenderVocalOverlay(DrawingContext context, EditorSession session, VocalTrack vocal, VocalLane vocals, LaneProjection screen, Size size)
         {
-            DrawVocalSinging(context, session, vocal, vocals, screen, size);
+            DrawVocalAlignment(context, session, vocal, screen);
+            DrawLyricBubbles(context, session, vocal, vocals, screen, size);
+            DrawVocalSinging(context, session, vocal, vocals, screen);
             DrawVocalHover(context, session, vocal, vocals, screen);
             DrawVocalStripHover(context, session, screen, size);
             DrawVocalTempoHover(context, session, screen);
             DrawLoopLine(context, session, screen, screen.Slots);
             DrawLoopHover(context, session, screen, screen.Slots);
 
-            var lyrics = LyricsArea(size, screen);
-            var reach = new Rect(RowsOf(screen).TopLeft, new Point(screen.TimeFrom + screen.TimeLength, Math.Max(RowsOf(screen).Bottom, lyrics.Bottom)));
-            DrawCursor(context, session, screen, reach);
+            DrawCursor(context, session, screen, RowsOf(screen));
             DrawBox(context, screen);
             DrawHiddenNotes(context, session, vocal, vocals, screen);
 

@@ -188,6 +188,10 @@ namespace ChartBuilder.Controls.Editing
                     else
                         tools.ToggleStarPowerOverSelection();
                     return true;
+
+                // A vocal note's lyric, in the box over it (charter-spec C3 item 7).
+                case BuilderKeys.NoteEditLyric:
+                    return lane.IsVocal && canvas.OpenLyricEditor();
                 case BuilderKeys.TapTempo:
                     editor.Tap();
                     return true;
@@ -377,7 +381,7 @@ namespace ChartBuilder.Controls.Editing
         /// (Alt and <c>n + 1</c> by default). The table <see cref="ToolOf"/> reads.
         /// </summary>
         public static IReadOnlyList<EditorTool> ToolKeys { get; } =
-            [EditorTool.Select, EditorTool.Place, EditorTool.Erase, EditorTool.Phrase, EditorTool.Tempo, EditorTool.Sync];
+            [EditorTool.Select, EditorTool.Place, EditorTool.Erase, EditorTool.Phrase, EditorTool.Tempo, EditorTool.Sync, EditorTool.VocalAlign];
 
         /// <summary>The tool the action <paramref name="id"/> picks, or <see langword="null"/> when it isn't a tool action.</summary>
         public static EditorTool? ToolOf(string id)

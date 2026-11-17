@@ -150,6 +150,7 @@ public sealed class BuilderKeysTests
         ("canvas", "A", "A", BuilderKeys.NoteAccent),
         ("canvas", "Shift+A", "Shift+A", BuilderKeys.NoteGhost),
         ("canvas", "S", "S", BuilderKeys.NoteStarPower),
+        ("canvas", "F2", "F2", BuilderKeys.NoteEditLyric),
         ("canvas", "B", "B", BuilderKeys.TapTempo),
         ("canvas", "D0", "Digit0", BuilderKeys.NoteOpen),
         ("canvas", "NumPad0", "NumPad0", BuilderKeys.NoteOpen),

@@ -57,6 +57,33 @@ public sealed class VocalEditsTests
     }
 
     [TestMethod]
+    [DataRow("hey", "hey", "")]
+    [DataRow("hey#", "hey", "#")]
+    [DataRow("hey-#", "hey-", "#")]
+    [DataRow("hey#-", "hey-", "#")]
+    [DataRow("yeah^", "yeah", "^")]
+    [DataRow("#", "", "#")]
+    [DataRow(" a#b ", "a#b", "")]
+    [DataRow("", "", "")]
+    public void TheMarksOfASpokenNoteAreSplitFromTheSyllableAfterWhichTheyWrite(string raw, string shown, string marks)
+    {
+        Assert.AreEqual((shown, marks), VocalEdits.SplitSpokenMarks(raw));
+        Assert.AreEqual(raw.Trim() == "#" ? "#" : raw.Trim().Replace("#-", "-#", StringComparison.Ordinal), VocalEdits.WithSpokenMarks(shown, marks));
+    }
+
+    [TestMethod]
+    public void ClearingALyricLeavesTheMarksOfASpokenNoteAndASlideAlone()
+    {
+        var content = Content([new(0, 100, 60), new(120, 100, 60), new(240, 100, 60), new(360, 100, 60)],
+            [new(0, "sung-"), new(120, "talk#"), new(240, "+")]);
+
+        var cleared = VocalEdits.ClearLyric(content, [0, 120, 240, 360]);
+
+        Assert.AreSequenceEqual([new VocalLyricEvent(120, "#"), new VocalLyricEvent(240, "+")], [.. cleared.Lyrics]);
+        Assert.IsTrue(VocalEdits.IsSpoken(cleared, 120));
+    }
+
+    [TestMethod]
     public void SettingALyricReplacesEveryLyricOnTheTickKeepingHowTheFirstIsWritten()
     {
         var content = Content([new(0, 100, 60)], [new(0, "old", VocalTrackContent.TextType), new(0, "extra")]);

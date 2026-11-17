@@ -143,7 +143,9 @@ through `IProgress<T>`.
   projects, so tests use a fake `IImageOptimizer` and the decisions (fit, format, rename) live in
   `ChartShared.Core` as pure code (`ImageOptimization`, `ImageHeader`).
 - The one exception to Core's budget: it uses `z440.atl.core` (ATL.NET, MIT) to read audio
-  durations from file headers, for the library list's length when a song has no `song_length`.
+  durations from file headers, for the library list's length when a song has no `song_length`,
+  and the lyrics in an audio file's tags, for Chart Builder's Import Lyrics (the other lyric
+  formats are parsed in Core with no package).
 - `ChartShared.Audio` plays audio (F7). It keeps codecs and native code out of Core, and uses:
   - FFmpeg's `vorbis`, `opus` and `mp1float`/`mp2float`/`mp3float` decoders, through
     `ChartShared.Ffmpeg`, for mono and stereo streams when the libraries have them. Decoding is

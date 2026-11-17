@@ -400,8 +400,98 @@ public sealed class VocalToolsTests
         Assert.AreEqual(new VocalLyricEvent(240, "+"), Vocals(session).Lyrics[1]);
         Assert.AreEqual(70, Vocals(session).Notes[1].Pitch);
 
+        // A slide has no lyric to take away.
         session.Tools.SetVocalLyric("");
-        Assert.HasCount(1, Vocals(session).Lyrics);
+        Assert.HasCount(2, Vocals(session).Lyrics);
+
+        session.Selection.SelectVocalNotes(VocalTrack.Vocals, [new(0, 60)]);
+        session.Tools.SetVocalLyric("");
+        Assert.AreSequenceEqual([new VocalLyricEvent(240, "+")], [.. Vocals(session).Lyrics]);
+    }
+
+    [TestMethod]
+    public void TheLyricOfTheSelectedNotesIsSetKeepingASpokenNoteSpokenAndASlideASlide()
+    {
+        var session = Of(WithVocals([new(0, 100, 60), new(120, 100, 62), new(240, 100, 64), new(360, 100, 65)],
+            [new(0, "sung-"), new(120, "talk#"), new(240, "+")]));
+        session.Tools.SelectAllVocals(VocalTrack.Vocals);
+
+        session.Tools.SetVocalLyric("la");
+
+        Assert.AreSequenceEqual(
+            [new VocalLyricEvent(0, "la"), new VocalLyricEvent(120, "la#"), new VocalLyricEvent(240, "+"), new VocalLyricEvent(360, "la")],
+            [.. Vocals(session).Lyrics]);
+        Assert.AreEqual(1, session.UndoStack.UndoCount);
+
+        session.Tools.SetVocalLyric("");
+        Assert.AreSequenceEqual([new VocalLyricEvent(120, "#"), new VocalLyricEvent(240, "+")], [.. Vocals(session).Lyrics]);
+    }
+
+    // A note's lyric edited in its bubble, whatever's selected.
+
+    [TestMethod]
+    public void ALyricIsAddedToANoteWithNoneAndReplacedAndTakenAwayWhateverIsSelected()
+    {
+        var session = Of(WithVocals([new(0, 100, 60), new(240, 100, 62)], [new(0, "hey-")]));
+        session.Selection.SelectVocalNotes(VocalTrack.Vocals, [new(0, 60)]);
+
+        Assert.IsTrue(session.Tools.SetVocalLyric(VocalTrack.Vocals, 240, "you"));
+        Assert.AreSequenceEqual(["hey-", "you"], [.. Vocals(session).Lyrics.Select(l => l.Text)]);
+
+        Assert.IsTrue(session.Tools.SetVocalLyric(VocalTrack.Vocals, 240, " there "));
+        Assert.AreSequenceEqual(["hey-", "there"], [.. Vocals(session).Lyrics.Select(l => l.Text)]);
+
+        Assert.IsTrue(session.Tools.SetVocalLyric(VocalTrack.Vocals, 0, ""));
+        Assert.AreSequenceEqual([new VocalLyricEvent(240, "there")], [.. Vocals(session).Lyrics]);
+        Assert.HasCount(2, Vocals(session).Notes);
+
+        // The selection is as it was.
+        Assert.AreSequenceEqual([new VocalNotePlace(0, 60)], [.. session.Selection.VocalPlaces]);
+    }
+
+    [TestMethod]
+    public void EachLyricEditIsOneUndoStepAndALyricLeftAsItWasOrOnNoNoteMakesNone()
+    {
+        var session = Of(WithVocals([new(0, 100, 60)], [new(0, "hey")]));
+
+        Assert.IsFalse(session.Tools.SetVocalLyric(VocalTrack.Vocals, 0, "hey"));
+        Assert.IsFalse(session.Tools.SetVocalLyric(VocalTrack.Vocals, 0, "  hey "));
+        Assert.IsFalse(session.Tools.SetVocalLyric(VocalTrack.Vocals, 120, "nobody"));
+        Assert.AreEqual(0, session.UndoStack.UndoCount);
+
+        Assert.IsTrue(session.Tools.SetVocalLyric(VocalTrack.Vocals, 0, "ho"));
+        Assert.AreEqual(1, session.UndoStack.UndoCount);
+
+        session.UndoStack.Undo();
+        Assert.AreSequenceEqual([new VocalLyricEvent(0, "hey")], [.. Vocals(session).Lyrics]);
+    }
+
+    [TestMethod]
+    public void DeletingTheLyricsOfTheSelectedNotesKeepsASpokenNoteSpokenAndMakesOneStep()
+    {
+        var session = Of(WithVocals([new(0, 100, 60), new(240, 100, 62), new(480, 100, 64)], [new(0, "hey-"), new(240, "talk#")]));
+        session.Tools.SelectAllVocals(VocalTrack.Vocals);
+
+        session.Tools.DeleteVocalLyric();
+
+        Assert.AreSequenceEqual([new VocalLyricEvent(240, "#")], [.. Vocals(session).Lyrics]);
+        Assert.HasCount(3, Vocals(session).Notes);
+        Assert.AreEqual(1, session.UndoStack.UndoCount);
+
+        // Nothing left to take: no step.
+        session.Tools.DeleteVocalLyric();
+        Assert.AreEqual(1, session.UndoStack.UndoCount);
+    }
+
+    [TestMethod]
+    public void ASlidesLyricCantBeSetFromItsBubbleSoItStaysASlide()
+    {
+        var session = Of(WithVocals([new(0, 100, 60), new(120, 100, 62)], [new(0, "hey"), new(120, "+")]));
+
+        Assert.IsFalse(session.Tools.SetVocalLyric(VocalTrack.Vocals, 120, "oh"));
+        Assert.IsFalse(session.Tools.SetVocalLyric(VocalTrack.Vocals, 120, ""));
+        Assert.AreEqual(0, session.UndoStack.UndoCount);
+        Assert.AreEqual(new VocalLyricEvent(120, "+"), Vocals(session).Lyrics[1]);
     }
 
     // The selection.
