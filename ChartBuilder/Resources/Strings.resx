@@ -298,6 +298,14 @@
     <value>_Export copy…</value>
     <comment>File menu: writes a copy of the song to another folder.</comment>
   </data>
+  <data name="MenuImportLyrics" xml:space="preserve">
+    <value>_Import Lyrics…</value>
+    <comment>File menu: picks a lyrics file and puts its words into a vocal part.</comment>
+  </data>
+  <data name="MenuExportLyrics" xml:space="preserve">
+    <value>Export _Lyrics…</value>
+    <comment>File menu: writes a vocal part's lyrics to an .lrc file.</comment>
+  </data>
   <data name="MenuEdit" xml:space="preserve">
     <value>_Edit</value>
     <comment>The editor title bar's Edit menu. The underscore marks its access key (Alt+E).</comment>
@@ -2935,6 +2943,78 @@ Saving also changes song.ini:
   </data>
   <data name="LaneMappingPasteButton" xml:space="preserve">
     <value>Paste</value>
+  </data>
+  <data name="LyricsImportTitle" xml:space="preserve">
+    <value>Import Lyrics</value>
+    <comment>Title of the dialog, and of the file picker, that import lyrics from a file into a vocal part.</comment>
+  </data>
+  <data name="LyricsExportTitle" xml:space="preserve">
+    <value>Export Lyrics</value>
+    <comment>Title of the dialog, and of the save dialog, that write a vocal part's lyrics to an .lrc file.</comment>
+  </data>
+  <data name="LyricsImportButton" xml:space="preserve">
+    <value>Import</value>
+    <comment>The Import lyrics dialog's confirm button.</comment>
+  </data>
+  <data name="LyricsExportButton" xml:space="preserve">
+    <value>Export</value>
+    <comment>The Export lyrics dialog's confirm button.</comment>
+  </data>
+  <data name="LyricsImportSummaryFormat" xml:space="preserve">
+    <value>{0}: {1} lines, {2} words.</value>
+    <comment>The Import lyrics dialog's summary of the file read. {0} is the file's name, {1} its number of lines, {2} its number of words.</comment>
+  </data>
+  <data name="LyricsExportSummary" xml:space="preserve">
+    <value>Writes one line for each phrase of the part, timed to the audio.</value>
+    <comment>The Export lyrics dialog's description of what's written.</comment>
+  </data>
+  <data name="LyricsPartLabel" xml:space="preserve">
+    <value>Vocal Part</value>
+    <comment>The Import and Export lyrics dialogs' drop-down of the vocal part: Vocals, or a harmony.</comment>
+  </data>
+  <data name="LyricsReplaceOption" xml:space="preserve">
+    <value>Replace Existing Lyrics</value>
+    <comment>Import lyrics option: the part's own notes, lyrics and phrases are removed first.</comment>
+  </data>
+  <data name="LyricsMergeOption" xml:space="preserve">
+    <value>Merge with Existing Lyrics</value>
+    <comment>Import lyrics option: the part keeps what it has, and the words are added where there's room.</comment>
+  </data>
+  <data name="LyricsImportNote" xml:space="preserve">
+    <value>Every imported word is spoken: a note with no pitch. Each line becomes a phrase.</value>
+    <comment>Import lyrics dialog: a note under the replace and merge options.</comment>
+  </data>
+  <data name="LyricsUseWordTimes" xml:space="preserve">
+    <value>Use Word Timing from the File</value>
+    <comment>Import lyrics option, shown when the file times its words (LRC with A2, TTML, UltraStar, karaoke): when off, the words of each line share its time.</comment>
+  </data>
+  <data name="LyricsIncludeWordTimes" xml:space="preserve">
+    <value>Include Word Timing (A2)</value>
+    <comment>Export lyrics option: when on, each syllable has its own time, in the A2 extension of LRC.</comment>
+  </data>
+  <data name="LyricsImportedFormat" xml:space="preserve">
+    <value>Imported {0} words into {1}.</value>
+    <comment>Message bar, after Import lyrics. {0} is how many words were added, {1} the vocal part's name.</comment>
+  </data>
+  <data name="LyricsImportedSkippedFormat" xml:space="preserve">
+    <value>Imported {0} words into {1}; {2} were left out.</value>
+    <comment>Message bar, after Import lyrics left some words out: before the start of the song, on another word, or on a note the part has. {0} is how many were added, {1} the vocal part's name, {2} how many were left out.</comment>
+  </data>
+  <data name="LyricsImportFailedFormat" xml:space="preserve">
+    <value>The lyrics weren't imported: {0}</value>
+    <comment>Message bar. {0} is why, e.g. that the file isn't a lyrics file, or has no times.</comment>
+  </data>
+  <data name="LyricsExportedFormat" xml:space="preserve">
+    <value>Exported the lyrics to {0}.</value>
+    <comment>Message bar, after Export lyrics. {0} is the file written.</comment>
+  </data>
+  <data name="LyricsExportFailedFormat" xml:space="preserve">
+    <value>The lyrics weren't exported: {0}</value>
+    <comment>Message bar. {0} is why, e.g. that the file can't be written.</comment>
+  </data>
+  <data name="LyricsExportNone" xml:space="preserve">
+    <value>No vocal part has lyrics to export.</value>
+    <comment>Message bar, when Export lyrics is chosen and no vocal part has any.</comment>
   </data>
   <data name="LaneSelectLane" xml:space="preserve">
     <value>Select lane</value>

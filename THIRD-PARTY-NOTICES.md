@@ -77,6 +77,29 @@ specifications; no code from any implementation of them is used.
   (`Decoding/Mp3Source.cs`).
 - **WAV:** the RIFF WAVE format, including `WAVE_FORMAT_EXTENSIBLE` (`Decoding/WavSource.cs`).
 
+### Lyric Formats
+
+The lyric files Chart Builder imports and exports (`ChartShared.Core/Lyrics/`) are read and
+written from the formats' published descriptions; no code from any implementation of them is used.
+
+- **LRC and Enhanced LRC (A2):** the line time tags `[mm:ss.xx]`, the `[offset:]` tag, and the
+  per-word `<mm:ss.xx>` tags of the A2 extension, as described on the
+  [LRC format](https://en.wikipedia.org/wiki/LRC_(file_format)) page (`LrcParser.cs`,
+  `LrcWriter.cs`).
+- **SRT:** the SubRip cue layout, `start --> end` over its text (`CueParser.cs`).
+- **WebVTT:** [W3C WebVTT: The Web Video Text Tracks Format](https://www.w3.org/TR/webvtt1/): cues,
+  cue settings, NOTE/STYLE/REGION blocks and inline tags (`CueParser.cs`).
+- **TTML:** [W3C Timed Text Markup Language 2](https://www.w3.org/TR/ttml2/): clock and offset
+  time expressions, the tick rate, and timing inside `body`, `div`, `p` and `span`
+  (`TtmlParser.cs`).
+- **KAR:** the Standard MIDI Files specification (as for the chart's MIDI) and the karaoke
+  convention of syllables as text or lyric events, `/` and `\` line breaks and `@` header events
+  (`KarParser.cs`).
+- **UltraStar `.txt`:** the [UltraStar song format](https://usdx.eu/format/), with its `#BPM` and
+  `#GAP` header and its note, line-break and duet lines (`UltraStarParser.cs`).
+- **Embedded lyrics:** ID3v2's `SYLT` and `USLT` frames and Vorbis comments' `LYRICS`, read by
+  ATL.NET (below) (`EmbeddedLyricsReader.cs`).
+
 ## Icons
 
 ### game-icons.net
@@ -254,7 +277,7 @@ builds only) aren't part of a release and aren't listed.
 | [Tmds.DBus.Protocol](https://github.com/tmds/Tmds.DBus) | 0.92.0 | MIT | © Tom Deseyn |
 | [SkiaSharp](https://github.com/mono/SkiaSharp), with its native assets | 3.119.4 | MIT, plus the notices below | © Microsoft Corporation |
 | [HarfBuzzSharp](https://github.com/mono/SkiaSharp), with its native assets | 8.3.1.3 | MIT, plus the notices below | © Microsoft Corporation |
-| [ATL.NET](https://github.com/Zeugma440/atldotnet) (`z440.atl.core`) | 7.18.0 | MIT | © 2017 Zeugma440 |
+| [ATL.NET](https://github.com/Zeugma440/atldotnet) (`z440.atl.core`) | 7.19.0 | MIT | © 2017 Zeugma440 |
 | [ANGLE](https://github.com/google/angle) (`Avalonia.Angle.Windows.Natives`) | 2.1.27548 | BSD 3-Clause | © 2018 The ANGLE Project Authors |
 | [Inter](https://github.com/rsms/inter) typeface, embedded in `Avalonia.Fonts.Inter` | — | SIL OFL 1.1 | © 2016 The Inter Project Authors |
 | [Ude](https://github.com/yinyue200/ude) (`Ude.NetStandard`), a dependency of ATL.NET | 1.2.0 | MPL 1.1 (or GPL 2.0+ / LGPL 2.1+) | The Ude and Mozilla contributors |
@@ -268,7 +291,8 @@ builds only) aren't part of a release and aren't listed.
 | [libopus](https://opus-codec.org), the Opus encoder linked into `libavcodec` | the release build's package | BSD 3-Clause | © Xiph.Org Foundation, Skype Limited, Octasic, CSIRO, Mozilla, Amazon and others |
 
 ATL.NET reads audio durations in `ChartShared.Core/Scanning/AudioLength.cs`, the library list's
-fallback when a song has no `song_length`.
+fallback when a song has no `song_length`, and the lyrics in an audio file's tags in
+`ChartShared.Core/Lyrics/EmbeddedLyricsReader.cs`, which Chart Builder's Import Lyrics reads.
 
 Serilog writes both apps' logs, and Serilog.Sinks.File writes them to daily files in the per-user
 log folder (`ChartShared.UI/AppLog.cs`).

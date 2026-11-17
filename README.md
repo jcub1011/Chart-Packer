@@ -28,6 +28,10 @@ Easily create star power phrases for the whole track.
 
 ![Automatic star power phrase generation](<screenshots/Auto Star Power Generation Demo.webp>)
 
+### Lyric Import & Export
+
+Import lyrics from `.lrc` (including A2 word timing), `.srt`, `.vtt`, `.ttml`, `.kar`, UltraStar `.txt`, or an audio file's lyrics tags, and export a vocal part as `.lrc`.
+
 ### Waveform Visualization
 
 See audio waveforms and spectrograms while charting.

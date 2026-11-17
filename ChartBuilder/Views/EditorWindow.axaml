@@ -138,6 +138,13 @@
                                     <MenuItem.Icon><ctl:LineIcon Data="{StaticResource OutputFolderStroke}" /></MenuItem.Icon>
                                 </MenuItem>
                                 <Separator />
+                                <MenuItem Header="{x:Static res:Strings.MenuImportLyrics}" Command="{Binding ImportLyricsCommand}">
+                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource TextEventStroke}" /></MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="{x:Static res:Strings.MenuExportLyrics}" Command="{Binding ExportLyricsCommand}">
+                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource TextEventStroke}" /></MenuItem.Icon>
+                                </MenuItem>
+                                <Separator />
                                 <!-- Settings is the program's, last under File as in Chart Packer; the chart's are a tab in the
                                      left panel. Its key is in the tooltip, as Avalonia would print Ctrl+, as Ctrl+OemComma. -->
                                 <MenuItem Header="{x:Static res:Strings.MenuSettings}"

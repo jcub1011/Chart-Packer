@@ -189,6 +189,18 @@
     <value>Charts and songs ({0})</value>
     <comment>File-picker filter. {0} is the extensions, e.g. "chart, mid, midi, sng".</comment>
   </data>
+  <data name="LyricsFileTypeFormat" xml:space="preserve">
+    <value>Lyrics files ({0})</value>
+    <comment>File-picker filter for importing lyrics. {0} is the extensions, e.g. "lrc, srt, vtt".</comment>
+  </data>
+  <data name="LyricsTagsFileTypeFormat" xml:space="preserve">
+    <value>Audio with lyrics in its tags ({0})</value>
+    <comment>File-picker filter for importing lyrics. {0} is the extensions, e.g. "mp3, ogg, flac".</comment>
+  </data>
+  <data name="LrcFileTypeFormat" xml:space="preserve">
+    <value>LRC lyrics ({0})</value>
+    <comment>Save-dialog file type for exporting lyrics. {0} is the extension, "lrc".</comment>
+  </data>
   <data name="SettingsWindowTitle" xml:space="preserve">
     <value>Settings</value>
   </data>

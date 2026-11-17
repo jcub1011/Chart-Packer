@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
+using ChartShared.Core.Lyrics;
 using ChartShared.Core.Scanning;
 using ChartShared.UI.Resources;
 
@@ -38,6 +39,15 @@ namespace ChartShared.UI.Services
         [
             FileType(SharedStrings.LyricsSourceFileTypeFormat, [.. ChartFiles.Extensions, ".sng"], ["application/x-chart", "audio/midi"]),
         ];
+
+        // Lyrics files first, so the default filter shows everything that can be imported; the audio files' tags are the second.
+        private static readonly FilePickerFileType[] LyricsFiles =
+        [
+            FileType(SharedStrings.LyricsFileTypeFormat, LyricFiles.TextExtensions, ["text/plain", "application/xml", "audio/midi"]),
+            FileType(SharedStrings.LyricsTagsFileTypeFormat, LyricFiles.AudioExtensions, ["audio/mpeg", "audio/ogg", "audio/opus", "audio/flac"]),
+        ];
+
+        private static readonly FilePickerFileType Lrc = FileType(SharedStrings.LrcFileTypeFormat, [".lrc"], ["text/plain"]);
 
         // A folder can't be picked in the same dialog as a file, so a song folder is picked by a file in it.
         private static readonly FilePickerFileType[] Songs =
@@ -111,6 +121,25 @@ namespace ChartShared.UI.Services
         public Task<string?> PickChartAsync(string title) => PickOneAsync(title, Charts);
 
         public Task<string?> PickLyricsSourceAsync(string title) => PickOneAsync(title, LyricsSources);
+
+        public Task<string?> PickLyricsFileAsync(string title) => PickOneAsync(title, LyricsFiles);
+
+        public async Task<string?> PickLrcSaveAsync(string title, string suggestedName)
+        {
+            if (topLevel() is not { } owner)
+                return null;
+
+            var file = await owner.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+            {
+                Title = title,
+                SuggestedFileName = suggestedName,
+                DefaultExtension = "lrc",
+                FileTypeChoices = [Lrc],
+                ShowOverwritePrompt = true,
+            });
+
+            return file?.TryGetLocalPath();
+        }
 
         public Task<string?> PickSongAsync(string title) => PickOneAsync(title, Songs);
 

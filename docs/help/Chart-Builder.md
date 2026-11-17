@@ -18,6 +18,10 @@ In the **Art** tab, set the video's **Video start** box to choose where the song
 
 The stopwatch button beside the box, **Auto Align by Waveform**, lines the video up using its own audio track and the song's mix. It's disabled when the video has no audio. Under the row, the chart waveform is drawn above the video waveform: drag either to adjust the start by eye. Both the button and a drag are undoable.
 
+## Importing And Exporting Lyrics
+
+**File → Import Lyrics…** brings lyrics into a vocal part from an `.lrc` file (with or without the A2 word timing), or from `.srt`, `.vtt`, `.ttml`, `.kar`, an UltraStar `.txt`, or the lyrics tags of an audio file. Every imported word is spoken, and you choose whether the part's own lyrics are replaced or merged with. **File → Export Lyrics…** writes a part's lyrics as an `.lrc`, with or without A2 word timing. Both are undoable. See [Lyric Import and Export](Lyric-Import-and-Export.md).
+
 ## Typical Workflow
 
 1. Start a new chart (or drop audio onto the window), or open a song.

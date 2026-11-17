@@ -1,0 +1,77 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:help="using:ChartShared.Core.Help"
+        xmlns:ui="using:ChartShared.UI.Controls"
+        xmlns:vm="using:ChartBuilder.ViewModels"
+        xmlns:res="using:ChartBuilder.Resources"
+        xmlns:sres="using:ChartShared.UI.Resources"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="420" d:DesignHeight="320"
+        x:Class="ChartBuilder.Views.LyricsDialogWindow"
+        x:DataType="vm:LyricsDialogViewModel"
+        Icon="/Assets/ChartBuilder.ico"
+        Title="{Binding Title}"
+        Background="{DynamicResource AppBackgroundBrush}"
+        WindowStartupLocation="CenterOwner"
+        SizeToContent="Height"
+        CanResize="False"
+        ShowInTaskbar="False"
+        Width="420"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaTitleBarHeightHint="30"
+        WindowDecorationsTheme="{StaticResource TitleBarDecorations}">
+
+    <DockPanel>
+        <ui:TitleBar x:Name="WindowTitleBar"
+                     HelpPage="{x:Static help:HelpPages.LyricImportExport}"
+                     DockPanel.Dock="Top"
+                     Height="31"
+                     BorderThickness="0,0,0,1"
+                     BorderBrush="{DynamicResource SubtleBorderBrush}">
+            <TextBlock Margin="8,0,12,0"
+                       FontSize="12"
+                       VerticalAlignment="Center"
+                       TextTrimming="CharacterEllipsis"
+                       Text="{Binding Title}" />
+        </ui:TitleBar>
+
+        <!-- Import or export lyrics (issue 270): the part, and what the import or the LRC does with the words' times. -->
+        <StackPanel Margin="20" Spacing="14">
+            <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap" Text="{Binding Summary}" />
+
+            <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.LyricsPartLabel}" />
+                <ComboBox Grid.Column="1" Width="160"
+                          ItemsSource="{Binding Parts}"
+                          SelectedItem="{Binding SelectedPart}"
+                          DisplayMemberBinding="{Binding Label, x:DataType=vm:LyricsPartChoice}"
+                          AutomationProperties.Name="{x:Static res:Strings.LyricsPartLabel}" />
+            </Grid>
+
+            <StackPanel Spacing="6" IsVisible="{Binding IsImport}">
+                <RadioButton GroupName="LyricsMode" IsChecked="{Binding IsReplace}"
+                             Content="{x:Static res:Strings.LyricsReplaceOption}" />
+                <RadioButton GroupName="LyricsMode" IsChecked="{Binding IsMerge}"
+                             Content="{x:Static res:Strings.LyricsMergeOption}" />
+                <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap" Text="{x:Static res:Strings.LyricsImportNote}" />
+            </StackPanel>
+
+            <CheckBox IsVisible="{Binding ShowsWordTimes}"
+                      IsChecked="{Binding UseWordTimes}"
+                      Content="{Binding WordTimesText}" />
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+                <Button Classes="accent"
+                        Content="{Binding ConfirmText}"
+                        IsDefault="True"
+                        Click="OnConfirm"
+                        AutomationProperties.Name="{Binding ConfirmText}" />
+                <Button Content="{x:Static sres:SharedStrings.CancelButton}"
+                        IsCancel="True"
+                        Click="OnCancel"
+                        AutomationProperties.Name="{x:Static sres:SharedStrings.CancelButton}" />
+            </StackPanel>
+        </StackPanel>
+    </DockPanel>
+</Window>

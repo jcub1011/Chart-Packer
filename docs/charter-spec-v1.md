@@ -1000,6 +1000,21 @@ Acceptance criteria:
      selected notes, or takes away the star power that's over them; `W` switches the part's audio
      between the waveform and the spectrogram; Delete and Ctrl+X, C and V work on its notes, with their lyrics. A vocal part's notes paste only into a vocal lane, and a
      highway's never into one. The keys that change a highway's notes do nothing.
+   - **Import and export lyrics** (issue 270) are in the File menu, and need no lane open.
+     **Import Lyrics…** picks a file, reads it (`ChartShared.Core/Lyrics/`) and asks which part,
+     replace or merge, and whether the file's word times are used. The formats are LRC (with or
+     without the A2 per-word tags), SRT, WebVTT, TTML, KAR, an UltraStar `.txt`, and the synchronized
+     or LRC lyrics in an audio file's tags (ATL.NET); the last five are import only. Every word
+     becomes a spoken note (middle C, lyric `word#`) and each line a phrase. A word with no time
+     of its own shares its line's time with the words beside it by their letters. The file's times
+     are the audio's, so the song's delay is taken off them. Replace takes out the part's notes,
+     lyrics and phrases but keeps its star power; Merge keeps all of it and leaves out a word that
+     would start on a note the part has, shortens one that would run into one, and adds no phrase
+     that overlaps one the part has. A part the chart hasn't is added in the same step, and the
+     import is one undoable step (`LyricImport.Apply`). **Export Lyrics…** writes one `[mm:ss.xx]`
+     line for each phrase of the chosen part, stamped with the time of its first lyric and timed to
+     the audio file, delay included; with A2 each syllable has a `<mm:ss.xx>` tag and the line ends
+     with one. The chart's lyric symbols are taken off, and a slide's `+` is dropped.
    - The vocal findings ([§6](#lint-rules)) name their part, and going to one opens its lane and
      selects the notes on its tick.
 

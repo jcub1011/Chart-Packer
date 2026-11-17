@@ -38,6 +38,7 @@ public static class HelpPages
     public const string GeneratePhrases = "Generate-Phrases";
     public const string InputDevices = "Input-Devices";
     public const string LaneMapping = "Lane-Mapping";
+    public const string LyricImportExport = "Lyric-Import-and-Export";
     public const string Messages = "Messages";
     public const string Preview = "Preview";
     public const string Reduce = "Reduce";

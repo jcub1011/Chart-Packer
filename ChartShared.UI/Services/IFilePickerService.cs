@@ -27,6 +27,18 @@ namespace ChartShared.UI.Services
         Task<string?> PickLyricsSourceAsync(string title);
 
         /// <summary>
+        /// Shows a picker for one file to import lyrics from: an .lrc, .srt, .vtt, .ttml, .kar or UltraStar .txt file, or an
+        /// audio file whose tags have them. Returns its local path, or <see langword="null"/> if cancelled.
+        /// </summary>
+        Task<string?> PickLyricsFileAsync(string title);
+
+        /// <summary>
+        /// Shows a save dialog for an .lrc file, starting with <paramref name="suggestedName"/>, and returns the local path
+        /// chosen, or <see langword="null"/> if cancelled. Overwriting a file is confirmed by the dialog.
+        /// </summary>
+        Task<string?> PickLrcSaveAsync(string title, string suggestedName);
+
+        /// <summary>
         /// Shows a picker for one song: a .sng, or a song folder's song.ini or chart, which stands for the folder. Returns
         /// the picked file's local path, or <see langword="null"/> if cancelled.
         /// </summary>
