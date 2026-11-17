@@ -1000,6 +1000,24 @@ Acceptance criteria:
      selected notes, or takes away the star power that's over them; `W` switches the part's audio
      between the waveform and the spectrogram; Delete and Ctrl+X, C and V work on its notes, with their lyrics. A vocal part's notes paste only into a vocal lane, and a
      highway's never into one. The keys that change a highway's notes do nothing.
+   - **Vocal Alignment tool** (`Alt`+`7`), in the toolbar only while a vocal lane has focus, for
+     lyrics timed to other audio, which drift as they go. It shifts and stretches the vocal parts in
+     the audio's time, not in ticks, with no snapping (`VocalAlignment`): a time `t` goes to
+     `start + offset + (t − start) / speed`, `start` being the first note or lyric. Each note's start
+     and end, each lyric, and each phrase's and star power phrase's ends go to the nearest tick, never
+     before the song's start; the track's other events stay. While it's picked every note of an
+     aligned part is outlined in the accent, the span from the first note to the last note's end is
+     shaded with a handle at each end, and the offset and speed are drawn over it. Dragging inside
+     the span shifts the parts; dragging the start's handle stretches them with the last note's end
+     kept, and the end's handle with the first note kept; Shift drags a quarter as far. The middle and
+     right buttons do nothing. The toolbar shows **Offset (ms)** and **Speed (%)**, typed or
+     scrubbed (shown at once, one undo step 600 ms after the last change), and **All Vocal Parts**,
+     on by default, off to align only the part in focus. The speed is 50–200%, and the offset keeps
+     the first note at or after the song's start. Each drag or settled field is one undoable step,
+     worked out from the parts as they were when the tool first took them, so a typed speed is that
+     speed of the original, and rounding to ticks doesn't build up; undo and redo bring each step's
+     values back, and an edit made any other way takes the parts as they are as the start again. A
+     highway's lane taking focus puts the tool down for the Select tool.
    - **Import and export lyrics** (issue 270) are in the File menu, and need no lane open.
      **Import Lyrics…** picks a file, reads it (`ChartShared.Core/Lyrics/`) and asks which part,
      replace or merge, and whether the file's word times and pitches are used. The formats are LRC
@@ -3181,7 +3199,7 @@ one is picked up by the other when its window is next activated.
 | `A` / `Shift`+`A` | Toggle accent or ghost (drums) |
 | `S` | Star power phrase over the selection |
 | `F2` | Edit the lyric of the first selected vocal note |
-| `Alt`+`1`–`6` | Pick the Select, Place, Erase, Phrase, Tempo or Sync tool, in the toolbar's order; the number row's digits, not the number pad's; works wherever focus is, except in a text box |
+| `Alt`+`1`–`7` | Pick the Select, Place, Erase, Phrase, Tempo, Sync or Vocal Alignment tool, in the toolbar's order; the number row's digits, not the number pad's; works wherever focus is, except in a text box. Vocal Alignment is picked only while a vocal lane has focus ([C3](#c3-editor-layout) item 7) |
 | `L` | Hold for the Loop tool: drag out the loop region, or drag its ends or middle to resize or move it. Tapped briefly, having touched nothing, it turns repeating the region on or off ([C10](#c10-playback)) |
 | `R` | Record mode on or off, and playtest off: on, playing the song records a pass. Space ends a pass, and Esc cancels it |
 | `P` | Playtest on or off, and record mode off: on, playing the song playtests the lane ([C19](#c19-playtest-and-instrument-input)) |

@@ -189,6 +189,7 @@ written from the formats' published descriptions; no code from any implementatio
 | [magnet](https://lucide.dev/icons/magnet) | Quantize; snap to the grid |
 | [merge](https://lucide.dev/icons/merge) | Merge |
 | [metronome](https://lucide.dev/icons/metronome) | The Tempo tool; the metronome |
+| [mic-vocal](https://lucide.dev/icons/mic-vocal) | The Vocal Alignment tool |
 | [midi-port](https://lucide.dev/icons/midi-port) | A MIDI chart |
 | [minus](https://lucide.dev/icons/minus) | Less, e.g. zoom out |
 | [mouse-pointer-2](https://lucide.dev/icons/mouse-pointer-2) | The Select tool |

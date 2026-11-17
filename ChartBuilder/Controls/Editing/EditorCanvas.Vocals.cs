@@ -269,6 +269,8 @@ namespace ChartBuilder.Controls.Editing
         {
             StandardCursorType? wanted = null;
             string? tip = null;
+            if (Session is { } aligning && ShowVocalAlignCursor(aligning, position))
+                return;
             if (_notesAbove is { } above && above.Badge.Contains(position) || _notesBelow is { } below && below.Badge.Contains(position))
                 wanted = StandardCursorType.Hand;
             else if (Session?.Tool == EditorTool.Select && BubbleAt(position) is not null)
@@ -505,13 +507,15 @@ namespace ChartBuilder.Controls.Editing
 
         /// <summary>
         /// The notes: a bar on its pitch's row for each sung one, a line from the note before for a slide, and an outline
-        /// along the middle row for a spoken one, which has no pitch. A selected note has the accent's edge around it.
+        /// along the middle row for a spoken one, which has no pitch. A selected note has the accent's edge around it, and so
+        /// does every note while the Vocal Alignment tool aligns the part, as they all move together.
         /// </summary>
         private void DrawVocalNotes(DrawingContext context, EditorSession session, VocalTrack vocal, VocalLane vocals, LaneProjection projection, double fromTick, double toTick)
         {
             int color = (int)vocal;
             var selection = session.Selection;
             var selectedPen = AccentPens().Selected;
+            bool aligning = IsAligning(session, vocal);
             double thickness = VocalNoteThickness(projection);
             var notes = vocals.Notes;
             var (first, last) = vocals.NotesBetween(fromTick, toTick);
@@ -534,7 +538,7 @@ namespace ChartBuilder.Controls.Editing
                     context.DrawRectangle(null, VocalUnpitchedPens[color], bar, radius, radius);
                 else
                     context.DrawRectangle(VocalNoteBrushes[color], VocalEdgePens[color], bar, radius, radius);
-                if (selection.Contains(vocal, new VocalNotePlace(note.Tick, note.Pitch)))
+                if (aligning || selection.Contains(vocal, new VocalNotePlace(note.Tick, note.Pitch)))
                     context.DrawRectangle(null, selectedPen, bar.Inflate(2), radius + 2, radius + 2);
             }
         }
@@ -705,6 +709,7 @@ namespace ChartBuilder.Controls.Editing
         /// </summary>
         private void RenderVocalOverlay(DrawingContext context, EditorSession session, VocalTrack vocal, VocalLane vocals, LaneProjection screen, Size size)
         {
+            DrawVocalAlignment(context, session, vocal, screen);
             DrawLyricBubbles(context, session, vocal, vocals, screen, size);
             DrawVocalSinging(context, session, vocal, vocals, screen);
             DrawVocalHover(context, session, vocal, vocals, screen);

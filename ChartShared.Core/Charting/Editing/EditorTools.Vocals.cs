@@ -49,6 +49,13 @@ public sealed partial class EditorTools
             return;
         }
 
+        // The Vocal Alignment tool takes hold of every part at once, wherever in the lane it's pressed.
+        if (_session.Tool == EditorTool.VocalAlign)
+        {
+            _gesture = PressVocalAlign(point);
+            return;
+        }
+
         if (VocalContentOrSay(point.Track) is not { } content)
             return;
         bool shift = modifiers.HasFlag(EditorModifiers.Shift);
@@ -86,6 +93,8 @@ public sealed partial class EditorTools
         _modifiers = EditorModifiers.None;
         if (LoopActive)
             _session.ClearLoop();
+        else if (_session.Tool == EditorTool.VocalAlign)
+            return;
         else if (_session.Tool == EditorTool.Tempo)
             RemoveTempoNear(point.Tick, point.Tolerance);
         else if (VocalContentOrSay(point.Track) is { } content)
@@ -102,7 +111,7 @@ public sealed partial class EditorTools
     {
         Cancel();
         _modifiers = modifiers;
-        if (point.InPhrases || point.InStarPower || VocalContentOrSay(point.Track) is not { } content)
+        if (_session.Tool == EditorTool.VocalAlign || point.InPhrases || point.InStarPower || VocalContentOrSay(point.Track) is not { } content)
             return;
 
         var selection = _session.Selection;

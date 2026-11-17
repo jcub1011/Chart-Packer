@@ -270,6 +270,58 @@
     <value>Loop tool</value>
     <comment>The Loop tool's button for a screen reader, said apart from the transport bar's Loop button, which repeats the region.</comment>
   </data>
+  <data name="ToolVocalAlign" xml:space="preserve">
+    <value>Vocal Alignment</value>
+    <comment>An editing tool, shown while a vocal lane has focus: shifts and stretches every vocal part in time, to line lyrics up with the audio.</comment>
+  </data>
+  <data name="ToolVocalAlignToolTip" xml:space="preserve">
+    <value>Shift and stretch every vocal part in time, with no snapping, to line its lyrics up with the audio. Drag the notes to shift them. Drag the handle before the first note, or after the last, to stretch them: the other end stays where it is. Hold Shift to drag finely, or type an offset and speed beside the tool. Shown while a vocal lane has focus.</value>
+    <comment>The Vocal Alignment tool's tooltip.</comment>
+  </data>
+  <data name="KeyActionToolVocalAlign" xml:space="preserve">
+    <value>Vocal Alignment Tool</value>
+    <comment>Name of the Vocal Alignment tool shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="VocalAlignOffsetLabel" xml:space="preserve">
+    <value>Offset (ms)</value>
+    <comment>The Vocal Alignment tool's option: how far the vocal parts are shifted, in milliseconds.</comment>
+  </data>
+  <data name="VocalAlignOffsetToolTip" xml:space="preserve">
+    <value>How far the first note is moved, in milliseconds: later when positive. Type a value, or drag across the box: Shift for ten times as far, Ctrl for a tenth.</value>
+    <comment>The Vocal Alignment tool's offset field's tooltip.</comment>
+  </data>
+  <data name="VocalAlignSpeedLabel" xml:space="preserve">
+    <value>Speed (%)</value>
+    <comment>The Vocal Alignment tool's option: how fast the vocal parts are played, as a percentage.</comment>
+  </data>
+  <data name="VocalAlignSpeedToolTip" xml:space="preserve">
+    <value>How fast the vocal parts are played, from the first note: above 100% they finish sooner, below it later. Type a value, or drag across the box: Shift for ten times as far, Ctrl for a tenth.</value>
+    <comment>The Vocal Alignment tool's speed field's tooltip.</comment>
+  </data>
+  <data name="VocalAlignAllParts" xml:space="preserve">
+    <value>All Vocal Parts</value>
+    <comment>The Vocal Alignment tool's option: every vocal part is aligned together, rather than only the one whose lane has focus.</comment>
+  </data>
+  <data name="VocalAlignAllPartsToolTip" xml:space="preserve">
+    <value>Align every vocal part together, so harmonies stay with the lead. Turn it off to align only the part whose lane has focus.</value>
+    <comment>The Vocal Alignment tool's All Vocal Parts option's tooltip.</comment>
+  </data>
+  <data name="VocalAlignMoveToolTip" xml:space="preserve">
+    <value>Drag to shift the vocal parts in time</value>
+    <comment>A vocal lane with the Vocal Alignment tool, over the notes: a drag shifts every part aligned.</comment>
+  </data>
+  <data name="VocalAlignStretchStartToolTip" xml:space="preserve">
+    <value>Drag to stretch the vocal parts, keeping the last note's end where it is</value>
+    <comment>A vocal lane with the Vocal Alignment tool, over the handle before the first note.</comment>
+  </data>
+  <data name="VocalAlignStretchEndToolTip" xml:space="preserve">
+    <value>Drag to stretch the vocal parts, keeping the first note where it is</value>
+    <comment>A vocal lane with the Vocal Alignment tool, over the handle after the last note's end.</comment>
+  </data>
+  <data name="VocalAlignReadoutFormat" xml:space="preserve">
+    <value>{0} s · {1}%</value>
+    <comment>A vocal lane with the Vocal Alignment tool: the offset and speed, drawn over the notes. {0} is the offset in seconds with its sign, e.g. "+11.446"; {1} the speed, e.g. "99.32".</comment>
+  </data>
   <data name="MenuFile" xml:space="preserve">
     <value>_File</value>
     <comment>The editor title bar's File menu. The underscore marks its access key (Alt+F).</comment>

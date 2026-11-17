@@ -860,7 +860,7 @@ namespace ChartBuilder.Controls.Editing
         /// placement line does too; or, with a synchronized region or the loop region drawn, its X and hover, which do too.
         /// </summary>
         private bool IsHoverShown => _hover is { } hover && !_isPressed
-            && (Session?.Tool is EditorTool.Place or EditorTool.Erase or EditorTool.Phrase or EditorTool.Tempo
+            && (Session?.Tool is EditorTool.Place or EditorTool.Erase or EditorTool.Phrase or EditorTool.Tempo or EditorTool.VocalAlign
                 || Session?.Sync.IsActive == true
                 || Session?.Loop?.Span is not null
                 || (Session?.Tool == EditorTool.Select && PointAt(hover) is { Rail: not null }));
@@ -1730,6 +1730,7 @@ namespace ChartBuilder.Controls.Editing
             {
                 editor.Session.ChartChanged += OnChartChanged;
                 editor.Session.StateChanged += OnRedraw;
+                editor.Session.VocalAlignment.Changed += OnRedraw;
                 editor.Session.Selection.Changed += OnRedraw;
                 editor.Session.Viewport.Changed += OnViewportChanged;
                 editor.Playback.PropertyChanged += OnPlaybackChanged;
@@ -1763,6 +1764,7 @@ namespace ChartBuilder.Controls.Editing
             {
                 editor.Session.ChartChanged -= OnChartChanged;
                 editor.Session.StateChanged -= OnRedraw;
+                editor.Session.VocalAlignment.Changed -= OnRedraw;
                 editor.Session.Selection.Changed -= OnRedraw;
                 editor.Session.Viewport.Changed -= OnViewportChanged;
                 editor.Playback.PropertyChanged -= OnPlaybackChanged;

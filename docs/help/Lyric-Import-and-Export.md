@@ -42,6 +42,30 @@ An UltraStar duet has two singers, `P1` and `P2`. Lines marked `P3`, which some 
 
 The file's times are the audio's, so the song's delay is taken off them. A word before the start of the song is moved to the start; one that ends before it is left out. The message bar says how many words were added, and how many were left out.
 
+### Lining Up Imported Lyrics
+
+A lyrics file downloaded from the internet is often timed to a different recording of the song: one with a longer intro, or one that plays slightly faster or slower. The first lyrics are then late or early, and a speed difference makes them drift further out as the song goes on. The **Vocal Alignment** tool fixes both.
+
+**Open it from:** the toolbar's microphone button, or **Alt+7**. It only shows while a vocal lane has focus, so click a vocal lane first.
+
+While the tool is picked, every note is outlined, the stretch from the first note to the last note's end is shaded, and a handle sits before the first note and after the last. Nothing snaps to the grid.
+
+1. **Drag inside the shaded stretch** until the first lyric lines up with the singing. Every note, lyric, phrase and star power phrase moves together.
+2. **Drag the handle after the last note** until the last lyric lines up too. The first note stays where it is, and everything between is stretched or squeezed to fit. The handle before the first note does the same with the last note's end kept where it is.
+3. Play the song through to check. Each drag is one undo step.
+
+Hold **Shift** while dragging to move a quarter as far, for fine adjustment.
+
+The toolbar beside the tool shows:
+
+- **Offset (ms)**: how far the first note has been moved, later when positive.
+- **Speed (%)**: how fast the vocals play from the first note. Above 100% they finish sooner, below it later. Between 50% and 200%.
+- **All Vocal Parts**: on by default, so harmonies move with the lead. Turn it off to align only the part whose lane has focus.
+
+Type a value, or drag across the box to scrub it (Shift for ten times as far, Ctrl for a tenth). The vocals move as you change it, and the change becomes one undo step once you stop. The offset and speed are always measured from the parts as they were when you first used the tool, so typing 100% and 0 ms puts them back exactly. Editing the vocals any other way starts them from the parts as they are.
+
+The tool works in the audio's time, not in beats, so a chart whose tempo changes is shifted and stretched evenly. No note is moved before the start of the song.
+
 ## Exporting
 
 Choose the **Format** first. **UltraStar (.txt)** is the default.

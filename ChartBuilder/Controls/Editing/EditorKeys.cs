@@ -381,7 +381,7 @@ namespace ChartBuilder.Controls.Editing
         /// (Alt and <c>n + 1</c> by default). The table <see cref="ToolOf"/> reads.
         /// </summary>
         public static IReadOnlyList<EditorTool> ToolKeys { get; } =
-            [EditorTool.Select, EditorTool.Place, EditorTool.Erase, EditorTool.Phrase, EditorTool.Tempo, EditorTool.Sync];
+            [EditorTool.Select, EditorTool.Place, EditorTool.Erase, EditorTool.Phrase, EditorTool.Tempo, EditorTool.Sync, EditorTool.VocalAlign];
 
         /// <summary>The tool the action <paramref name="id"/> picks, or <see langword="null"/> when it isn't a tool action.</summary>
         public static EditorTool? ToolOf(string id)
