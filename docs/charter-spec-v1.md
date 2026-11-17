@@ -900,6 +900,16 @@ Acceptance criteria:
    - **Tempo markers:** BPM, time signature, and whether it's anchored.
    - With several items selected, a field shows `<<multiple>>` when the values differ, and
      editing it sets every item. This is the same model as the metadata editor's bulk editing.
+   - The notes' and vocal notes' **Tick** and **Length** and the vocal notes' **Pitch** can also be
+     dragged sideways, as a number box can: right goes up and left down, Shift faster and Ctrl finer.
+     A drag moves every selected note by the same steps from where it was, rather than setting them
+     all to one value, so notes at different ticks, or of different lengths or pitches, keep their
+     differences: a semitone a step for a pitch, the notes kept to the sung range as a group; for a
+     tick or a length, a grid step while snap is on, or a tick while it's off. A tick dragged moves
+     the notes as Alt and the arrows do, the first to the grid while snap is on and none before the
+     start; a vocal note keeps its lyric. A vocal note lasts at least a tick, and a sustain shortened
+     past the shortest leaves a plain note. The chart shows it as it's dragged, and it's one undoable
+     step. A click without a drag edits the field as before.
 5. **Findings panel**: the [§6](#lint-rules) lint findings, each linked to the place in the chart
    where it happens. *Settled in CM2:* the Findings tab's title doesn't show the counts, as a
    collapsed panel's strip reads the titles only once. The counts are at the top of the panel.

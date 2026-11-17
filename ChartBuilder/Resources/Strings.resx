@@ -545,8 +545,16 @@
     <comment>A Properties field: a vocal note's MIDI pitch.</comment>
   </data>
   <data name="PropertiesPitchToolTip" xml:space="preserve">
-    <value>The MIDI pitch, 36 to 84, or a note name such as C4 or F#3.</value>
+    <value>The MIDI pitch, 36 to 84, or a note name such as C4 or F#3. Drag sideways to raise or lower every selected note by semitones, keeping their intervals: Shift is faster, Ctrl finer.</value>
     <comment>The tooltip of Properties' pitch field for vocal notes.</comment>
+  </data>
+  <data name="PropertiesTickToolTip" xml:space="preserve">
+    <value>Where the notes start, in ticks. Type a tick to move them there when they all start on one. Drag sideways to move every selected note later or earlier by the same grid steps, or ticks with snap off, so they keep their places around each other: Shift is faster, Ctrl finer.</value>
+    <comment>The tooltip of Properties' tick fields, for notes and vocal notes.</comment>
+  </data>
+  <data name="PropertiesLengthToolTip" xml:space="preserve">
+    <value>How long the notes are held, in ticks. Drag sideways to lengthen or shorten every selected note by the same grid steps, or ticks with snap off, so each keeps its own length: Shift is faster, Ctrl finer.</value>
+    <comment>The tooltip of Properties' length fields, for notes and vocal notes.</comment>
   </data>
   <data name="PropertiesSpokenPitch" xml:space="preserve">
     <value>spoken</value>

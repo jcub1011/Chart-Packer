@@ -16,5 +16,15 @@ namespace ChartShared.UI.Controls
             double stepped = step > 0 ? Math.Round(moved / step, MidpointRounding.AwayFromZero) * step : moved;
             return start + DecimalConversion.ToDecimal(stepped);
         }
+
+        /// <summary>
+        /// The whole steps in <paramref name="moved"/> pixels, a step being <paramref name="pixelsPerStep"/>: half a step or
+        /// more counts as one, either way.
+        /// </summary>
+        internal static int Steps(double moved, double pixelsPerStep)
+        {
+            double steps = Math.Round(moved / pixelsPerStep, MidpointRounding.AwayFromZero);
+            return double.IsNaN(steps) ? 0 : (int)Math.Clamp(steps, int.MinValue, int.MaxValue);
+        }
     }
 }

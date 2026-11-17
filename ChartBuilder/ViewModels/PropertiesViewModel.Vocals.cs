@@ -5,6 +5,7 @@ using ChartBuilder.Resources;
 using ChartShared.Core.Charting;
 using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charting.Layout;
+using ChartShared.UI.Controls;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -47,6 +48,15 @@ namespace ChartBuilder.ViewModels
 
         [ObservableProperty]
         public partial string VocalLengthText { get; set; } = "";
+
+        /// <summary>The vocal Tick field dragged: each note moved later or earlier by the same grid steps, with its lyric.</summary>
+        public IDeltaScrubTarget VocalTickScrub { get; }
+
+        /// <summary>The Pitch field dragged: each note raised or lowered by the same semitones, keeping their intervals.</summary>
+        public IDeltaScrubTarget PitchScrub { get; }
+
+        /// <summary>The vocal Length field dragged: each note lengthened or shortened by the same grid steps.</summary>
+        public IDeltaScrubTarget VocalLengthScrub { get; }
 
         /// <summary>
         /// The notes' lyric; blank for none. Without the <c>#</c> or <c>^</c> of a spoken note, which Spoken sets and the lyric
