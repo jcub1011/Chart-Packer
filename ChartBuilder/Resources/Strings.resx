@@ -275,7 +275,7 @@
     <comment>An editing tool, shown while a vocal lane has focus: shifts and stretches every vocal part in time, to line lyrics up with the audio.</comment>
   </data>
   <data name="ToolVocalAlignToolTip" xml:space="preserve">
-    <value>Shift and stretch every vocal part in time, with no snapping, to line its lyrics up with the audio. Drag the notes to shift them. Drag the handle before the first note, or after the last, to stretch them: the other end stays where it is. Hold Shift to drag finely, or type an offset and speed beside the tool. Shown while a vocal lane has focus.</value>
+    <value>Shift and stretch every vocal part in time to line its lyrics up with the audio. Drag the notes to shift them. Drag the handle before the first note, or after the last, to stretch them: the other end stays where it is. While snap is on, the first note or the handle dragged snaps to the grid. Hold Shift to drag finely, or type an offset and speed beside the tool. Shown while a vocal lane has focus.</value>
     <comment>The Vocal Alignment tool's tooltip.</comment>
   </data>
   <data name="KeyActionToolVocalAlign" xml:space="preserve">

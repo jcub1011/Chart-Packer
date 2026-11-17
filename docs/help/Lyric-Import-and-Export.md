@@ -48,7 +48,7 @@ A lyrics file downloaded from the internet is often timed to a different recordi
 
 **Open it from:** the toolbar's microphone button, or **Alt+7**. It only shows while a vocal lane has focus, so click a vocal lane first.
 
-While the tool is picked, every note is outlined, the stretch from the first note to the last note's end is shaded, and a handle sits before the first note and after the last. Nothing snaps to the grid.
+While the tool is picked, every note is outlined, the stretch from the first note to the last note's end is shaded, and a handle sits before the first note and after the last. While snap is on, a drag puts the first note, or the handle you're dragging, on the grid; the notes in between are stretched to fit and don't snap. Turn snap off to drag freely.
 
 1. **Drag inside the shaded stretch** until the first lyric lines up with the singing. Every note, lyric, phrase and star power phrase moves together.
 2. **Drag the handle after the last note** until the last lyric lines up too. The first note stays where it is, and everything between is stretched or squeezed to fit. The handle before the first note does the same with the last note's end kept where it is.

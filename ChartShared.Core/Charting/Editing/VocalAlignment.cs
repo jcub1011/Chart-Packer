@@ -26,7 +26,8 @@ public enum VocalAlignGrip
 /// <para>The parts are aligned in the audio's time, not in ticks, so a tempo map that changes doesn't bend them: a time
 /// <c>t</c> goes to <c>start + Offset + (t − start) / Speed</c>, where <c>start</c> is when the first note or lyric was,
 /// and each note's start and end, each lyric, each phrase's ends and each star power phrase's ends are put on the tick
-/// nearest their new time, with no snapping, and never before the song starts. Everything else in a part's track is
+/// nearest their new time, never before the song starts. Only the tool's drag snaps, and only the edge it drags; the
+/// offset and speed given here are kept as they are. Everything else in a part's track is
 /// left where it is.</para>
 /// <para><see cref="Offset"/> and <see cref="Speed"/> are kept from the parts as they were when the tool was first used
 /// on them: each change is worked out from those parts again, not from the last change, so typing a speed means that

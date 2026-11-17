@@ -8,9 +8,9 @@ using static ChartBuilder.Tests.Editing.EditorSessions;
 namespace ChartBuilder.Tests.Editing;
 
 /// <summary>
-/// The Vocal Alignment tool (charter-spec C3 item 7): every vocal part shifted and stretched in the audio's time, with no
-/// snapping, each change one undoable step worked out from the parts as they were. At 480 ticks a beat and 120 BPM a
-/// second is 960 ticks.
+/// The Vocal Alignment tool (charter-spec C3 item 7): every vocal part shifted and stretched in the audio's time, the
+/// edge a drag moves snapping to the grid while snap is on, each change one undoable step worked out from the parts as
+/// they were. At 480 ticks a beat and 120 BPM a second is 960 ticks, and a 1/16 step 120.
 /// </summary>
 [TestClass]
 public sealed class VocalAlignmentTests
@@ -32,6 +32,13 @@ public sealed class VocalAlignmentTests
         var session = Of(chart);
         session.FocusedVocal = VocalTrack.Vocals;
         session.Tool = EditorTool.VocalAlign;
+        return session;
+    }
+
+    private static EditorSession AligningWithSnapOff(EditableChart chart)
+    {
+        var session = Aligning(chart);
+        session.Snap = SnapGrid.Of(16, isOn: false);
         return session;
     }
 
@@ -150,9 +157,9 @@ public sealed class VocalAlignmentTests
     }
 
     [TestMethod]
-    public void DraggingTheNotesShiftsThemWithNoSnapping()
+    public void WithSnapOffDraggingTheNotesShiftsThemFreely()
     {
-        var session = Aligning(Song());
+        var session = AligningWithSnapOff(Song());
 
         DragFromTo(session, VocalAt(1500, 60), VocalAt(1977, 60));
 
@@ -162,9 +169,49 @@ public sealed class VocalAlignmentTests
     }
 
     [TestMethod]
-    public void WithShiftADragMovesTheNotesAQuarterAsFar()
+    public void WithSnapOnDraggingTheNotesPutsTheFirstOnTheGrid()
     {
         var session = Aligning(Song());
+
+        // The first note dragged to 1437 goes to the step at 1440.
+        DragFromTo(session, VocalAt(1500, 60), VocalAt(1977, 60));
+
+        Assert.AreSequenceEqual([1440L, 2400L], Ticks(session));
+        Assert.AreSequenceEqual([1440L, 1920L], Ticks(session, VocalTrack.Harmony1));
+        Assert.AreEqual(0.5, session.VocalAlignment.Offset, 1e-9);
+        Assert.AreEqual(1, session.UndoStack.UndoCount);
+    }
+
+    [TestMethod]
+    public void WithSnapOnTheEndsHandleGoesToTheGrid()
+    {
+        var session = Aligning(Song());
+
+        // The last note's end dragged to 3320 goes to the step at 3360: 3.5 s, as a speed of 0.6.
+        DragFromTo(session, VocalAt(2410, null), VocalAt(3330, null));
+
+        Assert.AreEqual(0.6, session.VocalAlignment.Speed, 1e-9);
+        Assert.AreSequenceEqual([960L, 2560L], Ticks(session));
+        Assert.AreEqual(3360L, Vocals(session).Notes[^1].EndTick);
+    }
+
+    [TestMethod]
+    public void WithSnapOnTheStartsHandleGoesToTheGrid()
+    {
+        var session = Aligning(Song());
+
+        // The first note dragged to 1420 goes to the step at 1440: 1.5 s, as a speed of 1.5.
+        DragFromTo(session, VocalAt(950, null), VocalAt(1410, null));
+
+        Assert.AreEqual(1.5, session.VocalAlignment.Speed, 1e-9);
+        Assert.AreSequenceEqual([1440L, 2080L], Ticks(session));
+        Assert.AreEqual(2400L, Vocals(session).Notes[^1].EndTick);
+    }
+
+    [TestMethod]
+    public void WithShiftADragMovesTheNotesAQuarterAsFar()
+    {
+        var session = AligningWithSnapOff(Song());
 
         DragFromTo(session, VocalAt(1500, 60), VocalAt(1980, 60), EditorModifiers.Shift);
 
@@ -175,7 +222,7 @@ public sealed class VocalAlignmentTests
     [TestMethod]
     public void TheEndsHandleStretchesThePartsWithTheFirstNoteKept()
     {
-        var session = Aligning(Song());
+        var session = AligningWithSnapOff(Song());
         Assert.AreEqual(VocalAlignGrip.End, session.Tools.VocalAlignGripAt(VocalAt(2410, null)));
 
         // The last note's end, at 2.5 s, dragged to 3.5 s: the first note stays at 1 s, the rest take 2.5 s, not 1.5 s.
@@ -190,7 +237,7 @@ public sealed class VocalAlignmentTests
     [TestMethod]
     public void TheStartsHandleStretchesThePartsWithTheLastNotesEndKept()
     {
-        var session = Aligning(Song());
+        var session = AligningWithSnapOff(Song());
         Assert.AreEqual(VocalAlignGrip.Start, session.Tools.VocalAlignGripAt(VocalAt(950, null)));
 
         // The first note, at 1 s, dragged to 1.5 s: the last note's end stays at 2.5 s.

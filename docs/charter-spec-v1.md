@@ -1002,14 +1002,16 @@ Acceptance criteria:
      highway's never into one. The keys that change a highway's notes do nothing.
    - **Vocal Alignment tool** (`Alt`+`7`), in the toolbar only while a vocal lane has focus, for
      lyrics timed to other audio, which drift as they go. It shifts and stretches the vocal parts in
-     the audio's time, not in ticks, with no snapping (`VocalAlignment`): a time `t` goes to
+     the audio's time, not in ticks (`VocalAlignment`): a time `t` goes to
      `start + offset + (t − start) / speed`, `start` being the first note or lyric. Each note's start
      and end, each lyric, and each phrase's and star power phrase's ends go to the nearest tick, never
      before the song's start; the track's other events stay. While it's picked every note of an
      aligned part is outlined in the accent, the span from the first note to the last note's end is
      shaded with a handle at each end, and the offset and speed are drawn over it. Dragging inside
      the span shifts the parts; dragging the start's handle stretches them with the last note's end
-     kept, and the end's handle with the first note kept; Shift drags a quarter as far. The middle and
+     kept, and the end's handle with the first note kept; Shift drags a quarter as far. While snap is
+     on, the edge dragged (the first note, or the handle) goes to the grid's nearest step, the notes
+     between to the nearest tick; with it off the drag is free. The fields never snap. The middle and
      right buttons do nothing. The toolbar shows **Offset (ms)** and **Speed (%)**, typed or
      scrubbed (shown at once, one undo step 600 ms after the last change), and **All Vocal Parts**,
      on by default, off to align only the part in focus. The speed is 50–200%, and the offset keeps
