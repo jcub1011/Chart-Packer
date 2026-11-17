@@ -76,7 +76,7 @@ public sealed class WaveformFidelitySettingTests
         var sharpening = catalog.Definitions.Single(d => d.Id == "playback.spectrogramSharpening") as ToggleSetting;
         Assert.IsNotNull(sharpening);
         Assert.AreEqual("playback.visualizers", sharpening.Category.Id);
-        Assert.IsTrue(sharpening.DefaultValue && new BuilderSettings().SpectrogramSharpening, "Spectrograms are sharpened until it's switched off.");
+        Assert.IsFalse(sharpening.DefaultValue && new BuilderSettings().SpectrogramSharpening, "Spectrograms are not sharpened until it's switched on.");
         Assert.AreEqual(BuilderSettings.DefaultSpectrogramBudgetMb, new BuilderSettings().SpectrogramBudgetMb);
         Assert.IsFalse(catalog.Definitions.Any(d => d.Id == "audio.masterVolume" || d.Id == "charter.laneBackdrop" || d.Id == "charter.spectrogramBudget"));
     }
