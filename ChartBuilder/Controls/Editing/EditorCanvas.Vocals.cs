@@ -843,7 +843,7 @@ namespace ChartBuilder.Controls.Editing
         private static readonly string?[] PitchNames = new string?[128];
 
         // The syllables made again with their hyphen, for the ones that join the next, kept so each frame doesn't build them anew.
-        private readonly Dictionary<string, string> _hyphenated = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, string> _hyphenated = [with(StringComparer.Ordinal)];
 
         /// <summary>A lyric as drawn: with a hyphen after it when it joins the next syllable.</summary>
         private string Joined(VocalLaneLyric lyric)

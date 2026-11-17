@@ -51,7 +51,7 @@ public sealed class SongDifficultyGenerationTests
         var generated = MidiChartLoader.Load(await File.ReadAllBytesAsync(chart.StagedPath, TestContext.CancellationToken), ChartReadOptions.From(pairs)).Chart;
         Assert.IsTrue(generated.PartOf(ChartInstrument.Guitar)!.Tracks.All(t => t.Notes.Count > 0));
         foreach (var (file, bytes) in before)
-            CollectionAssert.AreEqual(bytes, File.ReadAllBytes(file), $"{file} was written.");
+            Assert.AreSequenceEqual(bytes, File.ReadAllBytes(file), $"{file} was written.");
 
         var draft = new MetadataDraft();
         chart.ApplyTo(draft);

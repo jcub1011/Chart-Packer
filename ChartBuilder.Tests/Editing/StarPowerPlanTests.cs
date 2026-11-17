@@ -100,8 +100,8 @@ public sealed class StarPowerPlanTests
         var plan = StarPowerPlan.Generate(chart, ChartInstrument.Guitar, StarPowerOptions.Default, GenerationMode.Replace, (30 * Measure, (56 * Measure) - 1));
         var command = plan.BuildCommand();
 
-        Assert.IsFalse(plan.Existing.Contains(straddler));
-        Assert.IsTrue(plan.SurvivingStarPower.Contains(straddler));
+        Assert.DoesNotContain(straddler, plan.Existing);
+        Assert.Contains(straddler, plan.SurvivingStarPower);
         Assert.IsTrue(plan.Regions.All(r => !r.Phrase.Overlaps(straddler)), "The proposals keep clear of the star power that stays.");
         var removes = command switch
         {
@@ -109,7 +109,7 @@ public sealed class StarPowerPlanTests
             RemovePhrase remove => [remove],
             _ => [],
         };
-        Assert.IsFalse(removes.Any(r => r.Phrase == straddler));
+        Assert.DoesNotContain(r => r.Phrase == straddler, removes);
     }
 
     [TestMethod]
@@ -120,7 +120,7 @@ public sealed class StarPowerPlanTests
 
         Assert.HasCount(64, coverage.Samples);
         Assert.HasCount(plan.Spikes.Count, coverage.Spikes);
-        Assert.IsTrue(coverage.Samples.Any(static s => s.Meter > 0));
+        Assert.Contains(static s => s.Meter > 0, coverage.Samples);
         Assert.IsTrue(coverage.Samples.All(static s => s.Meter is >= 0 and <= 1));
     }
 

@@ -72,20 +72,20 @@ public sealed class OptimizeJobTests
         var item = result.Items.Single();
         Assert.AreEqual(OptimizeItemStatus.Succeeded, item.Status, item.ErrorMessage);
         Assert.AreSequenceEqual(["album.png", "guitar.opus", "highway.png", "notes.mid", "song.ini", "video.webm"], Names(entry));
-        Assert.AreEqual(500, (await ReadAsync(entry, "guitar.opus"))!.Length);
-        Assert.AreEqual(400, (await ReadAsync(entry, "album.png"))!.Length);
-        Assert.AreEqual(2500, (await ReadAsync(entry, "video.webm"))!.Length);
+        Assert.HasCount(500, await ReadAsync(entry, "guitar.opus"));
+        Assert.HasCount(400, await ReadAsync(entry, "album.png"));
+        Assert.HasCount(2500, await ReadAsync(entry, "video.webm"));
         Assert.AreSequenceEqual(Bytes(300, 4), await ReadAsync(entry, "highway.png"), "highway.* is left alone.");
-        Assert.IsTrue((await ReadAsync(entry, "notes.mid"))!.Length < Anchored().Length, "The editor events are gone from notes.mid.");
+        Assert.IsLessThan(Anchored().Length, (await ReadAsync(entry, "notes.mid"))!.Length, "The editor events are gone from notes.mid.");
         string text = (await File.ReadAllTextAsync(ini, TestContext.CancellationToken)).ReplaceLineEndings("\n");
         StringAssert.Contains(text, "; made by hand\n[song]\nname   = Song\n", "song.ini keeps its comment and spacing.");
         StringAssert.Contains(text, "charter");
         Assert.IsFalse(text.Contains("artist") || text.Contains("frets"));
         Assert.AreEqual(before, item.BytesBefore);
         Assert.AreEqual(Directory.EnumerateFiles(entry.FullPath).Sum(f => new FileInfo(f).Length), item.BytesAfter);
-        Assert.IsTrue(item.BytesSaved > 0);
+        Assert.IsGreaterThan(0, item.BytesSaved);
         Assert.AreEqual(entry.FullPath, item.OutputPath);
-        Assert.AreEqual(0, Leftovers(_root.FullName).Count);
+        Assert.IsEmpty(Leftovers(_root.FullName));
     }
 
     [TestMethod]
@@ -102,16 +102,16 @@ public sealed class OptimizeJobTests
         var item = result.Items.Single();
         Assert.AreEqual(OptimizeItemStatus.Succeeded, item.Status, item.ErrorMessage);
         Assert.AreSequenceEqual(["album.png", "guitar.opus", "highway.png", "notes.mid", "video.webm"], Names(entry));
-        Assert.AreEqual(500, (await ReadAsync(entry, "guitar.opus"))!.Length);
+        Assert.HasCount(500, await ReadAsync(entry, "guitar.opus"));
         Assert.AreSequenceEqual(Bytes(300, 4), await ReadAsync(entry, "highway.png"));
-        Assert.IsTrue((await ReadAsync(entry, "notes.mid"))!.Length < Anchored().Length);
+        Assert.IsLessThan(Anchored().Length, (await ReadAsync(entry, "notes.mid"))!.Length);
         var read = await SngReader.ReadAsync(entry.FullPath, TestContext.CancellationToken);
         Assert.IsFalse(read.HasErrors);
         Assert.AreSequenceEqual(["name", "charter"], read.Metadata.Select(p => p.Key));
         Assert.AreEqual(before, item.BytesBefore);
         Assert.AreEqual(new FileInfo(entry.FullPath).Length, item.BytesAfter);
-        Assert.IsTrue(item.BytesAfter < item.BytesBefore);
-        Assert.AreEqual(0, Leftovers(_root.FullName).Count);
+        Assert.IsLessThan(item.BytesBefore, item.BytesAfter);
+        Assert.IsEmpty(Leftovers(_root.FullName));
     }
 
     [TestMethod]
@@ -156,11 +156,11 @@ public sealed class OptimizeJobTests
         Assert.IsTrue(File.Exists(Path.Combine(folder.FullPath, "guitar.ogg")));
         var folderCopy = new SongEntry(SongEntryKind.SongFolder, Path.Combine(output, "Folder"), "Folder", "Folder");
         var sngCopy = new SongEntry(SongEntryKind.SngFile, Path.Combine(output, "Packed.sng"), "Packed.sng", "Packed");
-        Assert.AreEqual(500, (await ReadAsync(folderCopy, "guitar.opus"))!.Length);
-        Assert.AreEqual(500, (await ReadAsync(sngCopy, "guitar.opus"))!.Length);
+        Assert.HasCount(500, await ReadAsync(folderCopy, "guitar.opus"));
+        Assert.HasCount(500, await ReadAsync(sngCopy, "guitar.opus"));
         Assert.AreEqual(folderCopy.FullPath, result.Items[0].OutputPath);
         Assert.AreEqual(sngCopy.FullPath, result.Items[1].OutputPath);
-        Assert.AreEqual(0, Leftovers(_root.FullName).Count);
+        Assert.IsEmpty(Leftovers(_root.FullName));
 
         var again = await RunAsync(plans, options, optimizer);
         Assert.IsTrue(again.Items.All(i => i.SkipReason == OptimizeItemSkipReason.OutputExists), "An existing output is never overwritten.");
@@ -177,9 +177,9 @@ public sealed class OptimizeJobTests
 
         Assert.AreEqual(OptimizeItemStatus.Succeeded, result.Items[0].Status, result.Items[0].ErrorMessage);
         Assert.AreSequenceEqual(["preview.ogg", "song.opus"], Names(entry));
-        Assert.AreEqual(1000, (await ReadAsync(entry, "song.opus"))!.Length);
-        Assert.AreEqual(1, optimizer.Optimized.Count);
-        Assert.AreEqual(0, Leftovers(_root.FullName).Count);
+        Assert.HasCount(1000, await ReadAsync(entry, "song.opus"));
+        Assert.HasCount(1, optimizer.Optimized);
+        Assert.IsEmpty(Leftovers(_root.FullName));
     }
 
     [TestMethod]
@@ -192,7 +192,7 @@ public sealed class OptimizeJobTests
         var result = await RunAsync([await PlanAsync(entry, options, optimizer)], options, optimizer);
 
         Assert.IsFalse(File.Exists(Path.Combine(entry.FullPath, "video.mp4")));
-        Assert.AreEqual(0, optimizer.Optimized.Count);
+        Assert.IsEmpty(optimizer.Optimized);
         Assert.AreEqual(5000, result.Items[0].BytesSaved);
     }
 
@@ -207,9 +207,9 @@ public sealed class OptimizeJobTests
 
         Assert.AreEqual(OptimizeItemStatus.Succeeded, result.Items[0].Status, result.Items[0].ErrorMessage);
         Assert.AreSequenceEqual(["album.png", "guitar.ogg", "highway.png", "notes.mid", "song.ini", "video.mp4"], Names(entry));
-        Assert.IsFalse((await File.ReadAllTextAsync(Path.Combine(entry.FullPath, "song.ini"), TestContext.CancellationToken)).Contains("artist"));
-        Assert.AreEqual(0, optimizer.Estimated.Count);
-        Assert.AreEqual(0, Leftovers(_root.FullName).Count);
+        Assert.DoesNotContain("artist", await File.ReadAllTextAsync(Path.Combine(entry.FullPath, "song.ini"), TestContext.CancellationToken));
+        Assert.IsEmpty(optimizer.Estimated);
+        Assert.IsEmpty(Leftovers(_root.FullName));
     }
 
     [TestMethod]
@@ -239,8 +239,8 @@ public sealed class OptimizeJobTests
         Assert.AreSequenceEqual(names, Names(entry), "A cancelled chart is as it was.");
         if (sng)
             Assert.AreSequenceEqual(before, await File.ReadAllBytesAsync(entry.FullPath, TestContext.CancellationToken));
-        Assert.AreEqual(0, Leftovers(_root.FullName).Count);
-        Assert.IsFalse(progress.Reports.Any(r => r.Completed is not null), "No chart finished.");
+        Assert.IsEmpty(Leftovers(_root.FullName));
+        Assert.DoesNotContain(r => r.Completed is not null, progress.Reports, "No chart finished.");
         Assert.AreSequenceEqual(Names(other), names.Select(n => n), "The second chart wasn't started.");
     }
 
@@ -259,7 +259,7 @@ public sealed class OptimizeJobTests
 
         Assert.IsTrue(File.Exists(Path.Combine(first.FullPath, "guitar.opus")), "The finished chart stays optimized.");
         Assert.IsTrue(File.Exists(Path.Combine(second.FullPath, "guitar.ogg")));
-        Assert.AreEqual(0, Leftovers(_root.FullName).Count);
+        Assert.IsEmpty(Leftovers(_root.FullName));
     }
 
     private sealed class CancelAfterFirst(CancellationTokenSource cts) : IProgress<OptimizeProgress>
@@ -293,7 +293,7 @@ public sealed class OptimizeJobTests
         Assert.AreEqual(AssetOutcome.Skipped, video.Outcome);
         Assert.AreEqual(nameof(OptimizeSkipReason.WouldGrow), video.Detail);
         Assert.AreEqual(video.BytesBefore, video.BytesAfter);
-        Assert.AreEqual(0, Leftovers(_root.FullName).Count);
+        Assert.IsEmpty(Leftovers(_root.FullName));
     }
 
     [TestMethod]
@@ -313,7 +313,7 @@ public sealed class OptimizeJobTests
         Assert.IsTrue(File.Exists(Path.Combine(entry.FullPath, "guitar.ogg")));
         Assert.IsFalse(File.Exists(Path.Combine(entry.FullPath, "guitar.opus")));
         Assert.IsTrue(File.Exists(Path.Combine(entry.FullPath, "video.webm")));
-        Assert.AreEqual(0, Leftovers(_root.FullName).Count);
+        Assert.IsEmpty(Leftovers(_root.FullName));
     }
 
     [TestMethod]
@@ -334,7 +334,7 @@ public sealed class OptimizeJobTests
         Assert.AreEqual(OptimizeItemStatus.Succeeded, result.Items[1].Status);
         Assert.AreEqual(1, result.Failed);
         Assert.AreEqual(1, result.Succeeded);
-        Assert.AreEqual(0, Leftovers(_root.FullName).Count);
+        Assert.IsEmpty(Leftovers(_root.FullName));
     }
 
     [TestMethod]
@@ -349,7 +349,7 @@ public sealed class OptimizeJobTests
         Assert.AreEqual(OptimizeItemStatus.Skipped, result.Items[0].Status);
         Assert.AreEqual(OptimizeSkipReason.WouldGrow.ToString(), result.Items[0].Assets.Single().Detail);
         Assert.IsTrue(File.Exists(Path.Combine(entry.FullPath, "guitar.ogg")));
-        Assert.AreEqual(0, Leftovers(_root.FullName).Count);
+        Assert.IsEmpty(Leftovers(_root.FullName));
     }
 
     [TestMethod]
@@ -372,7 +372,7 @@ public sealed class OptimizeJobTests
         Assert.AreSequenceEqual(before, Names(locked));
         Assert.AreEqual(OptimizeItemStatus.Succeeded, result.Items[1].Status);
         Assert.IsFalse(set.Holds(free.FullPath), "A chart is let go once it's done.");
-        Assert.AreEqual(0, Leftovers(_root.FullName).Count);
+        Assert.IsEmpty(Leftovers(_root.FullName));
     }
 
     [TestMethod]
@@ -410,7 +410,7 @@ public sealed class OptimizeJobTests
             return Task.CompletedTask;
         }));
 
-        Assert.AreEqual(1, released.Count, "A chart with nothing to do isn't disturbed.");
+        Assert.HasCount(1, released, "A chart with nothing to do isn't disturbed.");
         Assert.AreEqual((worked.FullPath, true), released[0]);
         Assert.AreEqual(OptimizeItemSkipReason.NothingToDo, result.Items[1].SkipReason);
     }
@@ -428,7 +428,7 @@ public sealed class OptimizeJobTests
 
         Assert.AreEqual(OptimizeItemSkipReason.ChartChanged, result.Items[0].SkipReason);
         Assert.IsTrue(File.Exists(Path.Combine(entry.FullPath, "guitar.ogg")));
-        Assert.AreEqual(0, optimizer.Optimized.Count);
+        Assert.IsEmpty(optimizer.Optimized);
     }
 
     [TestMethod]
@@ -447,8 +447,8 @@ public sealed class OptimizeJobTests
             Assert.AreEqual(OptimizeItemStatus.Succeeded, result.Items[0].Status, result.Items[0].ErrorMessage);
         }
 
-        Assert.AreEqual(500, (await ReadAsync(entry, "guitar.opus"))!.Length);
-        Assert.AreEqual(0, Leftovers(_root.FullName).Count);
+        Assert.HasCount(500, await ReadAsync(entry, "guitar.opus"));
+        Assert.IsEmpty(Leftovers(_root.FullName));
     }
 
     [TestMethod]
@@ -467,8 +467,8 @@ public sealed class OptimizeJobTests
         Assert.AreSequenceEqual(result.Items, progress.Reports.Where(r => r.Completed is not null).Select(r => r.Completed!));
         Assert.AreEqual(2, progress.Reports.Last().Done);
         Assert.IsTrue(progress.Reports.All(r => r.Total == 2));
-        Assert.IsTrue(progress.Reports.Any(r => r.CurrentAsset == "guitar.ogg"));
-        Assert.IsTrue(progress.Reports.Any(r => r.CurrentAsset == "guitar.ogg" && r.FileFraction == 1), "An optimizer's own progress is passed on.");
+        Assert.Contains(r => r.CurrentAsset == "guitar.ogg", progress.Reports);
+        Assert.Contains(r => r.CurrentAsset == "guitar.ogg" && r.FileFraction == 1, progress.Reports, "An optimizer's own progress is passed on.");
         Assert.AreEqual(result.Items.Sum(i => i.BytesSaved), result.BytesSaved);
     }
 }

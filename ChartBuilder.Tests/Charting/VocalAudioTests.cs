@@ -59,7 +59,7 @@ public sealed class VocalAudioTests
 
         Assert.IsNull(choices[0].Source);
         StringAssert.Contains(choices[0].Label, "vocals_1");
-        Assert.IsTrue(choices.Any(c => c.Source == LaneAudioOptions.MixSource));
+        Assert.Contains(c => c.Source == LaneAudioOptions.MixSource, choices);
     }
 
     [TestMethod]

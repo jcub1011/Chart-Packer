@@ -62,16 +62,16 @@ public sealed class MetadataDraft
 {
     // Insertion order matters: keys added by the draft are appended in the order they were added.
     private readonly List<string> _order = [];
-    private readonly Dictionary<string, MetadataChange> _changes = new(StringComparer.OrdinalIgnoreCase);
-    private readonly HashSet<string> _removedFiles = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, MetadataChange> _changes = [with(StringComparer.OrdinalIgnoreCase)];
+    private readonly HashSet<string> _removedFiles = [with(StringComparer.OrdinalIgnoreCase)];
     private readonly List<AddedFile> _addedFiles = [];
 
     // The removals an add made, by the added name, so that dropping the add drops them too.
-    private readonly Dictionary<string, List<string>> _replacedBy = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, List<string>> _replacedBy = [with(StringComparer.OrdinalIgnoreCase)];
 
     // The keys an add changed, by the added name: each one's change as the add made it, and what it was before, so that
     // dropping the add puts them back.
-    private readonly Dictionary<string, Dictionary<string, (MetadataChange Made, MetadataChange? Before)>> _keysBy = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, Dictionary<string, (MetadataChange Made, MetadataChange? Before)>> _keysBy = [with(StringComparer.OrdinalIgnoreCase)];
 
     private readonly Dictionary<ChartTrackKey, int> _chartOffsets = [];
 
@@ -277,7 +277,7 @@ public sealed class MetadataDraft
         {
             ArgumentException.ThrowIfNullOrEmpty(change.Key);
             if (!_keysBy.TryGetValue(file.StoredName, out var made))
-                _keysBy[file.StoredName] = made = new(StringComparer.OrdinalIgnoreCase);
+                _keysBy[file.StoredName] = made = [with(StringComparer.OrdinalIgnoreCase)];
 
             // Added again under the name: what the key was before the first add is what reverting brings back.
             MetadataChange? before = made.TryGetValue(change.Key, out var earlier)

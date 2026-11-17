@@ -17,7 +17,7 @@ public static class SimulatedCrash
     {
         ArgumentNullException.ThrowIfNull(args);
         requested = false;
-        List<string> rest = new(args.Count);
+        List<string> rest = [with(args.Count)];
         bool options = true;
         foreach (string arg in args)
         {

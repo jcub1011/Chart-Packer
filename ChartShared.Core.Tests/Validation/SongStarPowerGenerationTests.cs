@@ -65,7 +65,7 @@ public sealed class SongStarPowerGenerationTests
         Assert.IsTrue(StarPowerGenerator.HasStarPower(guitar));
         Assert.IsTrue(guitar.Tracks.Where(t => t.Difficulty != ChartDifficulty.Expert).All(t => t.Notes.Count == 0), "Only star power was asked for.");
         foreach (var (file, bytes) in before)
-            CollectionAssert.AreEqual(bytes, File.ReadAllBytes(file), $"{file} was written.");
+            Assert.AreSequenceEqual(bytes, File.ReadAllBytes(file), $"{file} was written.");
 
         var draft = new MetadataDraft();
         chart.ApplyTo(draft);
@@ -96,7 +96,7 @@ public sealed class SongStarPowerGenerationTests
         var generation = SongDifficultyGeneration.Prepare(read, pairs, ReductionDefaults.Shipped, new SongGenerationWork(true, [Guitar]));
 
         Assert.IsFalse(StarPowerGenerator.HasStarPower(read.Load.Chart.PartOf(Guitar)!));
-        Assert.IsTrue(read.Load.Chart.PartOf(Guitar)![ChartDifficulty.Hard].Notes.Count == 0);
+        Assert.AreEqual(0, read.Load.Chart.PartOf(Guitar)![ChartDifficulty.Hard].Notes.Count);
         Assert.IsNotEmpty(generation.StarPower![Guitar]);
         Assert.IsTrue(StarPowerGenerator.HasStarPower(generation.Drafted.PartOf(Guitar)!));
     }

@@ -23,10 +23,10 @@ namespace ChartPacker.Services
         private readonly MetadataDraftStore _drafts;
 
         // The hold each song with unsaved changes has, by its draft's path.
-        private readonly Dictionary<string, IDisposable> _draftHolds = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, IDisposable> _draftHolds = [with(StringComparer.Ordinal)];
 
         // The songs watched, by SongLock.KeyOf.
-        private readonly Dictionary<string, Watched> _watched = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, Watched> _watched = [with(StringComparer.Ordinal)];
 
         private readonly DispatcherTimer _timer;
         private bool _polling;

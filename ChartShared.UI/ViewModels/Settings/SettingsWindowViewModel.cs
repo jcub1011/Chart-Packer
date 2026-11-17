@@ -196,7 +196,7 @@ namespace ChartShared.UI.ViewModels.Settings
         /// <summary>Rebuilds the list for the search, and selects "All Settings" so every match shows until a category is picked.</summary>
         private void RebuildCategories()
         {
-            var matches = _matches = _catalog.Search(SearchText).ToHashSet();
+            var matches = _matches = [.. _catalog.Search(SearchText)];
             bool searching = !string.IsNullOrWhiteSpace(SearchText);
 
             // A new "All Settings" entry each time, to carry the match count, so it's never the one already selected and

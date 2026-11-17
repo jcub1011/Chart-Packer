@@ -56,7 +56,7 @@ public sealed class ToolShortcutTests
     public void EveryToolInTheTableIsPickedOnceAndItsActionNamesItsKey()
     {
         CollectionAssert.AllItemsAreUnique(EditorKeys.ToolKeys.ToList());
-        Assert.AreEqual(EditorKeys.ToolKeys.Count, BuilderKeys.ToolActions.Count);
+        Assert.HasCount(EditorKeys.ToolKeys.Count, BuilderKeys.ToolActions);
 
         for (int i = 0; i < EditorKeys.ToolKeys.Count; i++)
         {
@@ -72,7 +72,7 @@ public sealed class ToolShortcutTests
     [TestMethod]
     public void ATableToolThatNoKeyPicksHasNoAction()
     {
-        Assert.IsFalse(EditorKeys.ToolKeys.Contains(EditorTool.Loop));
+        Assert.DoesNotContain(EditorTool.Loop, EditorKeys.ToolKeys);
         Assert.IsNull(EditorKeys.ToolOf(BuilderKeys.LoopTool));
     }
 
@@ -95,6 +95,6 @@ public sealed class ToolShortcutTests
 
         Assert.AreEqual("Alt+P", map.Display(BuilderKeys.ToolPlace));
         Assert.AreEqual(BuilderKeys.ToolPlace, map.Resolve(BuilderKeys.Tools, new KeyChord("P", KeyMods.Alt), new KeyChord("P", KeyMods.Alt)).Single().Id);
-        Assert.AreEqual(0, map.Resolve(BuilderKeys.Tools, new KeyChord("D2", KeyMods.Alt), new KeyChord("Digit2", KeyMods.Alt)).Count);
+        Assert.IsEmpty(map.Resolve(BuilderKeys.Tools, new KeyChord("D2", KeyMods.Alt), new KeyChord("Digit2", KeyMods.Alt)));
     }
 }

@@ -118,7 +118,7 @@ public sealed class PerspectiveLaneTests
         // From perspective to the timeline: the lane's own is not perspective, though the default is.
         chosen.ToggleView();
         Assert.IsTrue(chosen.IsTimeline);
-        Assert.AreEqual(false, layout.Find(chosen.Lane.Id)!.Perspective);
+        Assert.IsFalse(layout.Find(chosen.Lane.Id)!.Perspective);
 
         settings.Settings.DefaultEditorPerspective = false;
         editor.ReloadSettings();
@@ -141,7 +141,7 @@ public sealed class PerspectiveLaneTests
 
         var read = LaneDockLayout.FromState(layout.ToState())!;
 
-        Assert.AreEqual(true, read.Find(lane.Lane.Id)?.Perspective ?? read.Lanes.ElementAt(1).Perspective);
+        Assert.IsTrue(read.Find(lane.Lane.Id)?.Perspective ?? read.Lanes.ElementAt(1).Perspective);
     }
 
     [TestMethod]

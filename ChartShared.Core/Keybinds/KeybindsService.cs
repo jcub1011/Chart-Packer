@@ -13,7 +13,7 @@ public sealed class KeybindsSettings
     /// Chord text by action id, for the actions whose keys differ from their defaults; an empty list is an action the user
     /// unbound. Ids this build doesn't know are kept as they are, since the other app, or a newer version, may.
     /// </summary>
-    public Dictionary<string, string[]> Bindings { get; set; } = new(StringComparer.Ordinal);
+    public Dictionary<string, string[]> Bindings { get; set; } = [with(StringComparer.Ordinal)];
 }
 
 [JsonSourceGenerationOptions(WriteIndented = true)]
@@ -181,7 +181,7 @@ public sealed class KeybindsService
     private void Read()
     {
         _settings = _file.Load();
-        _settings.Bindings ??= new Dictionary<string, string[]>(StringComparer.Ordinal);
+        _settings.Bindings ??= [with(StringComparer.Ordinal)];
         var applied = Map.ApplyLayout(_settings.Bindings.Where(b => Map.Catalog.Contains(b.Key)).ToDictionary(b => b.Key, b => b.Value), replace: true);
         if (applied.Ignored > 0)
             Trace.TraceWarning($"Ignored {applied.Ignored} unusable entries in '{_path}'.");

@@ -93,7 +93,7 @@ public sealed class OptimizeParallelTests
         Assert.AreSequenceEqual(charts.Select(c => c.Entry.FullPath).ToList(), result.Items.Select(i => i.Entry.FullPath).ToList());
         foreach (var chart in charts)
             Assert.AreSequenceEqual(["guitar.ogg", "song.ini", "video.webm"], Names(chart.Entry));
-        Assert.AreEqual(0, Leftovers(_root.FullName).Count);
+        Assert.IsEmpty(Leftovers(_root.FullName));
 
         // Each finished chart is reported once, and the count of finished charts rises by one each time.
         var completed = progress.Reports.Where(r => r.Completed is not null).ToList();
@@ -151,7 +151,7 @@ public sealed class OptimizeParallelTests
         Assert.AreEqual(4, result.Succeeded);
         Assert.AreEqual(1, result.Failed);
         Assert.AreEqual(OptimizeItemStatus.Failed, result.Items[2].Status);
-        Assert.AreEqual(0, Leftovers(_root.FullName).Count);
+        Assert.IsEmpty(Leftovers(_root.FullName));
     }
 
     [TestMethod]
@@ -176,7 +176,7 @@ public sealed class OptimizeParallelTests
         await Assert.ThrowsAsync<OperationCanceledException>(
             () => OptimizeJob.RunAsync(plans, options, SetOf(optimizer), null, null, cancel.Token));
 
-        Assert.AreEqual(0, Leftovers(_root.FullName).Count);
+        Assert.IsEmpty(Leftovers(_root.FullName));
         foreach (var chart in charts)
         {
             var names = Names(chart.Entry);

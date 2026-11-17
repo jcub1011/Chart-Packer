@@ -78,7 +78,7 @@ public static class SongJob
         SongLockSet? locks)
     {
         // Outputs this job has written, preferred and actual paths both, and the item that wrote each.
-        private readonly Dictionary<string, SongEntry> _claimed = new(OutputPaths.PathComparer);
+        private readonly Dictionary<string, SongEntry> _claimed = [with(OutputPaths.PathComparer)];
 
         public async Task<JobItemResult> RunItemAsync(SongEntry entry, CancellationToken cancellationToken)
         {

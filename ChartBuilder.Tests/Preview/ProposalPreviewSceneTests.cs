@@ -72,7 +72,7 @@ public sealed class ProposalPreviewSceneTests
 
         Assert.HasCount(1, lane.Bands);
         Assert.AreEqual(HighwayBandKind.Proposal, lane.Bands[0].Kind);
-        Assert.IsTrue((lane.Notes[0].Flags & NoteFlags.StarPower) != 0, "A fill preview leaves the chart's star power as it is.");
+        Assert.AreNotEqual(0, (int)(lane.Notes[0].Flags & NoteFlags.StarPower), "A fill preview leaves the chart's star power as it is.");
     }
 
     private static bool Covered(HighwayLane lane, long tick) =>

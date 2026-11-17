@@ -129,7 +129,7 @@ public static class ImageOptimization
     }
 
     /// <summary>The metadata keys whose value can name an image file; any other key, such as <c>name</c>, is text that may only look like one.</summary>
-    private static readonly HashSet<string> ImageKeys = new(StringComparer.OrdinalIgnoreCase) { "cover", "background" };
+    private static readonly HashSet<string> ImageKeys = [with(StringComparer.OrdinalIgnoreCase), "cover", "background"];
 
     /// <summary>
     /// The metadata edits that carry renamed files into <c>song.ini</c> or a <c>.sng</c>'s metadata: an image key

@@ -46,7 +46,7 @@ public sealed class KeyMap : INotifyPropertyChanged
     public const int MaxChordsPerAction = 8;
 
     // Only the actions whose keys differ from their defaults, so a catalog that gains an action gives it its defaults.
-    private readonly Dictionary<string, KeyChord[]> _overrides = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, KeyChord[]> _overrides = [with(StringComparer.Ordinal)];
 
     // The bare keys of the actions reserved during a playtest, as ConflictKeys, asked for on every key of a playtest; made when
     // first asked for and dropped when the keys change.

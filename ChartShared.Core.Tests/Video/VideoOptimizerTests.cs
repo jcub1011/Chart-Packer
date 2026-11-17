@@ -175,7 +175,7 @@ public sealed class VideoOptimizerTests
         await Assert.ThrowsAsync<OperationCanceledException>(
             () => new VideoOptimizer().OptimizeAsync(FileOf(source), Temp("video.webm"), Enabled, null, cancelled.Token));
 
-        Assert.AreSequenceEqual(new[] { "source.mp4" }, Directory.GetFileSystemEntries(_root.FullName).Select(Path.GetFileName).ToArray()!);
+        Assert.AreSequenceEqual(["source.mp4"], Directory.GetFileSystemEntries(_root.FullName).Select(Path.GetFileName).ToArray()!);
     }
 
     [TestMethod]
@@ -189,7 +189,7 @@ public sealed class VideoOptimizerTests
         await Assert.ThrowsExactlyAsync<InvalidDataException>(
             () => new VideoOptimizer().EstimateAsync(FileOf(source), Enabled, TestContext.CancellationToken));
 
-        Assert.AreSequenceEqual(new[] { "broken.mp4" }, Directory.GetFileSystemEntries(_root.FullName).Select(Path.GetFileName).ToArray()!);
+        Assert.AreSequenceEqual(["broken.mp4"], Directory.GetFileSystemEntries(_root.FullName).Select(Path.GetFileName).ToArray()!);
     }
 
     [TestMethod]

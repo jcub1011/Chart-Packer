@@ -81,7 +81,7 @@ public sealed class VocalTrackContentTests
 
         Assert.AreSequenceEqual([new VocalStarPowerEvent(480, 2400), new VocalStarPowerEvent(5000, 480)], [.. content.StarPower]);
         Assert.AreSequenceEqual([new VocalPhraseEvent(0, 960), new VocalPhraseEvent(1920, 960)], [.. content.Phrases], "A phrase and the star power over it are two things.");
-        Assert.IsFalse(content.Kept.Any(e => e.Bytes.Length >= 2 && e.Bytes[1] == VocalTrackContent.StarPowerPitch));
+        Assert.DoesNotContain(e => e.Bytes.Length >= 2 && e.Bytes[1] == VocalTrackContent.StarPowerPitch, content.Kept);
     }
 
     [TestMethod]

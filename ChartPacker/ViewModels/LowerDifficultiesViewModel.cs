@@ -103,7 +103,7 @@ namespace ChartPacker.ViewModels
         private static readonly TimeSpan SearchDelay = TimeSpan.FromMilliseconds(200);
 
         private readonly List<LowerDifficultiesSongRow> _rows;
-        private readonly Dictionary<string, LowerDifficultiesSongRow> _byPath = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, LowerDifficultiesSongRow> _byPath = [with(StringComparer.Ordinal)];
         private readonly MetadataDraftStore _drafts;
         private readonly GeneratedChartStash _stash;
         private readonly DraftSaver _saver;

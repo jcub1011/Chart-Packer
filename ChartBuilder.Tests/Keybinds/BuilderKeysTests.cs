@@ -33,7 +33,7 @@ public sealed class BuilderKeysTests
         foreach (var action in Catalog.Where(a => a.DisplayOverride is not null))
         {
             Assert.IsTrue(action.Locked, action.Id);
-            Assert.AreEqual(0, action.Defaults.Count, action.Id);
+            Assert.IsEmpty(action.Defaults, action.Id);
         }
     }
 
@@ -42,7 +42,7 @@ public sealed class BuilderKeysTests
     {
         var conflicts = DefaultMap().AllConflicts();
 
-        Assert.AreEqual(0, conflicts.Count, string.Join("; ", conflicts.Select(c => $"{c.First.Id} and {c.Second.Id} on {c.Chord}")));
+        Assert.IsEmpty(conflicts, string.Join("; ", conflicts.Select(c => $"{c.First.Id} and {c.Second.Id} on {c.Chord}")));
     }
 
     [TestMethod]
@@ -212,7 +212,7 @@ public sealed class BuilderKeysTests
         {
             var hits = map.Resolve(ScopeOf(scope), KeyChord.Parse(typed), KeyChord.Parse(where));
 
-            Assert.IsTrue(hits.Count > 0, $"{where} in {scope} does nothing now");
+            Assert.IsNotEmpty(hits, $"{where} in {scope} does nothing now");
             Assert.AreEqual(expected, hits[0].Id, $"{where} in {scope}");
         }
     }
@@ -235,7 +235,7 @@ public sealed class BuilderKeysTests
                 var pressed = new KeyChord(key.Value.ToString(), chord.Mods);
                 var hits = map.Resolve(action.Scope, pressed, default);
 
-                Assert.IsTrue(hits.Any(h => h.Id == action.Id), $"{action.Id}: {chord} isn't answered when pressed as {pressed.Key}");
+                Assert.Contains(h => h.Id == action.Id, hits, $"{action.Id}: {chord} isn't answered when pressed as {pressed.Key}");
             }
         }
     }
@@ -258,7 +258,7 @@ public sealed class BuilderKeysTests
         foreach (var action in Catalog.InScope(BuilderKeys.Canvas))
         {
             foreach (var chord in action.Defaults)
-                Assert.IsTrue(table.Contains((action.Id, chord)), $"{action.Id} has {chord}, which the table of old keys doesn't");
+                Assert.Contains((action.Id, chord), table, $"{action.Id} has {chord}, which the table of old keys doesn't");
         }
     }
 
@@ -282,7 +282,7 @@ public sealed class BuilderKeysTests
             .Where(k => map.IsReservedDuringPlaytest(new KeyChord(k.ToString(), KeyMods.None)))
             .ToHashSet();
 
-        CollectionAssert.AreEquivalent(new[] { PhysicalKey.Space, PhysicalKey.Escape, PhysicalKey.P, PhysicalKey.N }, reserved.ToArray());
+        Assert.AreSequenceEqual([PhysicalKey.Space, PhysicalKey.Escape, PhysicalKey.P, PhysicalKey.N], [.. reserved], Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
     }
 
     [TestMethod]
@@ -333,6 +333,6 @@ public sealed class BuilderKeysTests
                 stale.Add($"{entry.Key}: {hit.Value}");
         }
 
-        Assert.AreEqual(0, stale.Count, "Strings that still name a key: " + string.Join("; ", stale));
+        Assert.IsEmpty(stale, "Strings that still name a key: " + string.Join("; ", stale));
     }
 }

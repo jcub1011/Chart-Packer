@@ -47,7 +47,7 @@ namespace ChartBuilder.Services
                 return;
 
             // Copied here, on the thread that changes it; the shell is slow, and the songs' folders may be on a network.
-            var snapshot = new Snapshot(settings.Settings.RecentSongs.ToList(), Strings.JumpListRecentCategory, exe);
+            var snapshot = new Snapshot([.. settings.Settings.RecentSongs], Strings.JumpListRecentCategory, exe);
             lock (_gate)
             {
                 _pending = snapshot;

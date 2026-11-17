@@ -170,7 +170,7 @@ namespace ChartShared.UI.ViewModels
         private readonly Dictionary<FindingItem, int> _trackOrder = [];
 
         // Each Instrument chip's place among them, kept after its findings go, so a chip still on stays where it was.
-        private readonly Dictionary<string, int> _instrumentOrder = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, int> _instrumentOrder = [with(StringComparer.Ordinal)];
 
         private readonly TimeSpan _searchDelay;
 

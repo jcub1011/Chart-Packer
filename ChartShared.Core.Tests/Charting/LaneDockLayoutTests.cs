@@ -403,8 +403,8 @@ public sealed class LaneDockLayoutTests
         var read = LaneDockLayout.FromState(JsonSerializer.Deserialize(json, LaneDockTestJsonContext.Default.LaneDockState))!;
 
         Assert.AreEqual(0, changes, "Perspective isn't a change to the layout's shape.");
-        Assert.AreEqual(true, Lane(read, Bass).Perspective);
-        Assert.AreEqual(false, Lane(read, Drums).Perspective, "Flat is a choice, kept as one, not the default.");
+        Assert.IsTrue(Lane(read, Bass).Perspective);
+        Assert.IsFalse(Lane(read, Drums).Perspective, "Flat is a choice, kept as one, not the default.");
         Assert.IsNull(Lane(read, Guitar).Perspective, "A lane that was never set follows the editor's default.");
     }
 

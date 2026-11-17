@@ -70,7 +70,7 @@ public sealed class HalfBandDecimatorTests
         var cut = new float[100];
         HalfBandDecimator.Decimate(signal.AsSpan((int)from, count), from, cut, 300);
 
-        CollectionAssert.AreEqual(whole, cut);
+        Assert.AreSequenceEqual(whole, cut);
     }
 
     [TestMethod]

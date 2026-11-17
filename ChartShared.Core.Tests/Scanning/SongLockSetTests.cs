@@ -116,7 +116,7 @@ public sealed class SongLockSetTests
 
             var holders = set.HoldersElsewhere(songs);
 
-            CollectionAssert.AreEqual(songs.Select(set.HolderElsewhere).ToList(), holders.ToList());
+            Assert.AreSequenceEqual(songs.Select(set.HolderElsewhere).ToList(), holders.ToList());
             Assert.IsNotNull(holders[0]);
             Assert.IsNotNull(holders[1]);
             Assert.IsNull(holders[2], "Its own hold isn't elsewhere.");

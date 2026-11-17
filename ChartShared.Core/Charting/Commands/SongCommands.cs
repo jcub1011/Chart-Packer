@@ -79,7 +79,7 @@ public sealed class SongValueCommand : ChartCommand
     private static Dictionary<string, string?> Diff(Dictionary<string, string?> before, Dictionary<string, string?> after, out Dictionary<string, string?> changedAfter)
     {
         var changedBefore = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
-        changedAfter = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        changedAfter = [with(StringComparer.OrdinalIgnoreCase)];
         foreach (string key in before.Keys.Union(after.Keys, StringComparer.OrdinalIgnoreCase))
         {
             string? was = before.GetValueOrDefault(key);

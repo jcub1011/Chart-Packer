@@ -9,7 +9,7 @@ namespace ChartShared.Core.Optimization;
 /// </summary>
 internal sealed class AssetStager(SongEntry entry, Func<string> stagingFolder) : IDisposable
 {
-    private readonly Dictionary<string, AssetFile> _staged = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, AssetFile> _staged = [with(StringComparer.OrdinalIgnoreCase)];
     private string? _folder;
 
     /// <summary>The staging folder, once something has been extracted; <see langword="null"/> before.</summary>

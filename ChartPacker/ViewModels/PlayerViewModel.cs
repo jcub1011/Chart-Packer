@@ -87,14 +87,14 @@ namespace ChartPacker.ViewModels
         private int _waveformGeneration;
 
         // The stems whose waveforms have changed since TrackWaveformsChanged was last raised, and the timer that raises it for them.
-        private readonly HashSet<string> _changedWaveformStems = new(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> _changedWaveformStems = [with(StringComparer.OrdinalIgnoreCase)];
         private IDisposable? _waveformsChangedTimer;
 
         // The waveforms of several stems drawn together behind one lane, by the stems, with the peaks each was mixed from.
-        private readonly Dictionary<string, (StemPeaks[] From, Waveform Mix)> _laneMixes = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, (StemPeaks[] From, Waveform Mix)> _laneMixes = [with(StringComparer.OrdinalIgnoreCase)];
 
         // The lanes' mixes being made in the background, by the stems, so that each is only mixed once at a time.
-        private readonly HashSet<string> _laneMixesMixing = new(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> _laneMixesMixing = [with(StringComparer.OrdinalIgnoreCase)];
 
         // A song the library asked to play, to be started when the detail view gives it its tracks.
         private SongEntry? _previewRequest;

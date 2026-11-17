@@ -127,7 +127,7 @@ public sealed class LibraryEstimatorTests
         };
         var options = Media() with { Video = new VideoOptimizeOptions(Enabled: true, Remove: true) };
 
-        Assert.HasCount(0, SampleSelector.Cover(library, options));
+        Assert.IsEmpty(SampleSelector.Cover(library, options));
         Assert.AreEqual(0, OptimizationPlanner.UnitsOf(library[0], options).Single().KnownSavingBytes);
         Assert.AreEqual(9000, OptimizationPlanner.UnitsOf(library[1], options).Single().KnownSavingBytes);
     }
@@ -359,7 +359,7 @@ public sealed class LibraryEstimatorTests
         var second = await OptimizationPlanner.PlanAsync(chart, Media(), SetOf(optimizer), new PlanServices(reopened), TestContext.CancellationToken);
 
         Assert.AreEqual(2, reopened.Count);
-        Assert.HasCount(0, optimizer.Estimated);
+        Assert.IsEmpty(optimizer.Estimated);
         Assert.AreSequenceEqual(first.Actions.Select(a => a.EstimatedOutputBytes).ToList(), second.Actions.Select(a => a.EstimatedOutputBytes).ToList());
         Assert.AreSequenceEqual(first.Actions.Select(a => a.OutputName).ToList(), second.Actions.Select(a => a.OutputName).ToList());
     }
@@ -432,7 +432,7 @@ public sealed class LibraryEstimatorTests
         var run = estimator.RunAsync(progress, TestContext.CancellationToken);
         await Task.Delay(150, TestContext.CancellationToken);
         Assert.IsFalse(run.IsCompleted);
-        Assert.HasCount(0, progress.Reports);
+        Assert.IsEmpty(progress.Reports);
 
         estimator.Resume();
         await run;
@@ -469,7 +469,7 @@ public sealed class LibraryEstimatorTests
         var plans = await OptimizationPlanner.PlanAllAsync(charts, options, SetOf(optimizer), services, null, TestContext.CancellationToken);
         var result = await OptimizeJob.RunAsync(plans, options, SetOf(optimizer), cancellationToken: TestContext.CancellationToken);
 
-        Assert.AreEqual(measured, optimizer.Estimated.Count, "planning the run asked the optimizers nothing");
+        Assert.HasCount(measured, optimizer.Estimated, "planning the run asked the optimizers nothing");
         Assert.AreEqual(5, result.Succeeded);
     }
 

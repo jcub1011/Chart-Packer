@@ -46,7 +46,7 @@ public sealed class OpusAudioOptimizerTests
         Assert.AreEqual(2, decoded.Channels);
         Assert.AreEqual(48000, decoded.LengthFrames);
         Assert.IsGreaterThan(0.9, TestAudio.CorrelationWithChirp(TestAudio.ReadAll(decoded), 2, 48000));
-        Assert.IsFalse(source.LengthFrames < 0);
+        Assert.IsGreaterThanOrEqualTo(0, source.LengthFrames);
     }
 
     [TestMethod]
@@ -134,7 +134,7 @@ public sealed class OpusAudioOptimizerTests
         await Assert.ThrowsAsync<InvalidDataException>(() =>
             new OpusAudioOptimizer().OptimizeAsync([file], destination, AudioOptimizeOptions.Default, null, TestContext.CancellationToken));
 
-        CollectionAssert.AreEqual(new byte[] { 1, 2, 3 }, File.ReadAllBytes(destination), "The sources failed to open before anything was written.");
+        Assert.AreSequenceEqual(new byte[] { 1, 2, 3 }, File.ReadAllBytes(destination), "The sources failed to open before anything was written.");
     }
 
     [TestMethod]
@@ -218,7 +218,7 @@ public sealed class OpusAudioOptimizerTests
         var file = StemFile("guitar.wav", Music(30, 44100, seed: 6));
         await new OpusAudioOptimizer().EstimateAsync([file], AudioOptimizeOptions.Default, TestContext.CancellationToken);
 
-        Assert.AreEqual(1, Directory.GetFileSystemEntries(_root.FullName).Length, "Only the stem itself is in the folder.");
+        Assert.HasCount(1, Directory.GetFileSystemEntries(_root.FullName), "Only the stem itself is in the folder.");
     }
 
     // ---- Skip rules ---------------------------------------------------------------------------------------------------
@@ -274,7 +274,7 @@ public sealed class OpusAudioOptimizerTests
         Assert.AreEqual(OptimizeItemStatus.Succeeded, item.Status, item.ErrorMessage);
         Assert.AreSequenceEqual(["crowd.wav", "preview.wav", "song.ini", "song.opus"], Names(entry));
         await AssertMixAsync(entry);
-        Assert.AreEqual(0, Leftovers(_root.FullName).Count);
+        Assert.IsEmpty(Leftovers(_root.FullName));
     }
 
     [TestMethod]
@@ -287,7 +287,7 @@ public sealed class OpusAudioOptimizerTests
         Assert.AreEqual(OptimizeItemStatus.Succeeded, item.Status, item.ErrorMessage);
         Assert.AreSequenceEqual(["crowd.wav", "preview.wav", "song.opus"], Names(entry));
         await AssertMixAsync(entry);
-        Assert.AreEqual(0, Leftovers(_root.FullName).Count);
+        Assert.IsEmpty(Leftovers(_root.FullName));
     }
 
     [TestMethod]
@@ -315,7 +315,7 @@ public sealed class OpusAudioOptimizerTests
 
         float[] mix = TestAudio.ReadAll(new MixedPcmSource(mixer));
 
-        Assert.AreEqual(48000 * 2, mix.Length);
+        Assert.HasCount(48000 * 2, mix);
         Assert.AreEqual(1f, mix.Max(s => Math.Abs(s)));
         Assert.IsTrue(mix.All(s => Math.Abs(s) <= 1f), "Nothing is beyond the mixer's limits.");
     }
@@ -351,7 +351,7 @@ public sealed class OpusAudioOptimizerTests
         var item = result.Items.Single();
         Assert.AreNotEqual(OptimizeItemStatus.Succeeded, item.Status);
         Assert.AreSequenceEqual(["bass.wav", "guitar.wav", "song.ini"], Names(entry));
-        Assert.AreEqual(0, Leftovers(_root.FullName).Count);
+        Assert.IsEmpty(Leftovers(_root.FullName));
     }
 
     // ---- Cancel and failure -------------------------------------------------------------------------------------------
@@ -392,7 +392,7 @@ public sealed class OpusAudioOptimizerTests
             OptimizeJob.RunAsync([plan], AudioOptions, optimizers, null, cancelling, cts.Token));
 
         Assert.AreSequenceEqual(["guitar.wav", "rhythm.wav", "song.ini"], Names(entry));
-        Assert.AreEqual(0, Leftovers(_root.FullName).Count);
+        Assert.IsEmpty(Leftovers(_root.FullName));
     }
 
     [TestMethod]
@@ -414,7 +414,7 @@ public sealed class OpusAudioOptimizerTests
         Assert.IsLessThan(before, new FileInfo(Path.Combine(entry.FullPath, "guitar.opus")).Length);
         using var decoded = AudioDecoder.Open(File.OpenRead(Path.Combine(entry.FullPath, "guitar.opus")), "guitar.opus");
         Assert.AreEqual(10 * 44100 * 48000L / 44100, decoded.LengthFrames, delta: 960);
-        Assert.AreEqual(0, Leftovers(_root.FullName).Count);
+        Assert.IsEmpty(Leftovers(_root.FullName));
     }
 
     // ---- Helpers ------------------------------------------------------------------------------------------------------

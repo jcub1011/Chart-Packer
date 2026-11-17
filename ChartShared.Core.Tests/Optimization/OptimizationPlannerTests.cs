@@ -112,9 +112,9 @@ public sealed class OptimizationPlannerTests
 
         var plan = await PlanAsync(Only(OptimizeStrategy.Video), optimizer, ("guitar.ogg", 1000), ("video.mp4", 1000), ("album.png", 1000));
 
-        Assert.AreEqual(1, plan.Actions.Count);
+        Assert.HasCount(1, plan.Actions);
         Assert.AreEqual(OptimizeStrategy.Video, plan.Actions[0].Strategy);
-        Assert.AreEqual(1, optimizer.Estimated.Count);
+        Assert.HasCount(1, optimizer.Estimated);
     }
 
     [TestMethod]
@@ -125,8 +125,8 @@ public sealed class OptimizationPlannerTests
         var plan = await PlanAsync(AllOn() with { Metadata = MetadataCleanupOptions.Default },
             optimizer, ("highway.png", 1000), ("notes.chart", 1000), ("foo.ogg", 1000), ("readme.txt", 1000));
 
-        Assert.AreEqual(0, plan.Actions.Count);
-        Assert.AreEqual(0, optimizer.Estimated.Count);
+        Assert.IsEmpty(plan.Actions);
+        Assert.IsEmpty(optimizer.Estimated);
     }
 
     [TestMethod]
@@ -160,7 +160,7 @@ public sealed class OptimizationPlannerTests
 
         var action = ActionFor(plan, OptimizeStrategy.Audio, "guitar.ogg");
         Assert.AreEqual(OptimizeSkipReason.OutputNameTaken, action.Reason);
-        Assert.AreEqual(1, plan.Actions.Count, "A stem with two formats is planned once.");
+        Assert.HasCount(1, plan.Actions, "A stem with two formats is planned once.");
     }
 
     [TestMethod]
@@ -170,10 +170,10 @@ public sealed class OptimizationPlannerTests
 
         var plan = await PlanAsync(Only(OptimizeStrategy.AlbumArt), optimizer, ("album.png", 1000), ("album.jpg", 1000));
 
-        Assert.AreEqual(2, plan.Actions.Count);
-        Assert.AreEqual(1, plan.Actions.Count(a => !a.IsSkip), "Only one of them gets album.webp.");
+        Assert.HasCount(2, plan.Actions);
+        Assert.ContainsSingle(a => !a.IsSkip, plan.Actions, "Only one of them gets album.webp.");
         Assert.AreEqual(OptimizeSkipReason.OutputNameTaken, plan.Actions.Single(a => a.IsSkip).Reason);
-        Assert.AreEqual(1, plan.Actions.Where(a => !a.IsSkip).Select(a => a.OutputName).Distinct(StringComparer.OrdinalIgnoreCase).Count());
+        Assert.HasCount(1, plan.Actions.Where(a => !a.IsSkip).Select(a => a.OutputName).Distinct(StringComparer.OrdinalIgnoreCase));
     }
 
     [TestMethod]
@@ -183,7 +183,7 @@ public sealed class OptimizationPlannerTests
 
         var plan = await PlanAsync(Only(OptimizeStrategy.Audio), optimizer, ("guitar.ogg", 1000), ("bass.ogg", 1000));
 
-        Assert.AreEqual(2, plan.Actions.Count);
+        Assert.HasCount(2, plan.Actions);
         Assert.IsTrue(plan.Actions.All(a => a.Reason == OptimizeSkipReason.EstimateFailed));
     }
 
@@ -206,12 +206,12 @@ public sealed class OptimizationPlannerTests
         var mix = ActionFor(plan, OptimizeStrategy.StemMixdown);
         Assert.AreEqual(OptimizeActionKind.MixDown, mix.Kind);
         Assert.AreEqual("song.opus", mix.OutputName);
-        CollectionAssert.AreEquivalent(new[] { "guitar.ogg", "rhythm.ogg", "drums.wav", "guitar.wav" }, mix.SourceNames.ToArray(), "Every format of a mixed stem goes.");
+        Assert.AreSequenceEqual(["guitar.ogg", "rhythm.ogg", "drums.wav", "guitar.wav"], [.. mix.SourceNames], Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder, "Every format of a mixed stem goes.");
         Assert.AreEqual(15000, mix.InputBytes);
         CollectionAssert.Contains(optimizer.Estimated, "guitar.ogg+rhythm.ogg+drums.wav", "One file of each stem is mixed.");
 
         var audio = plan.Actions.Where(a => a.Strategy == OptimizeStrategy.Audio).ToList();
-        Assert.AreEqual(1, audio.Count, "Only the preview is left to transcode.");
+        Assert.HasCount(1, audio, "Only the preview is left to transcode.");
         Assert.AreEqual("preview.ogg", audio[0].SourceNames[0]);
     }
 
@@ -221,7 +221,7 @@ public sealed class OptimizationPlannerTests
         var plan = await PlanAsync(Only(OptimizeStrategy.StemMixdown) with { StemMixdown = new AudioOptimizeOptions(Enabled: true) },
             new FakeOptimizer(), ("song.ogg", 1000), ("preview.ogg", 100));
 
-        Assert.AreEqual(0, plan.Actions.Count);
+        Assert.IsEmpty(plan.Actions);
     }
 
     [TestMethod]
@@ -253,7 +253,7 @@ public sealed class OptimizationPlannerTests
         var action = ActionFor(plan, OptimizeStrategy.Metadata);
         Assert.AreEqual(OptimizeActionKind.CleanMetadata, action.Kind);
         Assert.IsNotNull(plan.Metadata);
-        Assert.IsTrue(action.EstimatedSavingBytes >= 0);
+        Assert.IsGreaterThanOrEqualTo(0, action.EstimatedSavingBytes);
     }
 
     [TestMethod]

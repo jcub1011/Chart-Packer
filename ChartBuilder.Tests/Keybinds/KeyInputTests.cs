@@ -80,7 +80,7 @@ public sealed class KeyInputTests
     {
         var map = new KeyMap(new KeybindCatalog(SharedKeys.Actions()));
 
-        Assert.AreEqual(0, map.AllConflicts().Count);
+        Assert.IsEmpty(map.AllConflicts());
     }
 
     [TestMethod]
@@ -93,7 +93,7 @@ public sealed class KeyInputTests
         Assert.AreEqual("Ctrl+Z", map[SharedKeys.Undo]);
         Assert.AreEqual("Ctrl+Y", map[SharedKeys.Redo]);
         Assert.AreEqual("Space", map[SharedKeys.PlayPause]);
-        CollectionAssert.AreEqual(KeyChord.List("Ctrl+Y", "Ctrl+Shift+Z").ToArray(), map.ChordsOf(SharedKeys.Redo).ToArray());
+        Assert.AreSequenceEqual([.. KeyChord.List("Ctrl+Y", "Ctrl+Shift+Z")], [.. map.ChordsOf(SharedKeys.Redo)]);
     }
 
     [TestMethod]
@@ -103,7 +103,7 @@ public sealed class KeyInputTests
 
         var help = catalog[SharedKeys.Help];
 
-        CollectionAssert.AreEqual(KeyChord.List("F1").ToArray(), help.Defaults.ToArray());
+        Assert.AreSequenceEqual([.. KeyChord.List("F1")], [.. help.Defaults]);
         Assert.AreSame(KeyScope.Global, help.Scope);
         Assert.IsFalse(help.Locked);
     }

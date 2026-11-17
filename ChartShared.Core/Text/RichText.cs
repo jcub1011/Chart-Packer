@@ -37,13 +37,14 @@ public static class RichText
 {
     // Tags TextMeshPro understands that don't change what a single line of text in a table
     // looks like closely enough to be worth rendering. They're dropped rather than shown.
-    private static readonly HashSet<string> StrippedTags = new(StringComparer.OrdinalIgnoreCase)
-    {
+    private static readonly HashSet<string> StrippedTags =
+    [
+        with(StringComparer.OrdinalIgnoreCase),
         "align", "allcaps", "alpha", "cspace", "font", "font-weight", "gradient", "indent",
         "line-height", "line-indent", "link", "lowercase", "margin", "margin-left", "margin-right",
         "mark", "mspace", "nobr", "page", "pos", "rotate", "size", "smallcaps", "space", "sprite",
         "style", "sub", "sup", "uppercase", "voffset", "width",
-    };
+    ];
 
     private static readonly Dictionary<string, uint> NamedColors = new(StringComparer.OrdinalIgnoreCase)
     {

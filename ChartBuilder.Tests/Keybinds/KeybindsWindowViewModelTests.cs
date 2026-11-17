@@ -108,9 +108,8 @@ public sealed class KeybindsWindowViewModelTests
     {
         var vm = Open();
 
-        CollectionAssert.AreEqual(
-            new[] { "File", "Edit", "Playback", "Search", "Editor › Notes", "Editor › View", "Editor" },
-            vm.Groups.Select(g => g.Title).ToArray());
+        Assert.AreSequenceEqual(
+            ["File", "Edit", "Playback", "Search", "Editor › Notes", "Editor › View", "Editor"], [.. vm.Groups.Select(g => g.Title)]);
         Assert.IsFalse(Row(vm, SharedKeys.Undo).IsEditable);
         Assert.IsFalse(Row(vm, "test.mouse").IsEditable);
         Assert.AreEqual("Shift+Click", Row(vm, "test.mouse").OverrideText);
@@ -122,9 +121,8 @@ public sealed class KeybindsWindowViewModelTests
     {
         var vm = Open();
 
-        CollectionAssert.AreEqual(
-            new[] { "Ctrl+Y", "Ctrl+Shift+Z" },
-            Row(vm, SharedKeys.Redo).Chips.Select(c => c.Chord.ToString()).ToArray());
+        Assert.AreSequenceEqual(
+            ["Ctrl+Y", "Ctrl+Shift+Z"], [.. Row(vm, SharedKeys.Redo).Chips.Select(c => c.Chord.ToString())]);
     }
 
     [TestMethod]
@@ -145,7 +143,7 @@ public sealed class KeybindsWindowViewModelTests
 
         Assert.AreEqual("Ctrl+W", _live.Display(SharedKeys.Save));
         Assert.AreEqual(1, _saved);
-        Assert.AreEqual(0, _confirmation.Alerts.Count);
+        Assert.IsEmpty(_confirmation.Alerts);
     }
 
     [TestMethod]
@@ -158,7 +156,7 @@ public sealed class KeybindsWindowViewModelTests
         await vm.ApplyAsync();
 
         Assert.AreEqual(1, _saved);
-        Assert.AreEqual(1, _confirmation.Alerts.Count);
+        Assert.HasCount(1, _confirmation.Alerts);
         Assert.AreEqual("Ctrl+W", _live.Display(SharedKeys.Save));
     }
 
@@ -170,7 +168,7 @@ public sealed class KeybindsWindowViewModelTests
 
         await Capture(vm, find, "Ctrl+Alt+KeyF");
 
-        CollectionAssert.AreEqual(new[] { "Ctrl+F", "Ctrl+Alt+KeyF" }, find.Chips.Select(c => c.Chord.ToString()).ToArray());
+        Assert.AreSequenceEqual(["Ctrl+F", "Ctrl+Alt+KeyF"], [.. find.Chips.Select(c => c.Chord.ToString())]);
     }
 
     [TestMethod]
@@ -224,7 +222,7 @@ public sealed class KeybindsWindowViewModelTests
 
         await Capture(vm, Row(vm, "test.hopo"), "KeyG");
         Assert.IsFalse(vm.IsCapturing);
-        CollectionAssert.AreEqual(new[] { "KeyH", "KeyG" }, Row(vm, "test.hopo").Chips.Select(c => c.Chord.ToString()).ToArray());
+        Assert.AreSequenceEqual(["KeyH", "KeyG"], [.. Row(vm, "test.hopo").Chips.Select(c => c.Chord.ToString())]);
     }
 
     [TestMethod]
@@ -235,7 +233,7 @@ public sealed class KeybindsWindowViewModelTests
         await Capture(vm, Row(vm, SharedKeys.Save), "Ctrl+Z");
 
         Assert.IsTrue(vm.IsCapturing);
-        Assert.AreEqual(0, _confirmation.Asked.Count);
+        Assert.IsEmpty(_confirmation.Asked);
         StringAssert.Contains(vm.StatusMessage, "Undo");
     }
 
@@ -248,7 +246,7 @@ public sealed class KeybindsWindowViewModelTests
         await Capture(vm, find, "Ctrl+F");
 
         Assert.IsTrue(vm.IsCapturing);
-        Assert.AreEqual(1, find.Chips.Count);
+        Assert.HasCount(1, find.Chips);
     }
 
     [TestMethod]
@@ -259,9 +257,9 @@ public sealed class KeybindsWindowViewModelTests
 
         await Capture(vm, Row(vm, SharedKeys.Save), "Ctrl+F", Row(vm, SharedKeys.Save).Chips[0]);
 
-        Assert.AreEqual(1, _confirmation.Asked.Count);
+        Assert.HasCount(1, _confirmation.Asked);
         Assert.AreEqual("Ctrl+F", Row(vm, SharedKeys.Save).Chips.Single().Chord.ToString());
-        Assert.AreEqual(0, Row(vm, "test.find").Chips.Count);
+        Assert.IsEmpty(Row(vm, "test.find").Chips);
         Assert.IsTrue(Row(vm, "test.find").IsUnbound);
         Assert.IsFalse(Row(vm, SharedKeys.Save).HasConflict);
     }
@@ -291,7 +289,7 @@ public sealed class KeybindsWindowViewModelTests
         await capture;
 
         Assert.IsFalse(vm.IsCapturing);
-        Assert.AreEqual(0, Row(vm, SharedKeys.Save).Chips.Count, "the key is removed, not replaced by the one that was awaited");
+        Assert.IsEmpty(Row(vm, SharedKeys.Save).Chips, "the key is removed, not replaced by the one that was awaited");
         Assert.AreEqual("Ctrl+F", Row(vm, "test.find").Chips.Single().Chord.ToString(), "and the other shortcut keeps its key");
     }
 
@@ -336,8 +334,8 @@ public sealed class KeybindsWindowViewModelTests
 
         await Capture(vm, vm.Groups.Single().Rows.Single(r => r.Action.Id == "b"), "Ctrl+K");
 
-        Assert.AreEqual(0, _confirmation.Asked.Count);
-        Assert.IsFalse(vm.Groups.Single().Rows.Any(r => r.HasConflict));
+        Assert.IsEmpty(_confirmation.Asked);
+        Assert.DoesNotContain(r => r.HasConflict, vm.Groups.Single().Rows);
         Assert.IsFalse(vm.IsCapturing);
     }
 
@@ -379,20 +377,20 @@ public sealed class KeybindsWindowViewModelTests
         var vm = Open();
 
         vm.SearchText = "hopo";
-        CollectionAssert.AreEqual(new[] { "test.hopo" }, vm.Groups.SelectMany(g => g.Rows).Select(r => r.Action.Id).ToArray());
+        Assert.AreSequenceEqual(["test.hopo"], [.. vm.Groups.SelectMany(g => g.Rows).Select(r => r.Action.Id)]);
 
         vm.SearchText = "ctrl+f";
-        CollectionAssert.AreEqual(new[] { "test.find" }, vm.Groups.SelectMany(g => g.Rows).Select(r => r.Action.Id).ToArray());
+        Assert.AreSequenceEqual(["test.find"], [.. vm.Groups.SelectMany(g => g.Rows).Select(r => r.Action.Id)]);
 
         vm.SearchText = "Playback";
-        CollectionAssert.AreEqual(new[] { SharedKeys.PlayPause, SharedKeys.NextChange, SharedKeys.PreviousChange }, vm.Groups.SelectMany(g => g.Rows).Select(r => r.Action.Id).ToArray());
+        Assert.AreSequenceEqual([SharedKeys.PlayPause, SharedKeys.NextChange, SharedKeys.PreviousChange], [.. vm.Groups.SelectMany(g => g.Rows).Select(r => r.Action.Id)]);
 
         vm.SearchText = "zzzz";
         Assert.IsTrue(vm.HasNoMatches);
 
         vm.SearchText = "";
         Assert.IsFalse(vm.HasNoMatches);
-        Assert.AreEqual(7, vm.Groups.Count);
+        Assert.HasCount(7, vm.Groups);
     }
 
     private static string[] Labels(IEnumerable<KeybindNodeViewModel> categories) => [.. categories.Select(c => c.Label)];
@@ -407,7 +405,7 @@ public sealed class KeybindsWindowViewModelTests
     {
         var vm = Open();
 
-        CollectionAssert.AreEqual(new[] { "All Shortcuts", "File", "Edit", "Playback", "Search", "Editor" }, Labels(vm.Categories));
+        Assert.AreSequenceEqual(["All Shortcuts", "File", "Edit", "Playback", "Search", "Editor"], Labels(vm.Categories));
         Assert.IsTrue(vm.Categories[0].IsAll);
         Assert.AreSame(vm.Categories[0], vm.SelectedCategory);
         Assert.AreEqual("All Shortcuts", vm.PageTitle);
@@ -435,8 +433,8 @@ public sealed class KeybindsWindowViewModelTests
 
         vm.SelectedCategory = vm.Categories.Single(c => c.Label == "Editor");
 
-        CollectionAssert.AreEquivalent(new[] { "test.hopo", "test.mouse", "test.snap", "test.measure" }, RowIds(vm));
-        CollectionAssert.AreEqual(new[] { "Notes", "View", "" }, vm.Groups.Select(g => g.Title).ToArray(), "the page header says Editor, so its own shortcuts need no heading");
+        Assert.AreSequenceEqual(["test.hopo", "test.mouse", "test.snap", "test.measure"], RowIds(vm), Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
+        Assert.AreSequenceEqual(["Notes", "View", ""], [.. vm.Groups.Select(g => g.Title)], "the page header says Editor, so its own shortcuts need no heading");
         Assert.IsFalse(vm.Groups[2].HasTitle);
     }
 
@@ -450,9 +448,9 @@ public sealed class KeybindsWindowViewModelTests
 
         vm.Reveal(hopo);
 
-        CollectionAssert.AreEqual(new[] { hopo }, raised);
+        Assert.AreSequenceEqual([hopo], raised);
         Assert.IsTrue(hopo.IsRevealed);
-        Assert.AreEqual(7, vm.Groups.Count, "the list still shows every category");
+        Assert.HasCount(7, vm.Groups, "the list still shows every category");
         Assert.IsTrue(vm.SelectedCategory!.IsAll);
     }
 
@@ -466,7 +464,7 @@ public sealed class KeybindsWindowViewModelTests
         vm.Reveal(Row(vm, "test.snap"));
 
         Assert.AreSame(editor, vm.SelectedCategory);
-        CollectionAssert.AreEquivalent(new[] { "test.hopo", "test.mouse", "test.snap", "test.measure" }, RowIds(vm));
+        Assert.AreSequenceEqual(["test.hopo", "test.mouse", "test.snap", "test.measure"], RowIds(vm), Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
         Assert.IsTrue(Row(vm, "test.snap").IsRevealed);
     }
 
@@ -481,7 +479,7 @@ public sealed class KeybindsWindowViewModelTests
         vm.Reveal(hopo);
 
         Assert.AreEqual("Editor", vm.SelectedCategory!.Label);
-        CollectionAssert.AreEquivalent(new[] { "test.hopo", "test.mouse", "test.snap", "test.measure" }, RowIds(vm));
+        Assert.AreSequenceEqual(["test.hopo", "test.mouse", "test.snap", "test.measure"], RowIds(vm), Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
         Assert.IsTrue(hopo.IsRevealed);
         Assert.IsFalse(snap.IsRevealed);
     }
@@ -527,7 +525,7 @@ public sealed class KeybindsWindowViewModelTests
 
         vm.SelectedCategory = vm.Categories.Single(c => c.Label == "Edit");
 
-        CollectionAssert.AreEqual(new[] { "a" }, RowIds(vm));
+        Assert.AreSequenceEqual(["a"], RowIds(vm));
     }
 
     [TestMethod]
@@ -538,14 +536,14 @@ public sealed class KeybindsWindowViewModelTests
 
         vm.SearchText = "snap";
 
-        CollectionAssert.AreEqual(new[] { "All Shortcuts", "Editor" }, Labels(vm.Categories));
+        Assert.AreSequenceEqual(["All Shortcuts", "Editor"], Labels(vm.Categories));
         Assert.IsTrue(vm.SelectedCategory!.IsAll);
-        CollectionAssert.AreEqual(new[] { "test.snap" }, RowIds(vm));
+        Assert.AreSequenceEqual(["test.snap"], RowIds(vm));
         Assert.AreEqual(1, vm.Categories[0].MatchCount);
         Assert.AreEqual(1, vm.Categories[1].MatchCount);
 
         vm.SearchText = "";
-        Assert.AreEqual(6, vm.Categories.Count);
+        Assert.HasCount(6, vm.Categories);
         Assert.IsNull(vm.Categories[0].MatchCount);
         Assert.IsFalse(vm.Categories[1].HasMatchCount);
     }
@@ -584,7 +582,7 @@ public sealed class KeybindsWindowViewModelTests
 
         vm.IsKeyboardView = true;
         Assert.AreEqual("", vm.SearchText);
-        Assert.AreEqual(6, vm.Categories.Count);
+        Assert.HasCount(6, vm.Categories);
 
         vm.IsListView = true;
         Assert.IsFalse(vm.IsKeyboardView);
@@ -656,7 +654,7 @@ public sealed class KeybindsWindowViewModelTests
 
         vm.Map.Shift = true;
         Assert.AreEqual("Ctrl+Shift+S", vm.Map.SelectedChordText, "the pick stays while the layer changes");
-        Assert.AreEqual(0, vm.Map.Bindings.Count);
+        Assert.IsEmpty(vm.Map.Bindings);
         Assert.IsTrue(vm.Map.IsUnboundSelection);
         StringAssert.Contains(vm.Map.UnboundText, "Ctrl+Shift+S");
         Assert.IsTrue(vm.Map.CanAssign);
@@ -670,7 +668,7 @@ public sealed class KeybindsWindowViewModelTests
         Cap(vm, "K").SelectCommand.Execute(null);
         var find = Row(vm, "test.find");
         CollectionAssert.Contains(vm.Map.AssignChoices.ToList(), find);
-        Assert.IsFalse(vm.Map.AssignChoices.Any(r => !r.IsEditable), "a shortcut that can't change isn't offered");
+        Assert.DoesNotContain(r => !r.IsEditable, vm.Map.AssignChoices, "a shortcut that can't change isn't offered");
 
         vm.Map.AssignTo = find;
         await Task.Yield();
@@ -678,7 +676,7 @@ public sealed class KeybindsWindowViewModelTests
         Assert.IsNull(vm.Map.AssignTo, "it clears, ready for the next");
         Assert.AreEqual(find, Cap(vm, "K").Actions.Single());
         Assert.AreEqual("Find", vm.Map.Bindings.Single().Name);
-        Assert.IsTrue(find.Chips.Any(c => c.Chord.ToString() == "Ctrl+K"));
+        Assert.Contains(c => c.Chord.ToString() == "Ctrl+K", find.Chips);
         Assert.AreEqual("Ctrl+F", _live.Display("test.find"), "staged until OK");
         Assert.IsFalse(vm.IsCapturing);
     }
@@ -690,19 +688,19 @@ public sealed class KeybindsWindowViewModelTests
         vm.Map.Ctrl = true;
         Cap(vm, "K").SelectCommand.Execute(null);
         var all = vm.Map.AssignChoices.Select(r => r.Action.Id).ToArray();
-        CollectionAssert.AreEqual(all, vm.Map.FilteredAssignChoices.Select(r => r.Action.Id).ToArray(), "nothing typed offers every one");
+        Assert.AreSequenceEqual(all, [.. vm.Map.FilteredAssignChoices.Select(r => r.Action.Id)], "nothing typed offers every one");
         Assert.IsFalse(vm.Map.HasNoAssignMatches);
 
         vm.Map.AssignSearch = "FIND";
-        CollectionAssert.AreEqual(new[] { "test.find" }, vm.Map.FilteredAssignChoices.Select(r => r.Action.Id).ToArray(), "case doesn't matter");
+        Assert.AreSequenceEqual(["test.find"], [.. vm.Map.FilteredAssignChoices.Select(r => r.Action.Id)], "case doesn't matter");
 
         vm.Map.AssignSearch = "playback next";
-        CollectionAssert.AreEqual(new[] { SharedKeys.NextChange }, vm.Map.FilteredAssignChoices.Select(r => r.Action.Id).ToArray(), "every word, in the name or the category, in any order");
+        Assert.AreSequenceEqual([SharedKeys.NextChange], [.. vm.Map.FilteredAssignChoices.Select(r => r.Action.Id)], "every word, in the name or the category, in any order");
 
         vm.Map.AssignSearch = "zzzz";
-        Assert.AreEqual(0, vm.Map.FilteredAssignChoices.Count);
+        Assert.IsEmpty(vm.Map.FilteredAssignChoices);
         Assert.IsTrue(vm.Map.HasNoAssignMatches);
-        Assert.AreEqual(all.Length, vm.Map.AssignChoices.Count, "the choices themselves are unchanged");
+        Assert.HasCount(all.Length, vm.Map.AssignChoices, "the choices themselves are unchanged");
     }
 
     [TestMethod]
@@ -727,12 +725,12 @@ public sealed class KeybindsWindowViewModelTests
         vm.Map.Ctrl = true;
         Cap(vm, "K").SelectCommand.Execute(null);
         vm.Map.AssignSearch = "find";
-        Assert.AreEqual(1, vm.Map.FilteredAssignChoices.Count);
+        Assert.HasCount(1, vm.Map.FilteredAssignChoices);
 
         Cap(vm, "S").SelectCommand.Execute(null);
 
-        Assert.AreEqual(1, vm.Map.FilteredAssignChoices.Count, "Find is offered for Ctrl+S too, as it has room for another key");
-        Assert.IsFalse(vm.Map.FilteredAssignChoices.Any(r => r.Action.Id == SharedKeys.Save), "but Save, which already has the key, isn't");
+        Assert.HasCount(1, vm.Map.FilteredAssignChoices, "Find is offered for Ctrl+S too, as it has room for another key");
+        Assert.DoesNotContain(r => r.Action.Id == SharedKeys.Save, vm.Map.FilteredAssignChoices, "but Save, which already has the key, isn't");
         vm.Map.AssignSearch = "save";
         Assert.IsTrue(vm.Map.HasNoAssignMatches);
     }
@@ -745,7 +743,7 @@ public sealed class KeybindsWindowViewModelTests
 
         await vm.BindKeyAsync(Row(vm, "test.hopo"), new KeyChord(Cap(vm, ";").Key.TokenFor(KeyMatch.Physical), KeyMods.None));
 
-        Assert.IsTrue(vm.Working.ChordsOf("test.hopo").Any(c => c.Key == "Semicolon"), "a canvas key is a physical one");
+        Assert.Contains(c => c.Key == "Semicolon", vm.Working.ChordsOf("test.hopo"), "a canvas key is a physical one");
         Assert.AreEqual("Force HOPO", Cap(vm, ";").Actions.Single().Name);
     }
 
@@ -757,14 +755,14 @@ public sealed class KeybindsWindowViewModelTests
 
         await vm.BindKeyAsync(Row(vm, "test.find"), KeyChord.Parse("Ctrl+S"));
 
-        Assert.AreEqual(1, _confirmation.Asked.Count);
+        Assert.HasCount(1, _confirmation.Asked);
         Assert.AreEqual("Ctrl+F", Row(vm, "test.find").Chips.Single().Chord.ToString());
         Assert.IsFalse(vm.IsCapturing);
 
         _confirmation.Choice = ConfirmChoice.Second;
         await vm.BindKeyAsync(Row(vm, "test.find"), KeyChord.Parse("Ctrl+S"));
 
-        CollectionAssert.AreEquivalent(new[] { "Ctrl+F", "Ctrl+S" }, Row(vm, "test.find").Chips.Select(c => c.Chord.ToString()).ToArray(), "kept on both");
+        Assert.AreSequenceEqual(["Ctrl+F", "Ctrl+S"], [.. Row(vm, "test.find").Chips.Select(c => c.Chord.ToString())], Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder, "kept on both");
         Assert.AreEqual("Ctrl+S", Row(vm, SharedKeys.Save).Chips.Single().Chord.ToString());
     }
 
@@ -789,7 +787,7 @@ public sealed class KeybindsWindowViewModelTests
 
         vm.Map.Bindings.Single().RemoveCommand.Execute(null);
 
-        Assert.AreEqual(0, Row(vm, SharedKeys.Save).Chips.Count);
+        Assert.IsEmpty(Row(vm, SharedKeys.Save).Chips);
         Assert.IsFalse(Cap(vm, "S").IsBound);
         Assert.IsTrue(vm.Map.IsUnboundSelection);
     }
@@ -821,7 +819,7 @@ public sealed class KeybindsWindowViewModelTests
         vm.Map.Bindings.Single().ShowInListCommand.Execute(null);
 
         Assert.IsFalse(vm.IsKeyboardView);
-        CollectionAssert.AreEqual(new[] { Row(vm, SharedKeys.Save) }, raised);
+        Assert.AreSequenceEqual([Row(vm, SharedKeys.Save)], raised);
         Assert.IsTrue(Row(vm, SharedKeys.Save).IsRevealed);
     }
 
@@ -835,7 +833,7 @@ public sealed class KeybindsWindowViewModelTests
         await Capture(vm, Row(vm, "test.measure"), "Ctrl+Alt+KeyG", Row(vm, "test.measure").Chips[0]);
 
         Assert.AreSame(editor, vm.SelectedCategory);
-        Assert.AreEqual(4, RowIds(vm).Length);
+        Assert.HasCount(4, RowIds(vm));
     }
 
     [TestMethod]
@@ -866,8 +864,8 @@ public sealed class KeybindsWindowViewModelTests
 
         await vm.ImportCommand.ExecuteAsync(null);
 
-        Assert.AreEqual(1, _confirmation.Alerts.Count);
-        Assert.AreEqual(0, _confirmation.Asked.Count);
+        Assert.HasCount(1, _confirmation.Alerts);
+        Assert.IsEmpty(_confirmation.Asked);
         Assert.AreEqual("Ctrl+S", Row(vm, SharedKeys.Save).Chips.Single().Chord.ToString());
     }
 
@@ -879,8 +877,8 @@ public sealed class KeybindsWindowViewModelTests
         await vm.ImportCommand.ExecuteAsync(null);
         await vm.ExportCommand.ExecuteAsync(null);
 
-        Assert.AreEqual(0, _confirmation.Alerts.Count);
-        Assert.AreEqual(0, _confirmation.Asked.Count);
+        Assert.IsEmpty(_confirmation.Alerts);
+        Assert.IsEmpty(_confirmation.Asked);
     }
 
     [TestMethod]
@@ -944,7 +942,7 @@ public sealed class KeybindsWindowViewModelTests
         Assert.AreEqual("", vm.SearchText);
         CollectionAssert.Contains(RowIds(vm), "test.hopo");
         Assert.IsTrue(hopo.IsRevealed);
-        CollectionAssert.AreEqual(new[] { hopo }, raised);
+        Assert.AreSequenceEqual([hopo], raised);
     }
 
     [TestMethod]

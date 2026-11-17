@@ -337,7 +337,7 @@ public sealed class StemMixerTests
 
             StemMixer.AddScaled(into, from, 0.37f);
 
-            CollectionAssert.AreEqual(expected, into, $"length {length}");
+            Assert.AreSequenceEqual(expected, into, $"length {length}");
         }
     }
 
@@ -352,7 +352,7 @@ public sealed class StemMixerTests
 
             StemMixer.Clip(samples);
 
-            CollectionAssert.AreEqual(expected, samples, $"length {length}");
+            Assert.AreSequenceEqual(expected, samples, $"length {length}");
             Assert.IsTrue(samples.All(s => s is >= -1f and <= 1f));
         }
     }

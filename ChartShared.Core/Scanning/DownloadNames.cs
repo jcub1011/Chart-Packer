@@ -5,12 +5,13 @@ namespace ChartShared.Core.Scanning;
 /// <summary>Names for files and folders saved out of a song, so they say which song they're from and never overwrite.</summary>
 public static class DownloadNames
 {
-    private static readonly HashSet<string> WindowsReservedNames = new(StringComparer.OrdinalIgnoreCase)
-    {
+    private static readonly HashSet<string> WindowsReservedNames =
+    [
+        with(StringComparer.OrdinalIgnoreCase),
         "CON", "PRN", "AUX", "NUL",
         "COM0", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
         "LPT0", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
-    };
+    ];
 
     // Invalid on any of the systems the app runs on, so a name saved on one can be copied to another.
     private const string InvalidChars = "<>:\"/\\|?*";

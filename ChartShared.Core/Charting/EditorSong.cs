@@ -16,13 +16,13 @@ namespace ChartShared.Core.Charting;
 /// </remarks>
 public sealed class EditorSong
 {
-    private readonly HashSet<string> _reverted = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _reverted = [with(StringComparer.OrdinalIgnoreCase)];
     private readonly List<KeyValuePair<string, string?>> _edits = [];
     private IReadOnlyList<KeyValuePair<string, string>> _values = [];
     private long? _audioLengthMs;
     private long? _delayMs;
     private string _defaultCharter = "";
-    private readonly Dictionary<string, int> _ratings = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, int> _ratings = [with(StringComparer.OrdinalIgnoreCase)];
 
     // A new chart's tracks as it was given them, which its track changes are made over until it's first saved.
     private readonly IReadOnlyList<SongTrack> _newTracks;

@@ -40,7 +40,7 @@ public sealed class KeyboardLayoutTests
     [TestMethod]
     public void KeysAreNamedOnceAndTheMainRowsAreAsWideAsEachOther()
     {
-        CollectionAssert.AreEqual(Keys.Select(key => key.Name).Distinct(StringComparer.OrdinalIgnoreCase).ToArray(), Keys.Select(key => key.Name).ToArray());
+        Assert.AreSequenceEqual([.. Keys.Select(key => key.Name).Distinct(StringComparer.OrdinalIgnoreCase)], [.. Keys.Select(key => key.Name)]);
 
         // The function row, the number row, and the two rows of letters that run to the edge.
         double[] widths = [.. KeyboardLayout.Rows.Take(4).Select(row => row.Sum(key => key.Width))];

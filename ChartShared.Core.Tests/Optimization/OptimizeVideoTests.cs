@@ -51,7 +51,7 @@ public sealed class OptimizeVideoTests
         Assert.AreEqual(OptimizeActionKind.Skip, action.Kind);
         Assert.AreEqual(OptimizeSkipReason.UnsupportedCodec, action.Reason);
         Assert.AreEqual(codec, action.CodecKey);
-        Assert.AreEqual(0, optimizer.Estimated.Count, "It isn't estimated for the plan, as nothing would be done with the answer.");
+        Assert.IsEmpty(optimizer.Estimated, "It isn't estimated for the plan, as nothing would be done with the answer.");
         Assert.IsFalse(plan.HasWork);
     }
 
@@ -184,7 +184,7 @@ public sealed class OptimizeVideoTests
         Assert.AreEqual(OptimizeItemStatus.Succeeded, item.Status, item.ErrorMessage);
         Assert.AreEqual(AssetOutcome.Applied, item.Assets.Single(a => a.Strategy == OptimizeStrategy.Video).Outcome);
         Assert.AreSequenceEqual(["guitar.ogg", "song.ini", "video.webm"], Names(compatibleAssets.Entry));
-        Assert.AreEqual(6500, (await ReadAsync(compatibleAssets.Entry, "video.webm"))!.Length);
+        Assert.HasCount(6500, await ReadAsync(compatibleAssets.Entry, "video.webm"));
 
         // Size: the estimate promised a saving, the file wasn't one, so it's left as it was.
         var normalAssets = await InspectedAsync("video/h264");
@@ -195,7 +195,7 @@ public sealed class OptimizeVideoTests
 
         Assert.AreEqual(AssetOutcome.Skipped, normalResult.Items.Single().Assets.Single(a => a.Strategy == OptimizeStrategy.Video).Outcome);
         Assert.AreSequenceEqual(["guitar.ogg", "song.ini", "video.mp4"], Names(normalAssets.Entry));
-        Assert.AreEqual(0, Leftovers(_root.FullName).Count);
+        Assert.IsEmpty(Leftovers(_root.FullName));
     }
 
     [TestMethod]

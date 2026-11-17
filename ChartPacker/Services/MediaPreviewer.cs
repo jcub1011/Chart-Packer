@@ -65,7 +65,7 @@ namespace ChartPacker.Services
         private sealed class Session(SongEntry entry, IImageOptimizer images) : IMediaPreviewSession
         {
             private readonly SemaphoreSlim _gate = new(1, 1);
-            private readonly Dictionary<string, string> _extracted = new(StringComparer.OrdinalIgnoreCase);
+            private readonly Dictionary<string, string> _extracted = [with(StringComparer.OrdinalIgnoreCase)];
             private string? _folder;
             private bool _disposed;
 
