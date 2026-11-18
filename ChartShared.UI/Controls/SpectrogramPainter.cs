@@ -197,6 +197,10 @@ namespace ChartShared.UI.Controls
 
             void DrawTile(Tile tile)
             {
+                // A picture that isn't there (it is made before a tile reaches here, so this is only a guard).
+                if (tile.Image is not { } image)
+                    return;
+
                 // A picture's pixel x is columns start + x·2^level, centred half a column earlier; its pixel y is rows
                 // top + y·(bottom - top) / height down the whole picture.
                 var stretch = tile.Key.Stretch;
@@ -209,7 +213,7 @@ namespace ChartShared.UI.Controls
                     : new Matrix(step, 0, 0, rowStep, along, rowsStart);
                 var size = new Rect(0, 0, TileColumns, tile.Key.Height);
                 using (context.PushTransform(matrix))
-                    context.DrawImage(tile.Image!, size, size);
+                    context.DrawImage(image, size, size);
             }
         }
 

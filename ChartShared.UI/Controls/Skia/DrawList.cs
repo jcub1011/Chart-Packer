@@ -63,9 +63,6 @@ namespace ChartShared.UI.Controls.Skia
         /// <summary>Where the host's visual is placed for this drawing, which is drawn moved back by as much: set by the host as it records.</summary>
         internal Point Origin { get; set; }
 
-        /// <summary>When this was recorded, in order of every recording: set as it's handed to the render thread.</summary>
-        internal long Sequence { get; set; }
-
         /// <summary>Empties this to record a new drawing, letting go of the pictures it held.</summary>
         public void Reset()
         {

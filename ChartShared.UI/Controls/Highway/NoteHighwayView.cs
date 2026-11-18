@@ -497,6 +497,10 @@ namespace ChartShared.UI.Controls.Highway
             if (change.Property == SceneProperty || change.Property == LookAheadProperty || change.Property == LengthModeProperty || change.Property == PixelsPerSecondProperty
                 || change.Property == WaveformsProperty || change.Property == AreNotesOutlinedProperty || change.Property == LengthSecondsProperty || change.Property == SelectedPhraseProperty)
             {
+                // The transparent rectangles in Render() are the lanes' pointer targets, and Avalonia hit-tests custom-drawn
+                // content: repaint them when they may have changed.
+                if (change.Property == SceneProperty)
+                    InvalidateVisual();
                 _host.Redraw();
                 RaiseStanding();
             }

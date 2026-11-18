@@ -353,6 +353,10 @@ namespace ChartPacker.Controls
             if (change.Property == SceneProperty || change.Property == TimeShiftProperty || change.Property == WaveformProperty
                 || change.Property == WindowSecondsProperty || change.Property == LengthSecondsProperty)
             {
+                // The transparent rectangles in Render() are the lane's pointer targets, and Avalonia hit-tests
+                // custom-drawn content: repaint one when it may have changed.
+                if (change.Property == SceneProperty)
+                    InvalidateVisual();
                 Redraw();
             }
 

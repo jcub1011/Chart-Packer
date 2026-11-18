@@ -47,7 +47,6 @@ namespace ChartShared.UI.Controls.Skia
         private static readonly object Release = new();
         private static readonly RenderOptions Even = new() { RequiresFullOpacityHandling = null };
         private static readonly RenderOptions Odd = new() { RequiresFullOpacityHandling = false };
-        private static long s_sequence;
         private static long s_playTicks;
         private static long s_plays;
 
@@ -141,10 +140,19 @@ namespace ChartShared.UI.Controls.Skia
                 return;
 
             var list = handler.Take();
-            list.Reset();
-            list.GreyscaleText = IsOnKeptPicture();
-            _content.Record(list, this);
-            list.Sequence = Interlocked.Increment(ref s_sequence);
+            try
+            {
+                list.Reset();
+                list.GreyscaleText = IsOnKeptPicture();
+                _content.Record(list, this);
+            }
+            catch
+            {
+                // Giving the half-drawn list back to the pool cleared, rather than let its pictures stay held.
+                list.Reset();
+                handler.Return(list);
+                throw;
+            }
 
             // Where it reaches, out to whole units, as the visual's place and size; and the render option flipped, so it's drawn
             // again this frame. Whole units, so a layer kept as a picture has its pixels on the same grid page after page, and its thin
@@ -190,6 +198,13 @@ namespace ChartShared.UI.Controls.Skia
             {
                 lock (_lock)
                     return _free.TryPop(out var list) ? list : new DrawList();
+            }
+
+            /// <summary>A list to go back round, cleared, for the next <see cref="Take"/>: after a drawing went wrong.</summary>
+            public void Return(DrawList list)
+            {
+                lock (_lock)
+                    _free.Push(list);
             }
 
             public override void OnMessage(object message)
