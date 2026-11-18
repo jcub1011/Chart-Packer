@@ -523,6 +523,21 @@ namespace ChartBuilder.Controls.Editing
             var selectedPen = AccentPens().Selected;
             bool aligning = IsAligning(session, vocal);
             double thickness = VocalNoteThickness(projection);
+            // The notes being dragged leave a faint ghost where they were, under the notes, until they're let go.
+            foreach (var lifted in session.Tools.VocalMoveGhost(vocal))
+            {
+                if (lifted.EndTick < fromTick || lifted.Tick > toTick)
+                    continue;
+                var ghost = VocalNoteRect(session, vocals, projection, lifted, thickness);
+                using (context.PushOpacity(0.4))
+                {
+                    if (lifted.IsUnpitched)
+                        context.DrawRectangle(null, VocalUnpitchedPens[color], ghost, thickness / 2, thickness / 2);
+                    else
+                        context.DrawRectangle(VocalNoteBrushes[color], VocalEdgePens[color], ghost, thickness / 2, thickness / 2);
+                }
+            }
+
             var notes = vocals.Notes;
             var (first, last) = vocals.NotesBetween(fromTick, toTick);
             for (int i = first; i < last; i++)

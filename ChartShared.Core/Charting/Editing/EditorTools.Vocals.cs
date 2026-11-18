@@ -689,6 +689,9 @@ public sealed partial class EditorTools
         private (long Ticks, int Pitches) _delta;
         private bool _moved;
 
+        // The notes as they were pressed, as a lane draws them, for the ghost they leave where they were.
+        private readonly IReadOnlyList<VocalLaneNote> _ghost;
+
         public VocalMoveGesture(EditorTools tools, VocalPoint pressed, VocalTrackContent content, VocalNoteEvent grabbed)
             : base(tools, pressed.Track, content)
         {
@@ -697,7 +700,11 @@ public sealed partial class EditorTools
             _grabbed = grabbed;
             _selected = [.. Session.Selection.VocalPlaces];
             _notes = VocalEdits.NotesAt(content, _selected);
+            _ghost = [.. _notes.Select(n => new VocalLaneNote(n.Tick, n.Tick + n.Length, n.Pitch, VocalEdits.IsSpoken(content, n.Tick), false))];
         }
+
+        /// <summary>The notes where they were pressed, once they've moved off them, if they're of <paramref name="track"/>.</summary>
+        public IReadOnlyList<VocalLaneNote> GhostOf(VocalTrack track) => _delta != default && track == Track ? _ghost : [];
 
         public override void Drag(VocalPoint point)
         {

@@ -43,6 +43,15 @@ public sealed partial class EditorTools
     /// <summary>Whether a gesture is going on.</summary>
     public bool IsActive => _gesture is not null;
 
+    /// <summary>
+    /// The notes of <paramref name="key"/> a move going on has lifted from where they were, to be drawn as a faint ghost there
+    /// until the move ends; null when none is being moved off its place.
+    /// </summary>
+    public EditableTrack? MoveGhost(ChartTrackKey key) => _gesture is MoveGesture move ? move.GhostOf(key) : null;
+
+    /// <summary>The notes of vocal part <paramref name="track"/> a move going on has lifted from where they were; empty when none has.</summary>
+    public IReadOnlyList<VocalLaneNote> VocalMoveGhost(VocalTrack track) => _gesture is VocalMoveGesture move ? move.GhostOf(track) : [];
+
     /// <summary>Whether the Sync tool is active: picked, or held on with Ctrl + Shift.</summary>
     public bool SyncActive => _session.Tool == EditorTool.Sync
         || (_held.HasFlag(EditorModifiers.Control) && _held.HasFlag(EditorModifiers.Shift));
@@ -1585,6 +1594,9 @@ public sealed partial class EditorTools
         private (long Ticks, int Lanes)? _delta;
         private IReadOnlyList<EditableNote>? _moved;
 
+        // The notes as they were pressed, as a track to draw where they've left; built when first needed.
+        private EditableTrack? _ghost;
+
         public MoveGesture(EditorTools tools, ChartPoint pressed, EditableNote grabbed)
             : base(tools)
         {
@@ -1594,6 +1606,21 @@ public sealed partial class EditorTools
             _notes = Session.Selection.Notes;
             _shown = Tools.ShownLanes(_track, _notes);
             _selected = [.. Session.Selection.Places];
+        }
+
+        /// <summary>The notes where they were pressed, once they've moved off them, if they're of <paramref name="key"/>.</summary>
+        public EditableTrack? GhostOf(ChartTrackKey key)
+        {
+            if (_delta is null || key != _track)
+                return null;
+            if (_ghost is null)
+            {
+                _ghost = new EditableTrack(ChartInstruments.KindOf(_track.Instrument), _track.Difficulty);
+                foreach (var note in _notes)
+                    _ghost.Notes.Add(note);
+            }
+
+            return _ghost;
         }
 
         public override void Drag(ChartPoint point)

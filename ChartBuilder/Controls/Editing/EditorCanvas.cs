@@ -692,6 +692,13 @@ namespace ChartBuilder.Controls.Editing
                     DrawNotes(context, session, ghostKey, part[ghost], projection, slots, fromTick, toTick, LongestOf(ref _ghostLongest, ghostKey, part[ghost]), isGhost: true, painter, pass);
             }
 
+            // The notes being dragged leave a faint ghost where they were, under the notes, until they're let go.
+            if (session.Tools.MoveGhost(key) is { } lifted)
+            {
+                using (context.PushOpacity(0.4))
+                    DrawNotes(context, session, key, lifted, projection, slots, fromTick, toTick, LongestIn(lifted), isGhost: true, painter, pass);
+            }
+
             long longest = LongestOf(ref _longest, key, track);
             if (session.GhostTrack(key) is { } draft)
             {
