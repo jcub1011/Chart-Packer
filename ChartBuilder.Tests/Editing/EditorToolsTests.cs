@@ -236,6 +236,33 @@ public sealed class EditorToolsTests
     }
 
     [TestMethod]
+    public void AMoveLeavesAGhostOfTheNotesWhereTheyWereOnlyWhileTheyreOffThem()
+    {
+        var session = Of(Guitar());
+        EditableNote held = new(480, 240, 1), plain = new(960, EditableNote.PlainLength, 2);
+        Expert(session).Notes.Add(held);
+        Expert(session).Notes.Add(plain);
+        session.Selection.Select(GuitarExpert, [held, plain]);
+
+        session.Tools.Press(At(session, 482, 1));
+        Assert.IsNull(session.Tools.MoveGhost(GuitarExpert), "Nothing's moved yet.");
+
+        session.Tools.Drag(At(session, 735, 1));
+        var ghost = session.Tools.MoveGhost(GuitarExpert);
+        Assert.IsNotNull(ghost);
+        Assert.AreSequenceEqual([held, plain], ghost.Value.Notes.Notes.ToList());
+        Assert.AreEqual(240, ghost.Value.Longest);
+        Assert.IsNull(session.Tools.MoveGhost(new ChartTrackKey(ChartInstrument.Guitar, ChartDifficulty.Hard)));
+
+        session.Tools.Drag(At(session, 482, 1));
+        Assert.IsNull(session.Tools.MoveGhost(GuitarExpert), "Dragged back, the notes are where they were.");
+
+        session.Tools.Drag(At(session, 735, 1));
+        session.Tools.Release(At(session, 735, 1));
+        Assert.IsNull(session.Tools.MoveGhost(GuitarExpert), "Let go, the move is done.");
+    }
+
+    [TestMethod]
     [DynamicData(nameof(Views))]
     public void SelectingAndDraggingMovesNotesOnTheGridAndAcrossLanes(LaneView view)
     {

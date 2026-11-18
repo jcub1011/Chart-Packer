@@ -44,12 +44,15 @@ public sealed partial class EditorTools
     public bool IsActive => _gesture is not null;
 
     /// <summary>
-    /// The notes of <paramref name="key"/> a move going on has lifted from where they were, to be drawn as a faint ghost there
-    /// until the move ends; null when none is being moved off its place.
+    /// The notes of <paramref name="key"/> a move going on has lifted from where they were, as they were, to be drawn as a
+    /// ghost there until the move ends, with the longest one's length; null while no move is previewed off their places.
     /// </summary>
-    public EditableTrack? MoveGhost(ChartTrackKey key) => _gesture is MoveGesture move ? move.GhostOf(key) : null;
+    public (EditableTrack Notes, long Longest)? MoveGhost(ChartTrackKey key) => _gesture is MoveGesture move ? move.GhostOf(key) : null;
 
-    /// <summary>The notes of vocal part <paramref name="track"/> a move going on has lifted from where they were; empty when none has.</summary>
+    /// <summary>
+    /// The notes of vocal part <paramref name="track"/> a move going on has lifted from where they were, as its lane drew
+    /// them; empty while no move is previewed off their places.
+    /// </summary>
     public IReadOnlyList<VocalLaneNote> VocalMoveGhost(VocalTrack track) => _gesture is VocalMoveGesture move ? move.GhostOf(track) : [];
 
     /// <summary>Whether the Sync tool is active: picked, or held on with Ctrl + Shift.</summary>
@@ -1590,12 +1593,14 @@ public sealed partial class EditorTools
         private readonly List<int> _shown;
         private readonly IReadOnlyCollection<NotePlace> _selected;
 
-        // The move previewed, and the notes where it put them; null with none.
+        // The move previewed, and the notes where it put them; null with none. Set only once a preview is taken, so the
+        // notes are off their places exactly while it's set.
         private (long Ticks, int Lanes)? _delta;
         private IReadOnlyList<EditableNote>? _moved;
 
-        // The notes as they were pressed, as a track to draw where they've left; built when first needed.
-        private EditableTrack? _ghost;
+        // The notes as they were pressed, as a track to draw where they've left, and the longest one's length; built when
+        // they're first lifted.
+        private (EditableTrack Notes, long Longest)? _ghost;
 
         public MoveGesture(EditorTools tools, ChartPoint pressed, EditableNote grabbed)
             : base(tools)
@@ -1608,16 +1613,22 @@ public sealed partial class EditorTools
             _selected = [.. Session.Selection.Places];
         }
 
-        /// <summary>The notes where they were pressed, once they've moved off them, if they're of <paramref name="key"/>.</summary>
-        public EditableTrack? GhostOf(ChartTrackKey key)
+        /// <summary>The notes where they were pressed, while a move previewed has them off their places, if they're of <paramref name="key"/>.</summary>
+        public (EditableTrack Notes, long Longest)? GhostOf(ChartTrackKey key)
         {
             if (_delta is null || key != _track)
                 return null;
             if (_ghost is null)
             {
-                _ghost = new EditableTrack(ChartInstruments.KindOf(_track.Instrument), _track.Difficulty);
+                var ghost = new EditableTrack(ChartInstruments.KindOf(_track.Instrument), _track.Difficulty);
+                long longest = 0;
                 foreach (var note in _notes)
-                    _ghost.Notes.Add(note);
+                {
+                    ghost.Notes.Add(note);
+                    longest = Math.Max(longest, note.Length);
+                }
+
+                _ghost = (ghost, longest);
             }
 
             return _ghost;

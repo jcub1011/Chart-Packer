@@ -523,18 +523,24 @@ namespace ChartBuilder.Controls.Editing
             var selectedPen = AccentPens().Selected;
             bool aligning = IsAligning(session, vocal);
             double thickness = VocalNoteThickness(projection);
-            // The notes being dragged leave a faint ghost where they were, under the notes, until they're let go.
-            foreach (var lifted in session.Tools.VocalMoveGhost(vocal))
+            // The notes being dragged leave a faint ghost where they were, under the notes, until they're let go, ringed in
+            // the accent as the selection is, as a highway's do.
+            if (session.Tools.VocalMoveGhost(vocal) is { Count: > 0 } ghosts)
             {
-                if (lifted.EndTick < fromTick || lifted.Tick > toTick)
-                    continue;
-                var ghost = VocalNoteRect(session, vocals, projection, lifted, thickness);
+                double radius = thickness / 2;
                 using (context.PushOpacity(0.4))
                 {
-                    if (lifted.IsUnpitched)
-                        context.DrawRectangle(null, VocalUnpitchedPens[color], ghost, thickness / 2, thickness / 2);
-                    else
-                        context.DrawRectangle(VocalNoteBrushes[color], VocalEdgePens[color], ghost, thickness / 2, thickness / 2);
+                    foreach (var lifted in ghosts)
+                    {
+                        if (lifted.EndTick < fromTick || lifted.Tick > toTick)
+                            continue;
+                        var ghost = VocalNoteRect(session, vocals, projection, lifted, thickness);
+                        if (lifted.IsUnpitched)
+                            context.DrawRectangle(null, VocalUnpitchedPens[color], ghost, radius, radius);
+                        else
+                            context.DrawRectangle(VocalNoteBrushes[color], VocalEdgePens[color], ghost, radius, radius);
+                        context.DrawRectangle(null, selectedPen, ghost.Inflate(2), radius + 2, radius + 2);
+                    }
                 }
             }
 
