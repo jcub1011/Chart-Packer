@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using ChartShared.Audio.Caching;
 using ChartShared.Core.Scanning;
 
 namespace ChartShared.Audio.Waveforms;
@@ -20,11 +21,7 @@ public sealed class StemPeaksCache
     public static StemPeaksCache Shared { get; } = new(128L * 1024 * 1024);
 
     private readonly Lock _lock = new();
-    private readonly Dictionary<StemPeaksKey, LinkedListNode<(StemPeaksKey Key, StemPeaks Peaks)>> _entries = [];
-
-    // Most recently used first.
-    private readonly LinkedList<(StemPeaksKey Key, StemPeaks Peaks)> _order = [];
-    private long _size;
+    private readonly SizedLru<StemPeaksKey, StemPeaks> _entries = new();
 
     public StemPeaksCache(long capacityBytes)
     {
@@ -40,7 +37,7 @@ public sealed class StemPeaksCache
         get
         {
             lock (_lock)
-                return _size;
+                return _entries.Size;
         }
     }
 
@@ -72,18 +69,7 @@ public sealed class StemPeaksCache
     public bool TryGet(StemPeaksKey key, [MaybeNullWhen(false)] out StemPeaks peaks)
     {
         lock (_lock)
-        {
-            if (_entries.TryGetValue(key, out var node))
-            {
-                _order.Remove(node);
-                _order.AddFirst(node);
-                peaks = node.Value.Peaks;
-                return true;
-            }
-        }
-
-        peaks = null;
-        return false;
+            return _entries.TryGet(key, out peaks);
     }
 
     /// <summary>
@@ -119,24 +105,12 @@ public sealed class StemPeaksCache
 
         lock (_lock)
         {
-            if (_entries.Remove(key, out var old))
-            {
-                _order.Remove(old);
-                _size -= old.Value.Peaks.SizeBytes;
-            }
-
+            _entries.Remove(key, out _);
             if (peaks.SizeBytes > CapacityBytes)
                 return;
 
-            _entries[key] = _order.AddFirst((key, peaks));
-            _size += peaks.SizeBytes;
-
-            while (_size > CapacityBytes && _order.Last is { } last)
-            {
-                _order.RemoveLast();
-                _entries.Remove(last.Value.Key);
-                _size -= last.Value.Peaks.SizeBytes;
-            }
+            _entries.Add(key, peaks, peaks.SizeBytes);
+            _entries.MakeRoom(0, CapacityBytes);
         }
     }
 }

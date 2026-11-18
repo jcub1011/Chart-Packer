@@ -2662,7 +2662,7 @@ Saving also changes song.ini:
     <value>Spectrogram Memory Budget (MB)</value>
   </data>
   <data name="SpectrogramBudgetDescription" xml:space="preserve">
-    <value>How much memory all stems' spectrograms may take together.</value>
+    <value>How much memory all stems' spectrograms may take together, with the stems decoded once to draw and analyse them. The spectrograms come first; decoded stems that don't fit are decoded again when needed.</value>
   </data>
   <data name="SpectrogramBudgetKeywords" xml:space="preserve">
     <value>spectrogram memory budget ram megabytes</value>
