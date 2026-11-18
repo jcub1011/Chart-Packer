@@ -1807,7 +1807,9 @@ Acceptance criteria:
    - *Changed for issue #140:* the app reads what it can of that latency
      (`DeviceLatency`): SDL's device buffer (`SDL_GetAudioDeviceFormat`'s sample frames at the
      device's rate) and, on Windows, what WASAPI reports for the endpoint, the stream latency and
-     device period of a shared-mode stream (`WindowsAudioEndpoint`). It comes with the device
+     device period of a shared-mode stream opened the way SDL opens it — `IAudioClient3` with the
+     periodicity SDL requests, with the small buffer when Low latency audio is on
+     (`WindowsAudioEndpoint`, issue #280). It comes with the device
      (`AudioDevice.DetectedLatencyMs`), and is **added** to the calibrated latency, so the
      calibration is only what's left: a Bluetooth link's delay, the display's, and whatever else
      the app can't see ([C11](#c11-calibration-tool) item 3). The latency drawn with is the two
@@ -3307,6 +3309,8 @@ tool.
 | Metronome volume / hit-sound volume | 50% / 50%. At 50%, each sound plays at the level `Synth` makes it. A change applies from the next time playback starts. |
 | Audio/visual latency | Per output device, plus a global fallback of 0 ms ([C11](#c11-calibration-tool)) |
 | Detect output latency | On. The latency detected from the device is added to its calibrated latency. Kept in `audio-latency.json`, shared by both apps (issue #140) |
+| Low latency audio | On. On Windows, plays audio on the low-latency WASAPI path, with a small device buffer. Applies when the app starts (issue #280) |
+| Output device | The default output device. A chosen device is used when it is connected; otherwise the default output device is, until the device returns (issue #280) |
 | Prompt for calibration on first editor use | On |
 | Autosave interval | 2 minutes (1 to 60) |
 | Default charter name | Empty. Prefills `charter` for a new chart, and fills an empty `charter` on save |

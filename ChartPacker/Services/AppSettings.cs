@@ -23,6 +23,7 @@ namespace ChartPacker.Services
         public const bool DefaultScanOnLaunch = true;
         public const bool DefaultScanOnFolderChange = true;
         public const double DefaultMasterVolume = 1;
+        public const bool DefaultLowLatencyAudio = true;
         public const bool DefaultPitchCorrection = true;
         public const OverwritePolicy DefaultOverwritePolicy = OverwritePolicy.Skip;
         public const DedupKindPreference DefaultDedupKeepPreference = DedupKindPreference.PreferSng;
@@ -107,6 +108,19 @@ namespace ChartPacker.Services
 
         /// <summary>The audio player's master volume, from 0 to 1.</summary>
         public double MasterVolume { get; set; } = DefaultMasterVolume;
+
+        /// <summary>
+        /// Whether audio is played on Windows' low-latency WASAPI path, with a small device buffer, instead of the
+        /// default one. Applies when the app starts.
+        /// </summary>
+        public bool LowLatencyAudio { get; set; } = DefaultLowLatencyAudio;
+
+        /// <summary>
+        /// The output device audio plays on, as <see cref="ChartShared.Audio.Playback.AudioDevices"/> identifies it:
+        /// on Windows the endpoint's ID, elsewhere SDL's device name. Empty — the default — plays on the default output
+        /// device, which is also used when the chosen device isn't connected.
+        /// </summary>
+        public string OutputDevice { get; set; } = "";
 
         /// <summary>Whether playing faster or slower keeps the audio's pitch, instead of raising or lowering it with the speed.</summary>
         public bool PitchCorrection { get; set; } = DefaultPitchCorrection;

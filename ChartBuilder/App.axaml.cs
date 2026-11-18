@@ -46,8 +46,8 @@ namespace ChartBuilder
                 MediaStash.SweepStale(TimeSpan.FromDays(1));
 
                 // SDL's audio starts on the main thread. It never throws: a device that can't start says so when a
-                // song is played.
-                var audio = new SdlAudio();
+                // song is played. Low latency applies from when SDL starts; the device is read anew each time one is opened.
+                var audio = new SdlAudio(settings.Settings.LowLatencyAudio, () => settings.Settings.OutputDevice);
                 var latency = new AudioLatencyService(new AudioLatencyFile(UserConfigPaths.AudioLatencyFile));
 
                 // The instrument devices (charter-spec C19). Their backends start only while something plays them, on the

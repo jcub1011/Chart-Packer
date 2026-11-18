@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using ChartBuilder.Resources;
+using ChartShared.Audio.Playback;
 using ChartShared.Audio.Waveforms;
 using ChartShared.Core.Charting;
 using ChartShared.Core.Charting.Editing;
@@ -207,6 +209,31 @@ namespace ChartBuilder.Services
                         Format = volume => volume.ToString("P0", CultureInfo.CurrentCulture),
                         Get = () => settings.Settings.MasterVolume,
                         Set = volume => settings.Settings.MasterVolume = volume,
+                    },
+                    // SDL reads the low-latency hint as its audio subsystem starts, so this applies on the next run (issue #280).
+                    new ToggleSetting
+                    {
+                        Id = "playback.lowLatencyAudio",
+                        Category = audio,
+                        Label = Strings.LowLatencyAudioLabel,
+                        Description = Strings.LowLatencyAudioDescription,
+                        Keywords = SettingKeywords.Split(Strings.LowLatencyAudioKeywords),
+                        DefaultValue = true,
+                        Get = () => settings.Settings.LowLatencyAudio,
+                        Set = low => settings.Settings.LowLatencyAudio = low,
+                    },
+                    // Made from the devices connected as the window opens; a disconnected saved device stays a choice so it isn't lost (issue #280).
+                    new ChoiceSetting<string>
+                    {
+                        Id = "playback.outputDevice",
+                        Category = audio,
+                        Label = Strings.OutputDeviceLabel,
+                        Description = Strings.OutputDeviceDescription,
+                        Keywords = SettingKeywords.Split(Strings.OutputDeviceKeywords),
+                        DefaultValue = "",
+                        Choices = OutputDeviceChoices(settings.Settings.OutputDevice),
+                        Get = () => settings.Settings.OutputDevice,
+                        Set = device => settings.Settings.OutputDevice = device,
                     },
                     Volume("playback.metronomeVolume", audio, Strings.MetronomeVolumeLabel, Strings.MetronomeVolumeDescription, Strings.MetronomeVolumeKeywords,
                         () => settings.Settings.MetronomeVolume, volume => settings.Settings.MetronomeVolume = volume),
@@ -467,6 +494,20 @@ namespace ChartBuilder.Services
                         Set = action => settings.Settings.StartupAction = action,
                     },
                 ]);
+        }
+
+        /// <summary>The output device choices, made as the window opens: the default device, one per connected device,
+        /// and any saved device that isn't connected anymore, so it stays a choice instead of being silently reset.</summary>
+        private static IReadOnlyList<SettingChoice<string>> OutputDeviceChoices(string saved)
+        {
+            var choices = new List<SettingChoice<string>> { new("", SharedStrings.OutputDeviceDefaultLabel) };
+            foreach (var device in AudioDevices.Playback())
+                choices.Add(new SettingChoice<string>(device.Identifier, device.Name));
+
+            if (!string.IsNullOrEmpty(saved) && choices.All(choice => choice.Value != saved))
+                choices.Add(new SettingChoice<string>(saved, SharedStrings.OutputDeviceNotConnectedLabel));
+
+            return choices;
         }
 
         /// <summary>A snap as it's shown, e.g. "1/16".</summary>

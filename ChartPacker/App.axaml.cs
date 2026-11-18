@@ -64,7 +64,8 @@ namespace ChartPacker
                 var downloads = new DownloadService(settings, () => window, notice, songFiles, locks);
                 var job = new JobViewModel(new AvaloniaJobProgressWindowService(() => window), locks.Set);
                 // Started here, on the UI thread, as SDL requires; devices are opened on it from any thread.
-                var audio = new SdlAudio();
+                // Low latency is read as SDL starts, so it's the setting from when the app launched; the device is read anew each time one is opened.
+                var audio = new SdlAudio(settings.Settings.LowLatencyAudio, () => settings.Settings.OutputDevice);
                 // Measured by the calibration tool, which both apps share and either may write (charter-spec C11 item 4).
                 var latency = new AudioLatencyFile(UserConfigPaths.AudioLatencyFile);
                 var player = new PlayerViewModel(settings, audio.Open, latency);

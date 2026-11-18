@@ -241,6 +241,14 @@
     <value>General</value>
     <comment>Top-level Settings category for app-wide settings.</comment>
   </data>
+  <data name="OutputDeviceDefaultLabel" xml:space="preserve">
+    <value>Default Output Device</value>
+    <comment>The choice in the output device list that plays on the system's default output device.</comment>
+  </data>
+  <data name="OutputDeviceNotConnectedLabel" xml:space="preserve">
+    <value>Previously Selected Device (Not Connected)</value>
+    <comment>The output device choice shown when the device saved in the settings isn't currently connected.</comment>
+  </data>
   <data name="SettingsCategoryLogging" xml:space="preserve">
     <value>Logging</value>
   </data>
