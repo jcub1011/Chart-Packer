@@ -22,6 +22,10 @@ The stopwatch button beside the box, **Auto Align by Waveform**, lines the video
 
 **File → Import Lyrics…** brings lyrics into a vocal part from an `.lrc` file (with or without the A2 word timing), or from `.srt`, `.vtt`, `.ttml`, `.kar`, an UltraStar `.txt`, or the lyrics tags of an audio file. Words from an UltraStar song, or a karaoke file with a melody, are sung at their pitches, and an UltraStar duet goes into Harmony 1 and 2; every other word is spoken. You choose whether the part's own lyrics are replaced or merged with, and the import is undoable. **File → Export Lyrics…** writes a part, or Harmony 1 and 2 as a duet, as an UltraStar `.txt` with its pitches, or a part as an `.lrc`, with or without A2 word timing. Lyrics timed to a different recording can be lined up with the **Vocal Alignment** tool (Alt+7, shown while a vocal lane has focus), which shifts and stretches every vocal part to fit. See [Lyric Import and Export](Lyric-Import-and-Export.md).
 
+## Saving And Loading Lane Layouts
+
+The **View** menu keeps named lane layouts. **Load Layout** puts a layout's lanes in place of those open (asking first if they aren't saved as a layout), and **Save Layout** saves the lanes open over an existing layout (after asking) or as a **New Layout…**. Changing the lanes never changes a layout until you save over it. **Manage Layouts…** renames, reorders, overwrites and deletes them. Chart Builder starts with **Default**: Expert Guitar and Expert Drums side by side. See [Manage Layouts](Manage-Layouts.md).
+
 ## Typical Workflow
 
 1. Start a new chart (or drop audio onto the window), or open a song.

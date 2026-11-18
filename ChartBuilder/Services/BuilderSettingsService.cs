@@ -127,6 +127,7 @@ namespace ChartBuilder.Services
             settings.EditorRightPanelWidth = Size(settings.EditorRightPanelWidth, BuilderSettings.MinEditorPanelWidth, BuilderSettings.DefaultEditorRightPanelWidth);
             settings.EditorTimelineHeight = Size(settings.EditorTimelineHeight, BuilderSettings.MinEditorTimelineHeight, BuilderSettings.DefaultEditorTimelineHeight);
             SanitizePanelLayout(settings);
+            settings.LayoutTemplates = LayoutTemplateStore.Sanitize(settings.LayoutTemplates);
             WindowMemory.Sanitize(settings);
         }
 

@@ -26,6 +26,7 @@ This wiki gives a high-level overview of what each window does and its idiosyncr
 - [Reduce](Reduce.md), [Generate Phrases](Generate-Phrases.md) and [Lane Mapping](Lane-Mapping.md)
 - [Lyric Import and Export](Lyric-Import-and-Export.md)
 - [Preview](Preview.md) and [Difficulty](Difficulty.md) windows
+- [Manage Layouts](Manage-Layouts.md)
 - [Input Devices](Input-Devices.md)
 - [Messages](Messages.md)
 

@@ -1,0 +1,83 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:help="using:ChartShared.Core.Help"
+        xmlns:ui="using:ChartShared.UI.Controls"
+        xmlns:vm="using:ChartBuilder.ViewModels"
+        xmlns:svc="using:ChartBuilder.Services"
+        xmlns:res="using:ChartBuilder.Resources"
+        xmlns:sres="using:ChartShared.UI.Resources"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="400" d:DesignHeight="200"
+        x:Class="ChartBuilder.Views.LayoutNameWindow"
+        x:DataType="vm:LayoutNameViewModel"
+        Icon="/Assets/ChartBuilder.ico"
+        Title="{Binding Title}"
+        Background="{DynamicResource AppBackgroundBrush}"
+        WindowStartupLocation="CenterOwner"
+        SizeToContent="Height"
+        CanResize="False"
+        CanMinimize="False"
+        ShowInTaskbar="False"
+        Width="400"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaTitleBarHeightHint="30"
+        WindowDecorationsTheme="{StaticResource TitleBarDecorations}">
+
+    <!-- A layout template's name (issue 263), new or renamed: Save or Rename stays off while it's blank or taken. -->
+    <DockPanel>
+        <ui:TitleBar x:Name="WindowTitleBar"
+                     HelpPage="{x:Static help:HelpPages.ManageLayouts}"
+                     DockPanel.Dock="Top"
+                     Height="31"
+                     BorderThickness="0,0,0,1"
+                     BorderBrush="{DynamicResource SubtleBorderBrush}">
+            <TextBlock Margin="8,0,12,0"
+                       FontSize="12"
+                       VerticalAlignment="Center"
+                       TextTrimming="CharacterEllipsis"
+                       Text="{Binding Title}" />
+        </ui:TitleBar>
+
+        <Border DockPanel.Dock="Bottom" Classes="toolbar" BorderThickness="0,1,0,0">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+                <Button MinWidth="80"
+                        HorizontalContentAlignment="Center"
+                        Content="{x:Static sres:SharedStrings.CancelButton}"
+                        IsCancel="True"
+                        Click="OnCancel"
+                        AutomationProperties.Name="{x:Static sres:SharedStrings.CancelButton}" />
+                <Button MinWidth="80"
+                        HorizontalContentAlignment="Center"
+                        Classes="accent"
+                        Content="{Binding ConfirmLabel}"
+                        Command="{Binding ConfirmCommand}"
+                        IsDefault="True"
+                        AutomationProperties.Name="{Binding ConfirmLabel}" />
+            </StackPanel>
+        </Border>
+
+        <StackPanel Margin="20,16,20,20" Spacing="6">
+            <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,8" Text="{Binding Intro}" IsVisible="{Binding HasIntro}" />
+            <TextBlock Classes="caption" Text="{x:Static res:Strings.LayoutNameLabel}" />
+            <TextBox x:Name="NameBox"
+                     Text="{Binding Name}"
+                     MaxLength="{x:Static svc:LayoutTemplateStore.MaxNameLength}"
+                     AutomationProperties.Name="{x:Static res:Strings.LayoutNameLabel}" />
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6" IsVisible="{Binding HasShownError}">
+                <ui:LineIcon Grid.Column="0"
+                             Width="14"
+                             Height="14"
+                             VerticalAlignment="Top"
+                             Margin="0,1,0,0"
+                             Foreground="{DynamicResource WarningTextBrush}"
+                             Data="{StaticResource WarningStroke}" />
+                <TextBlock Grid.Column="1"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Foreground="{DynamicResource WarningTextBrush}"
+                           Text="{Binding ShownError}" />
+            </Grid>
+        </StackPanel>
+    </DockPanel>
+</Window>

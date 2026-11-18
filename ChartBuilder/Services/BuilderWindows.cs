@@ -66,6 +66,9 @@ namespace ChartBuilder.Services
         // How long WaitForRenderAsync waits for the window's next frame.
         private static readonly TimeSpan FrameWaitLimit = TimeSpan.FromMilliseconds(100);
 
+        // The layout templates the View menu loads and saves, the same for every Editor opened.
+        private readonly LayoutTemplateStore _layouts = new(settings);
+
         // The Input devices window, while it's open.
         private InputDevicesWindow? _inputDevices;
 
@@ -176,7 +179,9 @@ namespace ChartBuilder.Services
             ShowInputDevices,
             new FileRevealService(() => editor),
             jumpList,
-            new AvaloniaKeybindsWindowService(() => editor, Strings.AppName));
+            new AvaloniaKeybindsWindowService(() => editor, Strings.AppName),
+            _layouts,
+            new AvaloniaLayoutDialogService(() => editor));
 
         /// <summary>
         /// Opens the Editor <paramref name="create"/> makes in the Editor window in place of what's open, letting go of that

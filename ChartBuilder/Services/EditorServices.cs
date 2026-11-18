@@ -28,6 +28,8 @@ namespace ChartBuilder.Services
     /// <param name="Reveal">Shows the song's folder or <c>.sng</c> in the file manager, from the title bar.</param>
     /// <param name="JumpList">The recent songs in the taskbar button's right-click menu, listed again as the Recent list changes.</param>
     /// <param name="Keybinds">Shows the Shortcuts window, where the keyboard shortcuts are changed.</param>
+    /// <param name="Layouts">The layout templates the View menu loads and saves (issue 263), the same for every Editor.</param>
+    /// <param name="LayoutDialogs">Asks a new layout template's name, and shows Manage Layouts.</param>
     public sealed record EditorServices(
         BuilderSettingsService Settings,
         ISettingsWindowService SettingsWindow,
@@ -50,5 +52,7 @@ namespace ChartBuilder.Services
         Action OpenInputDevices,
         IFileRevealService Reveal,
         IJumpListService JumpList,
-        IKeybindsWindowService Keybinds);
+        IKeybindsWindowService Keybinds,
+        LayoutTemplateStore Layouts,
+        ILayoutDialogService LayoutDialogs);
 }

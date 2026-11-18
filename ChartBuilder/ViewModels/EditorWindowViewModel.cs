@@ -109,6 +109,7 @@ namespace ChartBuilder.ViewModels
             Editor.Session.Find.Changed += OnEditMenuStateChanged;
             ChartClipboard.Shared.Changed += OnEditMenuStateChanged;
             Editor.PropertyChanged += OnEditorPropertyChanged;
+            StartLayouts();
         }
 
         /// <summary>A song opened from a folder or <c>.sng</c> (charter-spec C2).</summary>
@@ -504,6 +505,7 @@ namespace ChartBuilder.ViewModels
             Editor.Session.Find.Changed -= OnEditMenuStateChanged;
             ChartClipboard.Shared.Changed -= OnEditMenuStateChanged;
             Editor.PropertyChanged -= OnEditorPropertyChanged;
+            StopLayouts();
             _tracksTimer.Stop();
             Findings.Dispose();
             Sections.Dispose();
