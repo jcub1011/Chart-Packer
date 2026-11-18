@@ -79,6 +79,37 @@ namespace ChartBuilder.Controls.Editing
             return placed;
         }
 
+        /// <summary>
+        /// Where to start placing bubbles so that those from <paramref name="index"/> on go where they would were every bubble
+        /// before them placed too, so they don't move as the notes before them are left out. A note whose left edge is at
+        /// least <paramref name="reach"/> (the widest a bubble can be, and the gap after it) past the one before it is clear of
+        /// every bubble before it, so its bubble goes on its lowest level whatever came before, and so on from it: walking
+        /// back from <paramref name="index"/> to the first such note finds where placing can start.
+        /// </summary>
+        /// <param name="index">The first note whose bubble is wanted.</param>
+        /// <param name="leftOf">The left edge of a note's bar, by its index; never less than the one before's.</param>
+        /// <param name="reach">The widest a bubble can be, with the least gap along the time axis.</param>
+        /// <param name="maxBack">The most notes to walk back over, so a lane zoomed far out isn't walked to its start.</param>
+        /// <returns>The index of the note to start placing from: <paramref name="index"/> or before it.</returns>
+        public static int IndependentFrom(int index, Func<int, double> leftOf, double reach, int maxBack)
+        {
+            int stop = Math.Max(0, index - maxBack);
+            if (index <= stop)
+                return Math.Max(0, index);
+            double left = leftOf(index);
+            int i = index;
+            while (i > stop)
+            {
+                double before = leftOf(i - 1);
+                if (left - before >= reach)
+                    break;
+                left = before;
+                i--;
+            }
+
+            return i;
+        }
+
         // Whether bubble keeps the gaps from every one placed. The placed are in time order, so their left edges don't go back:
         // once one is further left than the widest could reach, so are all before it.
         private static bool Clears(List<LyricBubble> placed, Rect bubble, double widest, double gapX, double gapY)
