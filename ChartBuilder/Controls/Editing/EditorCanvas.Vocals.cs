@@ -14,6 +14,7 @@ using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charting.Layout;
 using ChartShared.UI.Controls;
 using ChartShared.UI.Controls.Highway;
+using ChartShared.UI.Controls.Skia;
 
 namespace ChartBuilder.Controls.Editing
 {
@@ -334,7 +335,7 @@ namespace ChartBuilder.Controls.Editing
         }
 
         /// <summary>Draws <paramref name="layer"/> of a vocal part's lane, as <see cref="RenderLayer"/> does a highway's.</summary>
-        private void RenderVocalLayer(DrawingContext context, Layer layer, EditorSession session, EditorLaneViewModel lane, VocalTrack vocal, VocalLane vocals)
+        private void RenderVocalLayer(IHighwayCanvas context, Layer layer, EditorSession session, EditorLaneViewModel lane, VocalTrack vocal, VocalLane vocals)
         {
             var size = Bounds.Size;
             Extras = default;
@@ -393,11 +394,11 @@ namespace ChartBuilder.Controls.Editing
             Box(projection.TimeFrom, projection.TimeFrom + projection.TimeLength, projection.LaneFrom, projection.LaneFrom + (projection.LaneSize * projection.Slots.Slots.Count));
 
         /// <summary>The rows' ground, under the audio.</summary>
-        private void FillPitchRows(DrawingContext context, LaneProjection projection) =>
+        private void FillPitchRows(IHighwayCanvas context, LaneProjection projection) =>
             context.FillRectangle(LanesBrush, RowsOf(projection));
 
         /// <summary>The rows, as a piano roll's: the black keys' darker, and a line under each C, over the audio.</summary>
-        private void DrawPitchRowLines(DrawingContext context, LaneProjection projection)
+        private void DrawPitchRowLines(IHighwayCanvas context, LaneProjection projection)
         {
             double from = projection.TimeFrom, to = projection.TimeFrom + projection.TimeLength;
             var pitches = projection.Slots.Slots;
@@ -418,7 +419,7 @@ namespace ChartBuilder.Controls.Editing
         /// to the rows, and moves with them as the keyboard is scrolled and zoomed. Pictures there was no time to draw this
         /// frame are drawn once it's out.
         /// </summary>
-        private void DrawVocalBackdrop(DrawingContext context, LaneProjection projection)
+        private void DrawVocalBackdrop(IHighwayCanvas context, LaneProjection projection)
         {
             if (_lane?.Audio is not { Source: { } source } audio || _editor is not { } editor)
                 return;
@@ -445,7 +446,7 @@ namespace ChartBuilder.Controls.Editing
         }
 
         /// <summary>Each phrase faintly shaded across the rows, with a line at either end.</summary>
-        private void DrawVocalPhrases(DrawingContext context, EditorSession session, VocalLane vocals, LaneProjection projection, double fromTick, double toTick)
+        private void DrawVocalPhrases(IHighwayCanvas context, EditorSession session, VocalLane vocals, LaneProjection projection, double fromTick, double toTick)
         {
             double across1 = projection.LaneFrom, across2 = projection.LaneFrom + (projection.LaneSize * projection.Slots.Slots.Count);
             var shade = AccentFill(0x12);
@@ -466,7 +467,7 @@ namespace ChartBuilder.Controls.Editing
         /// Each phrase as a bar in the strip above the rows, to select, drag and resize as a highway's phrase rail's are; a
         /// selected one lit, with the accent's edge.
         /// </summary>
-        private void DrawVocalPhraseStrip(DrawingContext context, EditorSession session, VocalTrack vocal, LaneProjection projection, double fromTick, double toTick, Size size)
+        private void DrawVocalPhraseStrip(IHighwayCanvas context, EditorSession session, VocalTrack vocal, LaneProjection projection, double fromTick, double toTick, Size size)
         {
             var strip = VocalPhraseArea(size, projection);
             if (strip.Height <= 0 || session.VocalContentOf(vocal) is not { } content)
@@ -492,7 +493,7 @@ namespace ChartBuilder.Controls.Editing
         /// resize as the phrase bars are; a selected one with the accent's edge. The rail is shaded, so it's seen to be there
         /// to draw in when there's none.
         /// </summary>
-        private void DrawVocalStarPowerRail(DrawingContext context, EditorSession session, VocalTrack vocal, LaneProjection projection, double fromTick, double toTick, Size size)
+        private void DrawVocalStarPowerRail(IHighwayCanvas context, EditorSession session, VocalTrack vocal, LaneProjection projection, double fromTick, double toTick, Size size)
         {
             var rail = VocalStarPowerArea(size, projection);
             if (rail.Height <= 0 || session.VocalContentOf(vocal) is not { } content)
@@ -516,7 +517,7 @@ namespace ChartBuilder.Controls.Editing
         /// along the middle row for a spoken one, which has no pitch. A selected note has the accent's edge around it, and so
         /// does every note while the Vocal Alignment tool aligns the part, as they all move together.
         /// </summary>
-        private void DrawVocalNotes(DrawingContext context, EditorSession session, VocalTrack vocal, VocalLane vocals, LaneProjection projection, double fromTick, double toTick)
+        private void DrawVocalNotes(IHighwayCanvas context, EditorSession session, VocalTrack vocal, VocalLane vocals, LaneProjection projection, double fromTick, double toTick)
         {
             int color = (int)vocal;
             var selection = session.Selection;
@@ -574,7 +575,7 @@ namespace ChartBuilder.Controls.Editing
         /// The notes the synchronized region holds on this vocal part, and each passage synced with it holds, marked over in
         /// orange while the Sync tool is active, as a highway's are: just which notes are synced.
         /// </summary>
-        private void DrawVocalSyncNotes(DrawingContext context, EditorSession session, VocalTrack vocal, VocalLane vocals, LaneProjection projection)
+        private void DrawVocalSyncNotes(IHighwayCanvas context, EditorSession session, VocalTrack vocal, VocalLane vocals, LaneProjection projection)
         {
             if (session.Sync is not { IsActive: true } sync || !sync.IsOn(vocal) || sync.Span is not var (from, to))
                 return;
@@ -603,7 +604,7 @@ namespace ChartBuilder.Controls.Editing
         }
 
         /// <summary>The phrase the strike line is in, shaded a little more than the others, behind the notes.</summary>
-        private void DrawSingingPhrase(DrawingContext context, EditorSession session, VocalLane vocals, LaneProjection screen)
+        private void DrawSingingPhrase(IHighwayCanvas context, EditorSession session, VocalLane vocals, LaneProjection screen)
         {
             double tick = session.TickAt(session.Viewport.Cursor);
             double across1 = screen.LaneFrom, across2 = screen.LaneFrom + (screen.LaneSize * screen.Slots.Slots.Count);
@@ -625,7 +626,7 @@ namespace ChartBuilder.Controls.Editing
         /// The note on the strike line, lit over the one drawn on the page, with a glow where it crosses the line. Drawn
         /// wherever the cursor stops, playing or not; its syllable is lit in its bubble, as <see cref="DrawLyricBubbles"/> draws it.
         /// </summary>
-        private void DrawVocalSinging(DrawingContext context, EditorSession session, VocalTrack vocal, VocalLane vocals, LaneProjection screen)
+        private void DrawVocalSinging(IHighwayCanvas context, EditorSession session, VocalTrack vocal, VocalLane vocals, LaneProjection screen)
         {
             double now = session.Viewport.Cursor;
             double tick = session.TickAt(now);
@@ -677,7 +678,7 @@ namespace ChartBuilder.Controls.Editing
         /// pointer, that has no lyric has a faint + bubble, which a press opens the lyric box from. Kept in
         /// <see cref="_bubbles"/> for the pointer to find.
         /// </summary>
-        private void DrawLyricBubbles(DrawingContext context, EditorSession session, VocalTrack vocal, VocalLane vocals, LaneProjection screen, Size size)
+        private void DrawLyricBubbles(IHighwayCanvas context, EditorSession session, VocalTrack vocal, VocalLane vocals, LaneProjection screen, Size size)
         {
             // The note under the pointer, found before the last frame's bubbles are cleared: a pointer on a + bubble keeps
             // its note hovered, and so the + drawn, when it's moved up off the note onto it.
@@ -755,7 +756,7 @@ namespace ChartBuilder.Controls.Editing
                     using (context.PushOpacity(hasLyric ? 1 : 0.55))
                     {
                         context.DrawRectangle(BadgeBrush, isEditing ? editPen : lit ? VocalSingingPens[color] : isSelected ? selectedPen : edge, bubble.Bubble, 4, 4);
-                        label.Draw(context, new Point(bubble.Bubble.Left + BubblePaddingX, bubble.Bubble.Top + ((BubbleHeight - label.Height) / 2)));
+                        context.DrawText(label, new Point(bubble.Bubble.Left + BubblePaddingX, bubble.Bubble.Top + ((BubbleHeight - label.Height) / 2)));
                     }
 
                     _bubbles.Add(new LyricBubbleSpot(bubble.Bubble, place, hasLyric));
@@ -768,7 +769,7 @@ namespace ChartBuilder.Controls.Editing
         /// synchronized region syncs, where the Loop or Sync tool would start drawing its region, and each region's X and
         /// what of it the pointer would take hold of; the cursor; a box being drawn; and the focus's edge.
         /// </summary>
-        private void RenderVocalOverlay(DrawingContext context, EditorSession session, VocalTrack vocal, VocalLane vocals, LaneProjection screen, Size size)
+        private void RenderVocalOverlay(IHighwayCanvas context, EditorSession session, VocalTrack vocal, VocalLane vocals, LaneProjection screen, Size size)
         {
             DrawVocalAlignment(context, session, vocal, screen);
             DrawLyricBubbles(context, session, vocal, vocals, screen, size);
@@ -797,7 +798,7 @@ namespace ChartBuilder.Controls.Editing
         /// The piano keyboard down the left edge: a key a row, white or black as the pitch is, with its name on it when the
         /// rows are tall enough, otherwise only the Cs'. Covers the whole edge, which the pages run on under.
         /// </summary>
-        private void DrawKeyboard(DrawingContext context, LaneProjection screen, Size size, int? sung)
+        private void DrawKeyboard(IHighwayCanvas context, LaneProjection screen, Size size, int? sung)
         {
             double width = VocalGutterWidth;
             context.FillRectangle(KeyboardBackBrush, new Rect(0, 0, width, size.Height));
@@ -823,7 +824,7 @@ namespace ChartBuilder.Controls.Editing
                     var nameBrush = lit ? LitKeyNameBrush : pitch % 12 == 0 ? _gems.Brush(AccentColor) : black ? BlackKeyNameBrush : WhiteKeyNameBrush;
                     var label = Label(PitchName(pitch), 9, nameBrush);
                     double x = black ? 3 : Math.Max(blackWidth + 1, width - label.Width - 3);
-                    label.Draw(context, new Point(x, top + ((row - label.Height) / 2)));
+                    context.DrawText(label, new Point(x, top + ((row - label.Height) / 2)));
                 }
             }
 
@@ -839,7 +840,7 @@ namespace ChartBuilder.Controls.Editing
         /// below the pitches shown, so none are lost to a narrow range or a range off to one side. Pressing one scrolls to the
         /// nearest of its notes.
         /// </summary>
-        private void DrawHiddenNotes(DrawingContext context, EditorSession session, VocalTrack vocal, VocalLane vocals, LaneProjection screen)
+        private void DrawHiddenNotes(IHighwayCanvas context, EditorSession session, VocalTrack vocal, VocalLane vocals, LaneProjection screen)
         {
             _notesAbove = _notesBelow = null;
             if (_lane is not { } lane || lane.PitchView.IsFull)
@@ -877,32 +878,28 @@ namespace ChartBuilder.Controls.Editing
 
         private const double NotesBadgeHeight = 16;
 
+        // The triangle on a badge of hidden notes, about its middle, pointing up or down.
+        private static readonly HighwayPath UpArrow = HighwayPath.Polygon([new Point(0, -3.5), new Point(5, 3), new Point(-5, 3)]);
+        private static readonly HighwayPath DownArrow = HighwayPath.Polygon([new Point(0, 3.5), new Point(5, -3), new Point(-5, -3)]);
+
         /// <summary>One badge of <see cref="DrawHiddenNotes"/>: a triangle pointing the way to scroll, and how many notes lie that way. Where it is.</summary>
-        private Rect DrawNotesBadge(DrawingContext context, VocalTrack vocal, int count, double left, double top, bool up)
+        private Rect DrawNotesBadge(IHighwayCanvas context, VocalTrack vocal, int count, double left, double top, bool up)
         {
             var label = Label(count.ToString(CultureInfo.CurrentCulture), 10, DefaultLabelBrush);
             var badge = new Rect(left, top, label.Width + 24, NotesBadgeHeight);
             var color = VocalNoteBrushes[(int)vocal];
             context.DrawRectangle(BadgeBrush, VocalBadgePens[(int)vocal], badge, 4, 4);
 
+            // The triangle, made once each way, moved to the badge.
             double mid = badge.Left + 11, center = badge.Center.Y;
-            var arrow = new StreamGeometry();
-            using (var ctx = arrow.Open())
-            {
-                double tip = up ? center - 3.5 : center + 3.5, back = up ? center + 3 : center - 3;
-                ctx.BeginFigure(new Point(mid, tip), true);
-                ctx.LineTo(new Point(mid + 5, back));
-                ctx.LineTo(new Point(mid - 5, back));
-                ctx.EndFigure(true);
-            }
-
-            context.DrawGeometry(color, null, arrow);
-            label.Draw(context, new Point(badge.Left + 20, badge.Top + ((badge.Height - label.Height) / 2)));
+            using (context.PushTransform(Matrix.CreateTranslation(mid, center)))
+                context.DrawGeometry(color, null, up ? UpArrow : DownArrow);
+            context.DrawText(label, new Point(badge.Left + 20, badge.Top + ((badge.Height - label.Height) / 2)));
             return badge;
         }
 
         /// <summary>The note the place tool would place under the pointer, faint: on the grid, a grid step long.</summary>
-        private void DrawVocalHover(DrawingContext context, EditorSession session, VocalTrack vocal, VocalLane vocals, LaneProjection screen)
+        private void DrawVocalHover(IHighwayCanvas context, EditorSession session, VocalTrack vocal, VocalLane vocals, LaneProjection screen)
         {
             if (_hover is not { } hover || _isPressed || session.Tool != EditorTool.Place || session.Tools.IsSyncPress(ModifiersOf(_keys))
                 || VocalPointAt(hover, clamp: false) is not { Pitch: { } pitch } point || session.Tools.HitTest(point) is not null)
@@ -924,7 +921,7 @@ namespace ChartBuilder.Controls.Editing
         /// or, over a bar, its outline in the accent, so the hover shows what a drag moves or resizes. None where a press does
         /// something else: with Shift held, the Loop tool, or a tool that doesn't draw there.
         /// </summary>
-        private void DrawVocalStripHover(DrawingContext context, EditorSession session, LaneProjection screen, Size size)
+        private void DrawVocalStripHover(IHighwayCanvas context, EditorSession session, LaneProjection screen, Size size)
         {
             if (_hover is not { } hover || _isPressed || (_keys & KeyModifiers.Shift) != 0 || session.Tools.LoopActive
                 || VocalPointAt(hover, clamp: false) is not { } point || !(point.InPhrases || point.InStarPower))
@@ -961,7 +958,7 @@ namespace ChartBuilder.Controls.Editing
         /// tempo markers' amber, on the grid step the press would snap to. None over a change the press would drag, in the
         /// phrase strip, or with Shift held or the Sync tool's press.
         /// </summary>
-        private void DrawVocalTempoHover(DrawingContext context, EditorSession session, LaneProjection screen)
+        private void DrawVocalTempoHover(IHighwayCanvas context, EditorSession session, LaneProjection screen)
         {
             if (_hover is not { } hover || _isPressed || session.Tool != EditorTool.Tempo || (_keys & KeyModifiers.Shift) != 0
                 || session.Tools.IsSyncPress(ModifiersOf(_keys)))

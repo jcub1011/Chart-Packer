@@ -6,7 +6,9 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Media.Immutable;
+using Avalonia.Media.TextFormatting;
 using ChartShared.Core.Metadata;
+using ChartShared.UI.Controls.Skia;
 
 namespace ChartShared.UI.Controls
 {
@@ -77,15 +79,24 @@ namespace ChartShared.UI.Controls
         private static readonly IBrush TagBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xD0, 0x00, 0x00, 0x00));
         private static readonly IBrush TagTextBrush = new ImmutableSolidColorBrush(Color.FromRgb(0xFF, 0xE6, 0x80));
         private static readonly Typeface TagTypeface = new(FontFamily.Default, FontStyle.Normal, FontWeight.SemiBold);
+        private static TextLayout? s_tagText;
+        private static string? s_tagTime;
 
         /// <summary>
         /// Writes <paramref name="seconds"/> as a time on a dark tag beside the pointer's line, kept inside
         /// <paramref name="bounds"/>: above a line across a highway, or right of a line down the lyrics.
         /// </summary>
-        public static void DrawTimeTag(DrawingContext context, double seconds, Rect bounds, double at, bool isAcross)
+        public static void DrawTimeTag(IHighwayCanvas context, double seconds, Rect bounds, double at, bool isAcross)
         {
-            var text = new FormattedText(MetadataTimes.FormatDuration((long)(Math.Max(0, seconds) * 1000)), CultureInfo.CurrentCulture,
-                FlowDirection.LeftToRight, TagTypeface, 10.5, TagTextBrush);
+            // Laid out again only when the time it shows changes, as the pointer moves a whole step.
+            string time = MetadataTimes.FormatDuration((long)(Math.Max(0, seconds) * 1000));
+            if (s_tagText is not { } text || s_tagTime != time)
+            {
+                s_tagText?.Dispose();
+                s_tagText = text = new TextLayout(time, TagTypeface, 10.5, TagTextBrush);
+                s_tagTime = time;
+            }
+
             var size = new Size(text.Width + 6, text.Height + 2);
             Point origin;
             if (isAcross)

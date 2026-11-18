@@ -14,6 +14,7 @@ using ChartShared.Core.Charting;
 using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charts;
 using ChartShared.UI.Controls;
+using ChartShared.UI.Controls.Skia;
 
 namespace ChartShared.UI.Controls.Highway
 {
@@ -286,6 +287,9 @@ namespace ChartShared.UI.Controls.Highway
         private static readonly IBrush WaveformLoudBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x48, 0xC8, 0xD2, 0xFF));
 
         private readonly GemPainter _gems = new();
+
+        // What draws the highways: SkiaSharp, on the render thread.
+        private readonly SkiaHost _host;
         private readonly NotePainter _notes;
         private readonly UprightGemPainter _upright;
         private readonly NotePainter _uprightNotes;
@@ -459,6 +463,14 @@ namespace ChartShared.UI.Controls.Highway
             _uprightNotes = new NotePainter(_upright);
             _gestures = new ViewportGestures(this, new GestureHost(this), new ScrubBinding(MouseButton.Left, KeyModifiers.None, AllowsOverview: true), WatchesKeys);
             EffectiveViewportChanged += OnEffectiveViewportChanged;
+            _host = new SkiaHost(new PlaneContent(this));
+            VisualChildren.Add(_host);
+        }
+
+        /// <summary>The highways, recorded for SkiaSharp to draw on the render thread.</summary>
+        private sealed class PlaneContent(NoteHighwayView view) : ISkiaContent
+        {
+            public void Record(IHighwayCanvas canvas, SkiaHost host) => view.PaintPlane(canvas);
         }
 
         // Ctrl and Shift are watched while the pointer is over a highway, or one is being scrubbed.
@@ -481,10 +493,15 @@ namespace ChartShared.UI.Controls.Highway
             if (change.Property == BoundsProperty || change.Property == LookAheadProperty || change.Property == LengthModeProperty || change.Property == PixelsPerSecondProperty)
                 ShareShownLookAhead();
 
-            // What makes the highway draw again makes what stands up on it draw again.
+            // What makes the highway draw again makes what stands up on it draw again, and has SkiaSharp's drawing of it recorded again.
             if (change.Property == SceneProperty || change.Property == LookAheadProperty || change.Property == LengthModeProperty || change.Property == PixelsPerSecondProperty
                 || change.Property == WaveformsProperty || change.Property == AreNotesOutlinedProperty || change.Property == LengthSecondsProperty || change.Property == SelectedPhraseProperty)
             {
+                // The transparent rectangles in Render() are the lanes' pointer targets, and Avalonia hit-tests custom-drawn
+                // content: repaint them when they may have changed.
+                if (change.Property == SceneProperty)
+                    InvalidateVisual();
+                _host.Redraw();
                 RaiseStanding();
             }
 
@@ -585,7 +602,19 @@ namespace ChartShared.UI.Controls.Highway
             _parked?.Stop();
         }
 
-        public override void Render(DrawingContext context)
+        public override void Render(DrawingContext drawingContext)
+        {
+            if (Scene is not { Lanes.Count: > 0 } scene || Bounds.Width <= 0 || Bounds.Height <= 0)
+                return;
+
+            // Transparent, so the whole highway takes the pointer, and the gaps between them don't: the drawing is SkiaSharp's (PaintPlane),
+            // and Avalonia finds the pointer on what it draws itself.
+            for (int i = 0; i < scene.Lanes.Count; i++)
+                drawingContext.DrawRectangle(Brushes.Transparent, null, HighwayRect(scene, i));
+        }
+
+        /// <summary>Draws the highways on the plane, each faded to its whole chart as far as it has.</summary>
+        private void PaintPlane(IHighwayCanvas context)
         {
             if (Scene is not { Lanes.Count: > 0 } scene || Bounds.Width <= 0 || Bounds.Height <= 0)
                 return;
@@ -605,9 +634,6 @@ namespace ChartShared.UI.Controls.Highway
             for (int i = 0; i < count; i++)
             {
                 var bounds = HighwayRect(scene, i);
-
-                // Transparent, so the whole highway takes the pointer, and the gaps between them don't.
-                context.DrawRectangle(Brushes.Transparent, null, bounds);
 
                 // Fading between them, each is drawn see-through, so one shows through the other.
                 var fade = FadeOf(i);
@@ -679,7 +705,7 @@ namespace ChartShared.UI.Controls.Highway
         /// marks in their lanes, what's been played shaded, a line where the audio is, and one where the pointer is, or was
         /// last, <paramref name="pointerAt"/> down it.
         /// </summary>
-        private void DrawOverview(DrawingContext context, HighwayLane lane, Rect bounds, double now, double pointerAt)
+        private void DrawOverview(IHighwayCanvas context, HighwayLane lane, Rect bounds, double now, double pointerAt)
         {
             double timeline = Math.Max(0.1, Scene is { } scene ? TimelineOf(scene) : 0);
             double Y(double time) => bounds.Bottom - (time / timeline * bounds.Height);
@@ -925,7 +951,7 @@ namespace ChartShared.UI.Controls.Highway
             Redraw();
         }
 
-        private void DrawHighway(DrawingContext context, HighwayScene scene, HighwayLane lane, Waveform? waveform, Rect bounds, double strike, double gem, double now, LaneProjection projection, int? selectedBand)
+        private void DrawHighway(IHighwayCanvas context, HighwayScene scene, HighwayLane lane, Waveform? waveform, Rect bounds, double strike, double gem, double now, LaneProjection projection, int? selectedBand)
         {
             double from = projection.Start, to = projection.End;
             var y = _alongOf.For(projection);
@@ -1022,7 +1048,7 @@ namespace ChartShared.UI.Controls.Highway
         }
 
         /// <summary>The dark bar across the strike line, with a target per lane that lights as it's struck.</summary>
-        private void DrawStrikeBar(DrawingContext context, HighwayLane lane, LaneProjection projection, Rect bounds, double strike, double gem, double[] hits)
+        private void DrawStrikeBar(IHighwayCanvas context, HighwayLane lane, LaneProjection projection, Rect bounds, double strike, double gem, double[] hits)
         {
             var band = new Rect(bounds.X, strike - (gem * 0.85), bounds.Width, gem * 1.7);
             HighwayChrome.DrawStrikeBand(context, LaneView.Highway, band, HighwayChrome.StrikeBandBrush, asRect: _camera is not null);
@@ -1042,7 +1068,7 @@ namespace ChartShared.UI.Controls.Highway
         /// <param name="painter">What draws the notes: flat, or standing up on a perspective highway.</param>
         /// <param name="pass">Which of the notes' tails and the notes themselves to draw.</param>
         /// <param name="fadeLength">How far along the plane, from its far end, the notes fade in over, as the plane does; none for none.</param>
-        private void DrawNotes(DrawingContext context, HighwayLane lane, LaneProjection projection, double gem, double now, double from, double to, bool outlined, NotePainter painter, NotePass pass, double fadeLength)
+        private void DrawNotes(IHighwayCanvas context, HighwayLane lane, LaneProjection projection, double gem, double now, double from, double to, bool outlined, NotePainter painter, NotePass pass, double fadeLength)
         {
             int first = LowerBound(lane.Starts, from - lane.MaxLength);
             int last = LowerBound(lane.Starts, to + 0.001);
@@ -1108,14 +1134,14 @@ namespace ChartShared.UI.Controls.Highway
 
         private static HighwayNoteMark MarkOf(HighwayLane lane, int index) => lane.Marks is { } marks ? marks[index] : HighwayNoteMark.None;
 
-        private void DrawLabel(DrawingContext context, string label, Rect bounds, double top)
+        private void DrawLabel(IHighwayCanvas context, string label, Rect bounds, double top)
         {
             // The highway is as wide as the view and the number of lanes allow, which both change.
             var text = _labels.Get(label, 10.5, LabelBrush, Math.Max(1, bounds.Width - 4));
 
             // Below the strike bar when there's room, otherwise at the top.
             double y = top + 2 + text.Height <= bounds.Bottom ? top + 1 : 4;
-            text.Draw(context, new Point(bounds.X + ((bounds.Width - Math.Min(text.Width, bounds.Width)) / 2), y));
+            context.DrawText(text, new Point(bounds.X + ((bounds.Width - Math.Min(text.Width, bounds.Width)) / 2), y));
         }
 
         /// <summary>The time the highway is drawn at this frame, in seconds: the clock as it was read for it, not read again.</summary>
@@ -1150,6 +1176,7 @@ namespace ChartShared.UI.Controls.Highway
                 _gems.PlainTails = value is not null;
                 ShareShownLookAhead();
                 InvalidateVisual();
+                _host.Redraw();
                 RaiseStanding();
             }
         }
@@ -1166,9 +1193,10 @@ namespace ChartShared.UI.Controls.Highway
         }
 
         /// <summary>Has the highway drawn again, and what stands up on it.</summary>
+        /// <remarks>Only SkiaSharp's drawing is recorded again: Avalonia's part, the pointer's rectangles, moves only as the highways do.</remarks>
         private void Redraw()
         {
-            InvalidateVisual();
+            _host.Redraw();
             RaiseStanding();
         }
 
@@ -1181,7 +1209,7 @@ namespace ChartShared.UI.Controls.Highway
         }
 
         /// <inheritdoc />
-        public void PaintGems(DrawingContext context)
+        public void PaintGems(IHighwayCanvas context)
         {
             if (_camera is null || Scene is not { Lanes.Count: > 0 } scene || Bounds.Width <= 0 || Bounds.Height <= 0)
                 return;
@@ -1208,12 +1236,12 @@ namespace ChartShared.UI.Controls.Highway
         }
 
         /// <inheritdoc />
-        public void PaintGemMarks(DrawingContext context)
+        public void PaintGemMarks(IHighwayCanvas context)
         {
         }
 
         /// <summary>The highway's name, standing up at the near end of its plane, as large as the plane is there, to be read.</summary>
-        private void DrawStandingLabel(DrawingContext context, string label, Rect bounds)
+        private void DrawStandingLabel(IHighwayCanvas context, string label, Rect bounds)
         {
             if (_camera is not { } camera)
                 return;
@@ -1223,7 +1251,7 @@ namespace ChartShared.UI.Controls.Highway
             var at = camera.Project(foot);
             double scale = camera.ScaleAt(foot.Y);
             using (context.PushTransform(Matrix.CreateScale(scale, scale) * Matrix.CreateTranslation(at.X, at.Y)))
-                text.Draw(context, new Point(-Math.Min(text.Width, bounds.Width) / 2, -text.Height));
+                context.DrawText(text, new Point(-Math.Min(text.Width, bounds.Width) / 2, -text.Height));
         }
 
         /// <summary>The column a lane is drawn in: six-fret's black and white frets share three.</summary>

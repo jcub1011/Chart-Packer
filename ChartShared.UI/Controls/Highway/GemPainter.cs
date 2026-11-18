@@ -4,6 +4,7 @@ using Avalonia;
 using Avalonia.Media;
 using Avalonia.Media.Immutable;
 using ChartShared.Core.Charts;
+using ChartShared.UI.Controls.Skia;
 
 namespace ChartShared.UI.Controls.Highway
 {
@@ -42,15 +43,15 @@ namespace ChartShared.UI.Controls.Highway
         private readonly Dictionary<(Color, double), IPen> _pens = [];
 
         // A cymbal's shape for each size of gem, and a ghost cymbal's dashed edge, at the origin, moved to each gem drawn.
-        private readonly Dictionary<Size, StreamGeometry> _cymbals = [];
-        private readonly Dictionary<Size, Geometry> _ghostCymbals = [];
+        private readonly Dictionary<Size, HighwayPath> _cymbals = [];
+        private readonly Dictionary<Size, HighwayPath> _ghostCymbals = [];
 
         /// <summary>
         /// Draws a gem in <paramref name="rect"/>: a cymbal, a tap, or a flat gem with a HOPO's mark, as its flags say.
         /// </summary>
         /// <param name="kind">How the part's notes are laid out, which says whether the note is a black fret.</param>
         /// <param name="outlined">Whether only its outline is drawn, so what's behind it shows through.</param>
-        public void DrawGem(DrawingContext context, ChartInstrumentKind kind, ChartNote note, Color color, Rect rect, bool outlined)
+        public void DrawGem(IHighwayCanvas context, ChartInstrumentKind kind, ChartNote note, Color color, Rect rect, bool outlined)
         {
             // A ghost: faded, with a dashed edge in its colour.
             if (!outlined && (note.Flags & NoteFlags.Ghost) != 0)
@@ -70,7 +71,7 @@ namespace ChartShared.UI.Controls.Highway
         }
 
         /// <summary>Draws the gem itself, as <see cref="DrawGem"/> does, without an accent's or a ghost's marks.</summary>
-        private void DrawFace(DrawingContext context, ChartInstrumentKind kind, ChartNote note, Color color, Rect rect, bool outlined)
+        private void DrawFace(IHighwayCanvas context, ChartInstrumentKind kind, ChartNote note, Color color, Rect rect, bool outlined)
         {
             bool black = HighwayPalette.IsBlackFret(kind, note.Lane);
 
@@ -109,7 +110,7 @@ namespace ChartShared.UI.Controls.Highway
 
         /// <summary>Draws an open note or a kick: a flat bar across the lanes, with an inner edge for a 2× kick. A HOPO open is brighter, edged in its lane's base colour so it still reads in star power.</summary>
         /// <param name="kind">How the part's notes are laid out, which says whether the bar is an open note or a kick.</param>
-        public void DrawBar(DrawingContext context, ChartInstrumentKind kind, ChartNote note, Color color, Rect bar, bool outlined)
+        public void DrawBar(IHighwayCanvas context, ChartInstrumentKind kind, ChartNote note, Color color, Rect bar, bool outlined)
         {
             if ((note.Flags & NoteFlags.Hopo) == 0)
             {
@@ -133,7 +134,7 @@ namespace ChartShared.UI.Controls.Highway
         }
 
         /// <summary>Draws a sustain's tail filling <paramref name="tail"/>.</summary>
-        public void DrawTail(DrawingContext context, ChartInstrumentKind kind, ChartNote note, Color color, Rect tail, bool outlined)
+        public void DrawTail(IHighwayCanvas context, ChartInstrumentKind kind, ChartNote note, Color color, Rect tail, bool outlined)
         {
             if (tail.Width <= 0 || tail.Height <= 0)
                 return;
@@ -150,7 +151,7 @@ namespace ChartShared.UI.Controls.Highway
         /// Draws an open note's sustain filling <paramref name="tail"/>: a band across the lanes, faint, so the frets' tails
         /// drawn over it show through.
         /// </summary>
-        public void DrawWideTail(DrawingContext context, Color color, Rect tail, bool outlined)
+        public void DrawWideTail(IHighwayCanvas context, Color color, Rect tail, bool outlined)
         {
             if (tail.Width <= 0 || tail.Height <= 0)
                 return;
@@ -166,7 +167,7 @@ namespace ChartShared.UI.Controls.Highway
         /// A flat gem: its face in the colour over a darker lower edge, like a key seen from the front, with a thin dark
         /// outline so it reads over any background. Outlined, only its edge is drawn, in the colour.
         /// </summary>
-        public void DrawFlat(DrawingContext context, Rect rect, Color color, Color? outline = null, bool outlined = false)
+        public void DrawFlat(IHighwayCanvas context, Rect rect, Color color, Color? outline = null, bool outlined = false)
         {
             double radius = CornerOf(rect);
             if (outlined)
@@ -181,7 +182,7 @@ namespace ChartShared.UI.Controls.Highway
         }
 
         /// <summary>A cymbal: a flat hexagon, pointed at the sides, in two tones like a gem; outlined, only its edge in the colour.</summary>
-        public void DrawCymbal(DrawingContext context, Rect rect, Color color, bool outlined)
+        public void DrawCymbal(IHighwayCanvas context, Rect rect, Color color, bool outlined)
         {
             var hexagon = Cymbal(rect.Size);
             using (context.PushTransform(Matrix.CreateTranslation(rect.X, rect.Y)))
@@ -207,7 +208,7 @@ namespace ChartShared.UI.Controls.Highway
         /// Draws a ring in <paramref name="color"/> round the gem or bar drawn in <paramref name="rect"/>, outside an accent's,
         /// with a dark edge so it reads over the gems beside it.
         /// </summary>
-        public void DrawRing(DrawingContext context, ChartNote note, Rect rect, Color color)
+        public void DrawRing(IHighwayCanvas context, ChartNote note, Rect rect, Color color)
         {
             var ring = rect.Inflate(3.5);
             DrawEdge(context, note, ring, RingShadowPen);
@@ -215,7 +216,7 @@ namespace ChartShared.UI.Controls.Highway
         }
 
         /// <summary>Draws the edge of a gem's shape in <paramref name="rect"/>: a cymbal's hexagon, or a rounded gem's.</summary>
-        private void DrawEdge(DrawingContext context, ChartNote note, Rect rect, IPen pen)
+        private void DrawEdge(IHighwayCanvas context, ChartNote note, Rect rect, IPen pen)
         {
             if ((note.Flags & NoteFlags.Cymbal) == 0)
             {
@@ -229,7 +230,7 @@ namespace ChartShared.UI.Controls.Highway
         }
 
         /// <summary>Draws a ghost's dashed edge in <paramref name="color"/> round its shape in <paramref name="rect"/>.</summary>
-        private void DrawGhostEdge(DrawingContext context, ChartNote note, Rect rect, Color color)
+        private void DrawGhostEdge(IHighwayCanvas context, ChartNote note, Rect rect, Color color)
         {
             if ((note.Flags & NoteFlags.Cymbal) == 0)
             {
@@ -282,7 +283,7 @@ namespace ChartShared.UI.Controls.Highway
         public static double CornerOf(Rect rect) => Math.Min(3, rect.Height * 0.25);
 
         /// <summary>A cymbal's hexagon filling <paramref name="size"/> from the origin, made once for each size.</summary>
-        private StreamGeometry Cymbal(Size size)
+        private HighwayPath Cymbal(Size size)
         {
             if (_cymbals.TryGetValue(size, out var hexagon))
                 return hexagon;
@@ -291,16 +292,7 @@ namespace ChartShared.UI.Controls.Highway
             if (_cymbals.Count > 16)
                 _cymbals.Clear();
 
-            var corners = CymbalCorners(size);
-            hexagon = new StreamGeometry();
-            using (var g = hexagon.Open())
-            {
-                g.BeginFigure(corners[0], true);
-                for (int i = 1; i < corners.Length; i++)
-                    g.LineTo(corners[i]);
-                g.EndFigure(true);
-            }
-
+            hexagon = HighwayPath.Polygon(CymbalCorners(size));
             _cymbals[size] = hexagon;
             return hexagon;
         }

@@ -6,6 +6,7 @@ using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charting.Playtest;
 using ChartShared.Core.Charts;
 using ChartShared.UI.Controls.Highway;
+using ChartShared.UI.Controls.Skia;
 
 namespace ChartBuilder.Controls.Editing
 {
@@ -40,7 +41,7 @@ namespace ChartBuilder.Controls.Editing
         }
 
         /// <summary>What the playtest found in the lane shown, and the meter at the strike line.</summary>
-        private void RenderPlaytest(DrawingContext context, EditorSession session, ChartTrackKey key, LaneSlots slots, LaneProjection screen)
+        private void RenderPlaytest(IHighwayCanvas context, EditorSession session, ChartTrackKey key, LaneSlots slots, LaneProjection screen)
         {
             if (PlaytestOf(key) is not { } run)
                 return;
@@ -70,7 +71,7 @@ namespace ChartBuilder.Controls.Editing
 
         /// <summary>A mark on each note missed or sustain dropped, which stays until the note is played again or the playtest is cleared.</summary>
         /// <param name="upright">Whether the marks are drawn standing up on the notes of a perspective highway, rather than flat.</param>
-        private void DrawPlaytestMarks(DrawingContext context, EditorSession session, ChartTrackKey key, PlaytestRun run, LaneSlots slots, LaneProjection screen, bool upright)
+        private void DrawPlaytestMarks(IHighwayCanvas context, EditorSession session, ChartTrackKey key, PlaytestRun run, LaneSlots slots, LaneProjection screen, bool upright)
         {
             bool drums = ChartInstruments.KindOf(key.Instrument) == ChartInstrumentKind.Drums;
             var (fromTick, toTick) = TicksOf(session, screen);
@@ -141,7 +142,7 @@ namespace ChartBuilder.Controls.Editing
         /// The frets and pads pressed, on their targets at the strike line, as the games show theirs: a fret while it's held,
         /// a pad or the kick as it's hit, and the strum across the lanes.
         /// </summary>
-        private void DrawPresses(DrawingContext context, EditorSession session, ChartTrackKey key, LaneProjection projection, LaneSlots slots)
+        private void DrawPresses(IHighwayCanvas context, EditorSession session, ChartTrackKey key, LaneProjection projection, LaneSlots slots)
         {
             var playtest = _editor!.Playtest;
             var kind = ChartInstruments.KindOf(key.Instrument);
@@ -174,7 +175,7 @@ namespace ChartBuilder.Controls.Editing
         }
 
         /// <summary>A ring bursting out of each target a note was just hit on, brighter than the column's glow.</summary>
-        private void DrawHitBursts(DrawingContext context, EditorSession session, ChartTrackKey key, PlaytestRun run, LaneProjection projection, LaneSlots slots)
+        private void DrawHitBursts(IHighwayCanvas context, EditorSession session, ChartTrackKey key, PlaytestRun run, LaneProjection projection, LaneSlots slots)
         {
             var kind = ChartInstruments.KindOf(key.Instrument);
             bool drums = kind == ChartInstrumentKind.Drums;
@@ -264,7 +265,7 @@ namespace ChartBuilder.Controls.Editing
             return column < 0 ? null : GemRect(projection, column, along, size);
         }
 
-        private static void DrawCross(DrawingContext context, IPen pen, Rect rect)
+        private static void DrawCross(IHighwayCanvas context, IPen pen, Rect rect)
         {
             double side = Math.Min(rect.Width, rect.Height);
             var box = new Rect(rect.Center.X - (side / 2), rect.Center.Y - (side / 2), side, side).Deflate(1);
@@ -276,7 +277,7 @@ namespace ChartBuilder.Controls.Editing
         /// A meter just past the strike line, across the middle half of the lanes: early to the left (or up, along a timeline)
         /// and late to the right, the hit window's width, each of the last hits a tick fading as the song goes on.
         /// </summary>
-        private void DrawTimingMeter(DrawingContext context, EditorSession session, PlaytestRun run, LaneProjection screen, Rect lanes)
+        private void DrawTimingMeter(IHighwayCanvas context, EditorSession session, PlaytestRun run, LaneProjection screen, Rect lanes)
         {
             if (_editor?.Playtest.Window is not { } window)
                 return;

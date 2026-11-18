@@ -5,9 +5,10 @@ using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
-using Avalonia.Platform;
 using ChartShared.Audio.Analysis;
 using ChartShared.Core.Charting.Layout;
+using ChartShared.UI.Controls.Skia;
+using SkiaSharp;
 
 namespace ChartShared.UI.Controls
 {
@@ -91,7 +92,7 @@ namespace ChartShared.UI.Controls
         public static void Clear()
         {
             foreach (var tile in Tiles.Values)
-                tile.Bitmap.Dispose();
+                tile.Image?.Dispose();
             Tiles.Clear();
             Latest.Clear();
             s_bytes = 0;
@@ -111,7 +112,7 @@ namespace ChartShared.UI.Controls
         /// a piano roll's rows line up with the notes' frequencies, which crops the picture to <paramref name="bounds"/>. Ignored down a lane.
         /// </param>
         /// <returns>Whether all of it was drawn as it is now: <see langword="false"/> when a picture had to wait for the budget.</returns>
-        public static bool Draw(DrawingContext context, Spectrogram spectrogram, Rect bounds, bool isVertical, double from, double to, Func<double, double> position,
+        public static bool Draw(IHighwayCanvas context, Spectrogram spectrogram, Rect bounds, bool isVertical, double from, double to, Func<double, double> position,
             double floorDb, double ceilingDb, SpectrogramBand band, double pixel = 1, PitchFrame? frame = null)
         {
             double origin = position(0);
@@ -196,6 +197,10 @@ namespace ChartShared.UI.Controls
 
             void DrawTile(Tile tile)
             {
+                // A picture that isn't there (it is made before a tile reaches here, so this is only a guard).
+                if (tile.Image is not { } image)
+                    return;
+
                 // A picture's pixel x is columns start + x·2^level, centred half a column earlier; its pixel y is rows
                 // top + y·(bottom - top) / height down the whole picture.
                 var stretch = tile.Key.Stretch;
@@ -208,7 +213,7 @@ namespace ChartShared.UI.Controls
                     : new Matrix(step, 0, 0, rowStep, along, rowsStart);
                 var size = new Rect(0, 0, TileColumns, tile.Key.Height);
                 using (context.PushTransform(matrix))
-                    context.DrawImage(tile.Bitmap, size, size);
+                    context.DrawImage(image, size, size);
             }
         }
 
@@ -285,7 +290,7 @@ namespace ChartShared.UI.Controls
                 if (current || now - tile.Built < RefreshInterval || !PaintBudget.CanBuild())
                     return tile;
 
-                Fill(tile.Bitmap, key);
+                Fill(tile, key);
                 tile.Ready = ready;
                 tile.Built = now;
                 PaintBudget.Spend(now);
@@ -301,10 +306,9 @@ namespace ChartShared.UI.Controls
             long bytes = (long)TileColumns * key.Height * 4;
             while (s_bytes + bytes > MaxBytes && Tiles.Count > 0)
                 DropLeastRecent();
-            var bitmap = new WriteableBitmap(new PixelSize(TileColumns, key.Height), new Vector(96, 96), PixelFormat.Bgra8888, AlphaFormat.Premul);
-            Fill(bitmap, key);
+            tile = new Tile(key) { Ready = ready, Built = now, Drawn = ++s_drawn };
+            Fill(tile, key);
             PaintBudget.Spend(now);
-            tile = new Tile(key, bitmap) { Ready = ready, Built = now, Drawn = ++s_drawn };
             Tiles[key] = tile;
             Latest[key.Stretch] = tile;
             s_bytes += bytes;
@@ -325,8 +329,11 @@ namespace ChartShared.UI.Controls
             return ready;
         }
 
-        /// <summary>Draws the picture's columns that are ready; the rest are left clear.</summary>
-        private static void Fill(WriteableBitmap bitmap, TileKey key)
+        /// <summary>
+        /// Draws the picture's columns that are ready; the rest are left clear. A picture can't be drawn in once made, and the render
+        /// thread may still be drawing it: it's made again, and the old one let go once no drawing holds it.
+        /// </summary>
+        private static void Fill(Tile tile, TileKey key)
         {
             var stretch = key.Stretch;
             var spectrogram = stretch.Spectrogram;
@@ -404,9 +411,9 @@ namespace ChartShared.UI.Controls
                 }
             }
 
-            using var buffer = bitmap.Lock();
-            for (int y = 0; y < height; y++)
-                Marshal.Copy(pixels, y * TileColumns, buffer.Address + (y * buffer.RowBytes), TileColumns);
+            var info = new SKImageInfo(TileColumns, height, SKColorType.Bgra8888, SKAlphaType.Premul);
+            var image = SKImage.FromPixelCopy(info, MemoryMarshal.AsBytes(pixels.AsSpan(0, TileColumns * height)), TileColumns * 4);
+            tile.Replace(HighwayImage.Of(image));
         }
 
         /// <summary>A column's levels down the picture, into <paramref name="strip"/>; <see langword="false"/> when it isn't ready, or there's no such column.</summary>
@@ -483,7 +490,7 @@ namespace ChartShared.UI.Controls
             if (Latest.TryGetValue(oldest.Key.Stretch, out var latest) && ReferenceEquals(latest, oldest))
                 Latest.Remove(oldest.Key.Stretch);
             s_bytes -= (long)TileColumns * oldest.Key.Height * 4;
-            oldest.Bitmap.Dispose();
+            oldest.Image?.Dispose();
         }
 
         /// <summary>
@@ -504,11 +511,19 @@ namespace ChartShared.UI.Controls
         private readonly record struct TileKey(StretchKey Stretch, int Top, int Bottom, int Height);
 
         /// <summary>A picture, how many of its columns were ready when it was drawn, and when it was drawn and last used.</summary>
-        private sealed class Tile(TileKey key, WriteableBitmap bitmap)
+        private sealed class Tile(TileKey key)
         {
             public TileKey Key { get; } = key;
 
-            public WriteableBitmap Bitmap { get; } = bitmap;
+            /// <summary>The picture, as last made; none until it's first filled.</summary>
+            public HighwayImage? Image { get; private set; }
+
+            /// <summary>Puts the newest picture in place of the last, which is let go.</summary>
+            public void Replace(HighwayImage image)
+            {
+                Image?.Dispose();
+                Image = image;
+            }
 
             public int Ready { get; set; }
 

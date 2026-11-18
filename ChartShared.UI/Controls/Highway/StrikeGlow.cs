@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Avalonia;
 using Avalonia.Media;
 using Avalonia.Media.Immutable;
+using ChartShared.UI.Controls.Skia;
 
 namespace ChartShared.UI.Controls.Highway
 {
@@ -103,7 +104,7 @@ namespace ChartShared.UI.Controls.Highway
         /// gradient's shader again, with garbage, each time it's drawn. A fill is a few bytes of the drawing's own, and the
         /// brush is only one more thing the drawing keeps.</para>
         /// </remarks>
-        public static void DrawBeam(DrawingContext context, Color color, bool isVertical, Rect rect, double opacity)
+        public static void DrawBeam(IHighwayCanvas context, Color color, bool isVertical, Rect rect, double opacity)
         {
             // How opaque the beam is at the strike line, and the faintest layer that, BeamLayers over each other, is that opaque.
             double full = BeamAlpha / 255.0 * Math.Clamp(opacity, 0, 1);

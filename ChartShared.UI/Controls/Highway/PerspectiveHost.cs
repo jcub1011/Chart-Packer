@@ -3,6 +3,7 @@ using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
+using ChartShared.UI.Controls.Skia;
 using ChartShared.UI.Theming;
 
 namespace ChartShared.UI.Controls.Highway
@@ -174,16 +175,22 @@ namespace ChartShared.UI.Controls.Highway
             Marks,
         }
 
-        /// <summary>A layer above the tilted highway that what it stands up is drawn in.</summary>
-        private sealed class GemOverlay : Control
+        /// <summary>
+        /// A layer above the tilted highway that what it stands up is drawn in, by SkiaSharp on the render thread, through a
+        /// <see cref="SkiaHost"/> inside it.
+        /// </summary>
+        private sealed class GemOverlay : Control, ISkiaContent
         {
             private readonly GemLayer _layer;
+            private readonly SkiaHost _host;
             private IPerspectiveContent? _content;
 
             public GemOverlay(GemLayer layer)
             {
                 _layer = layer;
                 IsHitTestVisible = false;
+                _host = new SkiaHost(this);
+                VisualChildren.Add(_host);
             }
 
             public IPerspectiveContent? Content
@@ -196,8 +203,8 @@ namespace ChartShared.UI.Controls.Highway
 
                     if (_content is not null)
                     {
-                        _content.GemsInvalidated -= InvalidateVisual;
-                        _content.GemMarksInvalidated -= InvalidateVisual;
+                        _content.GemsInvalidated -= Redraw;
+                        _content.GemMarksInvalidated -= Redraw;
                     }
 
                     _content = value;
@@ -205,21 +212,41 @@ namespace ChartShared.UI.Controls.Highway
                     {
                         // Each layer follows its own: the notes are drawn again as they change, the marks as the pointer does.
                         if (_layer == GemLayer.Notes)
-                            _content.GemsInvalidated += InvalidateVisual;
+                            _content.GemsInvalidated += Redraw;
                         else
-                            _content.GemMarksInvalidated += InvalidateVisual;
+                            _content.GemMarksInvalidated += Redraw;
                     }
 
-                    InvalidateVisual();
+                    Redraw();
                 }
             }
 
-            public override void Render(DrawingContext context)
+            /// <summary>Has what it stands up drawn again; not while it's hidden, as on a flat highway, which shows it again when it's shown.</summary>
+            private void Redraw()
+            {
+                if (IsVisible)
+                    _host.Redraw();
+            }
+
+            protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+            {
+                base.OnPropertyChanged(change);
+                if (change.Property == IsVisibleProperty && IsVisible)
+                    Redraw();
+            }
+
+            protected override Size ArrangeOverride(Size finalSize)
+            {
+                _host.Arrange(new Rect(finalSize));
+                return finalSize;
+            }
+
+            void ISkiaContent.Record(IHighwayCanvas canvas, SkiaHost host)
             {
                 if (_layer == GemLayer.Notes)
-                    _content?.PaintGems(context);
+                    _content?.PaintGems(canvas);
                 else
-                    _content?.PaintGemMarks(context);
+                    _content?.PaintGemMarks(canvas);
             }
         }
     }
