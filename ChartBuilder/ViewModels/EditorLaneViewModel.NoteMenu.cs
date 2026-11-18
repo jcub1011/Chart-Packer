@@ -141,9 +141,12 @@ namespace ChartBuilder.ViewModels
             bool sung = ticks.All(t => !VocalEdits.IsSpoken(content, t));
             bool slide = ticks.All(t => VocalEdits.IsSlide(content, t));
             bool lyric = ticks.Any(t => VocalEdits.LyricAt(content, t) is { } text && !VocalEdits.IsSlide(content, t) && VocalEdits.SplitSpokenMarks(text).Shown.Length > 0);
+
+            // The note the lyric box opens on, as the key opens it: the first selected that isn't a slide, which has none.
+            int editable = ticks.FindIndex(t => !VocalEdits.IsSlide(content, t));
             return
             [
-                LaneMenuItem.Action(Strings.NoteMenuEditLyric, ticks.Count > 0, () => LyricEditRequested?.Invoke(ticks[0]), null, BuilderKeys.NoteEditLyric),
+                LaneMenuItem.Action(Strings.NoteMenuEditLyric, editable >= 0, () => LyricEditRequested?.Invoke(ticks[editable]), null, BuilderKeys.NoteEditLyric),
                 LaneMenuItem.Action(Strings.NoteMenuDeleteLyric, lyric, tools.DeleteVocalLyric),
                 LaneMenuItem.Separator,
                 LaneMenuItem.Choice(Strings.NoteMenuSung, sung, () => tools.SetVocalSpoken(false)),

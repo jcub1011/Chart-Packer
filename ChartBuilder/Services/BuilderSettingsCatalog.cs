@@ -444,7 +444,7 @@ namespace ChartBuilder.Services
                         Label = Strings.SpectrogramSharpeningLabel,
                         Description = Strings.SpectrogramSharpeningDescription,
                         Keywords = SettingKeywords.Split(Strings.SpectrogramSharpeningKeywords),
-                        DefaultValue = true,
+                        DefaultValue = false,
                         Get = () => settings.Settings.SpectrogramSharpening,
                         Set = on => settings.Settings.SpectrogramSharpening = on,
                     },

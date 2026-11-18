@@ -89,6 +89,22 @@ public sealed class LyricImportTests
     }
 
     [TestMethod]
+    public void MergeSkipsWordsUnderALongEarlierNoteAndHoldsEachToTheNextNote()
+    {
+        // The note at 900 runs to 1400, over both of the first line's words; the one at 3000 cuts "one" short.
+        var session = Of(WithVocals([new(900, 500, 64), new(3000, 100, 64)]));
+
+        var result = LyricImport.Apply(session, VocalTrack.Vocals, TwoLines(), LyricImportMode.Merge);
+
+        Assert.AreEqual(2, result.Words);
+        Assert.AreEqual(2, result.Skipped);
+        var content = Vocals(session);
+        Assert.AreSequenceEqual([900L, 2880L, 3000L, 3360L], [.. content.Notes.Select(static n => n.Tick).Order()]);
+        Assert.AreEqual(120, content.Notes.Single(static n => n.Tick == 2880).Length);
+        Assert.AreEqual(480, content.Notes.Single(static n => n.Tick == 3360).Length);
+    }
+
+    [TestMethod]
     public void AMissingPartIsAddedInTheSameStep()
     {
         var session = Of(Guitar());
@@ -247,5 +263,27 @@ public sealed class LyricImportTests
         session.Undo();
         Assert.IsNull(session.VocalContentOf(VocalTrack.Harmony1));
         Assert.IsNull(session.VocalContentOf(VocalTrack.Harmony2));
+    }
+
+    [TestMethod]
+    public void ASingerWithNoWordPlacedAddsNoPart()
+    {
+        var session = Of(Guitar());
+        var document = new LyricDocument(
+        [
+            new LyricLine(S(1), S(2), [new LyricWord("one", S(1), S(2), 60)], Singer: 1),
+
+            // Over before the song starts, so it has no place.
+            new LyricLine(S(-2), S(-1), [new LyricWord("gone", S(-2), S(-1), 64)], Singer: 2),
+        ]);
+
+        var result = LyricImport.Apply(
+            session, [(VocalTrack.Harmony1, document.ForSinger(1)), (VocalTrack.Harmony2, document.ForSinger(2))], LyricImportMode.Replace);
+
+        Assert.IsTrue(result.Done);
+        Assert.AreEqual(1, result.Words);
+        Assert.AreEqual(1, result.Skipped);
+        Assert.AreEqual(1, Vocals(session, VocalTrack.Harmony1).Notes.Count);
+        Assert.IsNull(session.VocalContentOf(VocalTrack.Harmony2), "No empty part is left behind.");
     }
 }

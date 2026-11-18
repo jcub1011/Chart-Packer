@@ -29,7 +29,7 @@ public sealed class Spectrogram : IDisposable
     private int _released;
     private volatile string? _error;
 
-    internal Spectrogram(int sampleRate, long lengthFrames, int chunkColumns, bool sharpened = true)
+    internal Spectrogram(int sampleRate, long lengthFrames, int chunkColumns, bool sharpened = false)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(chunkColumns);
         SampleRate = sampleRate;

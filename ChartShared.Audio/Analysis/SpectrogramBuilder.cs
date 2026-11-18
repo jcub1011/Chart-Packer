@@ -29,10 +29,10 @@ public static class SpectrogramBuilder
 
     /// <summary>Starts computing <paramref name="input"/>'s spectrogram, from <paramref name="focusSeconds"/> outwards.</summary>
     /// <param name="sharpen">Whether to put each bin's energy where it really is (<see cref="Spectrogram.IsSharpened"/>).</param>
-    public static Spectrogram Start(AnalysisInput input, AnalysisWorkers workers, double focusSeconds, bool sharpen = true) =>
+    public static Spectrogram Start(AnalysisInput input, AnalysisWorkers workers, double focusSeconds, bool sharpen = false) =>
         Start(input, workers, focusSeconds, ChunkColumns, sharpen);
 
-    internal static Spectrogram Start(AnalysisInput input, AnalysisWorkers workers, double focusSeconds, int chunkColumns, bool sharpen = true)
+    internal static Spectrogram Start(AnalysisInput input, AnalysisWorkers workers, double focusSeconds, int chunkColumns, bool sharpen = false)
     {
         ArgumentNullException.ThrowIfNull(input);
         ArgumentNullException.ThrowIfNull(workers);

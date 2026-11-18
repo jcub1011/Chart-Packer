@@ -308,7 +308,7 @@ public sealed class SpectrogramTests
 
         using var workers = new AnalysisWorkers(3);
         var clock = Stopwatch.StartNew();
-        using var spectrogram = SpectrogramBuilder.Start(input, workers, focusSeconds: 0);
+        using var spectrogram = SpectrogramBuilder.Start(input, workers, focusSeconds: 0, sharpen: true);
         int lastColumn = spectrogram.ColumnAt(20);
         TestAudio.WaitUntil(() => Enumerable.Range(0, (lastColumn / spectrogram.ChunkColumns) + 1).All(spectrogram.IsChunkReady));
         clock.Stop();

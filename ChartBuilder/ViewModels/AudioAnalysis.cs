@@ -57,7 +57,7 @@ namespace ChartBuilder.ViewModels
         private SpectrogramCache? _spectrograms;
 
         /// <param name="sharpenSpectrograms">Whether spectrograms are sharpened (<see cref="Spectrogram.IsSharpened"/>).</param>
-        public AudioAnalysis(SongEntry? entry, IReadOnlyList<SongTrack> tracks, long budgetBytes, EditorMessages? messages, bool sharpenSpectrograms = true)
+        public AudioAnalysis(SongEntry? entry, IReadOnlyList<SongTrack> tracks, long budgetBytes, EditorMessages? messages, bool sharpenSpectrograms = false)
         {
             _entry = entry;
             _tracks = tracks;

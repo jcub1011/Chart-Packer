@@ -73,10 +73,29 @@ public static class LyricImport
         var steps = new List<Func<(IChartCommand?, string?)>>();
         foreach (var (track, document) in parts.Where(static p => p.Document.WordCount > 0))
         {
+            // A part the chart hasn't is added only when some of its words go in: worked out against an empty part first,
+            // so a singer whose every word is left out doesn't leave an empty part behind.
+            int? notAdded = null;
             if (VocalTracks.IndexIn(session.Chart, track) < 0)
-                steps.Add(() => (new AddVocalPart(track), null));
+            {
+                steps.Add(() =>
+                {
+                    var (_, placed, left) = Build(VocalTrackContent.Empty(VocalTracks.NameOf(track)), document, mode, session.TickAt);
+                    if (placed > 0)
+                        return (new AddVocalPart(track), null);
+                    notAdded = left;
+                    return (null, null);
+                });
+            }
+
             steps.Add(() =>
             {
+                if (notAdded is { } leftOut)
+                {
+                    skipped += leftOut;
+                    return (null, null);
+                }
+
                 if (session.VocalContentOf(track) is not { } content)
                     return (null, VocalsUnreadable);
                 var (to, placed, left) = Build(content, document, mode, session.TickAt);
@@ -134,6 +153,11 @@ public static class LyricImport
         var lyrics = new List<VocalLyricEvent>();
         var placed = new List<(long Tick, long End, int Line)>();
         var existing = mode == LyricImportMode.Merge ? content.Notes.OrderBy(static n => n.Tick).ToList() : [];
+
+        // The words come in tick order, so the part's notes are walked once beside them: those starting at or before the
+        // word's tick, the latest any of them ends, and the first that starts after it.
+        int passed = 0;
+        long passedEnd = long.MinValue;
         int lastLine = -1;
         foreach (var (tick, end, text, pitch, line) in words)
         {
@@ -149,7 +173,9 @@ public static class LyricImport
             long until = end;
             if (existing.Count > 0)
             {
-                if (existing.Any(n => n.Tick <= tick && n.EndTick > tick) || existing.Any(n => n.Tick == tick))
+                while (passed < existing.Count && existing[passed].Tick <= tick)
+                    passedEnd = Math.Max(passedEnd, existing[passed++].EndTick);
+                if (passedEnd > tick || (passed > 0 && existing[passed - 1].Tick == tick))
                 {
                     skipped++;
                     lastLine = -1;
@@ -157,8 +183,8 @@ public static class LyricImport
                 }
 
                 // Held no further than the next note the part has.
-                if (existing.Where(n => n.Tick > tick).Select(static n => (long?)n.Tick).Min() is { } after)
-                    until = Math.Min(until, after);
+                if (passed < existing.Count)
+                    until = Math.Min(until, existing[passed].Tick);
             }
 
             if (until <= tick)

@@ -37,6 +37,7 @@ namespace ChartBuilder.Controls.Editing
         private static readonly IPen[] VocalEdgePens = [.. Array.ConvertAll(VocalColors, c => (IPen)new ImmutablePen(HighwayPalette.Darken(c, 0.45).ToUInt32(), 1))];
         private static readonly IPen[] VocalSlidePens = [.. Array.ConvertAll(VocalColors, c => (IPen)new ImmutablePen(HighwayPalette.WithAlpha(c, 0xB0).ToUInt32(), 2))];
         private static readonly IPen[] VocalUnpitchedPens = [.. Array.ConvertAll(VocalColors, c => (IPen)new ImmutablePen(c.ToUInt32(), 1.5))];
+        private static readonly IPen[] VocalBadgePens = [.. Array.ConvertAll(VocalColors, c => (IPen)new ImmutablePen(c.ToUInt32(), 1))];
 
         // What's on the strike line, lit as the inspector's lyrics lane lights it: the note being sung near white in its
         // part's tint, with a glow around where it crosses the line; its syllable in the same tint; and its phrase shaded.
@@ -657,6 +658,16 @@ namespace ChartBuilder.Controls.Editing
         /// </summary>
         private void DrawLyricBubbles(DrawingContext context, EditorSession session, VocalTrack vocal, VocalLane vocals, LaneProjection screen, Size size)
         {
+            // The note under the pointer, found before the last frame's bubbles are cleared: a pointer on a + bubble keeps
+            // its note hovered, and so the + drawn, when it's moved up off the note onto it.
+            long? hovered = null;
+            if (_hover is { } hover && !_isPressed)
+            {
+                hovered = BubbleAt(hover) is { } over ? over.Place.Tick
+                    : VocalPointAt(hover, clamp: false) is { } point && session.Tools.HitTest(point) is { } hit ? hit.Note.Tick
+                    : null;
+            }
+
             _bubbles.Clear();
             var rows = RowsOf(screen);
             var notes = vocals.Notes;
@@ -667,14 +678,6 @@ namespace ChartBuilder.Controls.Editing
                 return;
 
             var selection = session.Selection;
-            long? hovered = null;
-            if (_hover is { } hover && !_isPressed)
-            {
-                hovered = BubbleAt(hover) is { } over ? over.Place.Tick
-                    : VocalPointAt(hover, clamp: false) is { } point && session.Tools.HitTest(point) is { } hit ? hit.Note.Tick
-                    : null;
-            }
-
             int color = (int)vocal;
             var textBrush = LabelBrush ?? DefaultLabelBrush;
             var litBrush = VocalSingingBrushes[color];
@@ -859,7 +862,7 @@ namespace ChartBuilder.Controls.Editing
             var label = Label(count.ToString(CultureInfo.CurrentCulture), 10, DefaultLabelBrush);
             var badge = new Rect(left, top, label.Width + 24, NotesBadgeHeight);
             var color = VocalNoteBrushes[(int)vocal];
-            context.DrawRectangle(BadgeBrush, new ImmutablePen(VocalColors[(int)vocal].ToUInt32(), 1), badge, 4, 4);
+            context.DrawRectangle(BadgeBrush, VocalBadgePens[(int)vocal], badge, 4, 4);
 
             double mid = badge.Left + 11, center = badge.Center.Y;
             var arrow = new StreamGeometry();

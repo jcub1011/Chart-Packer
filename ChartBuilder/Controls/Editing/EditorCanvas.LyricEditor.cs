@@ -43,6 +43,9 @@ namespace ChartBuilder.Controls.Editing
         /// <summary>How many characters wide the lyric box may grow before what's typed wraps onto another line.</summary>
         private const int LyricBoxWrapChars = 32;
 
+        // The lyric box's narrowest and widest, measured once for the font it's in (FitLyricBox).
+        private (Typeface Face, double Size, double Least, double Most)? _lyricBoxWidths;
+
         // The box's ground: the app's dark surface, so what's typed is plain over the lane.
         private static readonly Avalonia.Media.IBrush LyricBoxBrush = new Avalonia.Media.Immutable.ImmutableSolidColorBrush(Avalonia.Media.Color.FromRgb(0x1B, 0x1D, 0x2A));
 
@@ -114,6 +117,9 @@ namespace ChartBuilder.Controls.Editing
         /// </summary>
         internal void OpenLyricEditor(long tick)
         {
+            // What the box says so far is kept as it moves on: set first, so the note's lyric is read as it is after.
+            ApplyLyricEditor();
+
             if (Session is not { } session || _lane is not { Vocal: { } track } lane || session.VocalContentOf(track) is not { } content
                 || session.VocalsOf(track) is not { } vocals
                 || ProjectVocals(Bounds.Size, VocalSlotsOf(lane), session.Viewport, lane.Length) is not { } screen)
@@ -140,9 +146,6 @@ namespace ChartBuilder.Controls.Editing
                 session.Status = Strings.VocalSlideNoLyric;
                 return;
             }
-
-            // What the box says so far is kept as it moves on.
-            ApplyLyricEditor();
 
             var note = vocals.Notes[index];
             var place = new VocalNotePlace(note.Tick, note.Pitch);
@@ -233,8 +236,14 @@ namespace ChartBuilder.Controls.Editing
                 ? 0
                 : new FormattedText(text, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, face, box.FontSize, Brushes.Black).WidthIncludingTrailingWhitespace;
 
-            double least = WidthOf(box.PlaceholderText ?? "") + room;
-            double most = Math.Max(least, WidthOf(new string('n', LyricBoxWrapChars)) + room);
+            if (_lyricBoxWidths is not { } widths || widths.Face != face || widths.Size != box.FontSize)
+            {
+                double narrowest = WidthOf(box.PlaceholderText ?? "") + room;
+                widths = (face, box.FontSize, narrowest, Math.Max(narrowest, WidthOf(new string('n', LyricBoxWrapChars)) + room));
+                _lyricBoxWidths = widths;
+            }
+
+            var (_, _, least, most) = widths;
             box.Width = Math.Clamp(WidthOf(box.Text ?? "") + room, least, most);
         }
 

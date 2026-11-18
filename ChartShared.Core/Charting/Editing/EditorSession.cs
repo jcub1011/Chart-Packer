@@ -22,8 +22,8 @@ public enum EditorTool
     Loop,
 
     /// <summary>
-    /// Shifts and stretches the vocal parts in time, with no snapping (<see cref="Editing.VocalAlignment"/>): only while a
-    /// vocal part's lane has focus.
+    /// Shifts and stretches the vocal parts in time (<see cref="Editing.VocalAlignment"/>), the dragged edge snapping to the
+    /// grid while snap is on: only while a vocal part's lane has focus.
     /// </summary>
     VocalAlign,
 }

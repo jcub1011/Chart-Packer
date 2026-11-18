@@ -105,16 +105,16 @@ public sealed class SpectrogramCacheTests
     {
         using var workers = new AnalysisWorkers(1);
         using var cache = new SpectrogramCache(workers);
-        var sharp = Start(cache, "a");
-
-        cache.Sharpen = true;
-        Assert.IsFalse(sharp.IsReleased, "It was already.");
-        cache.Sharpen = false;
         var plain = Start(cache, "a");
 
-        Assert.IsTrue(sharp.IsSharpened && sharp.IsReleased);
-        Assert.IsFalse(plain.IsSharpened);
-        Assert.AreNotSame(sharp, plain);
+        cache.Sharpen = false;
+        Assert.IsFalse(plain.IsReleased, "It wasn't sharpened already.");
+        cache.Sharpen = true;
+        var sharp = Start(cache, "a");
+
+        Assert.IsTrue(!plain.IsSharpened && plain.IsReleased);
+        Assert.IsTrue(sharp.IsSharpened);
+        Assert.AreNotSame(plain, sharp);
     }
 
     private static Spectrogram Start(SpectrogramCache cache, string name) => cache.GetOrStart(Key(name), Input, 0).Spectrogram!;

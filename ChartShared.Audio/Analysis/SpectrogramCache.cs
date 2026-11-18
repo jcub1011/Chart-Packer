@@ -32,7 +32,7 @@ public sealed class SpectrogramCache : IDisposable
     private readonly Dictionary<Spectrogram, long> _used = [];
     private long _budget;
     private long _size;
-    private bool _sharpen = true;
+    private bool _sharpen;
 
     public SpectrogramCache(AnalysisWorkers workers, long budgetBytes = DefaultBudgetBytes)
     {
@@ -73,7 +73,7 @@ public sealed class SpectrogramCache : IDisposable
     public TimeSpan KeepInUse { get; set; }
 
     /// <summary>
-    /// Whether the spectrograms started are sharpened (<see cref="Spectrogram.IsSharpened"/>); they are at first. Changing
+    /// Whether the spectrograms started are sharpened (<see cref="Spectrogram.IsSharpened"/>); they aren't at first. Changing
     /// it releases every spectrogram, which were made the other way.
     /// </summary>
     public bool Sharpen

@@ -2120,7 +2120,7 @@ Acceptance criteria:
 
    A quarter of an octave either side of where two bands meet, the rows are a blend of both.
 
-   **Sharpening** (Settings, on by default). Each bin's energy is drawn at the frequency and the
+   **Sharpening** (Settings, off by default). Each bin's energy is drawn at the frequency and the
    time it's really at (the reassignment method) rather than at the bin's own, so a steady note
    is a line a row or two thick and a hit is a column or two wide, where unsharpened they're as
    blurred as the window is wide. Changing the setting computes the spectrograms again.
@@ -3303,7 +3303,7 @@ tool.
 | Notes keep ticks or times when the tempo changes | Keep ticks |
 | Waveform or spectrogram behind the lanes (**Lanes show**, under Audio assist) | Waveform |
 | Spectrogram memory budget (under Audio assist) | 512 MB (64 to 4096) |
-| Sharpen spectrograms (under Audio assist) | On ([C13](#c13-spectrogram)) |
+| Sharpen spectrograms (under Audio assist) | Off ([C13](#c13-spectrogram)) |
 | Metronome volume / hit-sound volume | 50% / 50%. At 50%, each sound plays at the level `Synth` makes it. A change applies from the next time playback starts. |
 | Audio/visual latency | Per output device, plus a global fallback of 0 ms ([C11](#c11-calibration-tool)) |
 | Detect output latency | On. The latency detected from the device is added to its calibrated latency. Kept in `audio-latency.json`, shared by both apps (issue #140) |
