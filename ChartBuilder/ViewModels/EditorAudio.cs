@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using ChartBuilder.Services;
+using ChartShared.Audio.Decoding;
 using ChartShared.Audio.Waveforms;
 using ChartShared.Core.Charting;
 using ChartShared.Core.Charting.Layout;
@@ -20,6 +21,11 @@ namespace ChartBuilder.ViewModels
     public sealed class EditorAudio : IDisposable
     {
         private readonly EditorMessages? _messages;
+
+        // The stems decoded once, up front, for the waveforms and the analysis both to read: within the memory budget, less
+        // what the spectrograms take of it, and kept across track changes for the files that stay.
+        private readonly DecodedAudioCache _decoded;
+        private StemDecoder _decoder;
         private long _budget;
         private bool _sharpen;
         private WaveformFidelity _fidelity;
@@ -37,9 +43,12 @@ namespace ChartBuilder.ViewModels
             _budget = BudgetOf(settings);
             _sharpen = settings.SpectrogramSharpening;
             _fidelity = Enum.IsDefined(settings.WaveformFidelity) ? settings.WaveformFidelity : BuilderSettings.DefaultWaveformFidelity;
+
+            // The spectrograms are drawn, where the stems decoded only save decoding again, so they come first.
+            _decoded = new DecodedAudioCache(_budget) { SharedBytes = () => Analysis?.SpectrogramBytes ?? 0 };
             Entry = song.Entry;
             Tracks = song.Tracks;
-            (Waveforms, Analysis) = Open(Entry, Tracks, _fidelity);
+            (_decoder, Waveforms, Analysis) = Open(Entry, Tracks, _fidelity);
         }
 
         /// <summary>Raised on the UI thread when something drawn from the audio may have changed.</summary>
@@ -79,18 +88,20 @@ namespace ChartBuilder.ViewModels
         /// <summary>The whole song as it plays, or null without audio.</summary>
         public AudioSource? Mix => AudioSource.MixOf(Tracks);
 
-        /// <summary>Starts reading the stems' waveforms.</summary>
+        /// <summary>Starts decoding the stems, and reading their waveforms as they're decoded.</summary>
         public void Start()
         {
+            _decoder.Start();
             Waveforms.Start();
             RefreshAudible();
         }
 
-        /// <summary>Takes up what may have changed in Settings: the spectrogram memory budget and sharpening, and the waveform detail.</summary>
+        /// <summary>Takes up what may have changed in Settings: the memory budget, spectrogram sharpening, and the waveform detail.</summary>
         public void ReloadSettings(BuilderSettings settings)
         {
             _budget = BudgetOf(settings);
             Analysis.SetBudget(_budget);
+            _decoded.BudgetBytes = _budget;
             if (settings.SpectrogramSharpening != _sharpen)
             {
                 // Every spectrogram is computed again the other way, and what's drawn of the old ones is no use.
@@ -177,7 +188,10 @@ namespace ChartBuilder.ViewModels
             Tracks = tracks;
             _sources.Clear();
             _vocalSources.Clear();
-            (Waveforms, Analysis) = Open(entry, tracks, _fidelity);
+
+            // The decoder lets go of what was decoded of files the tracks no longer are, and decodes those new or changed.
+            (_decoder, Waveforms, Analysis) = Open(entry, tracks, _fidelity);
+            _decoder.Start();
             Waveforms.Start();
             if (_settled.Task.IsCompleted)
                 _settled = new TaskCompletionSource<AudibleRange?>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -194,7 +208,7 @@ namespace ChartBuilder.ViewModels
         {
             Waveforms.Changed -= OnPartChanged;
             Waveforms.Dispose();
-            Waveforms = new StemWaveforms(Entry, Tracks, _fidelity);
+            Waveforms = new StemWaveforms(Entry, Tracks, _fidelity, _decoder);
             Waveforms.Changed += OnPartChanged;
             Waveforms.Start();
 
@@ -208,21 +222,27 @@ namespace ChartBuilder.ViewModels
             RefreshAudible();
         }
 
-        public void Dispose() => Close();
-
-        private (StemWaveforms Waveforms, AudioAnalysis Analysis) Open(SongEntry? entry, IReadOnlyList<SongTrack> tracks, WaveformFidelity fidelity)
+        public void Dispose()
         {
-            var waveforms = new StemWaveforms(entry, tracks, fidelity);
-            var analysis = new AudioAnalysis(entry, tracks, _budget, _messages, _sharpen);
+            Close();
+            _decoded.Dispose();
+        }
+
+        private (StemDecoder Decoder, StemWaveforms Waveforms, AudioAnalysis Analysis) Open(SongEntry? entry, IReadOnlyList<SongTrack> tracks, WaveformFidelity fidelity)
+        {
+            var decoder = new StemDecoder(entry, tracks, _decoded);
+            var waveforms = new StemWaveforms(entry, tracks, fidelity, decoder);
+            var analysis = new AudioAnalysis(entry, tracks, _budget, _messages, _sharpen, decoder);
             waveforms.Changed += OnPartChanged;
             analysis.Changed += OnPartChanged;
-            return (waveforms, analysis);
+            return (decoder, waveforms, analysis);
         }
 
         private void Close()
         {
             if (Waveforms is null)
                 return;
+            _decoder.Dispose();
             Waveforms.Changed -= OnPartChanged;
             Analysis.Changed -= OnPartChanged;
             Waveforms.Dispose();

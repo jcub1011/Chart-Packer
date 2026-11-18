@@ -1,3 +1,5 @@
+using ChartShared.Audio.Caching;
+
 namespace ChartShared.Audio.Analysis;
 
 /// <summary>What <see cref="SpectrogramCache.GetOrStart"/> gave.</summary>
@@ -27,11 +29,9 @@ public sealed class SpectrogramCache : IDisposable
 
     private readonly AnalysisWorkers _workers;
     private readonly Lock _lock = new();
-    private readonly Dictionary<AnalysisKey, LinkedListNode<(AnalysisKey Key, Spectrogram Spectrogram)>> _entries = [];
-    private readonly LinkedList<(AnalysisKey Key, Spectrogram Spectrogram)> _recency = new();
+    private readonly SizedLru<AnalysisKey, Spectrogram> _entries = new();
     private readonly Dictionary<Spectrogram, long> _used = [];
     private long _budget;
-    private long _size;
     private bool _sharpen;
 
     public SpectrogramCache(AnalysisWorkers workers, long budgetBytes = DefaultBudgetBytes)
@@ -103,7 +103,7 @@ public sealed class SpectrogramCache : IDisposable
         get
         {
             lock (_lock)
-                return _size;
+                return _entries.Size;
         }
     }
 
@@ -128,11 +128,11 @@ public sealed class SpectrogramCache : IDisposable
         Spectrogram started;
         lock (_lock)
         {
-            if (_entries.TryGetValue(key, out var raced))
+            if (_entries.TryGet(key, out var raced))
             {
-                Touch(raced);
-                raced.Value.Spectrogram.Focus(focusSeconds);
-                return new SpectrogramResult(raced.Value.Spectrogram, raced.Value.Spectrogram.SizeBytes);
+                _used[raced] = Environment.TickCount64;
+                raced.Focus(focusSeconds);
+                return new SpectrogramResult(raced, raced.SizeBytes);
             }
 
             if (needed > _budget)
@@ -142,9 +142,8 @@ public sealed class SpectrogramCache : IDisposable
 
             released = MakeRoom(needed);
             started = SpectrogramBuilder.Start(audio, _workers, focusSeconds, _sharpen);
-            _entries[key] = _recency.AddFirst((key, started));
+            _entries.Add(key, started, started.SizeBytes);
             _used[started] = Environment.TickCount64;
-            _size += started.SizeBytes;
         }
 
         Release(released);
@@ -156,31 +155,21 @@ public sealed class SpectrogramCache : IDisposable
     {
         lock (_lock)
         {
-            if (_entries.TryGetValue(key, out var node))
-            {
-                Touch(node);
-                spectrogram = node.Value.Spectrogram;
-                return true;
-            }
+            if (!_entries.TryGet(key, out spectrogram))
+                return false;
+            _used[spectrogram] = Environment.TickCount64;
+            return true;
         }
-
-        spectrogram = null;
-        return false;
     }
 
     /// <summary>Releases the spectrogram kept under <paramref name="key"/>, if there is one.</summary>
     public void Release(AnalysisKey key)
     {
-        Spectrogram? released = null;
+        Spectrogram? released;
         lock (_lock)
         {
-            if (_entries.Remove(key, out var node))
-            {
-                _recency.Remove(node);
-                _used.Remove(node.Value.Spectrogram);
-                _size -= node.Value.Spectrogram.SizeBytes;
-                released = node.Value.Spectrogram;
-            }
+            if (_entries.Remove(key, out released))
+                _used.Remove(released);
         }
 
         released?.Dispose();
@@ -192,11 +181,8 @@ public sealed class SpectrogramCache : IDisposable
         List<Spectrogram> released;
         lock (_lock)
         {
-            released = [.. _recency.Select(e => e.Spectrogram)];
-            _entries.Clear();
-            _recency.Clear();
+            released = _entries.Clear();
             _used.Clear();
-            _size = 0;
         }
 
         Release(released);
@@ -210,41 +196,26 @@ public sealed class SpectrogramCache : IDisposable
             spectrogram.Dispose();
     }
 
-    private void Touch(LinkedListNode<(AnalysisKey Key, Spectrogram Spectrogram)> node)
-    {
-        _recency.Remove(node);
-        _recency.AddFirst(node);
-        _used[node.Value.Spectrogram] = Environment.TickCount64;
-    }
-
     /// <summary>Whether <paramref name="needed"/> more fits once the spectrograms not used within <see cref="KeepInUse"/> are released.</summary>
+    /// <remarks>
+    /// Those used within it are the most recently used, so passing over them stops short of every one used later too, as
+    /// releasing in order would.
+    /// </remarks>
     private bool HasRoom(long needed)
     {
-        long size = _size;
-        long since = Environment.TickCount64 - (long)KeepInUse.TotalMilliseconds;
-        for (var node = _recency.Last; node is not null && size + needed > _budget; node = node.Previous)
-        {
-            if (KeepInUse > TimeSpan.Zero && _used.GetValueOrDefault(node.Value.Spectrogram) >= since)
-                return false;
-            size -= node.Value.Spectrogram.SizeBytes;
-        }
+        if (KeepInUse <= TimeSpan.Zero)
+            return _entries.CanFit(needed, _budget);
 
-        return size + needed <= _budget;
+        long since = Environment.TickCount64 - (long)KeepInUse.TotalMilliseconds;
+        return _entries.CanFit(needed, _budget, s => _used.GetValueOrDefault(s) < since);
     }
 
     /// <summary>Drops the least recently used until <paramref name="needed"/> more fits; returns them to release outside the lock.</summary>
     private List<Spectrogram> MakeRoom(long needed)
     {
-        var released = new List<Spectrogram>();
-        while (_size + needed > _budget && _recency.Last is { } oldest)
-        {
-            _recency.RemoveLast();
-            _entries.Remove(oldest.Value.Key);
-            _used.Remove(oldest.Value.Spectrogram);
-            _size -= oldest.Value.Spectrogram.SizeBytes;
-            released.Add(oldest.Value.Spectrogram);
-        }
-
+        var released = _entries.MakeRoom(needed, _budget);
+        foreach (var spectrogram in released)
+            _used.Remove(spectrogram);
         return released;
     }
 }

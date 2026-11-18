@@ -80,6 +80,11 @@ public sealed unsafe class FfmpegAudioDecoder : IDisposable
 
             void* options = null;
             Native.av_dict_set(&options, "threads", "1", 0);
+
+            // Decoders that can give either (libopus gives 16-bit integers otherwise; mp3float gives planes) give
+            // interleaved floats, which need no copying out of planes. The rest only offer planar floats, and leave
+            // this alone.
+            Native.av_dict_set(&options, "request_sample_fmt", "flt", 0);
             if (!trimsStart)
                 Native.av_dict_set(&options, "flags2", "+skip_manual", 0);
             int result = Native.avcodec_open2(_codec, codec, &options);

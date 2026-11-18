@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Avalonia.Threading;
 using ChartBuilder.Resources;
 using ChartShared.Audio.Analysis;
+using ChartShared.Audio.Decoding;
 using ChartShared.Audio.Playback;
 using ChartShared.Core.Charting.Analysis;
 using ChartShared.Core.Scanning;
@@ -20,8 +21,9 @@ namespace ChartBuilder.ViewModels
     /// memory budget, and onsets found and kept for as long as the chart is open. Nothing is written to disk.
     /// </summary>
     /// <remarks>
-    /// <para>The work runs on <see cref="AnalysisWorkers"/>, below normal priority, from decoders of its own, opened off the
-    /// UI thread the first time they're needed. A spectrogram's chunks near what's on screen come first; the view fills in
+    /// <para>The work runs on <see cref="AnalysisWorkers"/>, below normal priority, from the stems decoded up front
+    /// (<see cref="StemDecoder"/>) once they are, and from decoders of its own for those that weren't, opened off the UI
+    /// thread the first time they're needed. A spectrogram's chunks near what's on screen come first; the view fills in
     /// as they arrive.</para>
     /// <para>Its members are for the UI thread, and <see cref="Changed"/> is raised there, at most every
     /// <see cref="ChangedInterval"/>, as more is ready.</para>
@@ -35,6 +37,7 @@ namespace ChartBuilder.ViewModels
 
         private readonly SongEntry? _entry;
         private readonly IReadOnlyList<SongTrack> _tracks;
+        private readonly StemDecoder? _decoder;
         private readonly EditorMessages? _messages;
         private readonly CancellationTokenSource _cancel = new();
         private readonly DispatcherTimer _changed;
@@ -57,8 +60,13 @@ namespace ChartBuilder.ViewModels
         private SpectrogramCache? _spectrograms;
 
         /// <param name="sharpenSpectrograms">Whether spectrograms are sharpened (<see cref="Spectrogram.IsSharpened"/>).</param>
-        public AudioAnalysis(SongEntry? entry, IReadOnlyList<SongTrack> tracks, long budgetBytes, EditorMessages? messages, bool sharpenSpectrograms = false)
+        /// <param name="decoder">
+        /// Where the stems are decoded once, up front: the analysis waits for their decode and reads them from there, rather
+        /// than decoding them itself. The owner disposes it, after this.
+        /// </param>
+        public AudioAnalysis(SongEntry? entry, IReadOnlyList<SongTrack> tracks, long budgetBytes, EditorMessages? messages, bool sharpenSpectrograms = false, StemDecoder? decoder = null)
         {
+            _decoder = decoder;
             _entry = entry;
             _tracks = tracks;
             _budget = budgetBytes;
@@ -70,6 +78,9 @@ namespace ChartBuilder.ViewModels
 
         /// <summary>Raised on the UI thread when more of an analysis is ready.</summary>
         public event EventHandler? Changed;
+
+        /// <summary>How much memory the spectrograms take of the budget; from any thread.</summary>
+        public long SpectrogramBytes => Volatile.Read(ref _spectrograms)?.SizeBytes ?? 0;
 
         /// <summary>How much memory the spectrograms may take together (charter-spec C13 item 3).</summary>
         public void SetBudget(long bytes)
@@ -120,6 +131,9 @@ namespace ChartBuilder.ViewModels
             {
                 spectrogram.Updated += OnSpectrogramUpdated;
                 _followed.RemoveWhere(s => s.IsReleased);
+
+                // A new spectrogram takes its share of the budget from the stems decoded.
+                _decoder?.Cache.Trim();
             }
 
             return spectrogram;
@@ -302,7 +316,7 @@ namespace ChartBuilder.ViewModels
             return task;
         }
 
-        private Prepared? Prepare(AudioSource source, CancellationToken token)
+        private async Task<Prepared?> Prepare(AudioSource source, CancellationToken token)
         {
             try
             {
@@ -324,8 +338,20 @@ namespace ChartBuilder.ViewModels
                 if (opened.Count == 0)
                     return null;
 
+                // The stems decoded up front, once they're decoded whole: decoding them here as well is what the decode saves.
+                Dictionary<SongTrack, DecodedStem>? decoded = null;
+                if (_decoder is { } decoder)
+                {
+                    decoded = [];
+                    foreach (var track in opened)
+                    {
+                        if (await decoder.GetAsync(track.Track, token).ConfigureAwait(false) is { } stem && await stem.Completion.WaitAsync(token).ConfigureAwait(false))
+                            decoded[track.Track] = stem;
+                    }
+                }
+
                 var key = AnalysisKey.Of(_entry, source.Tracks) ?? new AnalysisKey(source.Key);
-                return new Prepared(key, AnalysisInput.Mix(audio, opened));
+                return new Prepared(key, AnalysisInput.Mix(audio, opened, decoded, _decoder?.Cache));
             }
             catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException or IOException or UnauthorizedAccessException or InvalidDataException or ArgumentException)
             {

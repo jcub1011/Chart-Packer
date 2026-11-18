@@ -91,6 +91,17 @@ public sealed class StemPeaksReader
     /// <summary>How many chunks there are to read, numbered from 0 at the start.</summary>
     public int ChunkCount => _chunks.Length;
 
+    /// <summary>
+    /// The frames chunk <paramref name="index"/> reads, from <c>From</c> up to <c>To</c>: <see cref="long.MaxValue"/> for
+    /// the last, which reads on to the source's end.
+    /// </summary>
+    public (long From, long To) ChunkFrames(int index)
+    {
+        var chunk = _chunks[index];
+        long from = WaveformPeaks.Boundary(chunk.FirstBucket, _resolution.BucketsPerSecond, _rate);
+        return (from, chunk.IsLast ? long.MaxValue : WaveformPeaks.Boundary(chunk.EndBucket, _resolution.BucketsPerSecond, _rate));
+    }
+
     /// <summary>Reads chunk <paramref name="index"/> from <paramref name="source"/>, a source of this stem that nothing else is reading.</summary>
     /// <remarks>
     /// The source is moved to the chunk's start; chunk 0 is read from where the source is, so a source just opened

@@ -1,3 +1,4 @@
+using ChartShared.Audio.Decoding;
 using ChartShared.Audio.Playback;
 
 namespace ChartShared.Audio.Waveforms;
@@ -82,6 +83,47 @@ public static class ChunkedPeaksRead
                 read.Fail(() => failed?.Invoke(read.Opened));
             }
         });
+    }
+
+    /// <summary>
+    /// Reads a stem's peaks from its audio as decoded once (<see cref="StemDecoder"/>), while it's decoded: each chunk as soon
+    /// as the frames it covers have been, side by side on the thread pool, so the peaks fill in from the start as they would
+    /// read from the file. They're the same peaks as read from the file.
+    /// </summary>
+    /// <param name="progress">Handed the peaks read so far, as <see cref="StemPeaksReader"/> hands them.</param>
+    /// <returns>The peaks; or <see langword="null"/> when the decode failed, so they're to be read from the file.</returns>
+    /// <exception cref="OperationCanceledException"><paramref name="cancellationToken"/> was cancelled.</exception>
+    public static async Task<StemPeaks?> ReadDecodedAsync(
+        string name,
+        DecodedStem stem,
+        WaveformResolution resolution,
+        Action<StemPeaks>? progress = null,
+        TimeSpan progressInterval = default,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(stem);
+
+        // Shaped as the stem is now: the length the decoder said while it's decoded, as a read from the file is.
+        var reader = new StemPeaksReader(name, new CachedMonoSource(stem), progress, progressInterval, resolution: resolution);
+        var reads = new Task[reader.ChunkCount];
+        for (int i = 0; i < reads.Length; i++)
+        {
+            int index = i;
+            reads[i] = Task.Run(
+                async () =>
+                {
+                    var (from, to) = reader.ChunkFrames(index);
+                    await stem.WhenReadable(from, to, cancellationToken).ConfigureAwait(false);
+                    if (stem.Completion is { IsCompleted: true, Result: false })
+                        return;
+                    reader.ReadChunk(index, new CachedMonoSource(stem), cancellationToken);
+                },
+                cancellationToken);
+        }
+
+        await Task.WhenAll(reads).ConfigureAwait(false);
+        return await stem.Completion.ConfigureAwait(false) ? reader.Finish() : null;
     }
 
     /// <summary>
