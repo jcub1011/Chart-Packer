@@ -100,8 +100,9 @@ public sealed class OpusSource : IPcmSource
         }
 
         // FFmpeg reads the whole header itself, mapping included. Its gain is zeroed, as it's applied here.
+        string decoderName = ChooseDecoder();
         byte[]? ffmpegHead = null;
-        if (AudioDecoder.UsesFfmpeg(backend, DecoderName, Channels, isAvailable))
+        if (AudioDecoder.UsesFfmpeg(backend, decoderName, Channels, isAvailable))
         {
             ffmpegHead = head.ToArray();
             ffmpegHead.AsSpan(16, 2).Clear();
@@ -139,14 +140,38 @@ public sealed class OpusSource : IPcmSource
 
         // Made last, once nothing else can throw, so that a stream that isn't Opus leaves nothing to free.
         IPacketDecoder? ffmpeg = ffmpegHead is not null
-            ? FfmpegPacketDecoder.Open(backend, DecoderName, Channels, ffmpegHead, trimsStart: false, errorsAreSilence: false)
+            ? FfmpegPacketDecoder.Open(backend, decoderName, Channels, ffmpegHead, trimsStart: false, errorsAreSilence: false)
             : null;
         _decoder = ffmpeg ?? new ConcentusDecoder(Channels, mapping);
         Rewind(_origin);
     }
 
     /// <summary>FFmpeg's native Opus decoder.</summary>
-    internal const string DecoderName = "opus";
+    internal const string NativeDecoder = "opus";
+
+    /// <summary>
+    /// FFmpeg's wrapper of libopus, the reference decoder, in libraries built with it. It gives interleaved floats, but
+    /// it decodes 34-57% slower than <see cref="NativeDecoder"/> (tools/DecodeBench/RESULTS.md), so it's only used when
+    /// <see cref="DecoderVariable"/> asks for it.
+    /// </summary>
+    internal const string LibopusDecoder = "libopus";
+
+    /// <summary>
+    /// The environment variable that makes this use one FFmpeg Opus decoder (<c>opus</c> or <c>libopus</c>) whatever else is
+    /// available, so that stream can't be opened when FFmpeg lacks it. For benchmarks and debugging: DecodeBench's
+    /// <c>--opus-decoder</c> sets it. Read once, before the first stream opens; any other value is ignored.
+    /// </summary>
+    internal const string DecoderVariable = "CHART_PACKER_OPUS_DECODER";
+
+    private static readonly string? ForcedDecoder = Environment.GetEnvironmentVariable(DecoderVariable)?.Trim() switch
+    {
+        NativeDecoder => NativeDecoder,
+        LibopusDecoder => LibopusDecoder,
+        _ => null,
+    };
+
+    /// <summary>The FFmpeg decoder to use for Opus: the forced one (see <see cref="DecoderVariable"/>), else the native one.</summary>
+    private static string ChooseDecoder() => ForcedDecoder ?? NativeDecoder;
 
     public int SampleRate => Rate;
 
