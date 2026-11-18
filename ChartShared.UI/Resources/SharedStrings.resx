@@ -249,6 +249,25 @@
     <value>Previously Selected Device (Not Connected)</value>
     <comment>The output device choice shown when the device saved in the settings isn't currently connected.</comment>
   </data>
+  <data name="LowLatencyAudioLabel" xml:space="preserve">
+    <value>Low Latency Audio</value>
+    <comment>Switch: plays audio on Windows' low-latency audio path instead of the default one.</comment>
+  </data>
+  <data name="LowLatencyAudioDescription" xml:space="preserve">
+    <value>Play audio on Windows' low-latency audio path, with a small device buffer, so audio is heard sooner after it is mixed. Windows only; applies when the app starts.</value>
+  </data>
+  <data name="LowLatencyAudioKeywords" xml:space="preserve">
+    <value>low latency audio wasapi driver buffer windows delay lag fast</value>
+  </data>
+  <data name="OutputDeviceLabel" xml:space="preserve">
+    <value>Output Device</value>
+  </data>
+  <data name="OutputDeviceDescription" xml:space="preserve">
+    <value>The device audio plays on. When the chosen device isn't connected, the default output device is used until it is. Applies the next time audio is opened.</value>
+  </data>
+  <data name="OutputDeviceKeywords" xml:space="preserve">
+    <value>output device audio playback headphones speakers wasapi default sound</value>
+  </data>
   <data name="SettingsCategoryLogging" xml:space="preserve">
     <value>Logging</value>
   </data>

@@ -25,7 +25,9 @@ public sealed record OutputDeviceInfo(string Identifier, string Name);
 /// </summary>
 /// <remarks>
 /// On Windows a device is identified by its endpoint ID, read through the MMDevice API and matched to SDL's
-/// device by its friendly name (SDL names its devices with the friendly name). Elsewhere, SDL gives no stable
+/// device by its friendly name (SDL names its devices with the friendly name). Devices that share a friendly name
+/// are paired in the order each side lists them, which is the best that can be done: SDL gives no ID to tell them
+/// apart. A device whose SDL name has no endpoint of that name isn't offered. Elsewhere, SDL gives no stable
 /// identifier this build can read, so the device's name is used.
 /// </remarks>
 public static class AudioDevices
@@ -66,12 +68,14 @@ public static class AudioDevices
     /// <summary>The device <paramref name="saved"/> identifies, with the SDL ID needed to open it, or null when it isn't connected.</summary>
     internal static Candidate? ResolveCandidate(string? saved)
     {
-        if (string.IsNullOrWhiteSpace(saved))
+        var candidates = Enumerate();
+        var found = Resolve(saved, [.. candidates.Select(candidate => candidate.Info)]);
+        if (found is null)
             return null;
 
-        foreach (var candidate in Enumerate())
+        foreach (var candidate in candidates)
         {
-            if (string.Equals(candidate.Info.Identifier, saved, StringComparison.OrdinalIgnoreCase))
+            if (ReferenceEquals(candidate.Info, found))
                 return candidate;
         }
 
@@ -100,24 +104,11 @@ public static class AudioDevices
             if (endpoints.Count == 0)
                 return candidates;
 
-            var byName = new Dictionary<string, int>(endpoints.Count, StringComparer.OrdinalIgnoreCase);
-            for (int i = 0; i < endpoints.Count; i++)
-            {
-                // Endpoints are in the order the MMDevice enumerator returns them; the first with a name wins.
-                byName.TryAdd(endpoints[i].Name, i);
-            }
-
+            var devices = new List<(uint SdlId, string? Name)>();
             foreach (var devid in SdlPlaybackDevices())
-            {
-                var name = SDL_GetAudioDeviceName(devid);
-                if (name is null || !byName.TryGetValue(name, out int index))
-                    continue;
+                devices.Add(((uint)devid, SDL_GetAudioDeviceName(devid)));
 
-                var (id, endpointName) = endpoints[index];
-                candidates.Add(new Candidate(new OutputDeviceInfo(id, endpointName), (uint)devid, id));
-            }
-
-            return candidates;
+            return Pair(endpoints, devices);
         }
 
         foreach (var devid in SdlPlaybackDevices())
@@ -126,7 +117,34 @@ public static class AudioDevices
             if (string.IsNullOrEmpty(name))
                 continue;
 
-            candidates.Add(new Candidate(new OutputDeviceInfo(name, name), (uint)devid, null));
+            candidates.Add(new Candidate(new OutputDeviceInfo(name, name), (uint)devid));
+        }
+
+        return candidates;
+    }
+
+    /// <summary>
+    /// Matches each SDL device to the Windows endpoint with its name, each endpoint to at most one device. Endpoints
+    /// that share a name are handed out in the order given, so two identical devices don't both get the first's ID.
+    /// A device with no endpoint of its name is left out.
+    /// </summary>
+    internal static List<Candidate> Pair(IReadOnlyList<(string Id, string Name)> endpoints, IReadOnlyList<(uint SdlId, string? Name)> devices)
+    {
+        var byName = new Dictionary<string, Queue<(string Id, string Name)>>(endpoints.Count, StringComparer.OrdinalIgnoreCase);
+        foreach (var endpoint in endpoints)
+        {
+            if (!byName.TryGetValue(endpoint.Name, out var queue))
+                byName[endpoint.Name] = queue = new Queue<(string, string)>();
+            queue.Enqueue(endpoint);
+        }
+
+        var candidates = new List<Candidate>(devices.Count);
+        foreach (var (sdlId, name) in devices)
+        {
+            if (name is null || !byName.TryGetValue(name, out var queue) || !queue.TryDequeue(out var endpoint))
+                continue;
+
+            candidates.Add(new Candidate(new OutputDeviceInfo(endpoint.Id, endpoint.Name), sdlId));
         }
 
         return candidates;
@@ -145,6 +163,10 @@ public static class AudioDevices
         return devices;
     }
 
-    /// <summary>A device, with the SDL ID needed to open it and the Windows endpoint ID, where there is one.</summary>
-    internal readonly record struct Candidate(OutputDeviceInfo Info, uint SdlId, string? EndpointId);
+    /// <summary>A device, with the SDL ID needed to open it.</summary>
+    internal readonly record struct Candidate(OutputDeviceInfo Info, uint SdlId)
+    {
+        /// <summary>The Windows endpoint's ID, which is the identifier there; none elsewhere.</summary>
+        public string? EndpointId => OperatingSystem.IsWindows() ? Info.Identifier : null;
+    }
 }

@@ -18,7 +18,7 @@ Both this window and **Shortcuts** take on the colours of the song selected in C
 
 Library (scanning, duplicates), output (pack and unpack, downloads), playback (audio, visualizers, scrubbing), and general (appearance, logging).
 
-The audio section holds **Low Latency Audio**, which plays audio on Windows' low-latency audio path so it's heard sooner (on by default, applies when the app starts), **Output Device**, which chooses the device audio plays on (**Default output device** plays on the system's default device, as does a chosen device that isn't connected), and **Audio/Visual Latency**, measured per output device.
+The audio section holds **Low Latency Audio**, which plays audio on Windows' low-latency audio path so it's heard sooner (on by default, applies when the app starts), **Output Device**, which chooses the device audio plays on (**Default output device** plays on the system's default device, as does a chosen device that isn't connected, until it is connected again), and **Audio/Visual Latency**, measured per output device.
 
 ## Chart Builder's Settings
 

@@ -1807,9 +1807,9 @@ Acceptance criteria:
    - *Changed for issue #140:* the app reads what it can of that latency
      (`DeviceLatency`): SDL's device buffer (`SDL_GetAudioDeviceFormat`'s sample frames at the
      device's rate) and, on Windows, what WASAPI reports for the endpoint, the stream latency and
-     device period of a shared-mode stream opened the way SDL opens it — `IAudioClient3` with the
-     periodicity SDL requests, with the small buffer when Low latency audio is on
-     (`WindowsAudioEndpoint`, issue #280). It comes with the device
+     device period of a shared-mode stream (`WindowsAudioEndpoint`): with Low latency audio on,
+     opened the way SDL opens it, `IAudioClient3` at the small periodicity SDL requests (issue
+     #280); otherwise a plain shared stream with the engine's own period. It comes with the device
      (`AudioDevice.DetectedLatencyMs`), and is **added** to the calibrated latency, so the
      calibration is only what's left: a Bluetooth link's delay, the display's, and whatever else
      the app can't see ([C11](#c11-calibration-tool) item 3). The latency drawn with is the two

@@ -100,10 +100,7 @@ namespace ChartBuilder.Services
                 : 1;
             settings.AutosaveMinutes = Math.Clamp(settings.AutosaveMinutes, BuilderSettings.MinAutosaveMinutes, BuilderSettings.MaxAutosaveMinutes);
             settings.LastTranscodeBitrateKbps = Math.Clamp(settings.LastTranscodeBitrateKbps, 32, 512);
-            if (string.IsNullOrWhiteSpace(settings.OutputDevice))
-                settings.OutputDevice = "";
-            else
-                settings.OutputDevice = settings.OutputDevice.Trim();
+            settings.OutputDevice = (settings.OutputDevice ?? "").Trim();
 
             settings.MasterVolume = double.IsFinite(settings.MasterVolume)
                 ? Math.Clamp(settings.MasterVolume, 0, 1)

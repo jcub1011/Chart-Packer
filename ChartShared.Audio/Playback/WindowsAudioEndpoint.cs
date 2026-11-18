@@ -50,12 +50,10 @@ internal static unsafe partial class WindowsAudioEndpoint
     private const int GetSharedModeEnginePeriodSlot = 18;
     private const int InitializeSharedAudioStreamSlot = 20;
 
-    // IAudioClient3: the small-period shared stream, opened the way SDL opens it.
+    // IAudioClient3: the small-period shared stream, as Windows documents it for low-latency audio, opened with an
+    // event callback as SDL opens it.
     private const uint StreamFlagsEventCallback = 0x00040000;
-    // IAudioClient3: the small-period shared stream, as Windows documents it for low-latency audio.
     private static readonly Guid IAudioClient3Iid = new("7ED4EE07-8E67-4CD4-8C1A-2B7A5987AD42");
-    // The buffer SDL asks of the device in low-latency mode, in sample frames: about 2.7 ms at 48 kHz.
-    private const int LowLatencySampleFrames = 128;
 
     private static readonly Guid MMDeviceEnumeratorClsid = new("BCDE0395-E52F-467C-8E3D-C4579291692E");
     private static readonly Guid IMMDeviceEnumeratorIid = new("A95664D2-9614-4F35-A746-DE8DB63617E6");
@@ -79,8 +77,9 @@ internal static unsafe partial class WindowsAudioEndpoint
     /// Either of the pair may be null when it can't be read; both are null when the endpoint is gone.
     /// </summary>
     /// <remarks>
-    /// <paramref name="lowLatency"/> should say whether SDL was asked to open the device with its small buffer, so the probe
-    /// opens its stream the same way, with the same periodicity, as the stream WASAPI actually plays.
+    /// <paramref name="lowLatency"/> should say whether SDL was asked to open the device with its small buffer; the probe
+    /// then opens its stream the same way, with the same periodicity, as the stream WASAPI actually plays. Otherwise it
+    /// opens a plain shared stream with the engine's own period.
     /// </remarks>
     public static (string? Id, TimeSpan? Latency) RenderIdAndLatency(string? endpointId, bool lowLatency = false)
     {
@@ -336,10 +335,11 @@ internal static unsafe partial class WindowsAudioEndpoint
 
             try
             {
-                // Open a stream of the same kind SDL opens, so the latency asked for is the latency heard: a shared stream
-                // with a small periodicity via IAudioClient3 (the low-latency path), with SDL's own requested buffer size.
-                // The stream's latency is only known once it's initialized.
-                if (!TryInitializeLowPeriod(client, format, lowLatency))
+                // Open a stream of the same kind SDL opens, so the latency asked for is the latency heard: with the small
+                // buffer, a shared stream with a small periodicity via IAudioClient3 (the low-latency path); otherwise a
+                // plain shared stream with no flags and the engine's own buffer and period. The stream's latency is only
+                // known once it's initialized.
+                if (!lowLatency || !TryInitializeLowPeriod(client, format))
                 {
                     var initialize = (delegate* unmanaged<IntPtr, int, uint, long, long, IntPtr, Guid*, int>)Slot(client, InitializeSlot);
                     if (initialize(client, AudclntSharemodeShared, 0, 0, 0, format, null) < 0)
@@ -367,25 +367,12 @@ internal static unsafe partial class WindowsAudioEndpoint
     }
 
     /// <summary>
-    /// The buffer SDL aims for, in frames: its low-latency request when <paramref name="lowLatency"/> is on, otherwise the
-    /// frequency-based default SDL uses (<c>SDL_GetDefaultSampleFramesFromFreq</c>).
+    /// Initializes <paramref name="client"/> with IAudioClient3 at the periodicity SDL is asked for in low-latency mode
+    /// (<see cref="AudioDevices.LowLatencySampleFrames"/>), as SDL does when the engine supports it: an integral multiple
+    /// of the fundamental period, clamped to the engine's range. False when IAudioClient3 can't be used, and the caller
+    /// should fall back to a plain shared initialization.
     /// </summary>
-    private static int SampleFramesFor(int freq, bool lowLatency)
-    {
-        if (lowLatency)
-            return AudioDevices.LowLatencySampleFrames;
-        if (freq <= 22050) return 512;
-        if (freq <= 48000) return 1024;
-        if (freq <= 96000) return 2048;
-        return 4096;
-    }
-
-    /// <summary>
-    /// Initializes <paramref name="client"/> with IAudioClient3 at SDL's requested periodicity, as SDL does when the
-    /// engine supports it: an integral multiple of the fundamental period, clamped to the engine's range. False when
-    /// IAudioClient3 can't be used, and the caller should fall back to a plain shared initialization.
-    /// </summary>
-    private static bool TryInitializeLowPeriod(IntPtr client, IntPtr format, bool lowLatency)
+    private static bool TryInitializeLowPeriod(IntPtr client, IntPtr format)
     {
         var iid = IAudioClient3Iid;
         var queryInterface = (delegate* unmanaged<IntPtr, Guid*, IntPtr*, int>)Slot(client, 0);
@@ -395,11 +382,6 @@ internal static unsafe partial class WindowsAudioEndpoint
 
         try
         {
-            // WAVEFORMATEX: wFormatTag (2), nChannels (2), nSamplesPerSec (4). The engine's format has that layout too,
-            // WAVEFORMATEXTENSIBLE included.
-            var freq = ((int*)((byte*)format + 4))[0];
-            var requested = SampleFramesFor(freq > 0 ? freq : 48000, lowLatency);
-
             uint defaultPeriod, fundamental, minPeriod, maxPeriod;
             var getPeriod = (delegate* unmanaged<IntPtr, IntPtr, uint*, uint*, uint*, uint*, int>)Slot(client3, GetSharedModeEnginePeriodSlot);
             if (getPeriod(client3, format, &defaultPeriod, &fundamental, &minPeriod, &maxPeriod) < 0)
@@ -407,7 +389,7 @@ internal static unsafe partial class WindowsAudioEndpoint
             if (fundamental == 0)
                 return false;
 
-            var period = fundamental * (uint)Math.Round((double)requested / fundamental);
+            var period = fundamental * (uint)Math.Round((double)AudioDevices.LowLatencySampleFrames / fundamental);
             period = Math.Clamp(period, minPeriod, maxPeriod);
 
             var initialize = (delegate* unmanaged<IntPtr, uint, uint, IntPtr, Guid*, int>)Slot(client3, InitializeSharedAudioStreamSlot);

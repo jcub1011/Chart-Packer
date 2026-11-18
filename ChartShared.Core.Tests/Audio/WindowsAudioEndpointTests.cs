@@ -3,7 +3,6 @@ using ChartShared.Audio.Playback;
 
 namespace ChartShared.Core.Tests.Audio;
 
-
 [TestClass]
 [SupportedOSPlatform("windows")]
 [OSCondition(OperatingSystems.Windows)]
@@ -76,7 +75,22 @@ public sealed class WindowsAudioEndpointTests
     [TestMethod]
     public void ANullEndpointIdReadsTheDefaultEndpoint()
     {
-        Assert.AreEqual(WindowsAudioEndpoint.DefaultRenderIdAndLatency(), WindowsAudioEndpoint.RenderIdAndLatency(null));
-        Assert.AreEqual(WindowsAudioEndpoint.DefaultRenderIdAndLatency(), WindowsAudioEndpoint.RenderIdAndLatency(""));
+        // Only the ID is compared: the latency of two separate probes can differ by a little.
+        var expected = WindowsAudioEndpoint.DefaultRenderId();
+
+        Assert.AreEqual(expected, WindowsAudioEndpoint.RenderIdAndLatency(null).Id);
+        Assert.AreEqual(expected, WindowsAudioEndpoint.RenderIdAndLatency("").Id);
+    }
+
+    [TestMethod]
+    public void TheLowLatencyProbeIsWithinASecondOrNone()
+    {
+        var latency = WindowsAudioEndpoint.DefaultRenderLatency(lowLatency: true);
+
+        if (latency is { } found)
+        {
+            Assert.IsGreaterThanOrEqualTo(TimeSpan.Zero, found);
+            Assert.IsLessThan(TimeSpan.FromSeconds(1), found);
+        }
     }
 }

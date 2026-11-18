@@ -17,8 +17,9 @@ namespace ChartShared.Audio.Playback;
 /// When an output device is chosen, the stream opens on that one and SDL leaves it there: a
 /// device opened by name or ID is left alone when it disconnects, rather than moved to the new
 /// default. So the output is checked about once a second, and when the chosen device is found to
-/// be gone the stream is opened again on the default device (dropping what was queued), which is
-/// what plays from then on. SDL moves a stream opened on the default device by itself.
+/// be gone the stream is opened again on the default device (dropping what was queued), which plays
+/// until the chosen device is connected again; the stream then moves back to it (dropping what was
+/// queued, again). SDL moves a stream opened on the default device by itself.
 /// </para>
 /// <para>
 /// SDL moves the stream without saying so, and only reports device events to an event loop this
@@ -43,14 +44,18 @@ public sealed unsafe class SdlAudioOutput : IAudioOutput
     private SDL_AudioStream* _stream;
     private AudioDevice _device;
     private (string Name, string? Id, TimeSpan? Latency)? _osLatency;
-    // The physical SDL device the stream was opened on, when one was chosen; null for the default device.
+    // The device that was asked for, as AudioDevices identifies it; null or empty when the default device was.
+    private readonly string? _preferredDevice;
+    // The physical SDL device the stream is on, when it's the chosen one; null when it's on the default device.
     private uint? _openedDeviceId;
-    // The chosen device's Windows endpoint ID, when one is chosen; null for the default device.
+    // The chosen device's Windows endpoint ID, when the stream is on it; null when it's on the default device.
     private string? _endpointId;
     private readonly bool _lowLatencyAudio;
     private float _volume = 1;
     private float _speed = 1;
-    private bool _paused;
+    // A device stream starts paused, until Resume.
+    private bool _paused = true;
+    private bool _disposed;
 
     /// <exception cref="AudioDeviceException">No output device could be opened.</exception>
     internal SdlAudioOutput(int sampleRate, string? outputDevice, bool lowLatencyAudio)
@@ -58,6 +63,7 @@ public sealed unsafe class SdlAudioOutput : IAudioOutput
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(sampleRate);
         SampleRate = sampleRate;
         _lowLatencyAudio = lowLatencyAudio;
+        _preferredDevice = outputDevice;
 
         var spec = new SDL_AudioSpec { format = SDL_AudioFormat.SDL_AUDIO_F32LE, channels = Channels, freq = sampleRate };
         _stream = Open(&spec, outputDevice);
@@ -179,6 +185,8 @@ public sealed unsafe class SdlAudioOutput : IAudioOutput
         _deviceCheck.Dispose();
         lock (_lock)
         {
+            // A check still running can't open a stream on the device after this.
+            _disposed = true;
             if (_stream is null)
                 return;
 
@@ -196,8 +204,7 @@ public sealed unsafe class SdlAudioOutput : IAudioOutput
             return;
         try
         {
-            if (_openedDeviceId is { } wanted && !AudioDevices.IsConnected(wanted))
-                ReopenDefault();
+            FollowChosenDevice();
 
             if (ReadDevice() is not { } device)
                 return;
@@ -236,34 +243,67 @@ public sealed unsafe class SdlAudioOutput : IAudioOutput
     }
 
     /// <summary>
-    /// Reopens the stream on the default output device, after the chosen one disappeared. What was queued is
-    /// dropped with the old stream. On failure the stream stays closed and opening is tried again on the next check.
+    /// Keeps the stream on the chosen device: moved to the default device when the chosen one is gone, and back to the
+    /// chosen one once it is connected again. Does nothing when no device is chosen, as SDL follows the default device.
     /// </summary>
-    private void ReopenDefault()
+    private void FollowChosenDevice()
+    {
+        if (string.IsNullOrWhiteSpace(_preferredDevice))
+            return;
+
+        uint? opened;
+        lock (_lock)
+            opened = _openedDeviceId;
+
+        if (opened is { } on)
+        {
+            if (!AudioDevices.IsConnected(on))
+                Reopen(null);
+        }
+        else if (AudioDevices.ResolveCandidate(_preferredDevice) is { } returned)
+        {
+            Reopen(returned);
+        }
+    }
+
+    /// <summary>
+    /// Opens the stream again on <paramref name="target"/>, or on the default output device when that is null, and closes
+    /// the old one; what was queued is dropped with it. When the chosen device won't open, the stream stays where it is.
+    /// When the default device won't open, the stream stays closed and opening is tried again on the next check.
+    /// </summary>
+    private void Reopen(AudioDevices.Candidate? target)
     {
         lock (_lock)
         {
+            if (_disposed)
+                return;
+
+            var spec = new SDL_AudioSpec { format = SDL_AudioFormat.SDL_AUDIO_F32LE, channels = Channels, freq = SampleRate };
+            var device = target is { } chosen ? (SDL_AudioDeviceID)chosen.SdlId : SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK;
+            var stream = SDL_OpenAudioDeviceStream(device, &spec, null, IntPtr.Zero);
+            if (stream is null && target is not null)
+                return;
+
             if (_stream is not null)
             {
-                // Chosen for deletion but still listed nowhere; a zombie that keeps swallowing audio.
+                // Left open, a stream on a disconnected device is a zombie that keeps swallowing audio.
                 SDL_DestroyAudioStream(_stream);
                 _stream = null;
             }
 
-            var spec = new SDL_AudioSpec { format = SDL_AudioFormat.SDL_AUDIO_F32LE, channels = Channels, freq = SampleRate };
-            var stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, null, IntPtr.Zero);
             if (stream is null)
                 return;
 
             _stream = stream;
             // The default device moves with the system from here on; SDL migrates the stream by itself.
-            _openedDeviceId = null;
-            _endpointId = null;
+            _openedDeviceId = target?.SdlId;
+            _endpointId = target?.EndpointId;
             _osLatency = null;
             SDL_SetAudioStreamGain(_stream, _volume);
             SDL_SetAudioStreamFrequencyRatio(_stream, _speed);
-            if (_paused)
-                SDL_PauseAudioStreamDevice(_stream);
+            // A stream opens paused.
+            if (!_paused)
+                SDL_ResumeAudioStreamDevice(_stream);
         }
     }
 
