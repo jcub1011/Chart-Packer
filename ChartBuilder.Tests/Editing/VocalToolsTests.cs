@@ -165,6 +165,31 @@ public sealed class VocalToolsTests
     }
 
     [TestMethod]
+    public void AMoveLeavesAGhostOfTheNotesAsTheLaneDrewThemOnlyWhileTheyreOffTheirPlaces()
+    {
+        var session = Of(WithVocals([new(0, 240, 60), new(240, 240, 62)], [new(0, "go#"), new(240, "+")]));
+        session.Tools.SelectAllVocals(VocalTrack.Vocals);
+        var before = session.VocalsOf(VocalTrack.Vocals)!.Notes;
+
+        session.Tools.Press(VocalAt(10, 60));
+        Assert.IsEmpty(session.Tools.VocalMoveGhost(VocalTrack.Vocals), "Nothing's moved yet.");
+
+        session.Tools.Drag(VocalAt(490, 63));
+        var ghost = session.Tools.VocalMoveGhost(VocalTrack.Vocals);
+        Assert.AreSequenceEqual([.. before], [.. ghost]);
+        Assert.IsTrue(ghost[0].IsUnpitched);
+        Assert.IsTrue(ghost[1].IsSlide, "A slide's ghost is drawn as the slide was.");
+        Assert.IsEmpty(session.Tools.VocalMoveGhost(VocalTrack.Harmony1));
+
+        session.Tools.Drag(VocalAt(10, 60));
+        Assert.IsEmpty(session.Tools.VocalMoveGhost(VocalTrack.Vocals), "Dragged back, the notes are where they were.");
+
+        session.Tools.Drag(VocalAt(490, 63));
+        session.Tools.Release(VocalAt(490, 63));
+        Assert.IsEmpty(session.Tools.VocalMoveGhost(VocalTrack.Vocals), "Let go, the move is done.");
+    }
+
+    [TestMethod]
     public void CancellingADragLeavesThePartAndTheSelectionAsTheyWere()
     {
         var session = Of(WithVocals([new(0, 240, 60)]));

@@ -692,6 +692,14 @@ namespace ChartBuilder.Controls.Editing
                     DrawNotes(context, session, ghostKey, part[ghost], projection, slots, fromTick, toTick, LongestOf(ref _ghostLongest, ghostKey, part[ghost]), isGhost: true, painter, pass);
             }
 
+            // The notes being dragged leave a faint ghost where they were, under the notes, until they're let go: outlined as
+            // the ghost difficulty's are, but ringed in the accent as the selection is, so they're not taken for its notes.
+            if (session.Tools.MoveGhost(key) is { } lifted)
+            {
+                using (context.PushOpacity(0.4))
+                    DrawNotes(context, session, key, lifted.Notes, projection, slots, fromTick, toTick, lifted.Longest, isGhost: true, painter, pass, ghostRing: AccentPens().Selected);
+            }
+
             long longest = LongestOf(ref _longest, key, track);
             if (session.GhostTrack(key) is { } draft)
             {
@@ -2625,7 +2633,8 @@ namespace ChartBuilder.Controls.Editing
         }
 
         /// <param name="longest">The longest note's length in <paramref name="track"/>, so a sustain begun before the view is drawn.</param>
-        private void DrawNotes(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, LaneProjection projection, LaneSlots slots, double fromTick, double toTick, long longest, bool isGhost, NotePainter painter, NotePass pass)
+        /// <param name="ghostRing">With <paramref name="isGhost"/>, the pen of a ring round each note, as the selection's: what a move leaves where the notes were.</param>
+        private void DrawNotes(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, LaneProjection projection, LaneSlots slots, double fromTick, double toTick, long longest, bool isGhost, NotePainter painter, NotePass pass, IPen? ghostRing = null)
         {
             var kind = track.Kind;
             bool drums = kind == ChartInstrumentKind.Drums;
@@ -2717,7 +2726,7 @@ namespace ChartBuilder.Controls.Editing
             }
 
             _flagged.Clear();
-            _decorations.Begin(session, key, track, projection, slots, AccentPens().Selected, isGhost, upright: ReferenceEquals(painter, _uprightNotes));
+            _decorations.Begin(session, key, track, projection, slots, AccentPens().Selected, isGhost, isGhost ? ghostRing : null, upright: ReferenceEquals(painter, _uprightNotes));
             painter.Draw(context, projection, kind, CollectionsMarshal.AsSpan(glyphs), size, _decorations, _alongLimit.From, _alongLimit.To, pass);
         }
 
@@ -2732,6 +2741,7 @@ namespace ChartBuilder.Controls.Editing
             private LaneSlots? _slots;
             private IPen? _selectedPen;
             private bool _isGhost;
+            private IPen? _ghostRing;
             private bool _isUpright;
 
             public NoteDecorations(EditorCanvas canvas)
@@ -2739,7 +2749,7 @@ namespace ChartBuilder.Controls.Editing
                 _canvas = canvas;
             }
 
-            public void Begin(EditorSession session, ChartTrackKey key, EditableTrack track, LaneProjection projection, LaneSlots slots, IPen selectedPen, bool isGhost, bool upright)
+            public void Begin(EditorSession session, ChartTrackKey key, EditableTrack track, LaneProjection projection, LaneSlots slots, IPen selectedPen, bool isGhost, IPen? ghostRing, bool upright)
             {
                 _session = session;
                 _key = key;
@@ -2748,6 +2758,7 @@ namespace ChartBuilder.Controls.Editing
                 _slots = slots;
                 _selectedPen = selectedPen;
                 _isGhost = isGhost;
+                _ghostRing = ghostRing;
                 _isUpright = upright;
             }
 
@@ -2764,17 +2775,16 @@ namespace ChartBuilder.Controls.Editing
             public void AfterNote(DrawingContext context, in NoteGlyph glyph, Rect rect)
             {
                 if (_isGhost)
+                {
+                    if (_ghostRing is { } ring)
+                        DrawRing(context, rect, ring);
                     return;
+                }
 
                 var note = _canvas._glyphNotes[glyph.Index];
                 bool across = glyph.Has(NoteGlyphParts.Across);
                 if (_session!.Selection.IsMarked(_key, note))
-                {
-                    if (_isUpright)
-                        _canvas._upright.DrawSelection(context, rect, _selectedPen!);
-                    else
-                        context.DrawRectangle(null, _selectedPen, rect.Inflate(2), 3, 3);
-                }
+                    DrawRing(context, rect, _selectedPen!);
 
                 if (!across && _track!.Kind != ChartInstrumentKind.Drums && _canvas._flagged.Add(note.Tick) && _track.FlagsAt(note.Tick) is var flags and not ChordFlags.None)
                 {
@@ -2783,6 +2793,15 @@ namespace ChartBuilder.Controls.Editing
                     else
                         _canvas.DrawForcing(context, _projection!, _slots!, glyph.Along, flags);
                 }
+            }
+
+            // A ring in pen round the note drawn at rect, as the selection's is, standing up on a perspective highway.
+            private void DrawRing(DrawingContext context, Rect rect, IPen pen)
+            {
+                if (_isUpright)
+                    _canvas._upright.DrawSelection(context, rect, pen);
+                else
+                    context.DrawRectangle(null, pen, rect.Inflate(2), 3, 3);
             }
         }
 

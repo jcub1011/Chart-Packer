@@ -689,6 +689,15 @@ public sealed partial class EditorTools
         private (long Ticks, int Pitches) _delta;
         private bool _moved;
 
+        // Whether a move is previewed that has the notes off their places: set only once a preview is taken, as the chart
+        // lanes' MoveGesture sets its delta, so a refused one leaves no ghost.
+        private bool _lifted;
+
+        // The lane as it was pressed, which draws the notes as they were, and their ghost from it, built when they're first
+        // lifted.
+        private readonly VocalLane? _pressedLane;
+        private IReadOnlyList<VocalLaneNote>? _ghost;
+
         public VocalMoveGesture(EditorTools tools, VocalPoint pressed, VocalTrackContent content, VocalNoteEvent grabbed)
             : base(tools, pressed.Track, content)
         {
@@ -697,6 +706,21 @@ public sealed partial class EditorTools
             _grabbed = grabbed;
             _selected = [.. Session.Selection.VocalPlaces];
             _notes = VocalEdits.NotesAt(content, _selected);
+            _pressedLane = Session.VocalsOf(Track);
+        }
+
+        /// <summary>The notes where they were pressed, while a move previewed has them off their places, if they're of <paramref name="track"/>.</summary>
+        public IReadOnlyList<VocalLaneNote> GhostOf(VocalTrack track)
+        {
+            if (!_lifted || track != Track || _pressedLane is null)
+                return [];
+            if (_ghost is null)
+            {
+                var places = _selected.ToHashSet();
+                _ghost = [.. _pressedLane.Notes.Where(n => places.Contains(new VocalNotePlace(n.Tick, n.Pitch)))];
+            }
+
+            return _ghost;
         }
 
         public override void Drag(VocalPoint point)
@@ -720,6 +744,7 @@ public sealed partial class EditorTools
 
             IReadOnlyList<VocalNotePlace> moved = [];
             bool previewed = Preview(c => VocalEdits.Change(c, _selected, n => n with { Tick = n.Tick + ticks, Pitch = n.Pitch + pitches }, out moved));
+            _lifted = previewed && _delta != default;
             Session.Selection.SelectVocalNotes(Track, previewed && moved.Count > 0 ? moved : _selected);
         }
 
