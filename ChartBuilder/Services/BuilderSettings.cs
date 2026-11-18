@@ -189,8 +189,21 @@ namespace ChartBuilder.Services
         /// <summary>The master volume of fresh settings: full.</summary>
         public const double DefaultMasterVolume = 1;
 
+        /// <summary>Whether low-latency audio is on by default.</summary>
+        public const bool DefaultLowLatencyAudio = true;
+
         /// <summary>The master volume, from silence to full.</summary>
         public double MasterVolume { get; set; } = DefaultMasterVolume;
+
+        /// <summary>Whether audio is played on Windows' low-latency WASAPI path, with a small device buffer, instead of the default one. Applies when the app starts.</summary>
+        public bool LowLatencyAudio { get; set; } = DefaultLowLatencyAudio;
+
+        /// <summary>
+        /// The output device audio plays on, as <see cref="ChartShared.Audio.Playback.AudioDevices"/> identifies it:
+        /// on Windows the endpoint's ID, elsewhere SDL's device name. Empty — the default — plays on the default output
+        /// device, which is also used when the chosen device isn't connected.
+        /// </summary>
+        public string OutputDevice { get; set; } = "";
 
         /// <summary>The metronome's volume, in percent of full.</summary>
         public int MetronomeVolume { get; set; } = 50;

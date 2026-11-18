@@ -96,6 +96,8 @@ namespace ChartPacker.Services
             if (!Enum.IsDefined(settings.LibrarySortField))
                 settings.LibrarySortField = LibrarySortField.ScanOrder;
 
+            settings.OutputDevice = (settings.OutputDevice ?? "").Trim();
+
             settings.MasterVolume = double.IsFinite(settings.MasterVolume)
                 ? Math.Clamp(settings.MasterVolume, 0, 1)
                 : AppSettings.DefaultMasterVolume;

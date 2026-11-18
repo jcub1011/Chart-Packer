@@ -189,6 +189,9 @@ namespace ChartPacker.Services
                         Get = () => player.Volume,
                         Set = volume => player.Volume = volume,
                     },
+                    .. AudioOutputSettings.CreateSettings(audio, AppSettings.DefaultLowLatencyAudio,
+                        () => settings.Settings.LowLatencyAudio, low => settings.Settings.LowLatencyAudio = low,
+                        () => settings.Settings.OutputDevice, device => settings.Settings.OutputDevice = device),
                     new ToggleSetting
                     {
                         Id = "playback.pitchCorrection",
