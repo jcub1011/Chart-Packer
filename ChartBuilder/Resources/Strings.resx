@@ -466,6 +466,158 @@
     <value>_Difficulty window</value>
     <comment>View menu: opens the difficulty analysis in a window of its own.</comment>
   </data>
+  <data name="MenuLoadLayout" xml:space="preserve">
+    <value>_Load Layout</value>
+    <comment>View menu: a submenu of the layout templates, each loading in place of the lanes open.</comment>
+  </data>
+  <data name="MenuSaveLayout" xml:space="preserve">
+    <value>Sa_ve Layout</value>
+    <comment>View menu: a submenu of the layout templates, each saving the lanes open over it, and New Layout.</comment>
+  </data>
+  <data name="MenuNewLayout" xml:space="preserve">
+    <value>New Layout…</value>
+    <comment>View menu, Save Layout submenu: saves the lanes open as a new layout template, asking its name.</comment>
+  </data>
+  <data name="MenuManageLayouts" xml:space="preserve">
+    <value>Manage La_youts…</value>
+    <comment>View menu: opens the window that adds, renames, reorders, overwrites and deletes the layout templates.</comment>
+  </data>
+  <data name="LayoutDefaultName" xml:space="preserve">
+    <value>Default</value>
+    <comment>The name of the layout template Chart Builder starts with: Guitar and Drums side by side.</comment>
+  </data>
+  <data name="LayoutNameBlank" xml:space="preserve">
+    <value>Enter a name for the layout.</value>
+    <comment>Layout name dialog: the name is blank.</comment>
+  </data>
+  <data name="LayoutNameTooLongFormat" xml:space="preserve">
+    <value>A layout's name can be at most {0} characters.</value>
+    <comment>Layout name dialog: the name is too long. {0} is the most characters.</comment>
+  </data>
+  <data name="LayoutNameTakenFormat" xml:space="preserve">
+    <value>There's already a layout named “{0}”.</value>
+    <comment>Layout name dialog: another layout has the name, ignoring case. {0} is the name.</comment>
+  </data>
+  <data name="LayoutLimitFormat" xml:space="preserve">
+    <value>There can be at most {0} layouts. Delete one to make room.</value>
+    <comment>Layout name dialog: no more layouts can be added. {0} is the most there can be.</comment>
+  </data>
+  <data name="LayoutNewTitle" xml:space="preserve">
+    <value>New Layout</value>
+    <comment>Title of the dialog that names a new layout template.</comment>
+  </data>
+  <data name="LayoutRenameTitle" xml:space="preserve">
+    <value>Rename Layout</value>
+    <comment>Title of the dialog that renames a layout template.</comment>
+  </data>
+  <data name="LayoutNameLabel" xml:space="preserve">
+    <value>Name</value>
+    <comment>Layout name dialog: the label above the name box.</comment>
+  </data>
+  <data name="LayoutNewIntro" xml:space="preserve">
+    <value>The lanes open now are saved as the new layout.</value>
+    <comment>Layout name dialog, naming a new layout: what's saved.</comment>
+  </data>
+  <data name="LayoutSaveButton" xml:space="preserve">
+    <value>Save</value>
+    <comment>Layout name dialog: saves the new layout.</comment>
+  </data>
+  <data name="LayoutRenameButton" xml:space="preserve">
+    <value>Rename</value>
+    <comment>Layout name dialog: renames the layout.</comment>
+  </data>
+  <data name="LayoutOverwriteTitle" xml:space="preserve">
+    <value>Overwrite Layout</value>
+    <comment>Title of the prompt before a layout template is overwritten.</comment>
+  </data>
+  <data name="LayoutOverwriteMessageFormat" xml:space="preserve">
+    <value>Replace the layout “{0}” with the lanes open now?</value>
+    <comment>Prompt before a layout template is overwritten. {0} is its name.</comment>
+  </data>
+  <data name="LayoutOverwriteButton" xml:space="preserve">
+    <value>Overwrite</value>
+    <comment>Overwrite prompt: replaces the layout with the lanes open.</comment>
+  </data>
+  <data name="LayoutLoadTitle" xml:space="preserve">
+    <value>Load Layout</value>
+    <comment>Title of the prompt before a layout template is loaded over lanes that aren't saved as one.</comment>
+  </data>
+  <data name="LayoutLoadMessageFormat" xml:space="preserve">
+    <value>Put the layout “{0}” in place of the lanes open now? They aren't saved as a layout, so their arrangement will be lost. Save them first with View ▸ Save Layout to keep it.</value>
+    <comment>Prompt before a layout template is loaded over lanes that aren't saved as one. {0} is its name.</comment>
+  </data>
+  <data name="LayoutLoadButton" xml:space="preserve">
+    <value>Load</value>
+    <comment>Load prompt: puts the layout in place of the lanes open.</comment>
+  </data>
+  <data name="LayoutDeleteTitle" xml:space="preserve">
+    <value>Delete Layout</value>
+    <comment>Title of the prompt before a layout template is deleted.</comment>
+  </data>
+  <data name="LayoutDeleteMessageFormat" xml:space="preserve">
+    <value>Delete the layout “{0}”? This can't be undone.</value>
+    <comment>Prompt before a layout template is deleted. {0} is its name.</comment>
+  </data>
+  <data name="LayoutDeleteButton" xml:space="preserve">
+    <value>Delete</value>
+    <comment>Delete prompt: deletes the layout.</comment>
+  </data>
+  <data name="LayoutUnreadableFormat" xml:space="preserve">
+    <value>The layout “{0}” couldn't be loaded.</value>
+    <comment>Message bar: a layout template couldn't be read, so the lanes stayed as they were. {0} is its name.</comment>
+  </data>
+  <data name="ManageLayoutsTitle" xml:space="preserve">
+    <value>Manage Layouts</value>
+    <comment>Title of the window that manages the layout templates.</comment>
+  </data>
+  <data name="ManageLayoutsIntro" xml:space="preserve">
+    <value>View ▸ Load Layout puts a layout's lanes in place of those open. Changing the lanes afterwards never changes the layout: overwrite it to update it.</value>
+    <comment>Manage Layouts: what the layouts are for.</comment>
+  </data>
+  <data name="ManageLayoutsEmpty" xml:space="preserve">
+    <value>No layouts yet. New Layout saves the lanes open as one.</value>
+    <comment>Manage Layouts: shown in place of the list when there are no layouts.</comment>
+  </data>
+  <data name="ManageLayoutsListName" xml:space="preserve">
+    <value>Layouts</value>
+    <comment>Manage Layouts: the accessible name of the list of layouts.</comment>
+  </data>
+  <data name="ManageLayoutsNewButton" xml:space="preserve">
+    <value>New Layout</value>
+    <comment>Manage Layouts: saves the lanes open as a new layout.</comment>
+  </data>
+  <data name="ManageLayoutsNewToolTip" xml:space="preserve">
+    <value>Save the lanes open now as a new layout, at the bottom of the list</value>
+    <comment>Manage Layouts: New Layout's tooltip.</comment>
+  </data>
+  <data name="ManageLayoutsRenameButton" xml:space="preserve">
+    <value>Rename</value>
+    <comment>Manage Layouts: renames the layout selected.</comment>
+  </data>
+  <data name="ManageLayoutsMoveUpButton" xml:space="preserve">
+    <value>Move Up</value>
+    <comment>Manage Layouts: moves the layout selected up the list.</comment>
+  </data>
+  <data name="ManageLayoutsMoveDownButton" xml:space="preserve">
+    <value>Move Down</value>
+    <comment>Manage Layouts: moves the layout selected down the list.</comment>
+  </data>
+  <data name="ManageLayoutsOverwriteButton" xml:space="preserve">
+    <value>Overwrite Layout</value>
+    <comment>Manage Layouts: replaces the layout selected with the lanes open.</comment>
+  </data>
+  <data name="ManageLayoutsOverwriteToolTip" xml:space="preserve">
+    <value>Replace the layout selected with the lanes open now</value>
+    <comment>Manage Layouts: Overwrite Layout's tooltip.</comment>
+  </data>
+  <data name="ManageLayoutsDeleteButton" xml:space="preserve">
+    <value>Delete</value>
+    <comment>Manage Layouts: deletes the layout selected.</comment>
+  </data>
+  <data name="ManageLayoutsCloseButton" xml:space="preserve">
+    <value>Close</value>
+    <comment>Manage Layouts: closes the window.</comment>
+  </data>
   <data name="MenuSettings" xml:space="preserve">
     <value>_Settings…</value>
     <comment>Edit menu: the program settings (Ctrl+,). The chart's settings are a tab in the left panel.</comment>

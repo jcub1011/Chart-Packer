@@ -239,6 +239,13 @@ namespace ChartBuilder.Services
         /// <summary>The editor's lanes, where each is docked and how big. Null for the default layout.</summary>
         public LaneDockState? EditorLanes { get; set; }
 
+        /// <summary>
+        /// The layout templates (issue 263), in the order the View menu lists them, which load in place of the lanes open.
+        /// Null in a file that's never had them, which starts with the default one (<see cref="LayoutTemplateStore"/>);
+        /// empty once the user has deleted them all.
+        /// </summary>
+        public List<LayoutTemplate>? LayoutTemplates { get; set; }
+
         /// <summary>How each window was shown when it last closed, by its type's name (<see cref="ChartShared.UI.Views.WindowMemory"/>). Null for none yet.</summary>
         public Dictionary<string, SavedWindow>? Windows { get; set; }
 

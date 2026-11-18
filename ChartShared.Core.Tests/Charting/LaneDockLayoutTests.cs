@@ -17,18 +17,83 @@ public sealed class LaneDockLayoutTests
     private static readonly LanePart Harmony1 = LanePart.Vocals(VocalTrack.Harmony1);
 
     [TestMethod]
-    public void TheDefaultIsThreeHighwaysOverVocals()
+    public void TheDefaultIsGuitarAndDrumsSideBySide()
     {
         var layout = LaneDockLayout.CreateDefault();
 
+        Assert.AreEqual("H(Guitar Drums)", Shape(layout));
+        Assert.AreSequenceEqual([1.0, 1.0], [.. ((DockSplit)layout.Root!).Weights]);
+    }
+
+    [TestMethod]
+    public void TheFixtureIsThreeHighwaysOverVocals()
+    {
+        var layout = ThreeHighwaysOverVocals();
+
         Assert.AreEqual("V(H(Guitar Bass Drums) Vocals)", Shape(layout));
         Assert.AreSequenceEqual([1.5, 0.5], [.. ((DockSplit)layout.Root!).Weights]);
+        Assert.AreSequenceEqual([1.0, 1.0, 1.0], [.. ((DockSplit)((DockSplit)layout.Root!).Children[0]).Weights]);
+    }
+
+    [TestMethod]
+    public void LoadingAStatePutsItsLanesInPlaceOfTheOpenOnes()
+    {
+        var layout = ThreeHighwaysOverVocals();
+        var oldIds = layout.Lanes.Select(l => l.Id).ToList();
+        var template = LaneDockLayout.CreateDefault();
+        template.SetLookAhead(Lane(template, Drums), 2.5);
+        template.SetAudio(Lane(template, Guitar), LaneAudioOptions.Default with { Backdrop = LaneBackdrop.Spectrogram });
+        template.SetWeights((DockSplit)template.Root!, [1, 3]);
+        int changes = 0;
+        layout.Changed += (_, _) => changes++;
+
+        bool loaded = layout.Load(template.ToState());
+
+        Assert.IsTrue(loaded);
+        Assert.AreEqual(1, changes);
+        Assert.AreEqual("H(Guitar Drums)", Shape(layout));
+        Assert.AreSequenceEqual([0.5, 1.5], [.. ((DockSplit)layout.Root!).Weights]);
+        Assert.AreEqual(2.5, Lane(layout, Drums).LookAhead);
+        Assert.AreEqual(LaneBackdrop.Spectrogram, Lane(layout, Guitar).Audio.Backdrop);
+        Assert.IsFalse(layout.Lanes.Any(l => oldIds.Contains(l.Id)), "A loaded lane has an id an old lane had.");
+    }
+
+    [TestMethod]
+    public void LoadingAnInvalidStateChangesNothing()
+    {
+        var layout = ThreeHighwaysOverVocals();
+        var lanes = layout.Lanes.ToList();
+        int changes = 0;
+        layout.Changed += (_, _) => changes++;
+        var twice = new LaneDockState
+        {
+            Root = new LaneDockNodeState
+            {
+                Split = "Horizontal",
+                Weights = [1, 1],
+                Children = [new() { Instrument = "Guitar", Difficulty = "Expert" }, new() { Instrument = "Guitar", Difficulty = "Expert" }],
+            },
+        };
+
+        Assert.IsFalse(layout.Load(twice));
+        Assert.IsFalse(layout.Load(null));
+        Assert.AreEqual(0, changes);
+        Assert.AreSequenceEqual(lanes, [.. layout.Lanes]);
+    }
+
+    [TestMethod]
+    public void LoadingAStateWithNoLanesClosesThemAll()
+    {
+        var layout = ThreeHighwaysOverVocals();
+
+        Assert.IsTrue(layout.Load(new LaneDockState()));
+        Assert.IsNull(layout.Root);
     }
 
     [TestMethod]
     public void LaneIdsAreUnique()
     {
-        var layout = LaneDockLayout.CreateDefault();
+        var layout = ThreeHighwaysOverVocals();
         layout.Add(Keys);
 
         var ids = layout.Lanes.Select(l => l.Id).ToList();
@@ -42,7 +107,7 @@ public sealed class LaneDockLayoutTests
     [DataRow(DockEdge.Bottom, "V(H(V(Guitar Vocals) Bass Drums))")]
     public void DockingAgainstALaneSplitsIt(DockEdge edge, string expected)
     {
-        var layout = LaneDockLayout.CreateDefault();
+        var layout = ThreeHighwaysOverVocals();
 
         layout.Move(Lane(layout, Vocals), Lane(layout, Guitar), edge);
 
@@ -53,7 +118,7 @@ public sealed class LaneDockLayoutTests
     [TestMethod]
     public void DockingBesideALaneInARowHalvesItsShare()
     {
-        var layout = LaneDockLayout.CreateDefault();
+        var layout = ThreeHighwaysOverVocals();
 
         layout.Move(Lane(layout, Vocals), Lane(layout, Bass), DockEdge.Right);
 
@@ -65,7 +130,7 @@ public sealed class LaneDockLayoutTests
     [TestMethod]
     public void DockingAcrossARowWrapsTheLaneInAnEvenSplit()
     {
-        var layout = LaneDockLayout.CreateDefault();
+        var layout = ThreeHighwaysOverVocals();
 
         layout.Move(Lane(layout, Drums), Lane(layout, Guitar), DockEdge.Bottom);
 
@@ -81,7 +146,7 @@ public sealed class LaneDockLayoutTests
     [DataRow(DockEdge.Bottom, "V(H(Guitar Bass) Drums Vocals)")]
     public void DockingAgainstTheWholeDockTakesAQuarterOfIt(DockEdge edge, string expected)
     {
-        var layout = LaneDockLayout.CreateDefault();
+        var layout = ThreeHighwaysOverVocals();
         layout.Move(Lane(layout, Drums), null, DockEdge.Bottom);
 
         layout.Move(Lane(layout, Vocals), null, edge);
@@ -95,7 +160,7 @@ public sealed class LaneDockLayoutTests
     [TestMethod]
     public void DockingALaneAgainstItselfDoesNothing()
     {
-        var layout = LaneDockLayout.CreateDefault();
+        var layout = ThreeHighwaysOverVocals();
         int changes = 0;
         layout.Changed += (_, _) => changes++;
 
@@ -119,7 +184,7 @@ public sealed class LaneDockLayoutTests
     [TestMethod]
     public void ClosingALaneGivesItsShareToTheLanesBesideIt()
     {
-        var layout = LaneDockLayout.CreateDefault();
+        var layout = ThreeHighwaysOverVocals();
         layout.Move(Lane(layout, Vocals), Lane(layout, Bass), DockEdge.Right);
 
         layout.Close(Lane(layout, Bass));
@@ -132,7 +197,7 @@ public sealed class LaneDockLayoutTests
     [TestMethod]
     public void ClosingALaneCollapsesAndMergesItsSplit()
     {
-        var layout = LaneDockLayout.CreateDefault();
+        var layout = ThreeHighwaysOverVocals();
         layout.Move(Lane(layout, Drums), Lane(layout, Guitar), DockEdge.Bottom);
 
         layout.Close(Lane(layout, Guitar));
@@ -144,7 +209,7 @@ public sealed class LaneDockLayoutTests
     [TestMethod]
     public void ASplitRunningTheSameWayAsItsParentIsMergedIntoIt()
     {
-        var layout = LaneDockLayout.CreateDefault();
+        var layout = ThreeHighwaysOverVocals();
 
         // Closing Vocals leaves the root a split of one row, which becomes the root.
         layout.Close(Lane(layout, Vocals));
@@ -158,7 +223,7 @@ public sealed class LaneDockLayoutTests
     [TestMethod]
     public void ClosingEveryLaneLeavesNoRoot()
     {
-        var layout = LaneDockLayout.CreateDefault();
+        var layout = ThreeHighwaysOverVocals();
 
         foreach (var lane in layout.Lanes.ToList())
             layout.Close(lane);
@@ -170,7 +235,7 @@ public sealed class LaneDockLayoutTests
     [TestMethod]
     public void AHighwayIsAddedAfterTheLastOneAsWideAsTheOthers()
     {
-        var layout = LaneDockLayout.CreateDefault();
+        var layout = ThreeHighwaysOverVocals();
 
         layout.Add(Keys);
 
@@ -182,7 +247,7 @@ public sealed class LaneDockLayoutTests
     [TestMethod]
     public void AHighwayAfterOneOnItsOwnGoesToItsRight()
     {
-        var layout = LaneDockLayout.CreateDefault();
+        var layout = ThreeHighwaysOverVocals();
         layout.Move(Lane(layout, Drums), Lane(layout, Vocals), DockEdge.Bottom);
 
         layout.Add(Keys);
@@ -206,7 +271,7 @@ public sealed class LaneDockLayoutTests
     [TestMethod]
     public void AVocalPartGoesTheFullWidthAlongTheBottom()
     {
-        var layout = LaneDockLayout.CreateDefault();
+        var layout = ThreeHighwaysOverVocals();
 
         layout.Add(Harmony1);
 
@@ -231,7 +296,7 @@ public sealed class LaneDockLayoutTests
     [TestMethod]
     public void APartAlreadyOpenIsNotAddedAgain()
     {
-        var layout = LaneDockLayout.CreateDefault();
+        var layout = ThreeHighwaysOverVocals();
 
         Assert.IsNull(layout.Add(Guitar));
         Assert.HasCount(4, layout.Lanes);
@@ -240,7 +305,7 @@ public sealed class LaneDockLayoutTests
     [TestMethod]
     public void ALaneCanShowAnotherPart()
     {
-        var layout = LaneDockLayout.CreateDefault();
+        var layout = ThreeHighwaysOverVocals();
         var lane = Lane(layout, Bass);
 
         Assert.IsTrue(layout.SetPart(lane, Harmony1));
@@ -251,7 +316,7 @@ public sealed class LaneDockLayoutTests
     [TestMethod]
     public void ALaneCanNotShowAPartAnotherLaneShows()
     {
-        var layout = LaneDockLayout.CreateDefault();
+        var layout = ThreeHighwaysOverVocals();
 
         Assert.IsFalse(layout.SetPart(Lane(layout, Bass), Guitar));
 
@@ -261,8 +326,8 @@ public sealed class LaneDockLayoutTests
     [TestMethod]
     public void ALaneNotInTheLayoutThrows()
     {
-        var layout = LaneDockLayout.CreateDefault();
-        var other = LaneDockLayout.CreateDefault();
+        var layout = ThreeHighwaysOverVocals();
+        var other = ThreeHighwaysOverVocals();
 
         Assert.ThrowsExactly<ArgumentException>(() => layout.Close(Lane(other, Bass)));
     }
@@ -270,7 +335,7 @@ public sealed class LaneDockLayoutTests
     [TestMethod]
     public void WeightsAreSetOnlyWhenThereIsOnePositiveWeightPerChild()
     {
-        var layout = LaneDockLayout.CreateDefault();
+        var layout = ThreeHighwaysOverVocals();
         var row = (DockSplit)((DockSplit)layout.Root!).Children[0];
 
         layout.SetWeights(row, [1, 2]);
@@ -285,7 +350,7 @@ public sealed class LaneDockLayoutTests
     [TestMethod]
     public void TheLayoutReadsBackFromItsState()
     {
-        var layout = LaneDockLayout.CreateDefault();
+        var layout = ThreeHighwaysOverVocals();
         layout.Move(Lane(layout, Drums), Lane(layout, Guitar), DockEdge.Bottom);
         layout.Add(Keys);
         layout.SetWeights((DockSplit)layout.Root!, [2, 1]);
@@ -300,7 +365,7 @@ public sealed class LaneDockLayoutTests
     [TestMethod]
     public void ALanesLookAheadIsKeptWithoutChangingTheLayout()
     {
-        var layout = LaneDockLayout.CreateDefault();
+        var layout = ThreeHighwaysOverVocals();
         int changes = 0;
         layout.Changed += (_, _) => changes++;
 
@@ -318,7 +383,7 @@ public sealed class LaneDockLayoutTests
     [TestMethod]
     public void ALanesPixelsPerSecondIsKeptBesideItsLookAheadWithoutChangingTheLayout()
     {
-        var layout = LaneDockLayout.CreateDefault();
+        var layout = ThreeHighwaysOverVocals();
         int changes = 0;
         layout.Changed += (_, _) => changes++;
 
@@ -338,7 +403,7 @@ public sealed class LaneDockLayoutTests
     [TestMethod]
     public void AVocalLanesPitchesAreKeptWithoutChangingTheLayout()
     {
-        var layout = LaneDockLayout.CreateDefault();
+        var layout = ThreeHighwaysOverVocals();
         int changes = 0;
         layout.Changed += (_, _) => changes++;
 
@@ -354,7 +419,7 @@ public sealed class LaneDockLayoutTests
     [TestMethod]
     public void TheFullPitchRangeIsKeptAsNone()
     {
-        var layout = LaneDockLayout.CreateDefault();
+        var layout = ThreeHighwaysOverVocals();
 
         layout.SetPitches(Lane(layout, Vocals), new VocalPitchView(72, 24));
         layout.SetPitches(Lane(layout, Vocals), VocalPitchView.Full);
@@ -393,7 +458,7 @@ public sealed class LaneDockLayoutTests
     [TestMethod]
     public void ALanesPerspectiveIsKeptWithoutChangingTheLayout()
     {
-        var layout = LaneDockLayout.CreateDefault();
+        var layout = ThreeHighwaysOverVocals();
         int changes = 0;
         layout.Changed += (_, _) => changes++;
 
@@ -411,7 +476,7 @@ public sealed class LaneDockLayoutTests
     [TestMethod]
     public void APerspectiveCanBePutBackToTheDefault()
     {
-        var layout = LaneDockLayout.CreateDefault();
+        var layout = ThreeHighwaysOverVocals();
         layout.SetPerspective(Lane(layout, Bass), true);
         layout.SetPerspective(Lane(layout, Bass), null);
 
@@ -431,7 +496,7 @@ public sealed class LaneDockLayoutTests
     [TestMethod]
     public void ALanesAudioOptionsAreKeptWithoutChangingTheLayout()
     {
-        var layout = LaneDockLayout.CreateDefault();
+        var layout = ThreeHighwaysOverVocals();
         int changes = 0;
         layout.Changed += (_, _) => changes++;
         var options = new LaneAudioOptions("drums_1", LaneBackdrop.Spectrogram, LaneAudioPlacement.Beside, LaneChannels.Stereo, 6, SpectrogramBand.Kick, -90, -10, false, 0.8);
@@ -460,7 +525,7 @@ public sealed class LaneDockLayoutTests
     [TestMethod]
     public void TheStateSurvivesJson()
     {
-        var layout = LaneDockLayout.CreateDefault();
+        var layout = ThreeHighwaysOverVocals();
         layout.Move(Lane(layout, Vocals), Lane(layout, Bass), DockEdge.Top);
 
         string json = JsonSerializer.Serialize(layout.ToState(), LaneDockTestJsonContext.Default.LaneDockState);
@@ -544,6 +609,15 @@ public sealed class LaneDockLayoutTests
     }
 
     private static DockLane Lane(LaneDockLayout layout, LanePart part) => layout.Lanes.Single(l => l.Part == part);
+
+    /// <summary>Three Expert highways in a row (guitar, bass, drums) with Vocals the full width below them, as the tests start from.</summary>
+    private static LaneDockLayout ThreeHighwaysOverVocals()
+    {
+        var layout = new LaneDockLayout();
+        foreach (var part in new[] { Guitar, Bass, Drums, Vocals })
+            layout.Add(part);
+        return layout;
+    }
 
     /// <summary>The weights, scaled so they add up to <paramref name="total"/>, to three decimal places.</summary>
     private static double[] Scaled(IReadOnlyList<double> weights, double total) =>

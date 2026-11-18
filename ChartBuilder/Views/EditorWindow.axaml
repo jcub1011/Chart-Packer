@@ -70,6 +70,18 @@
         </Style>
     </Window.Styles>
 
+    <Window.Resources>
+        <!-- An item of the View menu's Load Layout and Save Layout submenus (issue 263), which runs its own submenu's
+             command. Its name is shown as text, so an underscore in it isn't an access key. -->
+        <DataTemplate x:Key="LayoutMenuItemTemplate" x:DataType="vm:LayoutMenuItem">
+            <TextBlock MinWidth="160" MaxWidth="360" TextTrimming="CharacterEllipsis" Text="{Binding Header}" />
+        </DataTemplate>
+        <ControlTheme x:Key="LayoutMenuItemTheme" TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:DataType="vm:LayoutMenuItem">
+            <Setter Property="Command" Value="{Binding Command}" />
+            <Setter Property="CommandParameter" Value="{Binding}" />
+        </ControlTheme>
+    </Window.Resources>
+
     <Grid x:Name="RootGrid">
         <Grid.RowDefinitions>
             <!-- Toolbar (0), panels (1), splitter (2), timeline (3), message bar (4). EditorWindow.axaml.cs indexes these. -->
@@ -213,6 +225,19 @@
                                 </MenuItem>
                                 <MenuItem Header="{x:Static res:Strings.MenuShowDifficulty}" Command="{Binding ShowDifficultyCommand}">
                                     <MenuItem.Icon><ctl:LineIcon Data="{StaticResource SortAscendingStroke}" /></MenuItem.Icon>
+                                </MenuItem>
+                                <Separator />
+                                <!-- The layout templates (issue 263), each item shown and run as LayoutMenuItemTheme says. -->
+                                <MenuItem Header="{x:Static res:Strings.MenuLoadLayout}" ItemsSource="{Binding LoadLayoutItems}" IsEnabled="{Binding HasLayouts}"
+                                          ItemTemplate="{StaticResource LayoutMenuItemTemplate}" ItemContainerTheme="{StaticResource LayoutMenuItemTheme}">
+                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource ViewStroke}" /></MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="{x:Static res:Strings.MenuSaveLayout}" ItemsSource="{Binding SaveLayoutItems}"
+                                          ItemTemplate="{StaticResource LayoutMenuItemTemplate}" ItemContainerTheme="{StaticResource LayoutMenuItemTheme}">
+                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource SaveStroke}" /></MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="{x:Static res:Strings.MenuManageLayouts}" Command="{Binding ManageLayoutsCommand}">
+                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource SettingsStroke}" /></MenuItem.Icon>
                                 </MenuItem>
                             </MenuItem>
                             <ctl:AboutMenuItem />
