@@ -3,6 +3,7 @@ using Avalonia;
 using Avalonia.Media;
 using Avalonia.Media.Immutable;
 using ChartShared.Core.Charting.Editing;
+using ChartShared.UI.Controls.Skia;
 
 namespace ChartShared.UI.Controls.Highway
 {
@@ -81,7 +82,7 @@ namespace ChartShared.UI.Controls.Highway
         /// graphics card draws a line through the tilt as a path it works out again each frame, and a rectangle as a simple shape, and a
         /// lane's beat, grid and divider lines are hundreds a frame. Flat, a line is drawn as a line.
         /// </summary>
-        public static void DrawStraight(DrawingContext context, IPen pen, Point from, Point to, bool asRect)
+        public static void DrawStraight(IHighwayCanvas context, IPen pen, Point from, Point to, bool asRect)
         {
             if (asRect && pen.DashStyle is null && pen.Brush is { } brush && (from.X == to.X || from.Y == to.Y))
             {
@@ -97,7 +98,7 @@ namespace ChartShared.UI.Controls.Highway
 
         /// <summary>A beat's line, or a measure's, at <paramref name="along"/> across the lanes from <paramref name="across1"/> to <paramref name="across2"/>.</summary>
         /// <param name="asRect">Whether it's filled as a rectangle, for a highway tilted back (see <see cref="DrawStraight"/>).</param>
-        public static void DrawBeatLine(DrawingContext context, LaneView view, double along, double across1, double across2, bool isMeasure, bool asRect = false) =>
+        public static void DrawBeatLine(IHighwayCanvas context, LaneView view, double along, double across1, double across2, bool isMeasure, bool asRect = false) =>
             DrawStraight(context, isMeasure ? MeasurePen : BeatPen, At(view, along, across1), At(view, along, across2), asRect);
 
         /// <summary>
@@ -107,7 +108,7 @@ namespace ChartShared.UI.Controls.Highway
         /// <param name="alternateRows">A brush to shade every other lane with, for rows of a timeline that are hard to tell apart; null for none.</param>
         /// <param name="halves">A pen for the line down the middle of a lane two share (GHL's white and black frets); null for none.</param>
         /// <param name="asRect">Whether the lines are filled as rectangles, for a highway tilted back (see <see cref="DrawStraight"/>).</param>
-        public static void DrawLaneDividers(DrawingContext context, LaneProjection projection, double alongFrom, double alongTo, IBrush? alternateRows = null, IPen? halves = null, bool asRect = false)
+        public static void DrawLaneDividers(IHighwayCanvas context, LaneProjection projection, double alongFrom, double alongTo, IBrush? alternateRows = null, IPen? halves = null, bool asRect = false)
         {
             var view = projection.View;
             for (int i = 0; i < projection.Slots.Slots.Count; i++)
@@ -125,7 +126,7 @@ namespace ChartShared.UI.Controls.Highway
 
         /// <summary>The strike line's band across the lanes, filled with <paramref name="brush"/>, with a line along each of its edges across them.</summary>
         /// <param name="asRect">Whether the edges are filled as rectangles, for a highway tilted back (see <see cref="DrawStraight"/>).</param>
-        public static void DrawStrikeBand(DrawingContext context, LaneView view, Rect band, IBrush brush, bool asRect = false)
+        public static void DrawStrikeBand(IHighwayCanvas context, LaneView view, Rect band, IBrush brush, bool asRect = false)
         {
             context.FillRectangle(brush, band);
             if (view == LaneView.Highway)
@@ -147,7 +148,7 @@ namespace ChartShared.UI.Controls.Highway
         /// </summary>
         /// <param name="alongFrom">The nearest along the time axis anything is drawn, in pixels; see <see cref="Box"/>.</param>
         /// <param name="asRect">Whether the edge lines are filled as rectangles, for a highway tilted back (see <see cref="DrawStraight"/>).</param>
-        public static void DrawBands(DrawingContext context, GemPainter gems, LaneView view, ReadOnlySpan<BandGlyph> bands, double across1, double across2, double alongFrom = double.NegativeInfinity, double alongTo = double.PositiveInfinity, bool asRect = false)
+        public static void DrawBands(IHighwayCanvas context, GemPainter gems, LaneView view, ReadOnlySpan<BandGlyph> bands, double across1, double across2, double alongFrom = double.NegativeInfinity, double alongTo = double.PositiveInfinity, bool asRect = false)
         {
             foreach (var band in bands)
                 context.FillRectangle(gems.Brush(HighwayPalette.WithAlpha(band.Color, band.TintAlpha)), Box(view, band.Start, band.End, across1, across2, alongFrom, alongTo));
@@ -172,14 +173,14 @@ namespace ChartShared.UI.Controls.Highway
         }
 
         /// <summary>A lane's target on the strike line, dark until it's struck: its outline in <paramref name="color"/>.</summary>
-        public static void DrawTarget(DrawingContext context, GemPainter gems, Rect rect, Color color)
+        public static void DrawTarget(IHighwayCanvas context, GemPainter gems, Rect rect, Color color)
         {
             double radius = GemPainter.CornerOf(rect);
             context.DrawRectangle(gems.Brush(HighwayPalette.WithAlpha(HighwayPalette.Darken(color, 0.72), 0xC8)), gems.Pen(color, 2), rect.Deflate(1), radius, radius);
         }
 
         /// <summary>A lane's target filled in <paramref name="color"/> as brightly as <paramref name="lit"/> says, from 0 to 1.</summary>
-        public static void DrawLitTarget(DrawingContext context, GemPainter gems, Rect rect, Color color, double lit)
+        public static void DrawLitTarget(IHighwayCanvas context, GemPainter gems, Rect rect, Color color, double lit)
         {
             if (lit <= 0)
                 return;
@@ -190,7 +191,7 @@ namespace ChartShared.UI.Controls.Highway
         }
 
         /// <summary>A struck lane's beam over <paramref name="rect"/>, as brightly as <paramref name="lit"/> says, from 0 to 1.</summary>
-        public static void DrawLitBeam(DrawingContext context, LaneView view, Color color, double lit, Rect rect)
+        public static void DrawLitBeam(IHighwayCanvas context, LaneView view, Color color, double lit, Rect rect)
         {
             if (lit <= 0)
                 return;

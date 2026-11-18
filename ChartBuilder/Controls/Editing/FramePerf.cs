@@ -11,6 +11,7 @@ using Avalonia.Rendering.Composition;
 using Avalonia.Media.Immutable;
 using Avalonia.Media.TextFormatting;
 using ChartShared.UI.Controls;
+using ChartShared.UI.Controls.Skia;
 
 namespace ChartBuilder.Controls.Editing
 {
@@ -125,6 +126,9 @@ namespace ChartBuilder.Controls.Editing
         private TimeSpan _paused;
         private long _allocated;
         private long _tilesBuilt;
+
+        // The render thread's playing of the SkiaSharp drawings, at the window's start (SkiaHost.Played).
+        private (long Plays, long Ticks) _played;
         private string _renderer = "renderer ?";
         private bool _benchmarking;
         private string? _benchmark;
@@ -138,6 +142,7 @@ namespace ChartBuilder.Controls.Editing
             _paused = GC.GetTotalPauseDuration();
             _allocated = GC.GetTotalAllocatedBytes();
             _tilesBuilt = LaneWaveformPainter.TilesBuilt;
+            _played = SkiaHost.Played;
         }
 
         /// <summary>Whether the readout is asked for.</summary>
@@ -205,6 +210,7 @@ namespace ChartBuilder.Controls.Editing
             int[] gcCounts = [0, 0, 0];
             TimeSpan gcPaused = default;
             long gcAllocated = 0;
+            (long Plays, long Ticks) played = default;
 
             void Finish()
             {
@@ -251,6 +257,7 @@ namespace ChartBuilder.Controls.Editing
                         gcCounts = [GC.CollectionCount(0), GC.CollectionCount(1), GC.CollectionCount(2)];
                         gcPaused = GC.GetTotalPauseDuration();
                         gcAllocated = GC.GetTotalAllocatedBytes();
+                        played = SkiaHost.Played;
                     }
 
                     if (t >= WarmSeconds && last != default)
@@ -267,6 +274,8 @@ namespace ChartBuilder.Controls.Editing
                         string gc = gcStarted
                             ? string.Create(CultureInfo.InvariantCulture, $"  GC {GC.CollectionCount(0) - gcCounts[0]}/{GC.CollectionCount(1) - gcCounts[1]}/{GC.CollectionCount(2) - gcCounts[2]} paused {(GC.GetTotalPauseDuration() - gcPaused).TotalMilliseconds,5:F1} ms  alloc {(GC.GetTotalAllocatedBytes() - gcAllocated) / (1024.0 * 1024.0) / seconds,5:F1} MB/s")
                             : "";
+                        if (gcStarted && frames > 0 && SkiaHost.Played.Plays > played.Plays)
+                            gc += string.Create(CultureInfo.InvariantCulture, $"  render {Milliseconds(SkiaHost.Played.Ticks - played.Ticks) / frames,5:F2} ms");
                         results.Add(string.Create(CultureInfo.InvariantCulture, $"{Steps[step].Name,-26} {(frames == 0 ? 0 : 1000 * frames / measured),5:F1} fps  every {(frames == 0 ? 0 : measured / frames),5:F1} ms  worst {maxGap,4:F0} ms{gc}"));
                         step++;
                         if (step >= Steps.Length)
@@ -360,7 +369,7 @@ namespace ChartBuilder.Controls.Editing
         }
 
         /// <summary>Draws the last second's figures, as a badge with its top left corner at <paramref name="at"/>, or its bottom left when <paramref name="upwards"/>.</summary>
-        public void Draw(DrawingContext context, Point at, bool upwards = false)
+        public void Draw(IHighwayCanvas context, Point at, bool upwards = false)
         {
             if (_text is null)
                 return;
@@ -369,7 +378,7 @@ namespace ChartBuilder.Controls.Editing
                 at = new Point(at.X, at.Y - _text.Height);
 
             context.FillRectangle(BadgeBrush, new Rect(at, new Size(_text.Width, _text.Height)).Inflate(4));
-            _text.Draw(context, at);
+            context.DrawText(_text, at);
         }
 
         private static double Milliseconds(long ticks) => ticks * 1000.0 / Stopwatch.Frequency;
@@ -408,6 +417,13 @@ namespace ChartBuilder.Controls.Editing
             }
 
             text.AppendLine(slots.ToString());
+
+            // The SkiaSharp drawings the render thread played, every lane's, which the UI's figures above don't include.
+            var played = SkiaHost.Played;
+            long plays = played.Plays - _played.Plays;
+            if (plays > 0)
+                text.AppendLine(string.Create(culture, $"render thread playing {Milliseconds(played.Ticks - _played.Ticks) / _frames:F2}ms per frame  ({plays / (double)_frames:F1} drawings)"));
+            _played = played;
 
             int g0 = GC.CollectionCount(0), g1 = GC.CollectionCount(1), g2 = GC.CollectionCount(2);
             long built = LaneWaveformPainter.TilesBuilt;

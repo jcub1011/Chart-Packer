@@ -7,6 +7,7 @@ using ChartBuilder.Resources;
 using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charting.Layout;
 using ChartShared.UI.Controls.Highway;
+using ChartShared.UI.Controls.Skia;
 
 namespace ChartBuilder.Controls.Editing
 {
@@ -30,7 +31,7 @@ namespace ChartBuilder.Controls.Editing
         /// The span from the first note to the last note's end, shaded, its handles, brighter where the pointer would take
         /// hold of one, with the span outlined where it would take hold of the notes; and the offset and speed over it.
         /// </summary>
-        private void DrawVocalAlignment(DrawingContext context, EditorSession session, VocalTrack vocal, LaneProjection screen)
+        private void DrawVocalAlignment(IHighwayCanvas context, EditorSession session, VocalTrack vocal, LaneProjection screen)
         {
             if (!IsAligning(session, vocal) || session.VocalAlignment.Span is not { } span)
                 return;
@@ -65,11 +66,11 @@ namespace ChartBuilder.Controls.Editing
                 left = end - label.Width - 18;
             var badge = new Rect(left, top + 4, label.Width + 12, label.Height + 6);
             context.DrawRectangle(BadgeBrush, AccentLine(0x90), badge, 4, 4);
-            label.Draw(context, new Point(badge.Left + 6, badge.Top + 3));
+            context.DrawText(label, new Point(badge.Left + 6, badge.Top + 3));
         }
 
         // A handle: a line on the edge, and a grip outside the span, before its start or after its end.
-        private void DrawAlignHandle(DrawingContext context, double edge, double middle, double top, double bottom, bool before, bool hot)
+        private void DrawAlignHandle(IHighwayCanvas context, double edge, double middle, double top, double bottom, bool before, bool hot)
         {
             byte alpha = hot ? (byte)0xFF : (byte)0xC0;
             double width = hot ? AlignEdgeWidth + 1 : AlignEdgeWidth;

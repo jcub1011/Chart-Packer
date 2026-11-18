@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Avalonia;
 using Avalonia.Media;
+using ChartShared.UI.Controls.Skia;
 
 namespace ChartShared.UI.Controls.Highway
 {
@@ -29,13 +30,13 @@ namespace ChartShared.UI.Controls.Highway
         // How many pieces each quarter-circle corner of a rounded rectangle is drawn in, enough at a gem's few pixels.
         private const int CornerPieces = 4;
 
-        private static readonly Dictionary<(Size Size, double Radius, double Dash, double Gap), Geometry> Rectangles = [];
+        private static readonly Dictionary<(Size Size, double Radius, double Dash, double Gap), HighwayPath> Rectangles = [];
 
         /// <summary>
         /// Draws <paramref name="rect"/>'s outline, its corners rounded by <paramref name="radius"/>, dashed in
         /// <paramref name="pen"/>: <paramref name="dash"/> pixels drawn, then <paramref name="gap"/> left, from its top.
         /// </summary>
-        public static void DrawRectangle(DrawingContext context, IPen pen, Rect rect, double radius, double dash, double gap)
+        public static void DrawRectangle(IHighwayCanvas context, IPen pen, Rect rect, double radius, double dash, double gap)
         {
             using (context.PushTransform(Matrix.CreateTranslation(rect.X, rect.Y)))
                 context.DrawGeometry(null, pen, Rectangle(rect.Size, radius, dash, gap));
@@ -47,7 +48,7 @@ namespace ChartShared.UI.Controls.Highway
         /// (<see cref="Bucket"/>) and stretched to the rectangle, dashes, corners and pen with it, by too little to see. Made for
         /// its exact size, every frame would make a new one.
         /// </summary>
-        public static void DrawRectangleNear(DrawingContext context, IPen pen, Rect rect, double radius, double dash, double gap)
+        public static void DrawRectangleNear(IHighwayCanvas context, IPen pen, Rect rect, double radius, double dash, double gap)
         {
             if (rect.Width < MinBucketed || rect.Height < MinBucketed)
             {
@@ -70,7 +71,7 @@ namespace ChartShared.UI.Controls.Highway
             Rounded(Math.Pow(BucketRatio, Math.Round(Math.Log(pixels) / Math.Log(BucketRatio))));
 
         /// <summary>The dashes of a rectangle's outline from the origin, as <see cref="DrawRectangle"/> draws them, made once for each size.</summary>
-        public static Geometry Rectangle(Size size, double radius, double dash, double gap)
+        public static HighwayPath Rectangle(Size size, double radius, double dash, double gap)
         {
             var key = (new Size(Rounded(size.Width), Rounded(size.Height)), radius, dash, gap);
             if (Rectangles.TryGetValue(key, out var dashes))
@@ -84,19 +85,18 @@ namespace ChartShared.UI.Controls.Highway
         }
 
         /// <summary>The dashes along the closed <paramref name="outline"/>, from its first point, for the caller to keep.</summary>
-        public static Geometry Along(IReadOnlyList<Point> outline, double dash, double gap)
+        public static HighwayPath Along(IReadOnlyList<Point> outline, double dash, double gap)
         {
-            var geometry = new StreamGeometry();
-            using var context = geometry.Open();
+            var path = new HighwayPath.Builder();
             foreach (var points in Dashes(outline, dash, gap))
             {
-                context.BeginFigure(points[0], false);
+                path.BeginFigure(points[0], false);
                 for (int i = 1; i < points.Count; i++)
-                    context.LineTo(points[i]);
-                context.EndFigure(false);
+                    path.LineTo(points[i]);
+                path.EndFigure(false);
             }
 
-            return geometry;
+            return path.Build();
         }
 
         /// <summary>

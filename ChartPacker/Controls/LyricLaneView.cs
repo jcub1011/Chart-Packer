@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
@@ -8,9 +7,11 @@ using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Immutable;
+using Avalonia.Media.TextFormatting;
 using ChartShared.Audio.Waveforms;
 using ChartShared.Core.Charts;
 using ChartShared.UI.Controls;
+using ChartShared.UI.Controls.Skia;
 using ChartShared.UI.Theming;
 
 namespace ChartPacker.Controls
@@ -173,7 +174,7 @@ namespace ChartPacker.Controls
         private readonly BrushWatch _singingWatch;
         private readonly BrushWatch _sungWatch;
 
-        private readonly Dictionary<(int Index, int State), FormattedText> _words = [];
+        private readonly Dictionary<(int Index, int State), TextLayout> _words = [];
         private double _spaceWidth = -1;
         private bool _isFrameRequested;
         private Rect? _viewport;
@@ -189,12 +190,15 @@ namespace ChartPacker.Controls
         // How far the lane has faded to the whole part.
         private readonly OverviewFade _fade = new();
 
+        // What draws the lane: SkiaSharp, on the render thread.
+        private readonly SkiaHost _host;
+
         // The whole part's notes as last laid out, and the words of the phrase last written out under the pointer.
         private OverviewMarks? _overview;
-        private (int Index, double Width, FormattedText Text)? _phraseText;
+        private (int Index, double Width, TextLayout Text)? _phraseText;
 
         // A spoken note's diamond, a unit across from its middle, scaled and moved to each drawn.
-        private static StreamGeometry? s_diamond;
+        private static readonly HighwayPath Diamond = HighwayPath.Polygon([new Point(0, -1), new Point(1, 0), new Point(0, 1), new Point(-1, 0)]);
 
         static LyricLaneView()
         {
@@ -293,7 +297,18 @@ namespace ChartPacker.Controls
             _noteWatch.Watch(NoteBrush);
             _singingWatch.Watch(SingingBrush);
             _sungWatch.Watch(SungBrush);
+            _host = new SkiaHost(new LaneContent(this));
+            VisualChildren.Add(_host);
         }
+
+        /// <summary>The lane, recorded for SkiaSharp to draw on the render thread.</summary>
+        private sealed class LaneContent(LyricLaneView view) : ISkiaContent
+        {
+            public void Record(IHighwayCanvas canvas, SkiaHost host) => view.Paint(canvas);
+        }
+
+        /// <summary>Has the lane drawn again, for the next frame.</summary>
+        private void Redraw() => _host.Redraw();
 
         private LaneColours Colours => _colours ??= new LaneColours(
             ColourOf(NoteBrush, NoteBrushProperty), ColourOf(SingingBrush, SingingBrushProperty), ColourOf(SungBrush, SungBrushProperty));
@@ -306,7 +321,7 @@ namespace ChartPacker.Controls
         {
             _colours = null;
             _words.Clear();
-            InvalidateVisual();
+            Redraw();
         }
 
         // Whether any of the control is in view: scrolled out of sight, it isn't drawn as the clock moves. Not yet laid
@@ -319,7 +334,7 @@ namespace ChartPacker.Controls
             bool wasInViewport = IsInViewport;
             _viewport = e.EffectiveViewport;
             if (IsInViewport && !wasInViewport)
-                InvalidateVisual();
+                Redraw();
         }
 
         protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
@@ -333,6 +348,13 @@ namespace ChartPacker.Controls
             }
             if (change.Property == SceneProperty || change.Property == IsVisibleProperty)
                 RequestFrame();
+
+            // What Avalonia draws again, SkiaSharp's drawing is recorded again for.
+            if (change.Property == SceneProperty || change.Property == TimeShiftProperty || change.Property == WaveformProperty
+                || change.Property == WindowSecondsProperty || change.Property == LengthSecondsProperty)
+            {
+                Redraw();
+            }
 
             if (change.Property == NoteBrushProperty || change.Property == SingingBrushProperty || change.Property == SungBrushProperty)
             {
@@ -362,7 +384,15 @@ namespace ChartPacker.Controls
             _mode.Detach();
         }
 
+        /// <summary>Transparent, so the lane takes the pointer while it has a part: the drawing is SkiaSharp's (see <see cref="Paint"/>).</summary>
         public override void Render(DrawingContext context)
+        {
+            if (Scene is { IsEmpty: false } && Bounds.Width > 0 && Bounds.Height > 0)
+                context.FillRectangle(Brushes.Transparent, new Rect(Bounds.Size));
+        }
+
+        /// <summary>Draws the lane: scrolling with the audio, or the whole part, or fading between them.</summary>
+        private void Paint(IHighwayCanvas context)
         {
             var bounds = new Rect(Bounds.Size);
             if (Scene is not { IsEmpty: false } scene || bounds.Width <= 0 || bounds.Height <= 0)
@@ -391,7 +421,7 @@ namespace ChartPacker.Controls
         private bool IsOverviewShown => !double.IsNaN(_hoverX) && _mode.IsOverview;
 
         /// <summary>The lane as it scrolls with the audio, at <paramref name="clock"/>: its phrases, notes and words, and the now line.</summary>
-        private void DrawScrolling(DrawingContext context, LyricScene scene, Rect bounds, TimeSpan clock, double wordBand)
+        private void DrawScrolling(IHighwayCanvas context, LyricScene scene, Rect bounds, TimeSpan clock, double wordBand)
         {
             // Drawing the part later is drawing it at an earlier moment of the scene's own time.
             double now = (clock - TimeShift).TotalSeconds;
@@ -428,7 +458,7 @@ namespace ChartPacker.Controls
 
         /// <summary>Shades the phrase being sung and marks where each starts.</summary>
         /// <returns>The index of the phrase being sung, or -1.</returns>
-        private static int DrawPhrases(DrawingContext context, LyricScene scene, Rect bounds, double now, double from, double to, Func<double, double> x)
+        private static int DrawPhrases(IHighwayCanvas context, LyricScene scene, Rect bounds, double now, double from, double to, Func<double, double> x)
         {
             int current = -1;
             for (int i = Math.Max(0, LowerBound(scene.PhraseStarts, from) - 1); i < scene.PhraseStarts.Length && scene.PhraseStarts[i] <= to; i++)
@@ -449,7 +479,7 @@ namespace ChartPacker.Controls
             return current;
         }
 
-        private static void DrawNotes(DrawingContext context, LyricScene scene, LaneColours colours, Rect bounds, double top, double bottom, double now, double from, double to, Func<double, double> x)
+        private static void DrawNotes(IHighwayCanvas context, LyricScene scene, LaneColours colours, Rect bounds, double top, double bottom, double now, double from, double to, Func<double, double> x)
         {
             double thickness = Math.Clamp((bottom - top) / (Math.Max(1, scene.HighestPitch - scene.LowestPitch) + 2), 3, 8);
             double Y(int i) => NoteY(scene, i, top, bottom, thickness);
@@ -480,11 +510,11 @@ namespace ChartPacker.Controls
                     double half = thickness * 0.9;
                     context.FillRectangle(brush, new Rect(left, y - 1, right - left, 2));
                     using (context.PushTransform(new Matrix(half, 0, 0, half, left, y)))
-                        context.DrawGeometry(brush, null, Diamond());
+                        context.DrawGeometry(brush, null, Diamond);
                 }
                 else
                 {
-                    context.DrawRectangle(brush, null, new RoundedRect(new Rect(left, y - (thickness / 2), right - left, thickness), thickness / 2));
+                    context.DrawRectangle(brush, null, new Rect(left, y - (thickness / 2), right - left, thickness), thickness / 2, thickness / 2);
                 }
             }
         }
@@ -506,7 +536,7 @@ namespace ChartPacker.Controls
         /// where the audio is, and one where the pointer is, or was last, so it fades out with the rest once the pointer has gone.
         /// </summary>
         /// <param name="now">Where the audio is, in seconds: <see cref="TimeShift"/> not taken off.</param>
-        private void DrawOverview(DrawingContext context, LyricScene scene, Rect bounds, double now, double wordBand)
+        private void DrawOverview(IHighwayCanvas context, LyricScene scene, Rect bounds, double now, double wordBand)
         {
             double timeline = Math.Max(0.1, TimelineOf(scene));
             double shift = TimeShift.TotalSeconds;
@@ -595,19 +625,11 @@ namespace ChartPacker.Controls
         }
 
         /// <summary>The words of the scene's <paramref name="phrase"/>th phrase as one line, cut short to <paramref name="width"/>.</summary>
-        private FormattedText PhraseText(LyricScene scene, int phrase, double width)
+        private TextLayout PhraseText(LyricScene scene, int phrase, double width)
         {
             width = Math.Max(1, width);
-            if (_phraseText is { } known && known.Index == phrase)
-            {
-                if (known.Width != width)
-                {
-                    known.Text.MaxTextWidth = width;
-                    _phraseText = (phrase, width, known.Text);
-                }
-
+            if (_phraseText is { } known && known.Index == phrase && known.Width == width)
                 return known.Text;
-            }
 
             var line = new System.Text.StringBuilder();
             for (int i = LowerBound(scene.WordTimes, scene.PhraseStarts[phrase]); i < scene.WordTimes.Length && scene.WordTimes[i] < scene.PhraseEnds[phrase]; i++)
@@ -617,12 +639,9 @@ namespace ChartPacker.Controls
                     line.Append(' ');
             }
 
-            var text = new FormattedText(line.ToString().TrimEnd(), CultureInfo.CurrentCulture, FlowDirection.LeftToRight, WordTypeface, WordFontSize, PhraseWordBrush)
-            {
-                MaxTextWidth = width,
-                MaxLineCount = 1,
-                Trimming = TextTrimming.CharacterEllipsis,
-            };
+            var text = new TextLayout(line.ToString().TrimEnd(), WordTypeface, WordFontSize, PhraseWordBrush,
+                textTrimming: TextTrimming.CharacterEllipsis, maxWidth: width, maxLines: 1);
+            _phraseText?.Text.Dispose();
             _phraseText = (phrase, width, text);
             return text;
         }
@@ -734,14 +753,14 @@ namespace ChartPacker.Controls
             _hoverX = x;
             if (!double.IsNaN(x))
                 _fade.PointerAt = x;
-            InvalidateVisual();
+            Redraw();
         }
 
         /// <summary>
         /// Writes the syllables along the bottom, each at its note, or pushed on past the one before
         /// so none overlap; a syllable that runs on sits against the next.
         /// </summary>
-        private void DrawWords(DrawingContext context, LyricScene scene, Rect bounds, double top, double height, double now, double from, double to, int phrase, Func<double, double> x)
+        private void DrawWords(IHighwayCanvas context, LyricScene scene, Rect bounds, double top, double height, double now, double from, double to, int phrase, Func<double, double> x)
         {
             if (_spaceWidth < 0)
                 _spaceWidth = Text(" ", OtherWordBrush).WidthIncludingTrailingWhitespace;
@@ -771,15 +790,14 @@ namespace ChartPacker.Controls
             }
         }
 
-        private FormattedText Word(LyricScene scene, int index, int state)
+        private TextLayout Word(LyricScene scene, int index, int state)
         {
             if (!_words.TryGetValue((index, state), out var text))
                 _words[(index, state)] = text = Text(scene.Words[index], state switch { 0 => Colours.SungWord, 1 => PhraseWordBrush, _ => OtherWordBrush });
             return text;
         }
 
-        private static FormattedText Text(string text, IBrush brush) =>
-            new(text, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, WordTypeface, WordFontSize, brush);
+        private static TextLayout Text(string text, IBrush brush) => new(text, WordTypeface, WordFontSize, brush);
 
         /// <summary>The index of the first of <paramref name="times"/>, which are in order, at or after <paramref name="time"/>.</summary>
         private static int LowerBound(double[] times, double time)
@@ -795,25 +813,6 @@ namespace ChartPacker.Controls
             }
 
             return lo;
-        }
-
-        /// <summary>A diamond reaching a unit from the origin each way, made once.</summary>
-        private static StreamGeometry Diamond()
-        {
-            if (s_diamond is { } diamond)
-                return diamond;
-
-            diamond = new StreamGeometry();
-            using (var g = diamond.Open())
-            {
-                g.BeginFigure(new Point(0, -1), true);
-                g.LineTo(new Point(1, 0));
-                g.LineTo(new Point(0, 1));
-                g.LineTo(new Point(-1, 0));
-                g.EndFigure(true);
-            }
-
-            return s_diamond = diamond;
         }
 
         /// <summary>Asks to be called back when the screen is next drawn, while there's a part to draw.</summary>
@@ -846,7 +845,7 @@ namespace ChartPacker.Controls
             if (clock != _drawnAt || isFading)
             {
                 _drawnAt = clock;
-                InvalidateVisual();
+                Redraw();
             }
 
             RequestFrame();
