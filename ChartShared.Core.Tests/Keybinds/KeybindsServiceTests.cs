@@ -76,8 +76,8 @@ public sealed class KeybindsServiceTests
         Assert.IsTrue(service.Save());
         var read = KeybindsService.Load(_path, Shared());
 
-        CollectionAssert.AreEqual(KeyChord.List("Ctrl+W", "Ctrl+Alt+KeyW").ToArray(), read.Map.ChordsOf("file.save").ToArray());
-        Assert.AreEqual(0, read.Map.ChordsOf("media.play").Count);
+        Assert.AreSequenceEqual([.. KeyChord.List("Ctrl+W", "Ctrl+Alt+KeyW")], [.. read.Map.ChordsOf("file.save")]);
+        Assert.IsEmpty(read.Map.ChordsOf("media.play"));
     }
 
     [TestMethod]
@@ -90,7 +90,7 @@ public sealed class KeybindsServiceTests
 
         var file = JsonNode.Parse(File.ReadAllText(_path))!.AsObject();
         Assert.AreEqual(KeybindsService.SchemaVersion, (int)file["SchemaVersion"]!);
-        CollectionAssert.AreEqual(new[] { "file.save" }, file["Bindings"]!.AsObject().Select(p => p.Key).ToArray());
+        Assert.AreSequenceEqual(["file.save"], [.. file["Bindings"]!.AsObject().Select(p => p.Key)]);
     }
 
     [TestMethod]
@@ -167,7 +167,7 @@ public sealed class KeybindsServiceTests
 
         var service = KeybindsService.Load(_path, Shared());
 
-        Assert.AreEqual(2, service.Map.ChordsOf("edit.redo").Count);
+        Assert.HasCount(2, service.Map.ChordsOf("edit.redo"));
         Assert.AreEqual("Ctrl+W", service.Map.Display("file.save"));
         Assert.AreEqual("Space", service.Map.Display("media.play"));
     }

@@ -137,7 +137,7 @@ namespace ChartShared.UI.ViewModels.Keybinds
 
         private readonly KeybindsWindowViewModel _owner;
         private readonly IReadOnlyList<KeybindRowViewModel> _rows;
-        private readonly Dictionary<string, KeycapViewModel> _otherCaps = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, KeycapViewModel> _otherCaps = [with(StringComparer.OrdinalIgnoreCase)];
         private string? _selectedName;
         private bool _assigning;
 

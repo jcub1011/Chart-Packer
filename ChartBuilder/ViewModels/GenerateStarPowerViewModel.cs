@@ -209,7 +209,7 @@ namespace ChartBuilder.ViewModels
 
         /// <summary>Whether each hard passage is charged for, by its tick.</summary>
         private HashSet<long> ChargedSpikes() =>
-            _coverage.Spikes.Where(static s => s.Charged).Select(static s => s.Spike.StartTick).ToHashSet();
+            [.. _coverage.Spikes.Where(static s => s.Charged).Select(static s => s.Spike.StartTick)];
 
         private int SampleCount() => Math.Clamp((int)Math.Round(Math.Max(0, Playback.LengthSeconds) * 4), 64, 2048);
     }

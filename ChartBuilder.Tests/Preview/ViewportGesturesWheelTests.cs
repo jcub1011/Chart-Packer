@@ -51,7 +51,7 @@ public sealed class ViewportGesturesWheelTests
         Assert.IsTrue(gestures.Wheel(new Vector(0, 1), KeyModifiers.None));
         Assert.IsTrue(gestures.Wheel(new Vector(0, -1), KeyModifiers.None));
 
-        CollectionAssert.AreEqual(new[] { 1, -1 }, host.Scrolled);
+        Assert.AreSequenceEqual([1, -1], host.Scrolled);
         Assert.IsEmpty(host.Zoomed);
     }
 
@@ -63,7 +63,7 @@ public sealed class ViewportGesturesWheelTests
 
         gestures.Wheel(new Vector(0, 3), KeyModifiers.None);
 
-        CollectionAssert.AreEqual(new[] { 1 }, host.Scrolled);
+        Assert.AreSequenceEqual([1], host.Scrolled);
     }
 
     [TestMethod]
@@ -77,7 +77,7 @@ public sealed class ViewportGesturesWheelTests
         Assert.IsEmpty(host.Scrolled);
 
         gestures.Wheel(new Vector(0, 0.4), KeyModifiers.None);
-        CollectionAssert.AreEqual(new[] { 1 }, host.Scrolled);
+        Assert.AreSequenceEqual([1], host.Scrolled);
     }
 
     [TestMethod]
@@ -89,7 +89,7 @@ public sealed class ViewportGesturesWheelTests
         gestures.Wheel(new Vector(0, 1), KeyModifiers.Shift);
         gestures.Wheel(new Vector(-1, 0), KeyModifiers.Shift);
 
-        CollectionAssert.AreEqual(new[] { WheelSteps.FastScrollSteps, -WheelSteps.FastScrollSteps }, host.Scrolled);
+        Assert.AreSequenceEqual([WheelSteps.FastScrollSteps, -WheelSteps.FastScrollSteps], host.Scrolled);
     }
 
     [TestMethod]
@@ -100,7 +100,7 @@ public sealed class ViewportGesturesWheelTests
 
         gestures.Wheel(new Vector(0, 1), KeyModifiers.None);
 
-        CollectionAssert.AreEqual(new[] { -1 }, host.Scrolled);
+        Assert.AreSequenceEqual([-1], host.Scrolled);
     }
 
     [TestMethod]
@@ -112,7 +112,7 @@ public sealed class ViewportGesturesWheelTests
         gestures.Wheel(new Vector(0, 1), KeyModifiers.Control);
         gestures.Wheel(new Vector(0, -1), KeyModifiers.Control);
 
-        CollectionAssert.AreEqual(new[] { 1, -1 }, host.Zoomed);
+        Assert.AreSequenceEqual([1, -1], host.Zoomed);
         Assert.IsEmpty(host.Scrolled);
     }
 

@@ -26,8 +26,8 @@ namespace ChartPacker.Services
     /// </summary>
     public sealed class MetadataDraftStore
     {
-        private readonly Dictionary<string, MetadataDraft> _drafts = new(StringComparer.Ordinal);
-        private readonly Dictionary<string, DraftHistory> _histories = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, MetadataDraft> _drafts = [with(StringComparer.Ordinal)];
+        private readonly Dictionary<string, DraftHistory> _histories = [with(StringComparer.Ordinal)];
 
         /// <summary>Raised with a song's path, and what happened, after its draft may have changed.</summary>
         public event Action<string, DraftChange>? DraftsChanged;

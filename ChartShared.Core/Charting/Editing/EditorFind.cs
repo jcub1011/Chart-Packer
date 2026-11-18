@@ -1,10 +1,11 @@
+using ChartShared.Core.Charting.Layout;
 using ChartShared.Core.Charts;
 
 namespace ChartShared.Core.Charting.Editing;
 
 /// <summary>
-/// The passages of a track that match the selected notes (Ctrl+F), found as <see cref="SyncRegion"/> finds the passages
-/// to synchronize, and the one the cursor was last taken to. They're forgotten when the selection or the chart changes,
+/// The passages of a track, or of a vocal part, that match the selected notes (Ctrl+F), found as <see cref="SyncRegion"/>
+/// finds the passages to synchronize, and the one the cursor was last taken to. They're forgotten when the selection or the chart changes,
 /// as they'd no longer be what's there. The session owns it (<see cref="EditorSession.Find"/>).
 /// </summary>
 public sealed class EditorFind
@@ -27,8 +28,11 @@ public sealed class EditorFind
     /// <summary>Raised when the passages found, or the one the cursor is at, change.</summary>
     public event EventHandler? Changed;
 
-    /// <summary>The track the passages are of; null with none found.</summary>
+    /// <summary>The highway's track the passages are of; null with none found, or with a vocal part's found.</summary>
     public ChartTrackKey? Track { get; private set; }
+
+    /// <summary>The vocal part the passages are of; null with none found, or with a highway's found.</summary>
+    public VocalTrack? Vocal { get; private set; }
 
     /// <summary>The ticks of the selected notes found, from the first note's start up to the last's end; null with none found.</summary>
     public (long From, long To)? Span { get; private set; }
@@ -54,15 +58,31 @@ public sealed class EditorFind
             return;
         }
 
-        if (_session.Selection.Track is not { } key || _session.Selection.Notes is not { Count: > 0 } notes)
+        ChartTrackKey? key = null;
+        VocalTrack? vocal = null;
+        long from, to;
+        IReadOnlyList<long> found;
+        if (_session.Selection.Track is { } track && _session.Selection.Notes is { Count: > 0 } notes)
+        {
+            key = track;
+            from = notes[0].Tick;
+            to = notes.Max(static n => n.Tick + n.Length);
+            found = _session.Sync.Find(track, from, to);
+        }
+        else if (_session.Selection.Vocal is { } part && _session.VocalContentOf(part) is { } content
+            && content.Notes.Where(n => _session.Selection.Contains(part, n.Place)).ToList() is { Count: > 0 } sung)
+        {
+            vocal = part;
+            from = sung.Min(static n => n.Tick);
+            to = sung.Max(static n => n.EndTick);
+            found = _session.Sync.Find(part, from, to);
+        }
+        else
         {
             _session.Status = NothingSelected;
             return;
         }
 
-        long from = notes[0].Tick;
-        long to = notes.Max(static n => n.Tick + n.Length);
-        var found = _session.Sync.Find(key, from, to);
         if (found.Count == 0)
         {
             // The notes alone are no match to go to.
@@ -71,6 +91,7 @@ public sealed class EditorFind
         }
 
         Track = key;
+        Vocal = vocal;
         Span = (from, Math.Max(to, from + SyncRegion.MinLength(_session.Chart.Resolution)));
 
         // The notes searched for are a match of their own, in their place among the others.
@@ -101,9 +122,10 @@ public sealed class EditorFind
     /// <summary>Forgets the passages found.</summary>
     public void Clear()
     {
-        if (Track is null)
+        if (Track is null && Vocal is null)
             return;
         Track = null;
+        Vocal = null;
         Span = null;
         _matches.Clear();
         _current = -1;

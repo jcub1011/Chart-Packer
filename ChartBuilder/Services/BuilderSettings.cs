@@ -174,7 +174,17 @@ namespace ChartBuilder.Services
         public const int MaxSpectrogramBudgetMb = 4096;
 
         /// <summary>How much memory every stem's spectrogram may take together, in MB (charter-spec C13 item 3).</summary>
-        public int SpectrogramBudgetMb { get; set; } = 256;
+        public int SpectrogramBudgetMb { get; set; } = DefaultSpectrogramBudgetMb;
+
+        /// <summary>The spectrogram memory budget of fresh settings, in MB: room for six 10-minute stems.</summary>
+        public const int DefaultSpectrogramBudgetMb = 512;
+
+        /// <summary>
+        /// Whether spectrograms are sharpened: each part of the sound drawn at the pitch and the time it's really at, so
+        /// notes are thin lines and hits thin columns, rather than as blurred as the analysis's windows are wide
+        /// (charter-spec C13 item 1).
+        /// </summary>
+        public bool SpectrogramSharpening { get; set; } = false;
 
         /// <summary>The master volume of fresh settings: full.</summary>
         public const double DefaultMasterVolume = 1;

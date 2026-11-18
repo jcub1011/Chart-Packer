@@ -132,7 +132,7 @@ public static class VideoCodecs
     // VP8 in WebM is the only video that plays on every platform in both Clone Hero and YARG. VP9, AV1 and HEVC aren't
     // listed as supported anywhere (HEVC plays in Clone Hero only with codecs installed); H.264 and the older codecs play on
     // some platforms, so they're recompressed under the usual rules rather than converted as a matter of compatibility.
-    private static readonly HashSet<string> Unsupported = new(StringComparer.OrdinalIgnoreCase) { "video/vp9", "video/av1", "video/hevc" };
+    private static readonly HashSet<string> Unsupported = [with(StringComparer.OrdinalIgnoreCase), "video/vp9", "video/av1", "video/hevc"];
 
     /// <summary>Whether a video whose probed codec is <paramref name="codecKey"/> (<c>video/vp9</c>) is in a codec the games can't all play.</summary>
     public static bool IsUnsupported(string? codecKey) => codecKey is not null && Unsupported.Contains(codecKey);

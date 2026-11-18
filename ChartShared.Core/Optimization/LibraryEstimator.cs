@@ -32,11 +32,11 @@ public sealed class LibraryEstimator
     private readonly OptimizerSet _optimizers;
     private readonly PlanServices _services;
     private readonly int _parallelism;
-    private readonly Dictionary<string, ChartAssets> _pending = new(OutputPaths.PathComparer);
+    private readonly Dictionary<string, ChartAssets> _pending = [with(OutputPaths.PathComparer)];
     private readonly Queue<ChartAssets> _sample;
     private readonly Queue<ChartAssets> _rest;
     private readonly Stack<string> _priority = new();
-    private readonly HashSet<string> _samplePaths = new(OutputPaths.PathComparer);
+    private readonly HashSet<string> _samplePaths = [with(OutputPaths.PathComparer)];
     private readonly int _total;
     private int _done;
     private TaskCompletionSource _running = Completed();

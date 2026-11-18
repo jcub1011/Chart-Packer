@@ -4,6 +4,7 @@
              xmlns:svm="using:ChartShared.UI.ViewModels"
              xmlns:res="using:ChartBuilder.Resources"
              xmlns:bctl="using:ChartBuilder.Controls"
+             xmlns:ctl="using:ChartShared.UI.Controls"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d" d:DesignWidth="280" d:DesignHeight="600"
@@ -12,7 +13,8 @@
 
     <!-- Properties (charter-spec C3 item 4): the selected notes, phrases, disco flip sections, tempo markers and span, or a
          vocal part's notes and phrases (C3 item 7). A field shows <<multiple>> when the items differ, and a value typed there
-         is applied to every item when Enter is pressed or the field loses focus. -->
+         is applied to every item when Enter is pressed or the field loses focus. Tick, Length and Pitch can be dragged sideways too,
+         which moves every item by the same steps rather than setting them all to one value. -->
     <UserControl.Styles>
         <!-- What a section holds, under its header. -->
         <Style Selector="Border.section">
@@ -33,6 +35,8 @@
                     <TextBlock Grid.Row="0" Classes="muted" Text="{x:Static res:Strings.PropertiesTickLabel}" />
                     <TextBox Grid.Row="0" Grid.Column="1"
                              Text="{Binding TickText, UpdateSourceTrigger=LostFocus}"
+                             ctl:DeltaScrub.Target="{Binding TickScrub}"
+                             ToolTip.Tip="{x:Static res:Strings.PropertiesTickToolTip}"
                              AutomationProperties.Name="{x:Static res:Strings.PropertiesTickLabel}" />
                     <TextBlock Grid.Row="1" Classes="muted" Text="{x:Static res:Strings.PropertiesTimeLabel}" />
                     <SelectableTextBlock Grid.Row="1" Grid.Column="1" VerticalAlignment="Center" FontSize="12" Text="{Binding TimeText}" />
@@ -43,6 +47,8 @@
                     <TextBlock Grid.Row="4" Classes="muted" Text="{x:Static res:Strings.PropertiesLengthLabel}" />
                     <TextBox Grid.Row="4" Grid.Column="1"
                              Text="{Binding LengthText, UpdateSourceTrigger=LostFocus}"
+                             ctl:DeltaScrub.Target="{Binding LengthScrub}"
+                             ToolTip.Tip="{x:Static res:Strings.PropertiesLengthToolTip}"
                              AutomationProperties.Name="{x:Static res:Strings.PropertiesLengthLabel}" />
                     <TextBlock Grid.Row="5" Classes="muted" Text="{x:Static res:Strings.PropertiesForcingLabel}" IsVisible="{Binding CanForce}" />
                     <WrapPanel Grid.Row="5" Grid.Column="1" ItemSpacing="8" IsVisible="{Binding CanForce}">
@@ -70,6 +76,8 @@
                     <TextBlock Grid.Row="0" Classes="muted" Text="{x:Static res:Strings.PropertiesTickLabel}" />
                     <TextBox Grid.Row="0" Grid.Column="1"
                              Text="{Binding VocalTickText, UpdateSourceTrigger=LostFocus}"
+                             ctl:DeltaScrub.Target="{Binding VocalTickScrub}"
+                             ToolTip.Tip="{x:Static res:Strings.PropertiesTickToolTip}"
                              AutomationProperties.Name="{x:Static res:Strings.PropertiesTickLabel}" />
                     <TextBlock Grid.Row="1" Classes="muted" Text="{x:Static res:Strings.PropertiesTimeLabel}" />
                     <SelectableTextBlock Grid.Row="1" Grid.Column="1" VerticalAlignment="Center" FontSize="12" Text="{Binding VocalTimeText}" />
@@ -78,6 +86,7 @@
                     <TextBlock Grid.Row="3" Classes="muted" Text="{x:Static res:Strings.PropertiesPitchLabel}" />
                     <Grid Grid.Row="3" Grid.Column="1" ColumnDefinitions="*,Auto" ColumnSpacing="8">
                         <TextBox Text="{Binding PitchText, UpdateSourceTrigger=LostFocus}"
+                                 ctl:DeltaScrub.Target="{Binding PitchScrub}"
                                  ToolTip.Tip="{x:Static res:Strings.PropertiesPitchToolTip}"
                                  AutomationProperties.Name="{x:Static res:Strings.PropertiesPitchLabel}" />
                         <TextBlock Grid.Column="1" Classes="muted" VerticalAlignment="Center" FontSize="12" Text="{Binding PitchNameText}" />
@@ -85,10 +94,13 @@
                     <TextBlock Grid.Row="4" Classes="muted" Text="{x:Static res:Strings.PropertiesLengthLabel}" />
                     <TextBox Grid.Row="4" Grid.Column="1"
                              Text="{Binding VocalLengthText, UpdateSourceTrigger=LostFocus}"
+                             ctl:DeltaScrub.Target="{Binding VocalLengthScrub}"
+                             ToolTip.Tip="{x:Static res:Strings.PropertiesLengthToolTip}"
                              AutomationProperties.Name="{x:Static res:Strings.PropertiesLengthLabel}" />
                     <TextBlock Grid.Row="5" Classes="muted" Text="{x:Static res:Strings.PropertiesLyricLabel}" />
                     <TextBox Grid.Row="5" Grid.Column="1"
                              Text="{Binding LyricText, UpdateSourceTrigger=LostFocus}"
+                             IsEnabled="{Binding CanEditLyric}"
                              ToolTip.Tip="{x:Static res:Strings.PropertiesLyricToolTip}"
                              AutomationProperties.Name="{x:Static res:Strings.PropertiesLyricLabel}" />
                     <TextBlock Grid.Row="6" Classes="muted" Text="{x:Static res:Strings.PropertiesSungLabel}" />

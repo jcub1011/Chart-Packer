@@ -30,11 +30,12 @@ public readonly struct KeyChord : IEquatable<KeyChord>
 {
     // Keys that are only a modifier, or that Avalonia reports for a press that isn't a key (an IME or dead key, Alt+letter on
     // some platforms): a chord is never one of these on its own.
-    private static readonly HashSet<string> ModifierKeys = new(StringComparer.OrdinalIgnoreCase)
-    {
+    private static readonly HashSet<string> ModifierKeys =
+    [
+        with(StringComparer.OrdinalIgnoreCase),
         "None", "System", "ImeProcessed", "DeadCharProcessed", "Ctrl", "Control", "Shift", "Alt", "Meta", "Win", "LeftCtrl", "RightCtrl", "LeftShift", "RightShift", "LeftAlt", "RightAlt", "LWin", "RWin",
         "ControlLeft", "ControlRight", "ShiftLeft", "ShiftRight", "AltLeft", "AltRight", "MetaLeft", "MetaRight",
-    };
+    ];
 
     private readonly string? _key;
 

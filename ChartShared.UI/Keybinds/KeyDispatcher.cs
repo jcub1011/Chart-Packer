@@ -32,10 +32,10 @@ namespace ChartShared.UI.Keybinds;
 /// </remarks>
 public sealed class KeyDispatcher
 {
-    private static readonly ConditionalWeakTable<TopLevel, KeyDispatcher> Attached = new();
+    private static readonly ConditionalWeakTable<TopLevel, KeyDispatcher> Attached = [];
 
     private readonly KeyMap _map;
-    private readonly Dictionary<string, List<Registration>> _handlers = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, List<Registration>> _handlers = [with(StringComparer.Ordinal)];
 
     // The keys whose press ran an action and haven't come up: what an auto-repeat or a key up is recognised by.
     private readonly Dictionary<HeldKey, Pressed> _pressed = [];

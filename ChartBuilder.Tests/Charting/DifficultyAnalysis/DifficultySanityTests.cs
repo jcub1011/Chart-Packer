@@ -243,7 +243,7 @@ public sealed class DifficultySanityTests
         double editMs = chart.TempoMap.ToTempoMap().SecondsAt(editTick) * 1000;
 
         var earlier = before.Samples.Where(s => s.TimeMs < editMs).ToList();
-        CollectionAssert.AreEqual(earlier, after.Samples.Take(earlier.Count).ToList());
+        Assert.AreSequenceEqual(earlier, after.Samples.Take(earlier.Count).ToList());
         Assert.AreEqual(before.ValueAt(editMs - 10), after.ValueAt(editMs - 10));
     }
 

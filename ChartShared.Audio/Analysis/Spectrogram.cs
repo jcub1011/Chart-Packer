@@ -1,19 +1,22 @@
 namespace ChartShared.Audio.Analysis;
 
 /// <summary>
-/// A stem's (or a mix's) spectrogram (charter-spec C13), held in memory only: a column of 256 rows
+/// A stem's (or a mix's) spectrogram (charter-spec C13), held in memory only: a column of 768 rows
 /// (<see cref="SpectrogramRows"/>) every 256 samples, each row a byte of level. It's computed in chunks by
 /// <see cref="SpectrogramBuilder"/>, near <see cref="Focus"/> first, and can be drawn from while it fills in.
 /// </summary>
 /// <remarks>
-/// <para>Column <c>c</c> is a 2048-sample Hann window centred on sample <c>c × 256</c>. Its bytes hold absolute level,
+/// <para>Column <c>c</c> is what sounds at sample <c>c × 256</c>, analysed through windows centred there, longer for
+/// the low rows than the high (<see cref="SpectrogramTiers"/>). Its bytes hold absolute level,
 /// <see cref="FloorDb"/> + <see cref="DbPerStep"/> × byte, where 0 dB is a full-scale sine; contrast is for drawing to
 /// apply. 0 is silence (or below −120 dB).</para>
+/// <para>When it's sharpened (<see cref="IsSharpened"/>), each bin's energy is put at the frequency and the time it's
+/// really at rather than the bin's own (<see cref="ReassignedPair"/>), so a steady note is a thin line and a hit a
+/// thin column. A sharpened sine's level is 0 dB when it's in the middle of a row, and down to 3 dB less between two.</para>
 /// <para>Any thread may read it. A column's bytes are written before it's counted ready, and read after.</para>
 /// </remarks>
 public sealed class Spectrogram : IDisposable
 {
-    public const int WindowSize = 2048;
     public const int Hop = 256;
     public const int Rows = SpectrogramRows.Count;
     public const double FloorDb = -120;
@@ -26,10 +29,11 @@ public sealed class Spectrogram : IDisposable
     private int _released;
     private volatile string? _error;
 
-    internal Spectrogram(int sampleRate, long lengthFrames, int chunkColumns)
+    internal Spectrogram(int sampleRate, long lengthFrames, int chunkColumns, bool sharpened = false)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(chunkColumns);
         SampleRate = sampleRate;
+        IsSharpened = sharpened;
         ColumnCount = (int)(Math.Max(0, lengthFrames) / Hop) + 1;
         ChunkColumns = chunkColumns;
         ChunkCount = (ColumnCount + chunkColumns - 1) / chunkColumns;
@@ -41,6 +45,9 @@ public sealed class Spectrogram : IDisposable
     public event Action<Spectrogram>? Updated;
 
     public int SampleRate { get; }
+
+    /// <summary>Whether each bin's energy is put where it really is, in frequency and in time, rather than at its bin and column.</summary>
+    public bool IsSharpened { get; }
 
     public int ColumnCount { get; }
 

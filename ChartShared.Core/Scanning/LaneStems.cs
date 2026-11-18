@@ -1,3 +1,4 @@
+using ChartShared.Core.Charting.Layout;
 using ChartShared.Core.Charts;
 
 namespace ChartShared.Core.Scanning;
@@ -14,6 +15,8 @@ public static class LaneStems
     /// <summary>The vocal stems, the lead's first, each on its own.</summary>
     public static IReadOnlyList<IReadOnlyList<string>> Vocals { get; } = [["vocals"], ["vocals_1"], ["vocals_2"]];
 
+    private static readonly IReadOnlyList<IReadOnlyList<string>> HarmonyOneStems = [["vocals_1"], ["vocals"], ["vocals_2"]];
+    private static readonly IReadOnlyList<IReadOnlyList<string>> HarmonyTwoStems = [["vocals_2"], ["vocals"], ["vocals_1"]];
     private static readonly IReadOnlyList<IReadOnlyList<string>> GuitarStems = [["guitar"]];
     private static readonly IReadOnlyList<IReadOnlyList<string>> BassStems = [["bass"], ["rhythm"]];
     private static readonly IReadOnlyList<IReadOnlyList<string>> RhythmStems = [["rhythm"]];
@@ -34,6 +37,18 @@ public static class LaneStems
         ChartInstrument.Keys => KeysStems,
         ChartInstrument.Drums => DrumsStems,
         _ => [],
+    };
+
+    /// <summary>
+    /// The stems a vocal part is played against, most fitting first: the lead's own <c>vocals</c>, then the harmonies', each
+    /// on its own. A harmony takes its own stem (<c>vocals_1</c> for the first, <c>vocals_2</c> for the second) before the
+    /// lead's; the third has none of its own, so it follows the lead's.
+    /// </summary>
+    public static IReadOnlyList<IReadOnlyList<string>> For(VocalTrack vocal) => vocal switch
+    {
+        VocalTrack.Harmony1 => HarmonyOneStems,
+        VocalTrack.Harmony2 => HarmonyTwoStems,
+        _ => Vocals,
     };
 
     /// <summary>

@@ -22,7 +22,7 @@ public sealed record DifficultyReferences(double Strum, double Note, double Rhyt
     // Endurance's half-life is long, so it's given fifteen of them to settle.
     private const double EnduranceHalfLives = 15;
 
-    private static readonly ConditionalWeakTable<DifficultyParameters, DifficultyReferences> Cache = new();
+    private static readonly ConditionalWeakTable<DifficultyParameters, DifficultyReferences> Cache = [];
 
     /// <summary>A reference of 100 for each attribute, so a pass gives raw strains.</summary>
     internal static DifficultyReferences Raw { get; } = new(100, 100, 100, 100, 100);

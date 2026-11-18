@@ -32,7 +32,7 @@ public sealed class EstimateCache
     private const int VideoMethod = 3;
 
     private readonly Lock _sync = new();
-    private readonly Dictionary<string, Chart> _charts = new(OutputPaths.PathComparer);
+    private readonly Dictionary<string, Chart> _charts = [with(OutputPaths.PathComparer)];
     private readonly JsonSettingsFile<EstimateCacheData>? _file;
     private long _clock;
     private bool _dirty;
@@ -41,7 +41,7 @@ public sealed class EstimateCache
     {
         public string Stamp { get; } = stamp;
 
-        public Dictionary<string, OptimizeEstimate> Estimates { get; } = new(StringComparer.Ordinal);
+        public Dictionary<string, OptimizeEstimate> Estimates { get; } = [with(StringComparer.Ordinal)];
 
         public long LastUsed { get; set; }
     }

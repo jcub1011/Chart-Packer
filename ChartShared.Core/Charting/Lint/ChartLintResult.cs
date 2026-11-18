@@ -20,7 +20,7 @@ public sealed class ChartLintResult
     }
 
     /// <summary>A result with no rules run and no findings.</summary>
-    public static ChartLintResult Empty { get; } = new(new Dictionary<string, Finding[]>(StringComparer.Ordinal));
+    public static ChartLintResult Empty { get; } = new([with(StringComparer.Ordinal)]);
 
     /// <summary>
     /// Every finding, in order: those without a chart location first, then by part, difficulty (every difficulty first),

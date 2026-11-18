@@ -44,7 +44,7 @@ public sealed class SettingsWindowViewModelTests
     {
         var vm = Open();
 
-        CollectionAssert.AreEqual(new[] { "Playback", "General" }, vm.Categories.Skip(1).Select(c => c.Label).ToArray());
+        Assert.AreSequenceEqual(["Playback", "General"], [.. vm.Categories.Skip(1).Select(c => c.Label)]);
         Assert.IsNull(vm.Categories[0].Category);
         Assert.AreSame(vm.Categories[0], vm.SelectedCategory);
         Assert.AreEqual(vm.Categories[0].Label, vm.PageTitle);
@@ -67,10 +67,10 @@ public sealed class SettingsWindowViewModelTests
     public void ASelectedCategoryHeadsItsSectionsByTheirOwnNameAndAllSettingsByTheWholePath()
     {
         var vm = Open();
-        CollectionAssert.AreEqual(new[] { "Playback › Audio", "Playback › Visualizers", "General" }, vm.Groups.Select(g => g.Title).ToArray());
+        Assert.AreSequenceEqual(["Playback › Audio", "Playback › Visualizers", "General"], [.. vm.Groups.Select(g => g.Title)]);
 
         vm.SelectedCategory = vm.Categories.Single(c => c.Label == "Playback");
-        CollectionAssert.AreEqual(new[] { "Audio", "Visualizers" }, vm.Groups.Select(g => g.Title).ToArray());
+        Assert.AreSequenceEqual(["Audio", "Visualizers"], [.. vm.Groups.Select(g => g.Title)]);
 
         vm.SelectedCategory = vm.Categories.Single(c => c.Label == "General");
         Assert.AreEqual("", vm.Groups.Single().Title, "the page header already says General");
@@ -127,8 +127,8 @@ public sealed class SettingsWindowViewModelTests
 
         vm.SearchText = "beat";
 
-        CollectionAssert.AreEqual(new[] { "Playback" }, vm.Categories.Skip(1).Select(c => c.Label).ToArray());
-        Assert.IsTrue(vm.SelectedCategory!.Category is null);
+        Assert.AreSequenceEqual(["Playback"], [.. vm.Categories.Skip(1).Select(c => c.Label)]);
+        Assert.IsNull(vm.SelectedCategory!.Category);
         Assert.AreEqual(1, vm.Categories[0].MatchCount);
         Assert.AreEqual(1, vm.Categories[1].MatchCount);
         Assert.AreEqual("Beat Lines", vm.Groups.Single().Items.Single().Label);
@@ -137,7 +137,7 @@ public sealed class SettingsWindowViewModelTests
         Assert.IsTrue(vm.HasNoMatches);
 
         vm.SearchText = "";
-        Assert.AreEqual(3, vm.Categories.Count);
+        Assert.HasCount(3, vm.Categories);
         Assert.IsNull(vm.Categories[1].MatchCount);
         Assert.IsFalse(vm.Categories[1].HasMatchCount);
     }

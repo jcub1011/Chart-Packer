@@ -75,7 +75,7 @@ internal sealed class DifficultyState
         copy._recentBeats = [.. _recentBeats];
         copy._moves = (long[])_moves.Clone();
         copy._phraseTokens = (uint[])_phraseTokens.Clone();
-        copy._lastSeen = new Dictionary<UInt128, double>(_lastSeen);
+        copy._lastSeen = [with(_lastSeen)];
         copy._costs = _costs.Clone();
         return copy;
     }

@@ -197,6 +197,8 @@ internal readonly record struct RankedJob(AnalysisPriority Priority, long FocusS
 internal sealed class WorkerScratch
 {
     private readonly Dictionary<int, RealFftPair> _ffts = [];
+    private readonly Dictionary<int, ReassignedPair> _reassigned = [];
+    private readonly List<float[]> _floats = [];
     private float[] _samples = [];
 
     /// <summary>A buffer of at least <paramref name="length"/> samples; its contents are left over.</summary>
@@ -207,11 +209,31 @@ internal sealed class WorkerScratch
         return _samples;
     }
 
+    /// <summary>
+    /// One of several buffers, each of at least <paramref name="length"/> floats once asked for; its contents are left
+    /// over. Buffers of different <paramref name="slot"/>s can be used at once.
+    /// </summary>
+    public float[] Floats(int slot, int length)
+    {
+        while (_floats.Count <= slot)
+            _floats.Add([]);
+        if (_floats[slot].Length < length)
+            _floats[slot] = new float[length];
+        return _floats[slot];
+    }
+
     public RealFftPair Fft(int size)
     {
         if (!_ffts.TryGetValue(size, out var fft))
             _ffts[size] = fft = new RealFftPair(size);
         return fft;
+    }
+
+    public ReassignedPair Reassigned(int size)
+    {
+        if (!_reassigned.TryGetValue(size, out var pair))
+            _reassigned[size] = pair = new ReassignedPair(size);
+        return pair;
     }
 }
 

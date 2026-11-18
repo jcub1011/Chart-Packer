@@ -76,7 +76,7 @@ namespace ChartBuilder.ViewModels
         private int _openings;
 
         // Each stem's mute, solo and volume as last set, kept as the tracks are opened again; a stem not set has its default.
-        private readonly Dictionary<string, (bool IsMuted, bool IsSolo, double Volume)> _switches = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, (bool IsMuted, bool IsSolo, double Volume)> _switches = [with(StringComparer.Ordinal)];
 
         // Clock and DrawClock, made once: they're read every frame.
         private Func<TimeSpan>? _clock;

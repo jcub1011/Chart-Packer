@@ -1,13 +1,14 @@
 using System.Globalization;
 using ChartShared.Core.Charting.Commands;
+using ChartShared.Core.Charting.Layout;
 using ChartShared.Core.Charts;
 
 namespace ChartShared.Core.Charting.Editing;
 
 /// <summary>
-/// A synchronized region: a stretch of one track whose edits are made again in every passage of the track that matched
-/// it exactly when it was drawn, as one undoable step with the edit (the Sync tool). There's one at a time, and the
-/// session owns it (<see cref="EditorSession.Sync"/>).
+/// A synchronized region: a stretch of one track, or of one vocal part, whose edits are made again in every passage of
+/// it that matched it exactly when it was drawn, as one undoable step with the edit (the Sync tool). There's one at a
+/// time, and the session owns it (<see cref="EditorSession.Sync"/>).
 /// </summary>
 /// <remarks>
 /// <para>The passages are found as the region is drawn, moved or resized, and never again between: one made to match
@@ -18,6 +19,8 @@ namespace ChartShared.Core.Charting.Editing;
 /// synced alike. A passage found is synced only while it holds what the region holds: one edited by hand stops being
 /// synced, rather than being written over, as soon as it's edited, and is synced again once it matches again, as when
 /// that edit is undone.</para>
+/// <para>On a vocal part a passage holds its notes, by offset, length and pitch, and the lyrics on their ticks, by text;
+/// its phrases, star power and other events are neither matched nor copied, as copying and pasting the notes leaves them.</para>
 /// </remarks>
 public sealed class SyncRegion
 {
@@ -38,10 +41,25 @@ public sealed class SyncRegion
     public static long MinLength(int resolution) => Math.Max(1, resolution / 8);
 
     /// <summary>Whether a region is drawn.</summary>
-    public bool IsActive => Track is not null;
+    public bool IsActive => Track is not null || Vocal is not null;
 
-    /// <summary>The track the region is drawn on; null with no region.</summary>
+    /// <summary>The highway's track the region is drawn on; null with no region, or one on a vocal part.</summary>
     public ChartTrackKey? Track { get; private set; }
+
+    /// <summary>The vocal part the region is drawn on; null with no region, or one on a highway.</summary>
+    public VocalTrack? Vocal { get; private set; }
+
+    /// <summary>The lane the region is drawn on: <see cref="Track"/>'s highway or <see cref="Vocal"/>'s part; null with no region.</summary>
+    public LanePart? Part => Track is { } key ? LanePart.Highway(key) : Vocal is { } vocal ? LanePart.Vocals(vocal) : null;
+
+    /// <summary>Whether the region is drawn on <paramref name="track"/>'s highway.</summary>
+    public bool IsOn(ChartTrackKey track) => Track == track;
+
+    /// <summary>Whether the region is drawn on the vocal part <paramref name="track"/>.</summary>
+    public bool IsOn(VocalTrack track) => Vocal == track;
+
+    /// <summary>Whether the region is drawn on <paramref name="part"/>'s lane.</summary>
+    public bool IsOn(LanePart part) => part.Track is { } key ? IsOn(key) : part.Vocal is { } vocal && IsOn(vocal);
 
     /// <summary>The region's ticks, from its start up to, not including, its end; null with no region.</summary>
     public (long From, long To)? Span { get; private set; }
@@ -61,8 +79,8 @@ public sealed class SyncRegion
     /// </summary>
     public IReadOnlyList<long> Matches => _matches;
 
-    /// <summary>The region being dragged out with the Sync tool, from its start up to, not including, its end; null when none is.</summary>
-    public (ChartTrackKey Track, long From, long To)? Draft
+    /// <summary>The region being dragged out with the Sync tool, on its lane, from its start up to, not including, its end; null when none is.</summary>
+    public (LanePart Part, long From, long To)? Draft
     {
         get;
         internal set
@@ -80,13 +98,26 @@ public sealed class SyncRegion
     /// long; one with nothing matching it is kept all the same, hashed in yellow.
     /// </summary>
     /// <returns>Whether it was drawn.</returns>
-    public bool Define(ChartTrackKey track, long from, long to)
+    public bool Define(ChartTrackKey track, long from, long to) => Define(LanePart.Highway(track), from, to);
+
+    /// <summary>
+    /// Draws the region over <paramref name="from"/> up to, not including, <paramref name="to"/> of the vocal part
+    /// <paramref name="track"/>, as <see cref="Define(ChartTrackKey, long, long)"/> does a highway's.
+    /// </summary>
+    /// <returns>Whether it was drawn.</returns>
+    public bool Define(VocalTrack track, long from, long to) => Define(LanePart.Vocals(track), from, to);
+
+    /// <summary>Draws the region over <paramref name="from"/> up to, not including, <paramref name="to"/> of <paramref name="part"/>'s lane.</summary>
+    /// <returns>Whether it was drawn.</returns>
+    internal bool Define(LanePart part, long from, long to)
     {
         Clear();
-        Track = track;
+        Track = part.Track;
+        Vocal = part.Vocal;
         if (Set(from, to))
             return true;
         Track = null;
+        Vocal = null;
         return false;
     }
 
@@ -112,14 +143,21 @@ public sealed class SyncRegion
     /// </summary>
     internal void DragTo(long from, long to) => Set(from, to, say: false);
 
-    // Puts the region over from..to of its track and finds the passages that match it there again, keeping it however
+    // Puts the region over from..to of its lane and finds the passages that match it there again, keeping it however
     // few notes it holds; says what was found, unless say is off. False when there's no region there to redraw.
     private bool Set(long from, long to, bool say = true)
     {
-        if (Track is not { } key || _session.Chart.PartOf(key.Instrument) is not { } part || to <= from || from < 0)
+        if (to <= from || from < 0)
             return false;
         to = Math.Max(to, from + MinLength(_session.Chart.Resolution));
-        var matches = Matching(key, part, from, to);
+        List<long>? matches = null;
+        if (Track is { } key && _session.Chart.PartOf(key.Instrument) is { } part)
+            matches = Matching(key, part, from, to);
+        else if (Vocal is { } vocal && _session.VocalContentOf(vocal) is { } content)
+            matches = VocalMatching(content, from, to);
+        if (matches is null)
+            return false;
+
         Span = (from, to);
         _found.Clear();
         _found.AddRange(matches);
@@ -147,6 +185,18 @@ public sealed class SyncRegion
         return Matching(track, part, from, Math.Max(to, from + MinLength(_session.Chart.Resolution)));
     }
 
+    /// <summary>
+    /// The passages of the vocal part <paramref name="track"/> that match what it holds from <paramref name="from"/> up
+    /// to, not including, <paramref name="to"/>, as <see cref="Find(ChartTrackKey, long, long)"/> finds a highway's. Empty
+    /// when the part is gone, can't be read, or holds no notes there.
+    /// </summary>
+    public IReadOnlyList<long> Find(VocalTrack track, long from, long to)
+    {
+        if (_session.VocalContentOf(track) is not { } content || from < 0)
+            return [];
+        return VocalMatching(content, from, Math.Max(to, from + MinLength(_session.Chart.Resolution)));
+    }
+
     // The passages matching the track's notes from..to; none when it holds none there.
     private List<long> Matching(ChartTrackKey key, EditablePart part, long from, long to)
     {
@@ -161,6 +211,7 @@ public sealed class SyncRegion
         if (!IsActive)
             return;
         Track = null;
+        Vocal = null;
         Span = null;
         IsUnmatched = false;
         _found.Clear();
@@ -176,6 +227,8 @@ public sealed class SyncRegion
     /// <exception cref="ArgumentException">The command is refused, as it would be done alone.</exception>
     internal IChartCommand WithCopies(IChartCommand command)
     {
+        if (Vocal is { } vocal)
+            return WithVocalCopies(vocal, command);
         if (Track is not { } key || Span is not var (from, to) || _session.Chart.PartOf(key.Instrument) is not { } part)
             return command;
         var chart = _session.Chart;
@@ -228,26 +281,39 @@ public sealed class SyncRegion
     /// </summary>
     internal void OnChanged()
     {
-        if (Track is not { } key || Span is not var (from, to))
+        if (Span is not var (from, to))
             return;
-        if (_session.Chart.PartOf(key.Instrument) is not { } part)
-        {
-            Clear();
-            _session.Status = TrackGone;
-            return;
-        }
-
-        if (_session.Chart.Resolution != _resolution)
-        {
-            Clear();
-            _session.Status = ResolutionChanged;
-            return;
-        }
-
-        var track = part[key.Difficulty];
         long length = to - from;
-        var region = PatternAt(part, track, from, length);
-        var matches = _found.Where(m => PatternAt(part, track, m, length).SameAs(region)).ToList();
+        List<long> matches;
+        if (Track is { } key && _session.Chart.PartOf(key.Instrument) is { } part)
+        {
+            if (_session.Chart.Resolution != _resolution)
+            {
+                Cleared(ResolutionChanged);
+                return;
+            }
+
+            var track = part[key.Difficulty];
+            var region = PatternAt(part, track, from, length);
+            matches = _found.Where(m => PatternAt(part, track, m, length).SameAs(region)).ToList();
+        }
+        else if (Vocal is { } vocal && _session.VocalContentOf(vocal) is { } content)
+        {
+            if (_session.Chart.Resolution != _resolution)
+            {
+                Cleared(ResolutionChanged);
+                return;
+            }
+
+            var region = VocalPatternAt(content, from, length);
+            matches = _found.Where(m => VocalPatternAt(content, m, length).SameAs(region)).ToList();
+        }
+        else
+        {
+            Cleared(TrackGone);
+            return;
+        }
+
         if (matches.SequenceEqual(_matches))
             return;
         int lost = _matches.Except(matches).Count();
@@ -256,6 +322,13 @@ public sealed class SyncRegion
         if (lost > 0)
             _session.Status = string.Format(CultureInfo.InvariantCulture, StoppedSyncing, lost);
         _session.RaiseState();
+    }
+
+    // Takes the region away, saying why.
+    private void Cleared(string why)
+    {
+        Clear();
+        _session.Status = why;
     }
 
     // What the region holds now copied into the passage at start: its notes, the chords' markings, and on Pro drums
@@ -347,6 +420,126 @@ public sealed class SyncRegion
 
     private static bool IsPad(int lane) => lane is >= TomMarker.FirstPad and <= TomMarker.LastPad;
 
+    // The vocal part's version of WithCopies: the region's notes and lyrics, as the command leaves them, put in each
+    // passage synced in place of its own, as one more change of the part done with the command.
+    private IChartCommand WithVocalCopies(VocalTrack vocal, IChartCommand command)
+    {
+        if (Span is not var (from, to) || _session.VocalContentOf(vocal) is not { } content)
+            return command;
+        var chart = _session.Chart;
+        long length = to - from;
+        var before = VocalPatternAt(content, from, length);
+        var matched = _found.Where(m => VocalPatternAt(content, m, length).SameAs(before)).ToList();
+
+        command.Apply(chart);
+        IChartCommand? copy = null;
+        try
+        {
+            // The command may have taken the part away, or left it unreadable, which ends the region once it's done.
+            if (_session.VocalContentOf(vocal) is not { } after)
+                return command;
+            var region = VocalPatternAt(after, from, length);
+            if (region.SameAs(before))
+                return command;
+
+            var starts = matched.Where(m => !VocalPatternAt(after, m, length).SameAs(region)).ToList();
+            if (starts.Count == 0)
+                return command;
+
+            // A copy that's refused leaves the passages as they are, so they no longer match.
+            try
+            {
+                var copied = VocalCopiesInto(after, region, starts, length);
+                if (!ReferenceEquals(copied, after))
+                {
+                    copy = new ChangeVocals(vocal, copied);
+                    copy.Apply(chart);
+                }
+            }
+            catch (Exception e) when (EditorSession.IsRefusal(e))
+            {
+                copy = null;
+            }
+
+            return copy is null ? command : new CompositeCommand([command, copy]);
+        }
+        finally
+        {
+            // Taken back, to be done again as one step.
+            copy?.Revert(chart);
+            command.Revert(chart);
+        }
+    }
+
+    // The passages of the vocal part matching what it holds from..to; none when it holds no notes there.
+    private static List<long> VocalMatching(VocalTrackContent content, long from, long to)
+    {
+        long length = to - from;
+        var region = VocalPatternAt(content, from, length);
+        if (region.Notes.Count == 0)
+            return [];
+
+        // As a highway's: anchored on the region's first note, none overlapping the region or each other.
+        var first = region.Notes[0];
+        var matches = new List<long>();
+        long free = 0;
+        foreach (var note in content.Notes)
+        {
+            long start = note.Tick - first.Tick;
+            if (start < free || note.Pitch != first.Pitch || note.Length != first.Length)
+                continue;
+            if (start < from + length && start + length > from)
+                continue;
+            if (!VocalPatternAt(content, start, length).SameAs(region))
+                continue;
+            matches.Add(start);
+            free = start + length;
+        }
+
+        return matches;
+    }
+
+    // The part with each passage at starts holding the region's notes and lyrics, and only those, in place of its own.
+    private static VocalTrackContent VocalCopiesInto(VocalTrackContent content, VocalPattern region, List<long> starts, long length)
+    {
+        bool InAPassage(long tick) => starts.Any(s => tick >= s && tick < s + length);
+        var notes = content.Notes.Where(n => !InAPassage(n.Tick))
+            .Concat(starts.SelectMany(s => region.Notes.Select(n => n with { Tick = s + n.Tick })));
+        var lyrics = content.Lyrics.Where(l => !InAPassage(l.Tick))
+            .Concat(starts.SelectMany(s => region.Lyrics.Select(l => l with { Tick = s + l.Tick })));
+        return content.With(notes: notes, lyrics: lyrics);
+    }
+
+    // What the vocal part holds from start up to, not including, start + length: the notes starting there and the
+    // lyrics on its ticks, each by its offset from start.
+    private static VocalPattern VocalPatternAt(VocalTrackContent content, long start, long length)
+    {
+        long end = start + length;
+        var notes = new List<VocalNoteEvent>();
+        for (int i = FirstAtOrAfter(content.Notes, static n => n.Tick, start); i < content.Notes.Count && content.Notes[i].Tick < end; i++)
+            notes.Add(content.Notes[i] with { Tick = content.Notes[i].Tick - start });
+        var lyrics = new List<VocalLyricEvent>();
+        for (int i = FirstAtOrAfter(content.Lyrics, static l => l.Tick, start); i < content.Lyrics.Count && content.Lyrics[i].Tick < end; i++)
+            lyrics.Add(content.Lyrics[i] with { Tick = content.Lyrics[i].Tick - start });
+        return new VocalPattern(notes, lyrics);
+    }
+
+    // The index of the first item of the list, in order of tickOf, at or after tick; the count when there's none.
+    private static int FirstAtOrAfter<T>(IReadOnlyList<T> items, Func<T, long> tickOf, long tick)
+    {
+        int low = 0, high = items.Count;
+        while (low < high)
+        {
+            int mid = (low + high) >>> 1;
+            if (tickOf(items[mid]) < tick)
+                low = mid + 1;
+            else
+                high = mid;
+        }
+
+        return low;
+    }
+
     // A note of a passage, by its offset from the passage's start.
     private readonly record struct PatternNote(long Offset, long Length, int Lane, NoteDynamics Dynamics, bool DoubleKick, bool IsTom);
 
@@ -354,6 +547,16 @@ public sealed class SyncRegion
     private sealed record Pattern(IReadOnlyList<PatternNote> Notes, IReadOnlyList<FlaggedChord> Flags)
     {
         public bool SameAs(Pattern other) => Notes.SequenceEqual(other.Notes) && Flags.SequenceEqual(other.Flags);
+    }
+
+    // What a passage of a vocal part holds: its notes and lyrics in the part's order, each ticked by its offset from the
+    // passage's start. A note's velocity, which the editor doesn't set, is copied with it but not matched.
+    private sealed record VocalPattern(IReadOnlyList<VocalNoteEvent> Notes, IReadOnlyList<VocalLyricEvent> Lyrics)
+    {
+        public bool SameAs(VocalPattern other) =>
+            Notes.Count == other.Notes.Count
+            && Notes.Zip(other.Notes).All(static p => p.First.Tick == p.Second.Tick && p.First.Length == p.Second.Length && p.First.Pitch == p.Second.Pitch)
+            && Lyrics.SequenceEqual(other.Lyrics);
     }
 }
 
@@ -370,7 +573,7 @@ public enum SyncGrip
 }
 
 /// <summary>
-/// What a press takes hold of on the synchronized region (<see cref="EditorTools.SyncHitOf"/>): which part, and the tick
-/// that part begins at — a matched passage's first tick, or the region's own start or end.
+/// What a press takes hold of on the synchronized region (<see cref="EditorTools.SyncHitOf(ChartPoint)"/>): which part,
+/// and the tick that part begins at — a matched passage's first tick, or the region's own start or end.
 /// </summary>
 public readonly record struct SyncHit(SyncGrip Grip, long Start);

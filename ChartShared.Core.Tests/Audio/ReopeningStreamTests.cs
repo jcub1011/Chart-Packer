@@ -6,7 +6,7 @@ namespace ChartShared.Core.Tests.Audio;
 [TestClass]
 public sealed class ReopeningStreamTests
 {
-    private static readonly byte[] Content = Enumerable.Range(0, 100).Select(i => (byte)i).ToArray();
+    private static readonly byte[] Content = [.. Enumerable.Range(0, 100).Select(i => (byte)i)];
 
     private static readonly TimeSpan[] ThreeRetries = [TimeSpan.FromMilliseconds(1), TimeSpan.FromMilliseconds(2), TimeSpan.FromMilliseconds(3)];
 
@@ -19,12 +19,12 @@ public sealed class ReopeningStreamTests
         Assert.AreEqual(100, stream.Length);
         byte[] first = new byte[10];
         Assert.AreEqual(10, stream.Read(first, 0, 10));
-        CollectionAssert.AreEqual(Content[..10], first);
+        Assert.AreSequenceEqual(Content[..10], first);
 
         stream.Seek(-5, SeekOrigin.End);
         byte[] last = new byte[10];
         Assert.AreEqual(5, stream.Read(last, 0, 10));
-        CollectionAssert.AreEqual(Content[95..], last[..5]);
+        Assert.AreSequenceEqual(Content[95..], last[..5]);
         Assert.AreEqual(0, stream.Read(last, 0, 10));
 
         Assert.AreEqual(1, source.Opens);
@@ -42,10 +42,10 @@ public sealed class ReopeningStreamTests
         source.FailingReads = 2;
         Assert.AreEqual(10, stream.Read(buffer, 0, 10));
 
-        CollectionAssert.AreEqual(Content[10..20], buffer);
+        Assert.AreSequenceEqual(Content[10..20], buffer);
         Assert.AreEqual(10 + 10, stream.Position);
         Assert.AreEqual(3, source.Opens, "the first open, and one for each failure");
-        CollectionAssert.AreEqual(ThreeRetries[..2], waits);
+        Assert.AreSequenceEqual(ThreeRetries[..2], waits);
         Assert.AreEqual(2, source.Disposed, "each failed stream is let go of");
     }
 
@@ -60,7 +60,7 @@ public sealed class ReopeningStreamTests
         byte[] buffer = new byte[4];
         Assert.AreEqual(4, stream.Read(buffer, 0, 4));
 
-        CollectionAssert.AreEqual(Content[60..64], buffer);
+        Assert.AreSequenceEqual(Content[60..64], buffer);
     }
 
     [TestMethod]
@@ -73,7 +73,7 @@ public sealed class ReopeningStreamTests
         var error = Assert.Throws<IOException>(() => stream.Read(new byte[10], 0, 10));
 
         StringAssert.Contains(error.Message, "no such device");
-        CollectionAssert.AreEqual(ThreeRetries, waits);
+        Assert.AreSequenceEqual(ThreeRetries, waits);
         Assert.AreEqual(4, source.Opens, "the first open and three retries");
     }
 
@@ -88,7 +88,7 @@ public sealed class ReopeningStreamTests
         byte[] buffer = new byte[10];
         Assert.AreEqual(10, stream.Read(buffer, 0, 10));
 
-        CollectionAssert.AreEqual(Content[..10], buffer);
+        Assert.AreSequenceEqual(Content[..10], buffer);
     }
 
     [TestMethod]
@@ -155,7 +155,7 @@ public sealed class ReopeningStreamTests
                 throw new IOException("A device which does not exist was specified: no such device.");
             }
 
-            return new Flaky(this, new MemoryStream(Content.Take((int)Length).ToArray()));
+            return new Flaky(this, new MemoryStream([.. Content.Take((int)Length)]));
         }
 
         private sealed class Flaky(Source owner, MemoryStream inner) : Stream

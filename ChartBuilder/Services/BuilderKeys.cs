@@ -36,6 +36,7 @@ namespace ChartBuilder.Services
         public const string ToolPhrase = "builder.tool.phrase";
         public const string ToolTempo = "builder.tool.tempo";
         public const string ToolSync = "builder.tool.sync";
+        public const string ToolVocalAlign = "builder.tool.vocalAlign";
         public const string LoopTool = "builder.tool.loopHold";
         public const string PlaytestToggle = "builder.playtest.toggle";
         public const string PlaytestNext = "builder.playtest.next";
@@ -94,6 +95,7 @@ namespace ChartBuilder.Services
         public const string NoteAccent = "builder.note.accent";
         public const string NoteGhost = "builder.note.ghost";
         public const string NoteStarPower = "builder.note.starPower";
+        public const string NoteEditLyric = "builder.note.editLyric";
         public const string DifficultyEasy = "builder.difficulty.easy";
         public const string DifficultyMedium = "builder.difficulty.medium";
         public const string DifficultyHard = "builder.difficulty.hard";
@@ -101,6 +103,8 @@ namespace ChartBuilder.Services
         public const string MouseScroll = "builder.mouse.scroll";
         public const string MouseFastScroll = "builder.mouse.fastScroll";
         public const string MouseZoom = "builder.mouse.zoom";
+        public const string MousePitchScroll = "builder.mouse.pitchScroll";
+        public const string MousePitchZoom = "builder.mouse.pitchZoom";
         public const string MouseSync = "builder.mouse.sync";
         public const string PreviewFullScreen = "builder.preview.fullScreen";
         public const string PreviewExitFullScreen = "builder.preview.exitFullScreen";
@@ -110,7 +114,7 @@ namespace ChartBuilder.Services
 
         /// <summary>The tool actions, in the toolbar's order.</summary>
         public static IReadOnlyList<string> ToolActions { get; } =
-            [ToolSelect, ToolPlace, ToolErase, ToolPhrase, ToolTempo, ToolSync];
+            [ToolSelect, ToolPlace, ToolErase, ToolPhrase, ToolTempo, ToolSync, ToolVocalAlign];
 
         /// <summary>The lane keys 1 to 6, in the order of a highway's columns.</summary>
         public static IReadOnlyList<string> LaneActions { get; } =
@@ -164,6 +168,7 @@ namespace ChartBuilder.Services
             yield return Make(ToolPhrase, Strings.KeyActionToolPhrase, tools, Tools, "Alt+Digit4", yields: true);
             yield return Make(ToolTempo, Strings.KeyActionToolTempo, tools, Tools, "Alt+Digit5", yields: true);
             yield return Make(ToolSync, Strings.KeyActionToolSync, tools, Tools, "Alt+Digit6", yields: true);
+            yield return Make(ToolVocalAlign, Strings.KeyActionToolVocalAlign, tools, Tools, "Alt+Digit7", yields: true);
             yield return Make(LoopTool, Strings.KeyActionLoopTool, tools, Tools, "L", bare: true, hold: true);
 
             yield return Make(PlaytestToggle, Strings.KeyActionPlaytestToggle, playtest, Canvas, "P", bare: true, reserved: true);
@@ -228,6 +233,7 @@ namespace ChartBuilder.Services
             yield return Make(NoteAccent, Strings.KeyActionNoteAccent, notes, Canvas, "A", bare: true);
             yield return Make(NoteGhost, Strings.KeyActionNoteGhost, notes, Canvas, "Shift+A");
             yield return Make(NoteStarPower, Strings.KeyActionNoteStarPower, notes, Canvas, "S", bare: true);
+            yield return Make(NoteEditLyric, Strings.KeyActionNoteEditLyric, notes, Canvas, "F2", bare: true);
 
             yield return Make(DifficultyEasy, Strings.KeyActionDifficultyEasy, lane, Canvas, "Ctrl+Digit1");
             yield return Make(DifficultyMedium, Strings.KeyActionDifficultyMedium, lane, Canvas, "Ctrl+Digit2");
@@ -237,6 +243,8 @@ namespace ChartBuilder.Services
             yield return Make(MouseScroll, Strings.KeyActionMouseScroll, mouse, Canvas, "", locked: true, display: "Wheel");
             yield return Make(MouseFastScroll, Strings.KeyActionMouseFastScroll, mouse, Canvas, "", locked: true, display: "Shift+Wheel");
             yield return Make(MouseZoom, Strings.KeyActionMouseZoom, mouse, Canvas, "", locked: true, display: "Ctrl+Wheel");
+            yield return Make(MousePitchScroll, Strings.KeyActionMousePitchScroll, mouse, Canvas, "", locked: true, display: "Wheel over piano keys");
+            yield return Make(MousePitchZoom, Strings.KeyActionMousePitchZoom, mouse, Canvas, "", locked: true, display: "Ctrl+Wheel over piano keys");
             yield return Make(MouseSync, Strings.KeyActionMouseSync, mouse, Canvas, "", locked: true, display: "Ctrl+Shift (held)");
 
             yield return Make(PreviewFullScreen, Strings.KeyActionPreviewFullScreen, preview, Preview, "F11", bare: true);

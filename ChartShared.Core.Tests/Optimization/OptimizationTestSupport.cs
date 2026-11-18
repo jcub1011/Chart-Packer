@@ -107,7 +107,7 @@ internal sealed class FakeOptimizer : IAudioOptimizer, IVideoOptimizer, IImageOp
 /// <summary>Probes by file name, from a table.</summary>
 internal sealed class FakeProbe : IAudioProbe, IVideoProbe, IImageProbe
 {
-    public Dictionary<string, ProbeResult> Results { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, ProbeResult> Results { get; } = [with(StringComparer.OrdinalIgnoreCase)];
 
     public List<string> Probed { get; } = [];
 

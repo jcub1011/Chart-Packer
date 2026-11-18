@@ -91,7 +91,7 @@ public sealed class SngMaskTests
 
                 SngMask.Apply(data, mask, start);
 
-                CollectionAssert.AreEqual(expected, data, $"length {length} from {start}");
+                Assert.AreSequenceEqual(expected, data, $"length {length} from {start}");
             }
         }
     }

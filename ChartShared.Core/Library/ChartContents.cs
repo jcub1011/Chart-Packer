@@ -64,7 +64,7 @@ public sealed record ChartContents(LibraryInstruments Instruments, LibraryDiffic
     };
 
     // Pro guitar and bass keep every difficulty on one track: a string per pitch from 24, 48, 72 and 96.
-    private static readonly HashSet<string> ProStringParts = new(StringComparer.Ordinal) { "pro_guitar", "pro_guitar_22", "pro_bass", "pro_bass_22" };
+    private static readonly HashSet<string> ProStringParts = [with(StringComparer.Ordinal), "pro_guitar", "pro_guitar_22", "pro_bass", "pro_bass_22"];
     private const int ProStringCount = 6;
     private static readonly (int Base, ChartDifficulty Difficulty)[] ProStringBases =
     [

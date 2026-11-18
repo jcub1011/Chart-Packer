@@ -50,11 +50,11 @@ This spec **supersedes** the "editing charts" non-goal in
 
 ## 2. Non-goals for v1
 
-- **Vocal percussion, overdrive and lyric shifts.** The editor's vocal lanes edit the notes, lyrics
-  and phrases of `PART VOCALS` and `HARM1`–`HARM3` ([C3](#c3-editor-layout) item 7). Their
-  percussion notes (96, 97), overdrive (116), lyric and range shifts and any other events are kept
-  as they are ([§4.2](#lossless-passthrough)), and a `.chart`'s lyrics are imported only. The
-  existing vocals tools (`VocalsEditor`, lyrics lane) are unchanged.
+- **Vocal percussion and lyric shifts.** The editor's vocal lanes edit the notes, lyrics, phrases
+  and star power (overdrive, note 116) of `PART VOCALS` and `HARM1`–`HARM3`
+  ([C3](#c3-editor-layout) item 7). Their percussion notes (96, 97), lyric and range shifts and any
+  other events are kept as they are ([§4.2](#lossless-passthrough)), and a `.chart`'s lyrics are
+  imported only. The existing vocals tools (`VocalsEditor`, lyrics lane) are unchanged.
 - **Pro keys, pro guitar/bass, dance, Elite drums.** Their tracks are kept as they are. (5-lane
   `PART KEYS` is edited as a 5-fret part, *revised for #116*.)
 - **Venue, lighting, camera and crowd events.** Kept as they are.
@@ -224,8 +224,8 @@ The tracks Chart Builder does edit are rebuilt from the model:
 
 **Vocal tracks.** `PART VOCALS` and `HARM1`–`HARM3` are passthrough tracks that the vocal lanes edit
 ([C3](#c3-editor-layout) item 7). An edit replaces the track with one written again
-(`VocalTrackContent`): its sung notes (36–84), phrases (105, 106) and lyrics are written from what
-was edited, and every other event (its name, percussion, overdrive, animations) is kept with its
+(`VocalTrackContent`): its sung notes (36–84), phrases (105, 106), star power (116) and lyrics are
+written from what was edited, and every other event (its name, percussion, animations) is kept with its
 bytes, at its tick, in its order. A vocal track that hasn't been edited is still written byte for
 byte. One that has reads back as what was edited, though its bytes differ: running status isn't
 kept, the notes are on the first channel, and at a tick the kept events come first, then the
@@ -900,6 +900,16 @@ Acceptance criteria:
    - **Tempo markers:** BPM, time signature, and whether it's anchored.
    - With several items selected, a field shows `<<multiple>>` when the values differ, and
      editing it sets every item. This is the same model as the metadata editor's bulk editing.
+   - The notes' and vocal notes' **Tick** and **Length** and the vocal notes' **Pitch** can also be
+     dragged sideways, as a number box can: right goes up and left down, Shift faster and Ctrl finer.
+     A drag moves every selected note by the same steps from where it was, rather than setting them
+     all to one value, so notes at different ticks, or of different lengths or pitches, keep their
+     differences: a semitone a step for a pitch, the notes kept to the sung range as a group; for a
+     tick or a length, a grid step while snap is on, or a tick while it's off. A tick dragged moves
+     the notes as Alt and the arrows do, the first to the grid while snap is on and none before the
+     start; a vocal note keeps its lyric. A vocal note lasts at least a tick, and a sustain shortened
+     past the shortest leaves a plain note. The chart shows it as it's dragged, and it's one undoable
+     step. A click without a drag edits the field as before.
 5. **Findings panel**: the [§6](#lint-rules) lint findings, each linked to the place in the chart
    where it happens. *Settled in CM2:* the Findings tab's title doesn't show the counts, as a
    collapsed panel's strip reads the titles only once. The counts are at the top of the panel.
@@ -911,18 +921,35 @@ Acceptance criteria:
    Problems list and Clear ([C19](#c19-playtest-and-instrument-input)).
 7. **Vocal lanes.** A lane showing `PART VOCALS` or `HARM1`–`HARM3` is always drawn along a
    timeline, as a piano roll:
-   - one row per semitone, every pitch a part sings (36 to 84) whatever its notes, so any pitch can
-     be placed and the rows never move as notes are edited, with black keys' rows darker and each C
-     named at the left edge;
+   - a piano keyboard down the left edge, a key to each row, with the note names on the keys (only
+     the Cs' while the rows are too short for them all). Over it the wheel scrolls the pitches shown
+     rather than the song, two semitones a notch and an octave with Shift, and Ctrl and the wheel
+     zooms them, about the pitch under the pointer, between an octave and every pitch. Both are kept
+     with the lane's layout. A press on the keyboard edits nothing;
+   - one row per semitone of the pitches shown, from every pitch a part sings (36 to 84), the lane's
+     choice, so any pitch can be placed and the rows never move as notes are edited, with black keys'
+     rows darker and a line under each C. Where notes in view lie above or below the pitches shown, a
+     badge at the rows' top or bottom says how many, and a press on it scrolls to the nearest;
    - each sung note a bar on its pitch's row; a slide (`+`) a line from the note before; a spoken
      note (`#`, `^`) an outline along the middle row, middle C's;
-   - the phrases shaded behind the rows, and as bars in a strip above them; and the lyrics in a band
-     under the rows, each syllable at its tick, with a hyphen where it joins the next. A syllable
-     that would run into the one before is left out, as the lane is zoomed out;
+   - the part's audio behind the rows, as the lane's audio button sets it (C12, C13): a waveform,
+     always centred on the rows whatever the pitches shown, or a spectrogram with each key's row
+     across the band of its note's frequency, so a note placed on the roll sits on the sound at its
+     pitch, and moving with the rows as the keyboard is scrolled and zoomed. The audio is the part's
+     own stem (`vocals`, or `vocals_1` and `vocals_2` for the first two harmonies), the lead's or
+     the mix when it has none, or the stem the button picks;
+   - the phrases shaded behind the rows, and as bars in a strip above them, with the star power
+     (overdrive, note 116) as bars in a rail under that strip, in a highway's star power colour;
+   - the lyrics, each syllable in a bubble hovering above its note, on a line down to the note,
+     with a hyphen where it joins the next. A bubble that would cover another is moved up a level
+     (three at most), so lyrics that run together in time can still be read; a note too near the
+     top of the rows for a bubble above it has the bubble below it instead; one that fits on no
+     level is left out, as the lane is zoomed out. A selected note, or the one under the pointer,
+     that has no lyric shows a faint + bubble;
    - the beats, sections, tempo markers, loop and selection as a highway's lane has them;
    - what's on the strike line lit, as Chart Packer's lyrics lane lights it, wherever the cursor is,
      playing or not: the note being sung near white with a glow where it crosses the line, its
-     syllable in the same tint, and its phrase shaded a little more than the others.
+     syllable's bubble in the same tint, and its phrase shaded a little more than the others.
 
    Scrolling, zoom (look-ahead) and the keys that move the cursor or play work as in any lane. A
    lane whose track the chart hasn't says so, and offers to add it, empty. The part is read from its
@@ -939,23 +966,116 @@ Acceptance criteria:
    - **Place** puts a note a grid step long on the grid step and row pressed, and a drag stretches
      it, never past the next note's start; Shift places a slide. On a note, it moves it.
    - **Erase** removes each note passed over, **Sustain** drags the selected notes' end, **Phrase**
-     draws a phrase from the grid step pressed, and **Tempo** adds and drags tempo and time-signature
-     changes as in a highway's lane.
+     draws a phrase from the grid step pressed (in the rows, as in the strip), and **Tempo** adds and
+     drags tempo and time-signature changes as in a highway's lane.
+   - **Sync** (issue 272), or Ctrl+Shift held, draws, moves and resizes a synchronized region in the
+     rows as in a highway's lane (not in the phrase strip or star power rail, which keep their own
+     presses). A passage of the part matches the region when it holds exactly the same notes, by
+     offset, length and pitch (not velocity), and the same lyrics, by offset and text, so `+`, `#`
+     and hyphens count. An edit of the notes or lyrics in the region is made in each passage still
+     matching as one undoable step; phrases, star power and the track's other events are neither
+     matched nor copied. Another vocal part is never searched. The middle button, or the region's
+     X, takes it away; Delete and Ctrl+X do nothing while the tool is active, as on a highway.
    - **The phrase strip** works with any tool, as a highway's phrase rail does: a press on a bar
      selects its phrase (Shift adds it or takes it away), and a drag moves the selected phrases, or
-     resizes one by the end grabbed. A part's phrases never overlap. A new phrase is written as
+     resizes one by the end grabbed. A drag in an empty part of the strip draws a new phrase, from
+     the grid step pressed, with the Select, Place or Phrase tool (not with Shift held, which lends
+     the press to the selection). Over the strip the pointer shows what a press would do, as it does
+     over the star power rail (below). A part's phrases never overlap. A new phrase is written as
      105, or as 105 and 106 when every phrase the part has is.
+   - **The star power rail** works as a highway's phrase rail does, for the part's star power, which
+     is written as note 116 and, unlike a phrase, may lie over phrases and notes; one part's star
+     power never overlaps itself. A press on a bar selects it, and a drag moves it, or resizes it by
+     the end grabbed. A drag in an empty part of the rail draws new star power, from the grid step
+     pressed, with the Select, Place or Phrase tool (not with Shift held, which lends the press to
+     the selection). Over the rail the pointer shows what a press would do: a line across the rows
+     and a mark in the rail at the grid step star power would start at, and a cross there, or an
+     outline of the bar a press would grab, with a move or resize arrow. The middle button erases
+     the star power passed over, and Delete removes what's selected.
    - **Lyrics** belong to the notes that start on their tick: a note moved or deleted takes its
      lyric with it, unless a note that stays starts there. A lyric on no note's start stays where
      it is.
+   - **Editing a lyric** is done on its bubble. A double click on a bubble or a note (with the
+     Select tool), a press on a + bubble, **Edit Lyric…** in the note menu, or `F2` opens a box
+     over the first selected note, with its lyric. A spoken note's `#` or `^` is not shown in the box and is
+     written back after what's typed, blank or not, so editing never turns a spoken note sung. A slide's `+` is not a lyric: the box doesn't open on a
+     slide, the status saying so, and Tab skips slides. Enter, or leaving the box,
+     sets the lyric of that note alone, adding one to a note with none; blank takes it away; Esc
+     leaves it as it was; the box is as wide as what's typed, no narrower than its placeholder and no wider than 32
+     characters, past which the text wraps; the note's bubble shows what's typed, as it's typed, in the accent's outline, with the box under the note; Tab goes on to the next note's lyric, and Shift+Tab to the one before,
+     moving the song there when it isn't in view. **Delete Lyric** in the note menu takes the
+     lyric off the selected notes and leaves the notes, a spoken note staying spoken. Each edit is one undoable step, and one
+     that changes nothing makes none. A press on a bubble selects its note and no more.
    - **Properties** shows the selected notes' tick, pitch (a MIDI number, or a name such as `F#3`),
-     length and lyric, symbols included, with Slide and Spoken, and the selected phrases' start and
+     length and lyric, with Slide and Spoken (the lyric field, like the lyric box, leaves out a spoken
+     note's `#` or `^`, which it keeps, and is disabled when every selected note is a slide, which has
+     no lyric; a lyric set there goes to the notes that have one), and the selected phrases' start and
      end. **Type lyrics…** gives a typed line's syllables to the selected notes in turn, a slide
      skipped, split at spaces and after hyphens (`Hel-lo world`).
    - **Keys** ([§9](#9-keyboard-shortcuts)): Alt and the arrows move the selected notes a grid step or
-     a semitone, an octave with Shift; Ctrl+A selects the part's notes; Delete and Ctrl+X, C and V
-     work on its notes, with their lyrics. A vocal part's notes paste only into a vocal lane, and a
-     highway's never into one. The keys that change a highway's notes or a part's audio do nothing.
+     a semitone, an octave with Shift; Ctrl+A selects the part's notes; `F2` edits the first selected
+     note's lyric; `S` puts star power over the
+     selected notes, or takes away the star power that's over them; `W` switches the part's audio
+     between the waveform and the spectrogram; Delete and Ctrl+X, C and V work on its notes, with their lyrics. A vocal part's notes paste only into a vocal lane, and a
+     highway's never into one. The keys that change a highway's notes do nothing.
+   - **Vocal Alignment tool** (`Alt`+`7`), in the toolbar only while a vocal lane has focus, for
+     lyrics timed to other audio, which drift as they go. It shifts and stretches the vocal parts in
+     the audio's time, not in ticks (`VocalAlignment`): a time `t` goes to
+     `start + offset + (t − start) / speed`, `start` being the first note or lyric. Each note's start
+     and end, each lyric, and each phrase's and star power phrase's ends go to the nearest tick, never
+     before the song's start; the track's other events stay. While it's picked every note of an
+     aligned part is outlined in the accent, the span from the first note to the last note's end is
+     shaded with a handle at each end, and the offset and speed are drawn over it. Dragging inside
+     the span shifts the parts; dragging the start's handle stretches them with the last note's end
+     kept, and the end's handle with the first note kept; Shift drags a quarter as far. While snap is
+     on, the edge dragged (the first note, or the handle) goes to the grid's nearest step, the notes
+     between to the nearest tick; with it off the drag is free. The fields never snap. The middle and
+     right buttons do nothing. The toolbar shows **Offset (ms)** and **Speed (%)**, typed or
+     scrubbed (shown at once, one undo step 600 ms after the last change), and **All Vocal Parts**,
+     on by default, off to align only the part in focus. The speed is 50–200%, and the offset keeps
+     the first note at or after the song's start. Each drag or settled field is one undoable step,
+     worked out from the parts as they were when the tool first took them, so a typed speed is that
+     speed of the original, and rounding to ticks doesn't build up; undo and redo bring each step's
+     values back, and an edit made any other way takes the parts as they are as the start again. A
+     highway's lane taking focus puts the tool down for the Select tool.
+   - **Import and export lyrics** (issue 270) are in the File menu, and need no lane open.
+     **Import Lyrics…** picks a file, reads it (`ChartShared.Core/Lyrics/`) and asks which part,
+     replace or merge, and whether the file's word times and pitches are used. The formats are LRC
+     (with or without the A2 per-word tags), SRT, WebVTT, TTML, KAR, an UltraStar `.txt`, and the
+     synchronized or LRC lyrics in an audio file's tags (ATL.NET); SRT, WebVTT, TTML, KAR and the
+     tags are import only. A word with a pitch becomes a note at it, its lyric as it is; a word
+     with none a spoken note (middle C, lyric `word#`); each line a phrase. An UltraStar normal or
+     golden note's pitch is 60 more than the file's; freestyle and rap notes have none; a `~` at
+     another pitch is a slide (lyric `+`), and at the same pitch only lengthens the syllable
+     before. A KAR's melody is the track, drums aside, with the most notes starting within a 128th
+     of a syllable, taken when it has one for at least half of them: a syllable is sung at the
+     highest such note and held to its end, and melody notes following straight on before the next
+     syllable are slides. A part's pitches move by whole octaves into 36–84, all together by the
+     octaves that put the most in, then each still out on its own. An UltraStar duet's `P1` and
+     `P2` (and `P3`, both) are its singers; the dialog offers them as Harmony 1 and 2, imported in
+     one step. A word with no time
+     of its own shares its line's time with the words beside it by their letters. The file's times
+     are the audio's, so the song's delay is taken off them. Replace takes out the part's notes,
+     lyrics and phrases but keeps its star power; Merge keeps all of it and leaves out a word that
+     would start on a note the part has, shortens one that would run into one, and adds no phrase
+     that overlaps one the part has. A part the chart hasn't is added in the same step, and the
+     import is one undoable step (`LyricImport.Apply`). **Export Lyrics…** asks the format,
+     UltraStar first. UltraStar (`UltraStarWriter`) writes a format 1.1.0 song: `#TITLE`, `#ARTIST`,
+     `#CREATOR`, `#GENRE` and `#YEAR` from `song.ini`, the `song` stem (or the first track) as
+     `#AUDIO` and `#MP3`, the `vocals` stem as `#VOCALS`; `#GAP` the first note's time, delay
+     included; `#BPM` the first whole multiple (1×, 2×, 3×, …), to the nearest whole number, of the
+     average tempo from the first note to the last that puts every note's start and end within
+     10 ms of the chart's, measured as written. The search ends at the first whose beat is no longer
+     than 20 ms, where rounding can't move a note further unless two notes are under a beat apart.
+     Each note's beats come from its
+     time in the audio; its pitch less 60; `R` when spoken, `:` otherwise; `~` for a slide or a
+     note with no lyric; a syllable ending a word followed by a space; a `- beat` at each phrase's
+     end. Of notes on a tick the lowest is written, and each starts at least a beat after the one
+     before. Harmony 1 and 2, when both have lyrics, may be written as a `P1`/`P2` duet. LRC writes
+     one `[mm:ss.xx]`
+     line for each phrase of the chosen part, stamped with the time of its first lyric and timed to
+     the audio file, delay included; with A2 each syllable has a `<mm:ss.xx>` tag and the line ends
+     with one. The chart's lyric symbols are taken off, and a slide's `+` is dropped.
    - The vocal findings ([§6](#lint-rules)) name their part, and going to one opens its lane and
      selects the notes on its tick.
 
@@ -1982,18 +2102,34 @@ Acceptance criteria:
 **Behaviour:**
 
 1. **What is drawn.** A short-time Fourier transform of the chosen stem or the mix:
-   - a 2048-sample Hann window with a 256-sample hop (about 5.8 ms at 44.1 kHz);
-   - mapped to 256 logarithmic frequency bins from 30 Hz to 16 kHz;
+   - a column every 256 samples (about 5.8 ms at 44.1 kHz);
+   - mapped to 768 logarithmic frequency rows from 30 Hz to 16 kHz, about seven to a semitone;
    - shown in dB through a perceptually even colour map.
 
    The contrast (dB floor and ceiling) can be adjusted.
 
+   **Three bands, three windows.** Low notes are a few hertz apart, and high sounds are told
+   apart by when they start, so each band of the rows has a Hann window of its own (lengths at
+   44.1 kHz):
+
+   | Band | Rows | Window | Bins Apart |
+   |---|---|---|---|
+   | Low | below 500 Hz | 186 ms | 5.4 Hz |
+   | Middle | 500 Hz to 2.2 kHz | 93 ms | 10.8 Hz |
+   | High | above 2.2 kHz | 23 ms | 43 Hz |
+
+   A quarter of an octave either side of where two bands meet, the rows are a blend of both.
+
+   **Sharpening** (Settings, off by default). Each bin's energy is drawn at the frequency and the
+   time it's really at (the reassignment method) rather than at the bin's own, so a steady note
+   is a line a row or two thick and a hit is a column or two wide, where unsharpened they're as
+   blurred as the window is wide. Changing the setting computes the spectrograms again.
+
    **Limits of these settings.**
-   - At 44.1 kHz the FFT's bins are 21.5 Hz apart. Below about 870 Hz, the log bins are narrower
-     than that, so they repeat or interpolate a few FFT bins: the Kick band (30–120 Hz) shows
-     about four distinct bands.
-   - The 46 ms window also blurs the start of a hit by up to half its length, even though the
-     columns are 5.8 ms apart.
+   - Two sounds less than about two bins apart in the same band are one sound to the analysis,
+     sharpened or not: two bass notes a semitone apart below about 180 Hz, for one.
+   - Sharpened, noise (cymbals, breath, a dense mix) looks grainier than unsharpened.
+   - Unsharpened, the low band's window blurs the start of a hit by up to 93 ms either way.
    - The spectrogram is for seeing where a sound is, not for timing it. Onsets
      ([C14](#c14-onset-and-beat-assist)) are for timing.
 2. **Computed off the UI thread**, at low priority, starting near the view and spreading outwards.
@@ -2001,8 +2137,8 @@ Acceptance criteria:
 3. **Held in memory only.**
    - Nothing is written to disk, and closing the chart releases it.
    - Reopening a song computes it again.
-   - Columns are stored as bytes, about 26 MB per stem for a 10-minute song at the settings above.
-   - A **memory budget** (Settings, 256 MB by default) caps every stem's spectrogram together. The
+   - Columns are stored as bytes, about 79 MB per stem for a 10-minute song at the settings above.
+   - A **memory budget** (Settings, 512 MB by default) caps every stem's spectrogram together. The
      stems used least recently are released first.
 4. **Band presets** emphasise a range and dim the rest, to help pick out drum hits and bass notes:
    - **Kick:** 30–120 Hz
@@ -2018,21 +2154,40 @@ Acceptance criteria:
 - **Levels.** Each byte is an absolute level, −120 dB plus half a decibel a step, a full-scale sine
   reading 0 dB. The contrast is applied as it's drawn, so changing it computes nothing again; the
   floor and ceiling are each lane's own (default −80 dB and 0 dB).
-- **Low rows.** A row that holds an FFT bin takes the loudest of its bins. Below about 870 Hz the
-  rows hold none, and each is read off a parabola through the levels of the louder bin either side
-  and its neighbours.
+- **The bands.** The low and middle bands are analysed at a sixteenth and a quarter of the sample
+  rate (`HalfBandDecimator`), which makes their long windows cheap. At other sample rates the
+  windows are as long in time, to the nearest power of two (`SpectrogramTiers`).
+- **Unsharpened rows.** A row that holds a bin takes the loudest of its bins. A row narrower than
+  its band's bins holds none, and is read off a parabola through the levels of the louder bin
+  either side and its neighbours.
+- **Sharpened rows.** A frame is analysed at every other column. Each bin's power is spread over
+  the rows between where it points and halfway to where the bins either side point, and over the
+  columns between when it points to and halfway to when the same bin points to in the frames
+  before and after: a tone's bins all point at one frequency and a click's frames at one time, so
+  those stay thin, and noise, whose bins point all over, leaves hardly a cell empty. Half a
+  percent of each bin's power is put where the bin itself is, a faint bed that fills the cells
+  nothing points at. A sharpened sine reads 0 dB in the middle of a row, and up to 3 dB less
+  between two (`ReassignedPair`, `SpectrogramBuilder`).
 - **Colours** run from black through violet, magenta and orange to pale yellow, blended in OKLab with
   lightness rising evenly (`SpectrogramColors`). A band preset dims the rows outside it to 30%.
 - **Computing.** Columns are computed in chunks of 256 on threads below normal priority
   (`AnalysisWorkers`), the chunk nearest the middle of the view first, and frames two to an FFT.
-  Chunks near the view come before onsets; the rest of the song after.
+  Chunks near the view come before onsets; the rest of the song after. A chunk's columns are the
+  same to the byte however the song is cut into chunks: a sharpened chunk also analyses the few
+  columns either side that can put energy in its own.
 - **The budget.** A spectrogram counts at its full size from the moment it's started. One used in
   the last 2 s isn't released to make room for another: the newcomer is refused, and the editor
   says so, so two lanes that don't both fit don't take turns releasing each other. The budget is
   64 MB to 4096 MB.
-- **Drawing.** As the waveform's, in pictures of 256 columns, each a column or the loudest of a
-  power of two of them, drawn within the same budget, and drawn again as more of their columns are
-  ready, at most every 100 ms. Behind the lanes it's at 45% opacity.
+- **Drawing.** As the waveform's, in pictures drawn within the same budget, and drawn again as
+  more of their columns are ready, at most every 100 ms. A picture is drawn at the size it's shown
+  at: 256 pixels along the time axis, each a column, the loudest of a power of two of them, or,
+  zoomed in, a half or a quarter of one; and across it as many pixels as the rows shown take on
+  the screen (to the next 32, at most 1024), each the loudest of the rows it covers or between the
+  two it's between. What's between is worked out on the levels, before they're coloured. On the
+  vocal piano roll a picture is of the pitches shown only, so zooming the keyboard draws it again
+  at the new size; until it's drawn, the last picture of that stretch stands in, stretched. Up to
+  96 MB of pictures are kept. Behind the lanes it's at 45% opacity.
 
 Acceptance criteria:
 
@@ -2878,7 +3033,7 @@ Editor straight away, with no dialog before it.
 │ Tracks              │              ┃             ┃               │ …                  │
 │ Chart files         ├━━━━━━━━━━━━━━┻━━━━━━━━━━━━━┻━━━━━━━━━━━━━━━┤                    │
 │ Other files         │ Vocals ▾                        2.0 s + ✕  │                    │
-│ Findings            │   piano roll, lyrics under it              │                    │
+│ Findings            │   piano roll, lyric bubbles                │                    │
 │ Metadata            │                                            │                    │
 ╞═════════════════════╧════════════════════════════════════════════╧════════════════════╡
 │ Timeline                                                              1:38.4 / 4:12.0 │
@@ -3046,7 +3201,7 @@ one is picked up by the other when its window is next activated.
 | `PgUp` / `PgDn` | Move the cursor one measure |
 | `Home` / `End` | Move the cursor to the chart's start / to where its last note lets go |
 | `Ctrl+G` | Go to a measure: asks for a measure number (1 up to the last measure with notes) and moves the cursor to its start |
-| `Ctrl+F` | Find the passages of the lane that match the selected notes (matched as the Sync tool matches), and go to the next after the cursor; again goes on to the next |
+| `Ctrl+F` | Find the passages of the lane that match the selected notes (matched as the Sync tool matches, a vocal part's notes too), and go to the next after the cursor; again goes on to the next |
 | `F3` / `Shift+F3` | Go to the next / previous passage found, wrapping round |
 | `Ctrl`+`↑` / `Ctrl`+`↓` | Next or previous section |
 | `Ctrl`+`Shift`+`↑` / `Ctrl`+`Shift`+`↓` | Next or previous tempo or time signature change |
@@ -3063,7 +3218,8 @@ one is picked up by the other when its window is next activated.
 | `C` | Toggle cymbal or tom (Pro drums, every difficulty at that tick) |
 | `A` / `Shift`+`A` | Toggle accent or ghost (drums) |
 | `S` | Star power phrase over the selection |
-| `Alt`+`1`–`6` | Pick the Select, Place, Erase, Phrase, Tempo or Sync tool, in the toolbar's order; the number row's digits, not the number pad's; works wherever focus is, except in a text box |
+| `F2` | Edit the lyric of the first selected vocal note |
+| `Alt`+`1`–`7` | Pick the Select, Place, Erase, Phrase, Tempo, Sync or Vocal Alignment tool, in the toolbar's order; the number row's digits, not the number pad's; works wherever focus is, except in a text box. Vocal Alignment is picked only while a vocal lane has focus ([C3](#c3-editor-layout) item 7) |
 | `L` | Hold for the Loop tool: drag out the loop region, or drag its ends or middle to resize or move it. Tapped briefly, having touched nothing, it turns repeating the region on or off ([C10](#c10-playback)) |
 | `R` | Record mode on or off, and playtest off: on, playing the song records a pass. Space ends a pass, and Esc cancels it |
 | `P` | Playtest on or off, and record mode off: on, playing the song playtests the lane ([C19](#c19-playtest-and-instrument-input)) |
@@ -3146,7 +3302,8 @@ tool.
 | Wheel scroll direction | Wheel up moves later, in both lane views and on the timeline along the bottom |
 | Notes keep ticks or times when the tempo changes | Keep ticks |
 | Waveform or spectrogram behind the lanes (**Lanes show**, under Audio assist) | Waveform |
-| Spectrogram memory budget (under Audio assist) | 256 MB (64 to 4096) |
+| Spectrogram memory budget (under Audio assist) | 512 MB (64 to 4096) |
+| Sharpen spectrograms (under Audio assist) | Off ([C13](#c13-spectrogram)) |
 | Metronome volume / hit-sound volume | 50% / 50%. At 50%, each sound plays at the level `Synth` makes it. A change applies from the next time playback starts. |
 | Audio/visual latency | Per output device, plus a global fallback of 0 ms ([C11](#c11-calibration-tool)) |
 | Detect output latency | On. The latency detected from the device is added to its calibrated latency. Kept in `audio-latency.json`, shared by both apps (issue #140) |
@@ -3230,7 +3387,7 @@ fails the run if anything there changes anyway.
 
 ## 14. Future (after v1)
 
-- Vocal percussion and overdrive, lyric and range shifts, and pitch detection from the vocals stem,
+- Vocal percussion, lyric and range shifts, and pitch detection from the vocals stem,
   building on the vocal lanes' editing ([C3](#c3-editor-layout) item 7).
 - Pro keys, pro guitar/bass and Elite drums.
 - Venue, lighting and camera events.

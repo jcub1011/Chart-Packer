@@ -20,6 +20,12 @@ public enum EditorTool
 
     /// <summary>Draws out the loop region, and moves or resizes it (<see cref="ILoopSpan"/>).</summary>
     Loop,
+
+    /// <summary>
+    /// Shifts and stretches the vocal parts in time (<see cref="Editing.VocalAlignment"/>), the dragged edge snapping to the
+    /// grid while snap is on: only while a vocal part's lane has focus.
+    /// </summary>
+    VocalAlign,
 }
 
 /// <summary>The modifier keys held with a click or a key.</summary>
@@ -103,6 +109,7 @@ public sealed class EditorSession
         Reduce = new ReduceProposals(this);
         Sync = new SyncRegion(this);
         Find = new EditorFind(this);
+        VocalAlignment = new VocalAlignment(this);
         SongEventMarks = SongEventsWith(null);
         undo.Changed += OnUndoChanged;
     }
@@ -227,6 +234,9 @@ public sealed class EditorSession
     /// <summary>The passages found matching the selected notes (Ctrl+F), to jump between.</summary>
     public EditorFind Find { get; }
 
+    /// <summary>The Vocal Alignment tool's shift and stretch of the vocal parts, and what it's moved them by.</summary>
+    public VocalAlignment VocalAlignment { get; }
+
     /// <summary>
     /// The loop region the Loop tool draws, moves and resizes (charter-spec C10 item 2): playback's, in seconds of audio,
     /// or null without playback to hold one.
@@ -302,7 +312,10 @@ public sealed class EditorSession
         }
     } = SnapGrid.Default;
 
-    /// <summary>The tool a press in the lanes uses. Changing it keeps the selection.</summary>
+    /// <summary>
+    /// The tool a press in the lanes uses. Changing it keeps the selection. The Vocal Alignment tool is only picked while a
+    /// vocal part's lane has focus (<see cref="FocusedVocal"/>); otherwise the status says so and the tool stays.
+    /// </summary>
     public EditorTool Tool
     {
         get;
@@ -310,15 +323,26 @@ public sealed class EditorSession
         {
             if (field == value)
                 return;
+            if (value == EditorTool.VocalAlign && FocusedVocal is null)
+            {
+                Status = VocalAlignNeedsVocals;
+                RaiseState();
+                return;
+            }
+
             Tools.Cancel();
             if (value == EditorTool.Sync)
                 ToolBeforeSync = field;
             if (value == EditorTool.Loop)
                 ToolBeforeLoop = field;
             field = value;
+            if (value == EditorTool.VocalAlign)
+                VocalAlignment.Refresh();
             RaiseState();
         }
     }
+
+    private const string VocalAlignNeedsVocals = "The Vocal Alignment tool works on the vocal parts: click a vocal lane first.";
 
     /// <summary>The tool picked before the Sync tool, which a region drawn goes back to.</summary>
     internal EditorTool ToolBeforeSync { get; private set; }
@@ -417,7 +441,8 @@ public sealed class EditorSession
 
     /// <summary>
     /// The vocal part's lane the keys act on, when the lane last clicked or chosen was one; null when it was a highway's
-    /// (<see cref="Focused"/>). The Edit menu's Select all and Paste follow it, as the lane's own keys do.
+    /// (<see cref="Focused"/>). The Edit menu's Select all and Paste follow it, as the lane's own keys do. A highway's lane
+    /// taking focus puts the Vocal Alignment tool down for the Select tool.
     /// </summary>
     public VocalTrack? FocusedVocal
     {
@@ -427,6 +452,14 @@ public sealed class EditorSession
             if (field == value)
                 return;
             field = value;
+            if (Tool == EditorTool.VocalAlign)
+            {
+                if (value is null)
+                    Tool = EditorTool.Select;
+                else
+                    VocalAlignment.Refresh();
+            }
+
             RaiseState();
         }
     }
@@ -814,6 +847,8 @@ public sealed class EditorSession
             KeepPhraseKindOffered();
             Reduce.OnChanged();
             Sync.OnChanged();
+            if (Tool == EditorTool.VocalAlign)
+                VocalAlignment.Refresh();
             PlaceSongEvents();
         }
 

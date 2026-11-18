@@ -77,16 +77,16 @@ namespace ChartPacker.ViewModels
         private readonly IDownloadService _downloads;
         private readonly IChartBuilderLauncher _chartBuilder;
         private readonly NoticeViewModel _notice;
-        private readonly Dictionary<string, LibraryItemViewModel> _itemsByPath = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, LibraryItemViewModel> _itemsByPath = [with(StringComparer.Ordinal)];
 
         // The songs opened in Chart Builder, and what each was on disk when last read, to re-read them once it has
         // changed them (charter-spec §4.8). A background poller re-reads them a save or two after Chart Builder
         // writes, so the library shows the latest version without waiting for the window to be activated.
-        private readonly Dictionary<string, (SongEntry Entry, EntryStamp? Stamp)> _editedSongs = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, (SongEntry Entry, EntryStamp? Stamp)> _editedSongs = [with(StringComparer.Ordinal)];
 
         // A changed stamp seen once by the poller but not yet re-read, waiting for a second sighting so a
         // folder save caught between its files isn't read half-written. The activation path re-reads at once.
-        private readonly Dictionary<string, EntryStamp?> _pendingEditedStamps = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, EntryStamp?> _pendingEditedStamps = [with(StringComparer.Ordinal)];
 
         // How often songs opened in Chart Builder are checked for saves while this app runs.
         private static readonly TimeSpan EditedSongsPollInterval = TimeSpan.FromSeconds(2);

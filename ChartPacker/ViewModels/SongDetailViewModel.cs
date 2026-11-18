@@ -169,10 +169,10 @@ namespace ChartPacker.ViewModels
         private Dictionary<string, Bitmap> _artImages = [];
 
         // Staged replacement images by source path.
-        private Dictionary<string, StagedArt> _stagedArt = new(StringComparer.Ordinal);
+        private Dictionary<string, StagedArt> _stagedArt = [with(StringComparer.Ordinal)];
 
         // The theme each decoded image gives the window, by image hash; an image too grey for one has none.
-        private Dictionary<string, ThemeSeed> _artSeeds = new(StringComparer.Ordinal);
+        private Dictionary<string, ThemeSeed> _artSeeds = [with(StringComparer.Ordinal)];
 
         // One command per stem for the Add track menu, whose labels change with the song's tracks.
         private readonly Dictionary<string, IAsyncRelayCommand> _addTrackCommands = [];
@@ -2426,8 +2426,8 @@ namespace ChartPacker.ViewModels
             ArtNote = null;
             DisposeLater(_artImages.Values);
             _artImages = [];
-            _artSeeds = new(StringComparer.Ordinal);
-            _stagedArt = new(StringComparer.Ordinal);
+            _artSeeds = [with(StringComparer.Ordinal)];
+            _stagedArt = [with(StringComparer.Ordinal)];
         }
 
         /// <summary>Disposes <paramref name="bitmaps"/> once the UI has rendered without them.</summary>

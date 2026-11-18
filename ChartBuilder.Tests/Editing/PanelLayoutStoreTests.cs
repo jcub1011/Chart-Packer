@@ -9,38 +9,38 @@ public sealed class PanelLayoutStoreTests
     [TestMethod]
     public void NothingSavedIsTheDefaultOrder()
     {
-        CollectionAssert.AreEqual(new[] { "a", "b", "c" }, PanelLayoutStore.Arrange(null, ["a", "b", "c"]).ToArray());
+        Assert.AreSequenceEqual(["a", "b", "c"], [.. PanelLayoutStore.Arrange(null, ["a", "b", "c"])]);
     }
 
     [TestMethod]
     public void TheSavedOrderIsKept()
     {
-        CollectionAssert.AreEqual(new[] { "c", "a", "b" }, PanelLayoutStore.Arrange(["c", "a", "b"], ["a", "b", "c"]).ToArray());
+        Assert.AreSequenceEqual(["c", "a", "b"], [.. PanelLayoutStore.Arrange(["c", "a", "b"], ["a", "b", "c"])]);
     }
 
     [TestMethod]
     public void AKeyNoLongerThereIsDropped()
     {
-        CollectionAssert.AreEqual(new[] { "c", "a" }, PanelLayoutStore.Arrange(["c", "gone", "a"], ["a", "c"]).ToArray());
+        Assert.AreSequenceEqual(["c", "a"], [.. PanelLayoutStore.Arrange(["c", "gone", "a"], ["a", "c"])]);
     }
 
     [TestMethod]
     public void ANewKeyGoesAfterTheOneBeforeItByDefault()
     {
         // "b" is new, and comes after "a" by default, wherever "a" was moved to.
-        CollectionAssert.AreEqual(new[] { "c", "a", "b" }, PanelLayoutStore.Arrange(["c", "a"], ["a", "b", "c"]).ToArray());
+        Assert.AreSequenceEqual(["c", "a", "b"], [.. PanelLayoutStore.Arrange(["c", "a"], ["a", "b", "c"])]);
     }
 
     [TestMethod]
     public void ANewFirstKeyGoesFirst()
     {
-        CollectionAssert.AreEqual(new[] { "new", "c", "b" }, PanelLayoutStore.Arrange(["c", "b"], ["new", "b", "c"]).ToArray());
+        Assert.AreSequenceEqual(["new", "c", "b"], [.. PanelLayoutStore.Arrange(["c", "b"], ["new", "b", "c"])]);
     }
 
     [TestMethod]
     public void ARepeatedKeyIsTakenOnce()
     {
-        CollectionAssert.AreEqual(new[] { "b", "a" }, PanelLayoutStore.Arrange(["b", "a", "b"], ["a", "b"]).ToArray());
+        Assert.AreSequenceEqual(["b", "a"], [.. PanelLayoutStore.Arrange(["b", "a", "b"], ["a", "b"])]);
     }
 
     [TestMethod]
@@ -49,8 +49,8 @@ public sealed class PanelLayoutStoreTests
         var store = new PanelLayoutStore();
         store.SetSectionOrder("tempo-map", ["changes", "timing"]);
 
-        CollectionAssert.AreEqual(new[] { "changes", "timing", "audio" }, store.SectionOrder("tempo-map", ["timing", "audio", "changes"]).ToArray());
-        CollectionAssert.AreEqual(new[] { "parts", "metadata" }, store.SectionOrder("chart-settings", ["parts", "metadata"]).ToArray());
+        Assert.AreSequenceEqual(["changes", "timing", "audio"], [.. store.SectionOrder("tempo-map", ["timing", "audio", "changes"])]);
+        Assert.AreSequenceEqual(["parts", "metadata"], [.. store.SectionOrder("chart-settings", ["parts", "metadata"])]);
     }
 
     [TestMethod]
@@ -77,7 +77,7 @@ public sealed class PanelLayoutStoreTests
         store.SetSectionOrder("art", ["b", "a"]);
         store.SetTabOrder(PanelLayoutStore.LeftPanel, ["art", "chart-settings"]);
 
-        CollectionAssert.AreEqual(new[] { "art", "art", PanelLayoutStore.LeftPanel }, said);
+        Assert.AreSequenceEqual(["art", "art", PanelLayoutStore.LeftPanel], said);
     }
 
     [TestMethod]
@@ -90,7 +90,7 @@ public sealed class PanelLayoutStoreTests
 
         store.ResetSections("art");
 
-        CollectionAssert.AreEqual(new[] { "a", "b" }, store.SectionOrder("art", ["a", "b"]).ToArray());
+        Assert.AreSequenceEqual(["a", "b"], [.. store.SectionOrder("art", ["a", "b"])]);
         Assert.IsFalse(store.IsCollapsed("art", "a"));
         Assert.IsTrue(store.IsCollapsed("artwork", "a"));
     }
@@ -103,7 +103,7 @@ public sealed class PanelLayoutStoreTests
 
         store.ResetTabs(PanelLayoutStore.RightPanel);
 
-        CollectionAssert.AreEqual(new[] { "properties", "difficulty" }, store.TabOrder(PanelLayoutStore.RightPanel, ["properties", "difficulty"]).ToArray());
+        Assert.AreSequenceEqual(["properties", "difficulty"], [.. store.TabOrder(PanelLayoutStore.RightPanel, ["properties", "difficulty"])]);
     }
 
     [TestMethod]
@@ -119,9 +119,9 @@ public sealed class PanelLayoutStoreTests
         store.WriteTo(settings);
         var back = PanelLayoutStore.From(settings);
 
-        CollectionAssert.AreEqual(new[] { "tempo-map", "chart-settings" }, back.TabOrder(PanelLayoutStore.LeftPanel, ["chart-settings", "tempo-map"]).ToArray());
-        CollectionAssert.AreEqual(new[] { "findings", "properties" }, back.TabOrder(PanelLayoutStore.RightPanel, ["properties", "findings"]).ToArray());
-        CollectionAssert.AreEqual(new[] { "changes", "timing" }, back.SectionOrder("tempo-map", ["timing", "changes"]).ToArray());
+        Assert.AreSequenceEqual(["tempo-map", "chart-settings"], [.. back.TabOrder(PanelLayoutStore.LeftPanel, ["chart-settings", "tempo-map"])]);
+        Assert.AreSequenceEqual(["findings", "properties"], [.. back.TabOrder(PanelLayoutStore.RightPanel, ["properties", "findings"])]);
+        Assert.AreSequenceEqual(["changes", "timing"], [.. back.SectionOrder("tempo-map", ["timing", "changes"])]);
         Assert.IsTrue(back.IsCollapsed("tempo-map", "audio"));
     }
 }

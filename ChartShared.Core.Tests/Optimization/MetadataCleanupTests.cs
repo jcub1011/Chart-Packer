@@ -51,7 +51,7 @@ public sealed class MetadataCleanupTests
         var plan = await MetadataCleanup.AnalyzeAsync(entry, Only(o => o with { DropEmptyValues = true }), TestContext.CancellationToken);
 
         Assert.IsFalse(plan.HasChanges, "A draft can only remove a key whole, which would lose Someone.");
-        Assert.IsTrue(plan.After.Any(p => p.Key == "artist" && p.Value == "Someone"));
+        Assert.Contains(p => p.Key == "artist" && p.Value == "Someone", plan.After);
     }
 
     [TestMethod]
@@ -83,7 +83,7 @@ public sealed class MetadataCleanupTests
         var plan = await MetadataCleanup.AnalyzeAsync(entry, Only(o => o with { ReplaceLegacyKeys = true }), TestContext.CancellationToken);
 
         Assert.AreEqual("Someone", plan.After.Single(p => p.Key == "charter").Value);
-        Assert.IsFalse(plan.After.Any(p => p.Key == "frets"));
+        Assert.DoesNotContain(p => p.Key == "frets", plan.After);
         Assert.AreEqual("4", plan.After.Single(p => p.Key == "track").Value, "A legacy key whose replacement is already set is left, as its quick fix does.");
         Assert.AreEqual("9", plan.After.Single(p => p.Key == "album_track").Value);
     }
@@ -110,10 +110,10 @@ public sealed class MetadataCleanupTests
 
         Assert.IsTrue(plan.HasChanges);
         Assert.AreEqual("notes.mid", plan.MidiName);
-        Assert.IsTrue(plan.NewMidiBytes!.Length < midi.Length);
+        Assert.IsLessThan(midi.Length, plan.NewMidiBytes!.Length);
         Assert.AreEqual(midi.Length, plan.MidiBytesBefore);
         Assert.IsFalse(plan.Edits.HasMetadataChanges);
-        Assert.IsTrue(plan.BytesAfter < plan.BytesBefore);
+        Assert.IsLessThan(plan.BytesBefore, plan.BytesAfter);
     }
 
     [TestMethod]
@@ -124,7 +124,7 @@ public sealed class MetadataCleanupTests
         var plan = await MetadataCleanup.AnalyzeAsync(entry, Only(o => o), TestContext.CancellationToken);
 
         Assert.IsFalse(plan.HasChanges);
-        Assert.AreEqual(4, plan.After.Count);
+        Assert.HasCount(4, plan.After);
     }
 
     [TestMethod]

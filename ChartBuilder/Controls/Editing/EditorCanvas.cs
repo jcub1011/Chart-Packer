@@ -403,11 +403,17 @@ namespace ChartBuilder.Controls.Editing
         /// </summary>
         protected virtual LaneProjection? ProjectVocals(Size size, LaneSlots slots, EditorViewport viewport, HighwayLength length) => null;
 
-        /// <summary>Where a vocal part's lyrics are drawn, under its pitch rows.</summary>
-        protected virtual Rect LyricsArea(Size size, LaneProjection projection) => default;
+        /// <summary>How wide the piano keyboard is down a vocal part's left edge, in pixels; none for a view that has no keyboard.</summary>
+        protected virtual double VocalGutterWidth => 0;
+
+        /// <summary>Whether the canvas is showing a vocal part's lane.</summary>
+        protected bool IsVocalLane => _lane?.Vocal is not null;
 
         /// <summary>Where a vocal part's phrases are drawn as bars to select and drag, above its pitch rows.</summary>
         protected virtual Rect VocalPhraseArea(Size size, LaneProjection projection) => default;
+
+        /// <summary>Where a vocal part's star power is drawn as bars to select and drag, between its phrases and its pitch rows.</summary>
+        protected virtual Rect VocalStarPowerArea(Size size, LaneProjection projection) => default;
 
         /// <summary>How thick the phrase rail of <paramref name="phraseRows"/> rows is across the view, in pixels.</summary>
         protected static double PhraseRailSize(int phraseRows) =>
@@ -617,7 +623,7 @@ namespace ChartBuilder.Controls.Editing
             DrawPhraseRailBackground(context, rows, projection);
             DrawPhraseRanges(context, session, key, projection, fromTick, toTick);
             DrawSpans(context, session, projection);
-            DrawSyncBands(context, session, key, projection);
+            DrawSyncBands(context, session, projection);
             if (!FramePerf.IsOff(FramePerf.Part.BeatLines))
                 DrawBeats(context, session, session.TempoMap, projection, fromTick, toTick, size, RailOnPlane);
             DrawOnsets(context, size, projection, key);
@@ -729,7 +735,7 @@ namespace ChartBuilder.Controls.Editing
             DrawRailHover(context, session, key, part, rows, screen);
             DrawLoopLine(context, session, screen, slots);
             DrawSyncLine(context, session, screen, slots);
-            DrawSyncHover(context, session, key, screen, slots);
+            DrawSyncHover(context, session, screen, slots);
             DrawLoopHover(context, session, screen, slots);
 
             DrawCursor(context, session, screen, lanes);
@@ -854,7 +860,7 @@ namespace ChartBuilder.Controls.Editing
         /// placement line does too; or, with a synchronized region or the loop region drawn, its X and hover, which do too.
         /// </summary>
         private bool IsHoverShown => _hover is { } hover && !_isPressed
-            && (Session?.Tool is EditorTool.Place or EditorTool.Erase or EditorTool.Phrase or EditorTool.Tempo
+            && (Session?.Tool is EditorTool.Place or EditorTool.Erase or EditorTool.Phrase or EditorTool.Tempo or EditorTool.VocalAlign
                 || Session?.Sync.IsActive == true
                 || Session?.Loop?.Span is not null
                 || (Session?.Tool == EditorTool.Select && PointAt(hover) is { Rail: not null }));
@@ -1104,6 +1110,15 @@ namespace ChartBuilder.Controls.Editing
                 return;
             }
 
+            // A vocal part's keyboard takes no press, so a click on it never edits a note or moves the song.
+            if (IsOnVocalKeyboard(current.Position))
+            {
+                Focus();
+                ShowTip(null);
+                e.Handled = true;
+                return;
+            }
+
             _pressButton = button;
             _pressedAt = current.Position;
             _pressDragged = false;
@@ -1119,19 +1134,19 @@ namespace ChartBuilder.Controls.Editing
                 return;
             }
 
-            if (_lane is { Vocal: not null })
-            {
-                PressVocals(session, current.Position, e);
-                return;
-            }
-
-            // The small X at the synchronized region's top right clears it, whatever the tool.
+            // The small X at the synchronized region's top right clears it, whatever the tool, in a vocal part's lane too.
             if (button == MouseButton.Left && SyncCloseAt(current.Position))
             {
                 session.Sync.Clear();
                 Focus();
                 e.Handled = true;
                 _overlay.Redraw();
+                return;
+            }
+
+            if (_lane is { Vocal: not null })
+            {
+                PressVocals(session, current.Position, e);
                 return;
             }
 
@@ -1222,7 +1237,7 @@ namespace ChartBuilder.Controls.Editing
             {
                 if (_lane is { Vocal: not null })
                 {
-                    if (!ShowLoopCursor(position) && !ShowVocalTempoCursor(position))
+                    if (!ShowLoopCursor(position) && !ShowSyncCursor(position) && !ShowVocalTempoCursor(position))
                         ShowVocalCursor(position);
                 }
                 else if (!ShowLoopCursor(position) && !ShowSyncCursor(position) && !ShowTempoCursor(position))
@@ -1263,6 +1278,14 @@ namespace ChartBuilder.Controls.Editing
             else if (_lane is { Vocal: not null })
             {
                 session.Tools.Release(VocalPointAt(e.GetPosition(this), clamp: true) ?? _lastVocalPoint);
+
+                // A double click on a note, once its gesture's done, opens the box its lyric's edited in.
+                if (_lyricOnRelease is { } tick)
+                {
+                    _lyricOnRelease = null;
+                    if (!_pressDragged)
+                        OpenLyricEditor(tick);
+                }
             }
             else
             {
@@ -1291,6 +1314,7 @@ namespace ChartBuilder.Controls.Editing
             _isPressed = false;
             _boxFrom = null;
             _boxFromSeconds = null;
+            _lyricOnRelease = null;
             if (_lane is { Vocal: not null })
                 Session?.Tools.Release(_lastVocalPoint);
             else
@@ -1311,6 +1335,13 @@ namespace ChartBuilder.Controls.Editing
             base.OnPointerWheelChanged(e);
             if (Session is not { } session || _lane is not { HasCanvas: true } lane)
                 return;
+
+            // Over a vocal part's keyboard the wheel scrolls the notes shown and Ctrl zooms them, rather than moving the song.
+            if (IsOnVocalKeyboard(e.GetPosition(this)))
+            {
+                WheelVocalKeyboard(e, lane);
+                return;
+            }
 
             // The song moves past the strike line a grid step a notch, through the tempo map, so the strike line stays on the
             // grid across tempo and time-signature changes; Ctrl zooms, turned up the lane looking less far ahead. A turn of none
@@ -1534,7 +1565,7 @@ namespace ChartBuilder.Controls.Editing
         /// </summary>
         private bool ShowSyncCursor(Point position)
         {
-            if (Session is not { } session || _lane?.Track is not { } key || session.Sync is not { IsActive: true } sync || sync.Track != key)
+            if (Session is not { } session || session.Sync is not { IsActive: true } sync || !IsSyncLane(sync))
                 return false;
             if (CurrentProjection() is not { } projection || sync.Span is not var (from, to))
                 return false;
@@ -1548,7 +1579,7 @@ namespace ChartBuilder.Controls.Editing
 
             if (!session.Tools.IsSyncPress(ModifiersOf(_keys)))
                 return false;
-            if (PointAt(position) is not { Rail: null } point)
+            if (SyncTickAt(position) is not { } point)
                 return false;
 
             long length = to - from;
@@ -1694,10 +1725,12 @@ namespace ChartBuilder.Controls.Editing
             lane = wanted;
             _editor = lane.Editor;
             lane.PropertyChanged += OnLaneChanged;
+            lane.LyricEditRequested += OnLyricEditRequested;
             if (_editor is { } editor)
             {
                 editor.Session.ChartChanged += OnChartChanged;
                 editor.Session.StateChanged += OnRedraw;
+                editor.Session.VocalAlignment.Changed += OnRedraw;
                 editor.Session.Selection.Changed += OnRedraw;
                 editor.Session.Viewport.Changed += OnViewportChanged;
                 editor.Playback.PropertyChanged += OnPlaybackChanged;
@@ -1720,11 +1753,18 @@ namespace ChartBuilder.Controls.Editing
         private void Detach()
         {
             if (_lane is { } lane)
+            {
                 lane.PropertyChanged -= OnLaneChanged;
+                lane.LyricEditRequested -= OnLyricEditRequested;
+            }
+
+            // A lane going away takes its lyric box with it, without keeping what it said.
+            CloseLyricEditor(apply: false);
             if (_editor is { } editor)
             {
                 editor.Session.ChartChanged -= OnChartChanged;
                 editor.Session.StateChanged -= OnRedraw;
+                editor.Session.VocalAlignment.Changed -= OnRedraw;
                 editor.Session.Selection.Changed -= OnRedraw;
                 editor.Session.Viewport.Changed -= OnViewportChanged;
                 editor.Playback.PropertyChanged -= OnPlaybackChanged;
@@ -1748,6 +1788,8 @@ namespace ChartBuilder.Controls.Editing
         {
             if (e.PropertyName == nameof(EditorLaneViewModel.Track) && IsFocused && Session is { } session && _lane?.Track is { } key)
                 session.Focused = key;
+            if (e.PropertyName == nameof(EditorLaneViewModel.Vocal) && _lane is { } shown)
+                shown.SetExtent(TimeAxisLength(_arranged));
             _longest = null;
             _ghostLongest = null;
             InvalidateLayers();
@@ -1886,13 +1928,13 @@ namespace ChartBuilder.Controls.Editing
         private Func<double, double> AlongOf(LaneProjection projection) => _alongOf.For(projection);
 
         /// <returns>Whether all of it was drawn as it is now.</returns>
-        private bool DrawSpectrogram(DrawingContext context, LaneAudioViewModel audio, Spectrogram spectrogram, Rect area, LaneProjection projection)
+        private bool DrawSpectrogram(DrawingContext context, LaneAudioViewModel audio, Spectrogram spectrogram, Rect area, LaneProjection projection, SpectrogramPainter.PitchFrame? frame = null)
         {
             if (area.Width <= 1 || area.Height <= 1)
                 return true;
             double scaling = 1 / (TopLevel.GetTopLevel(this)?.RenderScaling ?? 1);
             return SpectrogramPainter.Draw(context, spectrogram, area, View == LaneView.Highway, projection.Start, projection.End, AlongOf(projection),
-                audio.Options.FloorDb, audio.Options.CeilingDb, audio.Options.Band, scaling);
+                audio.Options.FloorDb, audio.Options.CeilingDb, audio.Options.Band, scaling, frame);
         }
 
         /// <returns>Whether all of it was drawn.</returns>
@@ -2078,7 +2120,7 @@ namespace ChartBuilder.Controls.Editing
             if (Session is not { } session || _lane is null)
                 return null;
             if (_lane.Vocal is { } vocal)
-                return session.VocalsOf(vocal) is { } vocals ? ProjectVocals(Bounds.Size, VocalSlotsOf(vocals), session.Viewport, _lane.Length) : null;
+                return session.VocalsOf(vocal) is not null ? ProjectVocals(Bounds.Size, VocalSlotsOf(_lane), session.Viewport, _lane.Length) : null;
             if (_lane.Track is not { } key || session.TrackOf(key) is null)
                 return null;
             var slots = session.SlotsOf(key.Instrument, View);
@@ -2143,10 +2185,10 @@ namespace ChartBuilder.Controls.Editing
         /// the notes; a region nothing matched is hashed in yellow instead. And the region being dragged out with the Sync
         /// tool.
         /// </summary>
-        private void DrawSyncBands(DrawingContext context, EditorSession session, ChartTrackKey key, LaneProjection projection)
+        private void DrawSyncBands(DrawingContext context, EditorSession session, LaneProjection projection)
         {
             var sync = session.Sync;
-            if (sync.Track == key && sync.Span is var (regionFrom, regionTo))
+            if (IsSyncLane(sync) && sync.Span is var (regionFrom, regionTo))
             {
                 long length = regionTo - regionFrom;
                 foreach (long start in sync.Matches)
@@ -2158,7 +2200,7 @@ namespace ChartBuilder.Controls.Editing
                     context.DrawRectangle(SyncRegionBrush, SyncRegionPen, band);
             }
 
-            if (sync.Draft is var (track, draftFrom, draftTo) && track == key)
+            if (sync.Draft is var (part, draftFrom, draftTo) && IsLane(part))
                 context.DrawRectangle(SyncRegionBrush, SyncRegionPen, SyncBandOf(session, projection, draftFrom, draftTo));
         }
 
@@ -2193,7 +2235,7 @@ namespace ChartBuilder.Controls.Editing
         /// <summary>Whether the pointer at <paramref name="position"/> is on the X that clears the synchronized region.</summary>
         private bool SyncCloseAt(Point position)
         {
-            if (Session is not { } session || _lane?.Track is not { } key || session.Sync is not { IsActive: true } sync || sync.Track != key)
+            if (Session is not { } session || session.Sync is not { IsActive: true } sync || !IsSyncLane(sync))
                 return false;
             if (CurrentProjection() is not { } projection || sync.Span is not var (from, to))
                 return false;
@@ -3069,7 +3111,7 @@ namespace ChartBuilder.Controls.Editing
         {
             if (_hover is not { } hover || _isPressed || !session.Tools.IsSyncPress(ModifiersOf(_keys)) || SyncCloseAt(hover))
                 return;
-            if (PointAt(hover) is not { Rail: null } point || session.Tools.SyncDrawStart(point, ModifiersOf(_keys)) is not { } tick)
+            if (SyncDrawStartAt(session, hover) is not { } tick)
                 return;
             double along = projection.AlongOf(session.AudioAt(tick));
             context.FillRectangle(SyncLineBrush, Box(along - 1, along + 1, projection.LaneFrom, projection.LaneFrom + (projection.LaneSize * slots.Slots.Count)));
@@ -3081,7 +3123,7 @@ namespace ChartBuilder.Controls.Editing
         /// </summary>
         private void DrawSyncNotes(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, LaneProjection projection, LaneSlots slots, bool upright)
         {
-            if (session.Sync is not { IsActive: true } sync || sync.Track != key || sync.Span is not var (from, to))
+            if (session.Sync is not { IsActive: true } sync || !sync.IsOn(key) || sync.Span is not var (from, to))
                 return;
             if (!session.Tools.IsSyncPress(ModifiersOf(_keys)))
                 return;
@@ -3098,9 +3140,9 @@ namespace ChartBuilder.Controls.Editing
         /// the pointer is over the region; and with the Sync tool picked, or Ctrl + Shift held, what the pointer would take
         /// hold of: an end to resize, the region's body to move it, or a passage synced with it to make the source.
         /// </summary>
-        private void DrawSyncHover(DrawingContext context, EditorSession session, ChartTrackKey key, LaneProjection projection, LaneSlots slots)
+        private void DrawSyncHover(DrawingContext context, EditorSession session, LaneProjection projection, LaneSlots slots)
         {
-            if (_hover is not { } hover || _isPressed || session.Sync is not { IsActive: true } sync || sync.Track != key)
+            if (_hover is not { } hover || _isPressed || session.Sync is not { IsActive: true } sync || !IsSyncLane(sync))
                 return;
             if (sync.Span is not var (from, to))
                 return;
@@ -3112,7 +3154,7 @@ namespace ChartBuilder.Controls.Editing
             DrawSyncClose(context, close);
             if (!session.Tools.IsSyncPress(ModifiersOf(_keys)))
                 return;
-            if (PointAt(hover) is not { Rail: null } point)
+            if (SyncTickAt(hover) is not { } point)
                 return;
 
             long length = to - from;
@@ -3135,6 +3177,36 @@ namespace ChartBuilder.Controls.Editing
             {
                 context.DrawRectangle(null, SyncRegionPen, band.Inflate(1), 2, 2);
             }
+        }
+
+        /// <summary>Whether the synchronized region is drawn on this lane: on its highway's track, or on its vocal part.</summary>
+        private bool IsSyncLane(SyncRegion sync) => _lane is { } lane && (lane.Vocal is { } vocal ? sync.IsOn(vocal) : lane.Track is { } key && sync.IsOn(key));
+
+        /// <summary>Whether <paramref name="part"/> is what this lane shows: its highway's track, or its vocal part.</summary>
+        private bool IsLane(LanePart part) => _lane is { } lane && (lane.Vocal is { } vocal ? part.Vocal == vocal : lane.Track is { } key && part.Track == key);
+
+        /// <summary>
+        /// The tick under <paramref name="position"/>, and how many ticks either way it reaches, where the Sync tool's press
+        /// takes hold of the synchronized region: in a highway's lanes, not its phrase rail, or in a vocal part's rows, not
+        /// its phrase strip or star power rail. Null elsewhere.
+        /// </summary>
+        private (double Tick, double Tolerance)? SyncTickAt(Point position)
+        {
+            if (_lane is { Vocal: not null })
+                return VocalPointAt(position, clamp: false) is { Pitch: not null } vocal ? (vocal.Tick, vocal.Tolerance) : null;
+            return PointAt(position) is { Rail: null } point ? (point.Tick, point.Tolerance) : null;
+        }
+
+        /// <summary>
+        /// Where a press at <paramref name="position"/> would start drawing a synchronized region, in a highway's lane or a
+        /// vocal part's (<see cref="EditorTools.SyncDrawStart(ChartPoint, EditorModifiers)"/>).
+        /// </summary>
+        private long? SyncDrawStartAt(EditorSession session, Point position)
+        {
+            var modifiers = ModifiersOf(_keys);
+            if (_lane is { Vocal: not null })
+                return VocalPointAt(position, clamp: false) is { } vocal ? session.Tools.SyncDrawStart(vocal, modifiers) : null;
+            return PointAt(position) is { Rail: null } point ? session.Tools.SyncDrawStart(point, modifiers) : null;
         }
 
         /// <summary>Draws the small X at <paramref name="close"/> that clears the synchronized region, or the loop region.</summary>

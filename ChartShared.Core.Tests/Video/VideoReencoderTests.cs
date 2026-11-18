@@ -227,7 +227,7 @@ public sealed class VideoReencoderTests
         Assert.IsTrue(progress.Triggered, "The encode was cancelled partway, not before or after it.");
         Assert.AreEqual("the old one", File.ReadAllText(output));
         Assert.IsTrue(File.Exists(source));
-        Assert.AreEqual(2, Directory.GetFileSystemEntries(_root.FullName).Length, "Only the source and the old output are left.");
+        Assert.HasCount(2, Directory.GetFileSystemEntries(_root.FullName), "Only the source and the old output are left.");
     }
 
     [TestMethod]
@@ -241,7 +241,7 @@ public sealed class VideoReencoderTests
         Assert.ThrowsExactly<InvalidDataException>(() => VideoReencoder.Reencode(source, output, new VideoReencodeSettings()));
 
         Assert.AreEqual("the old one", File.ReadAllText(output));
-        Assert.AreEqual(2, Directory.GetFileSystemEntries(_root.FullName).Length);
+        Assert.HasCount(2, Directory.GetFileSystemEntries(_root.FullName));
     }
 
     [TestMethod]
@@ -262,7 +262,7 @@ public sealed class VideoReencoderTests
             Assert.IsFalse(File.Exists(output));
         }
 
-        Assert.IsFalse(Directory.GetFiles(_root.FullName).Any(f => Path.GetFileName(f).StartsWith('.')), "No temp file is left.");
+        Assert.DoesNotContain(f => Path.GetFileName(f).StartsWith('.'), Directory.GetFiles(_root.FullName), "No temp file is left.");
     }
 
     [TestMethod]
@@ -403,7 +403,7 @@ public sealed class VideoReencoderTests
 
         Assert.ThrowsExactly<OutputTooLargeException>(() => VideoReencoder.Reencode(source, output, new VideoReencodeSettings(Threads: 2), maxBytes: 200));
 
-        Assert.AreSequenceEqual(new[] { "source.webm" }, Directory.GetFileSystemEntries(_root.FullName).Select(Path.GetFileName).ToArray()!);
+        Assert.AreSequenceEqual(["source.webm"], Directory.GetFileSystemEntries(_root.FullName).Select(Path.GetFileName).ToArray()!);
     }
 
     [TestMethod]
@@ -494,7 +494,7 @@ public sealed class VideoReencoderTests
     }
 
     private void AssertOnlyTheOutputIsLeft(string output) =>
-        Assert.AreSequenceEqual(new[] { Path.GetFileName(output) }, Directory.GetFileSystemEntries(_root.FullName).Select(Path.GetFileName).ToArray()!);
+        Assert.AreSequenceEqual([Path.GetFileName(output)], Directory.GetFileSystemEntries(_root.FullName).Select(Path.GetFileName).ToArray()!);
 }
 
 /// <summary>Cancels once the encode has reported more than a fraction of the video, which it does between frames.</summary>
@@ -543,7 +543,7 @@ public sealed class VideoReencoderSizeTests
     {
         Assert.AreEqual(VideoEncodeSpeed.Balanced, new VideoReencodeSettings().Speed);
         Assert.AreEqual(VideoEncodeSpeed.Balanced, VideoOptimizeOptions.Default.Speed);
-        Assert.AreSequenceEqual(new[] { 4, 2, 1, 0 }, new[] { VideoEncodeSpeed.Fast, VideoEncodeSpeed.Balanced, VideoEncodeSpeed.Slow, VideoEncodeSpeed.Best }.Select(VideoReencodeSettings.CpuUsedOf).ToArray());
+        Assert.AreSequenceEqual([4, 2, 1, 0], [.. new[] { VideoEncodeSpeed.Fast, VideoEncodeSpeed.Balanced, VideoEncodeSpeed.Slow, VideoEncodeSpeed.Best }.Select(VideoReencodeSettings.CpuUsedOf)]);
         Assert.AreEqual(VideoReencodeSettings.CpuUsedOf(VideoEncodeSpeed.Best), new VideoReencodeSettings(Speed: VideoEncodeSpeed.Best).CpuUsed);
         Assert.AreEqual(VideoEncodeSpeed.Best, VideoReencodeSettings.From(new VideoOptimizeOptions(Speed: VideoEncodeSpeed.Best)).Speed);
         Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => VideoReencodeSettings.CpuUsedOf((VideoEncodeSpeed)99));

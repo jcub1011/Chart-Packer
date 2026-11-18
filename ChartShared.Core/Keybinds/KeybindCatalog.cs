@@ -8,7 +8,7 @@ namespace ChartShared.Core.Keybinds;
 public sealed class KeybindCatalog : IEnumerable<KeyAction>
 {
     private readonly List<KeyAction> _actions;
-    private readonly Dictionary<string, KeyAction> _byId = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, KeyAction> _byId = [with(StringComparer.Ordinal)];
     private readonly Dictionary<KeyScope, List<KeyAction>> _byScope = [];
 
     /// <exception cref="ArgumentException">Two actions share an id.</exception>

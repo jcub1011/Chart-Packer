@@ -236,14 +236,14 @@ public static class OptimizeJob
     {
         public List<AssetResult> Assets { get; } = [];
 
-        public HashSet<string> Removes { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public HashSet<string> Removes { get; } = [with(StringComparer.OrdinalIgnoreCase)];
 
         public List<AddedFile> Adds { get; } = [];
 
         public MetadataDraft? Edits { get; set; }
 
         /// <summary>Images stored under another name now (<c>album.png</c> to <c>album.jpg</c>), old name to new.</summary>
-        public Dictionary<string, string> Renames { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<string, string> Renames { get; } = [with(StringComparer.OrdinalIgnoreCase)];
 
         public bool HasChanges => Removes.Count > 0 || Adds.Count > 0 || Edits is { HasMetadataChanges: true };
     }

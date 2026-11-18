@@ -101,10 +101,10 @@ namespace ChartPacker.ViewModels
         private bool _isSyncing;
 
         // The instruments unchecked for each song, by its path. Never saved.
-        private readonly Dictionary<string, HashSet<ChartInstrument>> _hidden = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, HashSet<ChartInstrument>> _hidden = [with(StringComparer.Ordinal)];
 
         // The track picked for each instrument's waveform in place of its own, for each song, by its path. Never saved.
-        private readonly Dictionary<string, Dictionary<ChartInstrument, string>> _waveformStems = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, Dictionary<ChartInstrument, string>> _waveformStems = [with(StringComparer.Ordinal)];
 
         // The instrument of each of the scene's highways, in order.
         private List<ChartInstrument> _laneInstruments = [];

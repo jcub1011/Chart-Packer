@@ -21,6 +21,7 @@ namespace ChartBuilder.ViewModels
     {
         private readonly EditorMessages? _messages;
         private long _budget;
+        private bool _sharpen;
         private WaveformFidelity _fidelity;
         private TaskCompletionSource<AudibleRange?> _settled = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -34,6 +35,7 @@ namespace ChartBuilder.ViewModels
             ArgumentNullException.ThrowIfNull(settings);
             _messages = messages;
             _budget = BudgetOf(settings);
+            _sharpen = settings.SpectrogramSharpening;
             _fidelity = Enum.IsDefined(settings.WaveformFidelity) ? settings.WaveformFidelity : BuilderSettings.DefaultWaveformFidelity;
             Entry = song.Entry;
             Tracks = song.Tracks;
@@ -84,11 +86,19 @@ namespace ChartBuilder.ViewModels
             RefreshAudible();
         }
 
-        /// <summary>Takes up what may have changed in Settings: the spectrogram memory budget and the waveform detail.</summary>
+        /// <summary>Takes up what may have changed in Settings: the spectrogram memory budget and sharpening, and the waveform detail.</summary>
         public void ReloadSettings(BuilderSettings settings)
         {
             _budget = BudgetOf(settings);
             Analysis.SetBudget(_budget);
+            if (settings.SpectrogramSharpening != _sharpen)
+            {
+                // Every spectrogram is computed again the other way, and what's drawn of the old ones is no use.
+                _sharpen = settings.SpectrogramSharpening;
+                Analysis.SetSharpening(_sharpen);
+                SpectrogramPainter.Clear();
+            }
+
             if (settings.WaveformFidelity != _fidelity && Enum.IsDefined(settings.WaveformFidelity))
             {
                 // Every stem is read again at the new fidelity, or found in the cache if read at it before.
@@ -106,6 +116,7 @@ namespace ChartBuilder.ViewModels
             if (!ReferenceEquals(_sourcesFor, Tracks))
             {
                 _sources.Clear();
+                _vocalSources.Clear();
                 _sourcesFor = Tracks;
             }
 
@@ -115,7 +126,25 @@ namespace ChartBuilder.ViewModels
             return source;
         }
 
+        /// <summary>The audio a lane showing the vocal part <paramref name="vocal"/> is drawn over, as <paramref name="options"/> picks it.</summary>
+        public AudioSource? SourceFor(LaneAudioOptions options, VocalTrack vocal)
+        {
+            ArgumentNullException.ThrowIfNull(options);
+            if (!ReferenceEquals(_sourcesFor, Tracks))
+            {
+                _sources.Clear();
+                _vocalSources.Clear();
+                _sourcesFor = Tracks;
+            }
+
+            var key = (options.Source, vocal);
+            if (!_vocalSources.TryGetValue(key, out var source))
+                _vocalSources[key] = source = AudioSource.Resolve(options, LaneStems.For(vocal), Tracks);
+            return source;
+        }
+
         private readonly Dictionary<(string? Source, ChartInstrument Instrument), AudioSource?> _sources = [];
+        private readonly Dictionary<(string? Source, VocalTrack Vocal), AudioSource?> _vocalSources = [];
         private IReadOnlyList<SongTrack>? _sourcesFor;
 
         /// <summary>
@@ -147,6 +176,7 @@ namespace ChartBuilder.ViewModels
             Entry = entry;
             Tracks = tracks;
             _sources.Clear();
+            _vocalSources.Clear();
             (Waveforms, Analysis) = Open(entry, tracks, _fidelity);
             Waveforms.Start();
             if (_settled.Task.IsCompleted)
@@ -183,7 +213,7 @@ namespace ChartBuilder.ViewModels
         private (StemWaveforms Waveforms, AudioAnalysis Analysis) Open(SongEntry? entry, IReadOnlyList<SongTrack> tracks, WaveformFidelity fidelity)
         {
             var waveforms = new StemWaveforms(entry, tracks, fidelity);
-            var analysis = new AudioAnalysis(entry, tracks, _budget, _messages);
+            var analysis = new AudioAnalysis(entry, tracks, _budget, _messages, _sharpen);
             waveforms.Changed += OnPartChanged;
             analysis.Changed += OnPartChanged;
             return (waveforms, analysis);

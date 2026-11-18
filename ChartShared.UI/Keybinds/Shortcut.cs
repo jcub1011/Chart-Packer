@@ -28,7 +28,7 @@ public static class Shortcut
 
     // The controls on screen that show a key, each with its own subscription to a rebind. A subscription lasts from the
     // control's attaching to its detaching, and holds the control weakly, so a rebind never keeps a control alive.
-    private static readonly ConditionalWeakTable<Control, Subscription> Subscriptions = new();
+    private static readonly ConditionalWeakTable<Control, Subscription> Subscriptions = [];
 
     static Shortcut()
     {

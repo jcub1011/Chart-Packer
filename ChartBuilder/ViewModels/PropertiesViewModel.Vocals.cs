@@ -5,6 +5,7 @@ using ChartBuilder.Resources;
 using ChartShared.Core.Charting;
 using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charting.Layout;
+using ChartShared.UI.Controls;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -48,9 +49,25 @@ namespace ChartBuilder.ViewModels
         [ObservableProperty]
         public partial string VocalLengthText { get; set; } = "";
 
-        /// <summary>The notes' lyric as the track has it, symbols and all; blank for none.</summary>
+        /// <summary>The vocal Tick field dragged: each note moved later or earlier by the same grid steps, with its lyric.</summary>
+        public IDeltaScrubTarget VocalTickScrub { get; }
+
+        /// <summary>The Pitch field dragged: each note raised or lowered by the same semitones, keeping their intervals.</summary>
+        public IDeltaScrubTarget PitchScrub { get; }
+
+        /// <summary>The vocal Length field dragged: each note lengthened or shortened by the same grid steps.</summary>
+        public IDeltaScrubTarget VocalLengthScrub { get; }
+
+        /// <summary>
+        /// The notes' lyric; blank for none. Without the <c>#</c> or <c>^</c> of a spoken note, which Spoken sets and the lyric
+        /// leaves as it is, and without the <c>+</c> of a slide, which has no lyric.
+        /// </summary>
         [ObservableProperty]
         public partial string LyricText { get; set; } = "";
+
+        /// <summary>Whether any selected note has a lyric to edit: they aren't all slides.</summary>
+        [ObservableProperty]
+        public partial bool CanEditLyric { get; private set; }
 
         [ObservableProperty]
         public partial bool? IsSlide { get; set; }
@@ -143,7 +160,9 @@ namespace ChartBuilder.ViewModels
             PitchText = Same(notes, n => n.Pitch.ToString(CultureInfo.CurrentCulture));
             PitchNameText = Same(notes, n => VocalEdits.IsSpoken(content, n.Tick) ? Strings.PropertiesSpokenPitch : PitchName(n.Pitch));
             VocalLengthText = Same(notes, n => n.Length.ToString(CultureInfo.CurrentCulture));
-            LyricText = Same(notes, n => VocalEdits.LyricAt(content, n.Tick) ?? "");
+            var sung = notes.Where(n => !VocalEdits.IsSlide(content, n.Tick)).ToList();
+            CanEditLyric = sung.Count > 0;
+            LyricText = sung.Count == 0 ? "" : Same(sung, n => VocalEdits.SplitSpokenMarks(VocalEdits.LyricAt(content, n.Tick) ?? "").Shown);
             var list = notes.ToList();
             IsSlide = AllOrNone(list, n => VocalEdits.IsSlide(content, n.Tick));
             IsSpoken = AllOrNone(list, n => VocalEdits.IsSpoken(content, n.Tick));
@@ -200,7 +219,7 @@ namespace ChartBuilder.ViewModels
 
         partial void OnLyricTextChanged(string value)
         {
-            if (_loading || value == Multiple)
+            if (_loading || value == Multiple || !CanEditLyric)
                 return;
             Session.Tools.SetVocalLyric(value);
             Refresh();

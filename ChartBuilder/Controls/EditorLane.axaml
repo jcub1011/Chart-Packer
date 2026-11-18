@@ -44,7 +44,7 @@
                             <RadioButton Content="{x:Static res:Strings.LaneShowSpectrogram}" IsChecked="{Binding IsSpectrogram}" />
                         </StackPanel>
                     </StackPanel>
-                    <StackPanel Spacing="2">
+                    <StackPanel Spacing="2" IsVisible="{Binding !IsVocalLane}">
                         <TextBlock Text="{x:Static res:Strings.LanePlacementLabel}" />
                         <StackPanel Orientation="Horizontal" Spacing="12">
                             <RadioButton Content="{x:Static res:Strings.LanePlacementBehind}" IsChecked="{Binding IsBehind}" />
@@ -108,7 +108,7 @@
                     </StackPanel>
 
                     <!-- The onsets beside the lanes, and how many there are (C14 item 1). -->
-                    <StackPanel Spacing="4">
+                    <StackPanel Spacing="4" IsVisible="{Binding !IsVocalLane}">
                         <CheckBox Content="{x:Static res:Strings.LaneShowOnsets}" IsChecked="{Binding ShowOnsets}" />
                         <Grid ColumnDefinitions="*,Auto">
                             <TextBlock Grid.Column="0" Text="{x:Static res:Strings.LaneSensitivityLabel}" />
@@ -326,7 +326,6 @@
                     <StackPanel x:Name="OverflowTools" Orientation="Horizontal" Spacing="2">
                         <!-- The lane's audio (charter-spec C12–C14): which, as a waveform or a spectrogram, where, and its onsets. -->
                         <Button Classes="tool"
-                                IsVisible="{Binding !IsVocal}"
                                 Flyout="{StaticResource AudioFlyout}"
                                 ToolTip.Tip="{x:Static res:Strings.LaneAudioToolTip}"
                                 AutomationProperties.Name="{x:Static res:Strings.LaneAudioToolTip}">
@@ -369,7 +368,6 @@
                     <Panel x:Name="MoreHost" IsVisible="False">
                         <Button x:Name="MoreButton"
                                 Classes="tool"
-                                IsVisible="{Binding !IsVocal}"
                                 ToolTip.Tip="{x:Static res:Strings.LaneMoreToolTip}"
                                 AutomationProperties.Name="{x:Static res:Strings.LaneMoreToolTip}">
                             <ctl:LineIcon Data="{StaticResource MoreStroke}" />
@@ -378,7 +376,7 @@
                                     <MenuItem Header="{x:Static res:Strings.LaneMoreAudio}" Click="OnAudioMenuClick">
                                         <MenuItem.Icon><ctl:LineIcon Data="{StaticResource VolumeStroke}" /></MenuItem.Icon>
                                     </MenuItem>
-                                    <MenuItem Header="{Binding ViewToolTip}" Command="{Binding ToggleViewCommand}">
+                                    <MenuItem Header="{Binding ViewToolTip}" Command="{Binding ToggleViewCommand}" IsVisible="{Binding !IsVocal}">
                                         <MenuItem.Icon>
                                             <Panel>
                                                 <PathIcon Width="14" Height="14" Data="{StaticResource PerspectiveIconGeometry}" IsVisible="{Binding IsFlatHighway}" />
@@ -387,7 +385,7 @@
                                             </Panel>
                                         </MenuItem.Icon>
                                     </MenuItem>
-                                    <MenuItem Header="{x:Static res:Strings.LaneMoreGhost}" bctl:LaneMenu.Items="{Binding GhostMenu}">
+                                    <MenuItem Header="{x:Static res:Strings.LaneMoreGhost}" IsVisible="{Binding !IsVocal}" bctl:LaneMenu.Items="{Binding GhostMenu}">
                                         <MenuItem.Icon><ctl:LineIcon Data="{StaticResource ViewStroke}" /></MenuItem.Icon>
                                     </MenuItem>
                                     <MenuItem Header="{x:Static res:Strings.LaneMoreEdit}"

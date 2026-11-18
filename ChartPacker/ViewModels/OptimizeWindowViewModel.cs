@@ -96,7 +96,7 @@ namespace ChartPacker.ViewModels
         private readonly SemaphoreSlim _videoGate;
 
         private List<OptimizeChartRow> _rows = [];
-        private Dictionary<string, OptimizeChartRow> _byPath = new(OutputPaths.PathComparer);
+        private Dictionary<string, OptimizeChartRow> _byPath = [with(OutputPaths.PathComparer)];
         private OptimizerSet? _optimizers;
         private int _optimizersParallelism;
 
@@ -507,7 +507,7 @@ namespace ChartPacker.ViewModels
                 row.ClearPreviews();
             var scope = UseWholeLibrary ? _request.Library : _request.Selected;
             _rows = [.. scope.Select(e => new OptimizeChartRow(e))];
-            _byPath = new Dictionary<string, OptimizeChartRow>(OutputPaths.PathComparer);
+            _byPath = [with(OutputPaths.PathComparer)];
             foreach (var row in _rows)
                 _byPath.TryAdd(row.Path, row);
 

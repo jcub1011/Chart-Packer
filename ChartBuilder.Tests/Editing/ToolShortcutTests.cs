@@ -7,7 +7,7 @@ using ChartShared.UI.Keybinds;
 
 namespace ChartBuilder.Tests.Editing;
 
-/// <summary>The keys that pick the editing tools (charter-spec §9): Alt and 1 to 6 by default, in the toolbar's order.</summary>
+/// <summary>The keys that pick the editing tools (charter-spec §9): Alt and 1 to 7 by default, in the toolbar's order.</summary>
 [TestClass]
 public sealed class ToolShortcutTests
 {
@@ -27,6 +27,7 @@ public sealed class ToolShortcutTests
     [DataRow(PhysicalKey.Digit4, Key.D4, EditorTool.Phrase)]
     [DataRow(PhysicalKey.Digit5, Key.D5, EditorTool.Tempo)]
     [DataRow(PhysicalKey.Digit6, Key.D6, EditorTool.Sync)]
+    [DataRow(PhysicalKey.Digit7, Key.D7, EditorTool.VocalAlign)]
     public void AltAndADigitPicksTheToolInToolbarOrder(PhysicalKey key, Key typed, EditorTool expected) =>
         Assert.AreEqual(expected, ToolPicked(key, typed, KeyModifiers.Alt));
 
@@ -37,7 +38,7 @@ public sealed class ToolShortcutTests
     [DataRow(PhysicalKey.Digit1, Key.D1, KeyModifiers.Alt | KeyModifiers.Control)]
     [DataRow(PhysicalKey.Digit1, Key.D1, KeyModifiers.Alt | KeyModifiers.Shift)]
     [DataRow(PhysicalKey.Digit0, Key.D0, KeyModifiers.Alt)]
-    [DataRow(PhysicalKey.Digit7, Key.D7, KeyModifiers.Alt)]
+    [DataRow(PhysicalKey.Digit8, Key.D8, KeyModifiers.Alt)]
     [DataRow(PhysicalKey.L, Key.L, KeyModifiers.Alt)]
     [DataRow(PhysicalKey.ArrowUp, Key.Up, KeyModifiers.Alt)]
     public void OtherKeysPickNoTool(PhysicalKey key, Key typed, KeyModifiers modifiers) =>
@@ -56,7 +57,7 @@ public sealed class ToolShortcutTests
     public void EveryToolInTheTableIsPickedOnceAndItsActionNamesItsKey()
     {
         CollectionAssert.AllItemsAreUnique(EditorKeys.ToolKeys.ToList());
-        Assert.AreEqual(EditorKeys.ToolKeys.Count, BuilderKeys.ToolActions.Count);
+        Assert.HasCount(EditorKeys.ToolKeys.Count, BuilderKeys.ToolActions);
 
         for (int i = 0; i < EditorKeys.ToolKeys.Count; i++)
         {
@@ -72,7 +73,7 @@ public sealed class ToolShortcutTests
     [TestMethod]
     public void ATableToolThatNoKeyPicksHasNoAction()
     {
-        Assert.IsFalse(EditorKeys.ToolKeys.Contains(EditorTool.Loop));
+        Assert.DoesNotContain(EditorTool.Loop, EditorKeys.ToolKeys);
         Assert.IsNull(EditorKeys.ToolOf(BuilderKeys.LoopTool));
     }
 
@@ -95,6 +96,6 @@ public sealed class ToolShortcutTests
 
         Assert.AreEqual("Alt+P", map.Display(BuilderKeys.ToolPlace));
         Assert.AreEqual(BuilderKeys.ToolPlace, map.Resolve(BuilderKeys.Tools, new KeyChord("P", KeyMods.Alt), new KeyChord("P", KeyMods.Alt)).Single().Id);
-        Assert.AreEqual(0, map.Resolve(BuilderKeys.Tools, new KeyChord("D2", KeyMods.Alt), new KeyChord("Digit2", KeyMods.Alt)).Count);
+        Assert.IsEmpty(map.Resolve(BuilderKeys.Tools, new KeyChord("D2", KeyMods.Alt), new KeyChord("Digit2", KeyMods.Alt)));
     }
 }

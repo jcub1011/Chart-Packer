@@ -51,7 +51,7 @@ namespace ChartPacker.ViewModels
     public sealed record LoadedBackgrounds(IReadOnlyList<StoredBackgrounds> Stored, Dictionary<string, Bitmap> Images, Dictionary<string, StagedBackground> Staged)
     {
         // A new one each time: the dictionaries are handed over and added to.
-        public static LoadedBackgrounds Empty => new([], [], new(StringComparer.Ordinal));
+        public static LoadedBackgrounds Empty => new([], [], [with(StringComparer.Ordinal)]);
     }
 
     /// <summary>
@@ -83,7 +83,7 @@ namespace ChartPacker.ViewModels
         // doesn't post an update once it has.
         private volatile VideoPlayback? _sizedVideo;
         private Dictionary<string, Bitmap> _images = [];
-        private Dictionary<string, StagedBackground> _staged = new(StringComparer.Ordinal);
+        private Dictionary<string, StagedBackground> _staged = [with(StringComparer.Ordinal)];
 
         // The video being shown, by what it plays.
         private VideoSource? _videoSource;
@@ -268,7 +268,7 @@ namespace ChartPacker.ViewModels
             _videoSlot = Slot.None;
             DisposeLater(_images.Values);
             _images = [];
-            _staged = new(StringComparer.Ordinal);
+            _staged = [with(StringComparer.Ordinal)];
         }
 
         /// <summary>Completes once every stopped video has closed its file.</summary>

@@ -148,7 +148,7 @@ namespace ChartBuilder.Controls.Editing
                     return true;
 
                 // The lane's audio as a waveform or a spectrogram (charter-spec C13 item 5).
-                case BuilderKeys.AudioBackdrop when !lane.IsVocal:
+                case BuilderKeys.AudioBackdrop:
                     lane.Audio.ToggleBackdrop();
                     return true;
 
@@ -182,9 +182,16 @@ namespace ChartBuilder.Controls.Editing
                 case BuilderKeys.NoteGhost when !lane.IsVocal:
                     tools.ToggleDynamics(NoteDynamics.Ghost);
                     return true;
-                case BuilderKeys.NoteStarPower when !lane.IsVocal:
-                    tools.ToggleStarPowerOverSelection();
+                case BuilderKeys.NoteStarPower:
+                    if (lane.IsVocal)
+                        tools.ToggleVocalStarPowerOverSelection();
+                    else
+                        tools.ToggleStarPowerOverSelection();
                     return true;
+
+                // A vocal note's lyric, in the box over it (charter-spec C3 item 7).
+                case BuilderKeys.NoteEditLyric:
+                    return lane.IsVocal && canvas.OpenLyricEditor();
                 case BuilderKeys.TapTempo:
                     editor.Tap();
                     return true;
@@ -374,7 +381,7 @@ namespace ChartBuilder.Controls.Editing
         /// (Alt and <c>n + 1</c> by default). The table <see cref="ToolOf"/> reads.
         /// </summary>
         public static IReadOnlyList<EditorTool> ToolKeys { get; } =
-            [EditorTool.Select, EditorTool.Place, EditorTool.Erase, EditorTool.Phrase, EditorTool.Tempo, EditorTool.Sync];
+            [EditorTool.Select, EditorTool.Place, EditorTool.Erase, EditorTool.Phrase, EditorTool.Tempo, EditorTool.Sync, EditorTool.VocalAlign];
 
         /// <summary>The tool the action <paramref name="id"/> picks, or <see langword="null"/> when it isn't a tool action.</summary>
         public static EditorTool? ToolOf(string id)

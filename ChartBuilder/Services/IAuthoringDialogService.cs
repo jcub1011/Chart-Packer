@@ -24,6 +24,9 @@ namespace ChartBuilder.Services
         /// </summary>
         Task<bool> ShowPhraseGeneratorAsync(GeneratePhrasesViewModel viewModel);
 
+        /// <summary>Shows the options of Import lyrics or Export lyrics (issue 270): whether it was confirmed.</summary>
+        Task<bool> ShowLyricsAsync(LyricsDialogViewModel viewModel);
+
         /// <summary>
         /// Shows the highway preview in a window of its own beside the Editor, which can go full screen (charter-spec C18);
         /// one at a time, so showing it again brings it to the front.
@@ -135,6 +138,8 @@ namespace ChartBuilder.Services
             WindowChrome.UseOwnerIcon(dialog, window);
             return await dialog.ShowDialog<LaneMapping?>(window);
         }
+
+        public Task<bool> ShowLyricsAsync(LyricsDialogViewModel viewModel) => AskAsync(new LyricsDialogWindow { DataContext = viewModel });
 
         public Task<bool> ShowPhraseGeneratorAsync(GeneratePhrasesViewModel viewModel) => AskAsync(new GeneratePhrasesWindow { DataContext = viewModel });
 

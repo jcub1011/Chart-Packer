@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charting.Layout;
 using ChartShared.Core.Charts;
 
@@ -335,6 +336,52 @@ public sealed class LaneDockLayoutTests
     }
 
     [TestMethod]
+    public void AVocalLanesPitchesAreKeptWithoutChangingTheLayout()
+    {
+        var layout = LaneDockLayout.CreateDefault();
+        int changes = 0;
+        layout.Changed += (_, _) => changes++;
+
+        layout.SetPitches(Lane(layout, Vocals), new VocalPitchView(72, 24));
+        string json = JsonSerializer.Serialize(layout.ToState(), LaneDockTestJsonContext.Default.LaneDockState);
+        var read = LaneDockLayout.FromState(JsonSerializer.Deserialize(json, LaneDockTestJsonContext.Default.LaneDockState))!;
+
+        Assert.AreEqual(0, changes, "The pitches shown aren't a change to the layout's shape.");
+        Assert.AreEqual(new VocalPitchView(72, 24), Lane(read, Vocals).Pitches);
+        Assert.IsNull(Lane(read, Guitar).Pitches);
+    }
+
+    [TestMethod]
+    public void TheFullPitchRangeIsKeptAsNone()
+    {
+        var layout = LaneDockLayout.CreateDefault();
+
+        layout.SetPitches(Lane(layout, Vocals), new VocalPitchView(72, 24));
+        layout.SetPitches(Lane(layout, Vocals), VocalPitchView.Full);
+
+        Assert.IsNull(Lane(layout, Vocals).Pitches);
+        Assert.IsNull(layout.ToState().Root!.Children![1].PitchTop);
+    }
+
+    [TestMethod]
+    public void PitchesSavedOutOfRangeAreBroughtIntoIt()
+    {
+        var read = LaneDockLayout.FromState(JsonSerializer.Deserialize("""{"Root":{"Vocal":"Vocals","PitchTop":200,"PitchSpan":1}}""", LaneDockTestJsonContext.Default.LaneDockState));
+
+        Assert.IsNotNull(read);
+        Assert.AreEqual(VocalPitchView.Of(200, 1), Lane(read, Vocals).Pitches);
+    }
+
+    [TestMethod]
+    public void ALayoutSavedBeforePitchesStillLoadsWithEveryPitch()
+    {
+        var read = LaneDockLayout.FromState(JsonSerializer.Deserialize("""{"Root":{"Vocal":"Vocals"}}""", LaneDockTestJsonContext.Default.LaneDockState));
+
+        Assert.IsNotNull(read);
+        Assert.IsNull(Lane(read, Vocals).Pitches);
+    }
+
+    [TestMethod]
     public void ALayoutSavedBeforePixelsPerSecondStillLoadsWithTheDefault()
     {
         var read = LaneDockLayout.FromState(JsonSerializer.Deserialize("""{"Root":{"Instrument":"Guitar","Difficulty":"Expert","LookAhead":2.5}}""", LaneDockTestJsonContext.Default.LaneDockState));
@@ -356,8 +403,8 @@ public sealed class LaneDockLayoutTests
         var read = LaneDockLayout.FromState(JsonSerializer.Deserialize(json, LaneDockTestJsonContext.Default.LaneDockState))!;
 
         Assert.AreEqual(0, changes, "Perspective isn't a change to the layout's shape.");
-        Assert.AreEqual(true, Lane(read, Bass).Perspective);
-        Assert.AreEqual(false, Lane(read, Drums).Perspective, "Flat is a choice, kept as one, not the default.");
+        Assert.IsTrue(Lane(read, Bass).Perspective);
+        Assert.IsFalse(Lane(read, Drums).Perspective, "Flat is a choice, kept as one, not the default.");
         Assert.IsNull(Lane(read, Guitar).Perspective, "A lane that was never set follows the editor's default.");
     }
 

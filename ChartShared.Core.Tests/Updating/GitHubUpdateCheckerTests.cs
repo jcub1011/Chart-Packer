@@ -136,7 +136,7 @@ public sealed class GitHubUpdateCheckerTests
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
-            Assert.IsTrue(request.Headers.UserAgent.Count > 0, "GitHub requires a User-Agent.");
+            Assert.IsNotEmpty(request.Headers.UserAgent, "GitHub requires a User-Agent.");
             var response = new HttpResponseMessage(status)
             {
                 Content = new StringContent(json),

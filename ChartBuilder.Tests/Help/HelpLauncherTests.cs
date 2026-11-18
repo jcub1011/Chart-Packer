@@ -32,7 +32,7 @@ public sealed class HelpLauncherTests
         bool opened = await HelpLauncher.OpenAsync(launcher, Ref, Url, "a page");
 
         Assert.IsTrue(opened);
-        CollectionAssert.AreEqual(new[] { new Uri("https://example.test/v1.0.0") }, launcher.Launched);
+        Assert.AreSequenceEqual([new Uri("https://example.test/v1.0.0")], launcher.Launched);
     }
 
     [TestMethod]

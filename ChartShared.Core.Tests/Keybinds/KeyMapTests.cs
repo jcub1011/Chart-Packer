@@ -36,7 +36,7 @@ public sealed class KeyMapTests
     {
         var map = Map();
 
-        CollectionAssert.AreEqual(KeyChord.List("Ctrl+Y", "Ctrl+Shift+Z").ToArray(), map.ChordsOf("edit.redo").ToArray());
+        Assert.AreSequenceEqual([.. KeyChord.List("Ctrl+Y", "Ctrl+Shift+Z")], [.. map.ChordsOf("edit.redo")]);
         Assert.AreEqual("Ctrl+Y", map.Display("edit.redo"));
         Assert.IsFalse(map.IsCustomized("edit.redo"));
     }
@@ -48,7 +48,7 @@ public sealed class KeyMapTests
 
         Assert.IsTrue(map.Set("tool.select", KeyChord.List("Alt+KeyQ", "Alt+Digit1", "Ctrl+Alt+KeyW")));
 
-        Assert.AreEqual(3, map.ChordsOf("tool.select").Count);
+        Assert.HasCount(3, map.ChordsOf("tool.select"));
         Assert.AreEqual("Alt+Q", map["tool.select"]);
     }
 
@@ -59,7 +59,7 @@ public sealed class KeyMapTests
 
         Assert.IsFalse(map.Set("edit.redo", KeyChord.List("Ctrl+R")));
 
-        Assert.AreEqual(2, map.ChordsOf("edit.redo").Count);
+        Assert.HasCount(2, map.ChordsOf("edit.redo"));
     }
 
     [TestMethod]
@@ -94,7 +94,7 @@ public sealed class KeyMapTests
         // No modifier on a window command, an OS chord, a repeat, and a modifier on its own.
         map.Set("file.save", [KeyChord.Parse("F5"), KeyChord.Parse("Alt+F4"), KeyChord.Parse("Ctrl+W"), KeyChord.Parse("Ctrl+w"), default]);
 
-        CollectionAssert.AreEqual(KeyChord.List("Ctrl+W").ToArray(), map.ChordsOf("file.save").ToArray());
+        Assert.AreSequenceEqual([.. KeyChord.List("Ctrl+W")], [.. map.ChordsOf("file.save")]);
     }
 
     [TestMethod]
@@ -104,7 +104,7 @@ public sealed class KeyMapTests
 
         map.Set("tool.select", Enumerable.Range(1, 20).Select(i => KeyChord.Parse($"Ctrl+Alt+D{i % 10}Z{i}")));
 
-        Assert.AreEqual(KeyMap.MaxChordsPerAction, map.ChordsOf("tool.select").Count);
+        Assert.HasCount(KeyMap.MaxChordsPerAction, map.ChordsOf("tool.select"));
     }
 
     [TestMethod]
@@ -140,8 +140,8 @@ public sealed class KeyMapTests
         var inCanvas = map.Resolve(Canvas, space, KeyChord.Parse("Space"));
         var inPreview = map.Resolve(Preview, space, KeyChord.Parse("Space"));
 
-        CollectionAssert.AreEqual(new[] { "editor.play" }, inCanvas.Select(a => a.Id).ToArray());
-        CollectionAssert.AreEqual(new[] { "preview.play" }, inPreview.Select(a => a.Id).ToArray());
+        Assert.AreSequenceEqual(["editor.play"], [.. inCanvas.Select(a => a.Id)]);
+        Assert.AreSequenceEqual(["preview.play"], [.. inPreview.Select(a => a.Id)]);
     }
 
     [TestMethod]
@@ -153,9 +153,9 @@ public sealed class KeyMapTests
         var logicalSave = map.Resolve(Canvas, KeyChord.Parse("Ctrl+S"), KeyChord.Parse("Ctrl+KeyX"));
         var wrongKind = map.Resolve(Canvas, KeyChord.Parse("KeyH"), KeyChord.Parse("X"));
 
-        CollectionAssert.AreEqual(new[] { "note.hopo" }, physicalH.Select(a => a.Id).ToArray());
-        CollectionAssert.AreEqual(new[] { "file.save" }, logicalSave.Select(a => a.Id).ToArray());
-        Assert.AreEqual(0, wrongKind.Count);
+        Assert.AreSequenceEqual(["note.hopo"], [.. physicalH.Select(a => a.Id)]);
+        Assert.AreSequenceEqual(["file.save"], [.. logicalSave.Select(a => a.Id)]);
+        Assert.IsEmpty(wrongKind);
     }
 
     [TestMethod]
@@ -165,7 +165,7 @@ public sealed class KeyMapTests
 
         var hits = map.Resolve(Preview, KeyChord.Parse("Ctrl+Y"), KeyChord.Parse("Ctrl+KeyY"));
 
-        Assert.AreEqual(0, hits.Count);
+        Assert.IsEmpty(hits);
     }
 
     [TestMethod]
@@ -176,7 +176,7 @@ public sealed class KeyMapTests
         foreach (string text in new[] { "Ctrl+Y", "Ctrl+Shift+Z" })
         {
             var hits = map.Resolve(Editor, KeyChord.Parse(text), default);
-            CollectionAssert.AreEqual(new[] { "edit.redo" }, hits.Select(a => a.Id).ToArray(), text);
+            Assert.AreSequenceEqual(["edit.redo"], [.. hits.Select(a => a.Id)], text);
         }
     }
 
@@ -186,9 +186,9 @@ public sealed class KeyMapTests
         var map = Map();
 
         // Space is bound in the editor, an ancestor of the canvas: a canvas action taking it would clash.
-        Assert.AreEqual(1, map.FindConflicts("note.hopo", KeyChord.Parse("Space")).Count);
+        Assert.HasCount(1, map.FindConflicts("note.hopo", KeyChord.Parse("Space")));
         // The preview window is a sibling of the editor, so its Space is no clash with the editor's.
-        Assert.AreEqual(0, map.FindConflicts("preview.play", KeyChord.Parse("Space")).Count);
+        Assert.IsEmpty(map.FindConflicts("preview.play", KeyChord.Parse("Space")));
         Assert.AreEqual(0, map.AllConflicts().Count(c => c.First.Id == "preview.play" || c.Second.Id == "preview.play"));
     }
 
@@ -200,7 +200,7 @@ public sealed class KeyMapTests
         // Global Ctrl+S (logical) against a canvas action given Ctrl+KeyS (physical).
         var clash = map.FindConflicts("tool.select", KeyChord.Parse("Ctrl+KeyS"));
 
-        CollectionAssert.AreEqual(new[] { "file.save" }, clash.Select(a => a.Id).ToArray());
+        Assert.AreSequenceEqual(["file.save"], [.. clash.Select(a => a.Id)]);
     }
 
     [TestMethod]
@@ -221,8 +221,8 @@ public sealed class KeyMapTests
 
         var hits = map.Resolve(Canvas, KeyChord.Parse("Space"), KeyChord.Parse("Space"));
 
-        CollectionAssert.AreEqual(new[] { "note.hopo", "editor.play" }, hits.Select(a => a.Id).ToArray());
-        Assert.AreEqual(1, map.AllConflicts().Count);
+        Assert.AreSequenceEqual(["note.hopo", "editor.play"], [.. hits.Select(a => a.Id)]);
+        Assert.HasCount(1, map.AllConflicts());
     }
 
     [TestMethod]
@@ -300,9 +300,9 @@ public sealed class KeyMapTests
         Assert.AreEqual(2, applied.Applied);
         Assert.AreEqual(3, applied.Ignored);
         Assert.AreEqual("Ctrl+W", map.Display("file.save"));
-        Assert.AreEqual(2, map.ChordsOf("edit.redo").Count);
-        Assert.AreEqual(2, map.ChordsOf("tool.select").Count);
-        Assert.AreEqual(0, map.ChordsOf("note.hopo").Count);
+        Assert.HasCount(2, map.ChordsOf("edit.redo"));
+        Assert.HasCount(2, map.ChordsOf("tool.select"));
+        Assert.IsEmpty(map.ChordsOf("note.hopo"));
     }
 
     [TestMethod]
@@ -320,11 +320,11 @@ public sealed class KeyMapTests
 
         Assert.AreEqual(2, applied.Applied, "the entry left with no usable key is ignored");
         Assert.AreEqual(1, applied.Ignored);
-        CollectionAssert.AreEqual(KeyChord.List("Ctrl+Z").ToArray(), map.ChordsOf("file.save").ToArray());
-        CollectionAssert.AreEqual(KeyChord.List("Alt+KeyZ").ToArray(), map.ChordsOf("tool.select").ToArray());
-        CollectionAssert.AreEqual(KeyChord.List("KeyH").ToArray(), map.ChordsOf("note.hopo").ToArray());
+        Assert.AreSequenceEqual([.. KeyChord.List("Ctrl+Z")], [.. map.ChordsOf("file.save")]);
+        Assert.AreSequenceEqual([.. KeyChord.List("Alt+KeyZ")], [.. map.ChordsOf("tool.select")]);
+        Assert.AreSequenceEqual([.. KeyChord.List("KeyH")], [.. map.ChordsOf("note.hopo")]);
         var hits = map.Resolve(Editor, KeyChord.Parse("Ctrl+Y"), KeyChord.Parse("Ctrl+Y"));
-        CollectionAssert.AreEqual(new[] { "edit.redo" }, hits.Select(a => a.Id).ToArray());
+        Assert.AreSequenceEqual(["edit.redo"], [.. hits.Select(a => a.Id)]);
     }
 
     [TestMethod]
@@ -334,7 +334,7 @@ public sealed class KeyMapTests
 
         map.Set("file.save", KeyChord.List("Ctrl+Y", "Ctrl+W"));
 
-        CollectionAssert.AreEqual(KeyChord.List("Ctrl+W").ToArray(), map.ChordsOf("file.save").ToArray());
+        Assert.AreSequenceEqual([.. KeyChord.List("Ctrl+W")], [.. map.ChordsOf("file.save")]);
     }
 
     [TestMethod]
@@ -360,7 +360,7 @@ public sealed class KeyMapTests
         copy.ApplyLayout(map.Export(), replace: true);
 
         foreach (var action in map.Catalog)
-            CollectionAssert.AreEqual(map.ChordsOf(action.Id).ToArray(), copy.ChordsOf(action.Id).ToArray(), action.Id);
+            Assert.AreSequenceEqual([.. map.ChordsOf(action.Id)], [.. copy.ChordsOf(action.Id)], action.Id);
         Assert.IsFalse(map.Export().ContainsKey("edit.redo"), "locked actions are not part of a layout");
     }
 
@@ -390,7 +390,7 @@ public sealed class KeyMapTests
         ]));
 
         Assert.AreEqual("Shift+Click", map["mouse.select"]);
-        Assert.AreEqual(0, map.Resolve(Canvas, KeyChord.Parse("Shift+Click"), KeyChord.Parse("Shift+Click")).Count);
+        Assert.IsEmpty(map.Resolve(Canvas, KeyChord.Parse("Shift+Click"), KeyChord.Parse("Shift+Click")));
     }
 
     [TestMethod]
@@ -399,7 +399,7 @@ public sealed class KeyMapTests
         var map = Map();
 
         Assert.AreEqual("", map["nothing"]);
-        Assert.AreEqual(0, map.ChordsOf("nothing").Count);
+        Assert.IsEmpty(map.ChordsOf("nothing"));
     }
 
     [TestMethod]

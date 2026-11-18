@@ -94,11 +94,11 @@ public sealed class FillPlanTests
 
         Assert.HasCount(1, plan.Existing);
         Assert.HasCount(1, plan.SurvivingFills);
-        Assert.IsTrue(plan.SurvivingFills.Contains(existing));
-        Assert.IsFalse(plan.Regions.Any(r => r.Phrase.Tick == 4 * Measure), "A fill starts clear of the one there.");
+        Assert.Contains(existing, plan.SurvivingFills);
+        Assert.DoesNotContain(r => r.Phrase.Tick == 4 * Measure, plan.Regions, "A fill starts clear of the one there.");
 
         Assert.IsTrue(session.Execute(plan.BuildCommand()!));
-        Assert.IsTrue(Fills(session).Contains(existing), "The fill already there stays.");
+        Assert.Contains(existing, Fills(session), "The fill already there stays.");
     }
 
     [TestMethod]
@@ -115,7 +115,7 @@ public sealed class FillPlanTests
         Assert.IsEmpty(plan.SurvivingFills);
 
         Assert.IsTrue(session.Execute(plan.BuildCommand()!));
-        Assert.IsFalse(Fills(session).Contains(existing), "The fill the plan replaced is gone.");
+        Assert.DoesNotContain(existing, Fills(session), "The fill the plan replaced is gone.");
         Assert.HasCount(5, Fills(session).ToList());
     }
 
@@ -130,7 +130,7 @@ public sealed class FillPlanTests
         var plan = Plan(session, GenerationMode.Replace, ((10 * Measure) + 1, 17 * Measure));
 
         Assert.IsEmpty(plan.Existing, "A fill reaching across the span's edge isn't replaced.");
-        Assert.IsTrue(plan.SurvivingFills.Contains(crossing));
+        Assert.Contains(crossing, plan.SurvivingFills);
     }
 
     [TestMethod]

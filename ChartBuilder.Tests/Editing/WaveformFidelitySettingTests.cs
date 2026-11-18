@@ -65,13 +65,19 @@ public sealed class WaveformFidelitySettingTests
         Assert.IsNotNull(fidelity, "Waveform detail sits in Playback like Chart Packer's playback.waveformFidelity.");
         Assert.AreEqual("playback.visualizers", fidelity.Category.Id);
         Assert.AreEqual(WaveformFidelity.High, fidelity.DefaultValue);
-        CollectionAssert.AreEqual(
-            new[] { WaveformFidelity.Low, WaveformFidelity.Medium, WaveformFidelity.High, WaveformFidelity.Ultra },
-            fidelity.Choices.Select(c => c.Value).ToArray());
+        Assert.AreSequenceEqual(
+            [WaveformFidelity.Low, WaveformFidelity.Medium, WaveformFidelity.High, WaveformFidelity.Ultra], [.. fidelity.Choices.Select(c => c.Value)]);
 
         Assert.AreEqual("playback.audio", catalog.Definitions.Single(d => d.Id == "playback.masterVolume").Category.Id);
         Assert.AreEqual("playback.visualizers", catalog.Definitions.Single(d => d.Id == "playback.laneBackdrop").Category.Id);
         Assert.AreEqual("playback.visualizers", catalog.Definitions.Single(d => d.Id == "playback.spectrogramBudget").Category.Id);
-        Assert.IsFalse(catalog.Definitions.Any(d => d.Id == "audio.masterVolume" || d.Id == "charter.laneBackdrop" || d.Id == "charter.spectrogramBudget"));
+
+        var sharpening = catalog.Definitions.Single(d => d.Id == "playback.spectrogramSharpening") as ToggleSetting;
+        Assert.IsNotNull(sharpening);
+        Assert.AreEqual("playback.visualizers", sharpening.Category.Id);
+        Assert.IsFalse(sharpening.DefaultValue, "Spectrograms are not sharpened until it's switched on.");
+        Assert.AreEqual(sharpening.DefaultValue, new BuilderSettings().SpectrogramSharpening, "Fresh settings are at the setting's default.");
+        Assert.AreEqual(BuilderSettings.DefaultSpectrogramBudgetMb, new BuilderSettings().SpectrogramBudgetMb);
+        Assert.DoesNotContain(d => d.Id == "audio.masterVolume" || d.Id == "charter.laneBackdrop" || d.Id == "charter.spectrogramBudget", catalog.Definitions);
     }
 }

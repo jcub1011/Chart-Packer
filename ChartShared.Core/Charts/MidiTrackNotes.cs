@@ -43,7 +43,7 @@ internal sealed class MidiTrackNotes
     private MidiTrackNotes(int capacity, bool rent)
     {
         _rented = rent;
-        Notes = rent ? ListPool<MidiNote>.Rent(capacity) : new List<MidiNote>(capacity);
+        Notes = rent ? ListPool<MidiNote>.Rent(capacity) : [with(capacity)];
     }
 
     /// <summary>The notes, in the order they're let go.</summary>

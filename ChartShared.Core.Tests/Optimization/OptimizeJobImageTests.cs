@@ -98,13 +98,13 @@ public sealed class OptimizeJobImageTests
 
         Assert.AreEqual(OptimizeItemStatus.Succeeded, item.Status, item.ErrorMessage);
         Assert.AreSequenceEqual(["album.jpg", "background.jpg", "guitar.ogg", "highway.png", "song.ini"], Names(entry));
-        Assert.AreEqual(200, (await ReadAsync(entry, "album.jpg"))!.Length);
-        Assert.AreEqual(1500, (await ReadAsync(entry, "background.jpg"))!.Length);
+        Assert.HasCount(200, await ReadAsync(entry, "album.jpg"));
+        Assert.HasCount(1500, await ReadAsync(entry, "background.jpg"));
         Assert.AreSequenceEqual(Bytes(300, 4), await ReadAsync(entry, "highway.png"), "highway.* is left alone.");
         Assert.AreSequenceEqual(Bytes(1000, 1), await ReadAsync(entry, "guitar.ogg"), "Audio isn't this strategy's.");
         Assert.AreEqual("; by hand\n[song]\nname = Song\nartist =\nbackground = background.jpg\ncover = album.jpg\nicon = gh\n", IniOf(entry),
             "Only the values naming a renamed file change; the comment, spacing and other keys stay.");
-        Assert.AreEqual(0, Leftovers(_root.FullName).Count);
+        Assert.IsEmpty(Leftovers(_root.FullName));
     }
 
     [TestMethod]
@@ -118,14 +118,14 @@ public sealed class OptimizeJobImageTests
 
         Assert.AreEqual(OptimizeItemStatus.Succeeded, item.Status, item.ErrorMessage);
         Assert.AreSequenceEqual(["album.jpg", "background.jpg", "guitar.ogg", "highway.png"], Names(entry));
-        Assert.AreEqual(200, (await ReadAsync(entry, "album.jpg"))!.Length);
+        Assert.HasCount(200, await ReadAsync(entry, "album.jpg"));
         Assert.AreSequenceEqual(Bytes(300, 4), await ReadAsync(entry, "highway.png"));
         var metadata = await SngMetadataOfAsync(entry.FullPath);
         Assert.AreEqual("background.jpg", metadata["background"]);
         Assert.AreEqual("album.jpg", metadata["cover"]);
         Assert.AreEqual("Song", metadata["name"]);
         Assert.AreEqual("gh", metadata["icon"]);
-        Assert.AreEqual(0, Leftovers(_root.FullName).Count);
+        Assert.IsEmpty(Leftovers(_root.FullName));
     }
 
     [TestMethod]
@@ -154,7 +154,7 @@ public sealed class OptimizeJobImageTests
         var sngCopy = new SongEntry(SongEntryKind.SngFile, Path.Combine(output, "Packed.sng"), "Packed.sng", "Packed");
         Assert.AreSequenceEqual(["album.jpg", "background.jpg", "guitar.ogg", "highway.png"], Names(sngCopy));
         Assert.AreEqual("album.jpg", (await SngMetadataOfAsync(sngCopy.FullPath))["cover"]);
-        Assert.AreEqual(0, Leftovers(_root.FullName).Count);
+        Assert.IsEmpty(Leftovers(_root.FullName));
     }
 
     [TestMethod]
@@ -169,8 +169,8 @@ public sealed class OptimizeJobImageTests
 
         Assert.AreEqual(OptimizeItemStatus.Succeeded, item.Status, item.ErrorMessage);
         Assert.AreSequenceEqual(["album.jpg", "background.jpeg", "song.ini"], Names(entry));
-        Assert.AreEqual(400, (await ReadAsync(entry, "album.jpg"))!.Length);
-        Assert.AreEqual(3000, (await ReadAsync(entry, "background.jpeg"))!.Length);
+        Assert.HasCount(400, await ReadAsync(entry, "album.jpg"));
+        Assert.HasCount(3000, await ReadAsync(entry, "background.jpeg"));
         Assert.AreSequenceEqual(iniBefore, await File.ReadAllBytesAsync(Path.Combine(entry.FullPath, "song.ini"), TestContext.CancellationToken));
     }
 
@@ -207,7 +207,7 @@ public sealed class OptimizeJobImageTests
         Assert.AreSequenceEqual(Bytes(800, 2), await ReadAsync(entry, "album.png"));
         Assert.AreEqual(unreadable, IniOf(entry));
         Assert.IsTrue(item.Assets.Where(a => a.Strategy is OptimizeStrategy.AlbumArt or OptimizeStrategy.BackgroundArt).All(a => a.Outcome == AssetOutcome.Failed));
-        Assert.AreEqual(0, Leftovers(_root.FullName).Count);
+        Assert.IsEmpty(Leftovers(_root.FullName));
     }
 
     [TestMethod]
@@ -221,7 +221,7 @@ public sealed class OptimizeJobImageTests
 
         Assert.AreEqual(OptimizeItemStatus.Succeeded, item.Status, item.ErrorMessage);
         Assert.AreSequenceEqual(["album.png", "background.jpg", "song.ini"], Names(entry));
-        Assert.AreEqual(1500, (await ReadAsync(entry, "background.jpg"))!.Length, "A .jpg keeps its name, so it needs no reference to change.");
+        Assert.HasCount(1500, await ReadAsync(entry, "background.jpg"), "A .jpg keeps its name, so it needs no reference to change.");
         Assert.AreEqual(AssetOutcome.Failed, item.Assets.Single(a => a.StoredName == "album.png").Outcome);
     }
 
@@ -283,7 +283,7 @@ public sealed class OptimizeJobImageTests
 
         Assert.AreEqual(OptimizeItemStatus.Skipped, item.Status);
         Assert.AreSequenceEqual(["album.png", "background.png", "guitar.ogg", "highway.png", "song.ini"], Names(entry));
-        Assert.AreEqual(0, Leftovers(_root.FullName).Count);
+        Assert.IsEmpty(Leftovers(_root.FullName));
     }
 
     [TestMethod]
@@ -333,7 +333,7 @@ public sealed class OptimizeJobImageTests
 
         Assert.AreSequenceEqual(["album.png"], a.Work.SelectMany(w => w.SourceNames));
         Assert.AreSequenceEqual(["background.png"], b.Work.SelectMany(w => w.SourceNames));
-        Assert.AreEqual(0, n.Actions.Count);
+        Assert.IsEmpty(n.Actions);
     }
 
     [TestMethod]
@@ -345,7 +345,7 @@ public sealed class OptimizeJobImageTests
         var plan = await PlanAsync(entry, Art(true, true), optimizer);
 
         Assert.IsTrue(plan.Actions.All(a => a.Reason == OptimizeSkipReason.OptimizerUnavailable));
-        Assert.AreEqual(0, optimizer.Estimated.Count);
+        Assert.IsEmpty(optimizer.Estimated);
     }
 
     // ---- Removal ---------------------------------------------------------------------------------------------------
@@ -363,12 +363,12 @@ public sealed class OptimizeJobImageTests
 
         Assert.AreEqual(OptimizeItemStatus.Succeeded, folderItem.Status, folderItem.ErrorMessage);
         Assert.AreEqual(OptimizeItemStatus.Succeeded, sngItem.Status, sngItem.ErrorMessage);
-        Assert.IsFalse(Names(folder).Contains("background.png"));
-        Assert.IsFalse(Names(sng).Contains("background.png"));
-        Assert.IsTrue(Names(folder).Contains("album.png"), "Album art, not set to be removed, is recompressed under its own name.");
-        Assert.IsFalse(optimizer.Estimated.Contains("background.png"));
-        Assert.IsFalse(optimizer.Optimized.Contains("background.png"));
-        Assert.AreEqual(0, Leftovers(_root.FullName).Count);
+        Assert.DoesNotContain("background.png", Names(folder));
+        Assert.DoesNotContain("background.png", Names(sng));
+        Assert.Contains("album.png", Names(folder), "Album art, not set to be removed, is recompressed under its own name.");
+        Assert.DoesNotContain("background.png", optimizer.Estimated);
+        Assert.DoesNotContain("background.png", optimizer.Optimized);
+        Assert.IsEmpty(Leftovers(_root.FullName));
     }
 
     [TestMethod]

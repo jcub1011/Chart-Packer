@@ -144,7 +144,7 @@ public sealed class StarPowerGeneratorTests
         Assert.IsTrue(generated.Proposals.All(p => p.Role == StarPowerRole.Filler));
         var starts = generated.Proposals.Select(p => (double)p.Phrase.Tick / Measure).ToList();
         var gaps = starts.Zip(starts.Skip(1), static (a, b) => b - a).ToList();
-        Assert.IsTrue(gaps.Max() - gaps.Min() <= 3, $"Starts at measures {string.Join(", ", starts)}.");
+        Assert.IsLessThanOrEqualTo(3, gaps.Max() - gaps.Min(), $"Starts at measures {string.Join(", ", starts)}.");
     }
 
     [TestMethod]
@@ -153,7 +153,7 @@ public sealed class StarPowerGeneratorTests
         var steady = Propose(Chart(Steady(0, 64)));
         var withTacet = Propose(Chart([.. Steady(0, 32), .. Steady(62, 32)]));
 
-        Assert.AreEqual(steady.Proposals.Count, withTacet.Proposals.Count);
+        Assert.HasCount(steady.Proposals.Count, withTacet.Proposals);
         Assert.IsTrue(withTacet.Proposals.All(p => p.Phrase.CoverEnd <= 32 * Measure || p.Phrase.Tick >= 62 * Measure));
     }
 
@@ -215,7 +215,7 @@ public sealed class StarPowerGeneratorTests
         foreach (var proposal in Propose(chart).Proposals)
         {
             Assert.AreEqual(0, proposal.Phrase.CoverEnd % Measure, $"{proposal.Phrase}");
-            Assert.IsTrue(chart.PartOf(Guitar)![Expert].Notes.At(proposal.Phrase.CoverEnd).Length > 0, "The next chord starts where it ends.");
+            Assert.IsGreaterThan(0, chart.PartOf(Guitar)![Expert].Notes.At(proposal.Phrase.CoverEnd).Length, "The next chord starts where it ends.");
         }
     }
 
@@ -234,7 +234,7 @@ public sealed class StarPowerGeneratorTests
         var sections = SectionEvents.All(chart).Select(e => e.Tick).ToList();
         foreach (var phrase in generated.Proposals.Select(p => p.Phrase))
         {
-            Assert.IsFalse(sections.Any(s => s > phrase.Tick && s < phrase.CoverEnd), $"{phrase} crosses a section.");
+            Assert.DoesNotContain(s => s > phrase.Tick && s < phrase.CoverEnd, sections, $"{phrase} crosses a section.");
             Assert.IsFalse(phrase.Overlaps(new Phrase(PhraseKind.BigRockEnding, 50 * Measure, 4 * Measure)));
             var solo = new Phrase(PhraseKind.Solo, (10 * Measure) + Beat, 20 * Measure);
             Assert.IsTrue(!phrase.Overlaps(solo) || (phrase.Tick >= solo.Tick && phrase.CoverEnd <= solo.CoverEnd), $"{phrase} crosses the solo's edge.");
@@ -307,7 +307,7 @@ public sealed class StarPowerGeneratorTests
         Assert.IsGreaterThan(1, proposals.Count);
         List<Phrase> phrases = [earlier, .. proposals];
         var gaps = phrases.Zip(phrases.Skip(1), static (a, b) => (double)(b.Tick - a.CoverEnd) / Measure).ToList();
-        Assert.IsTrue(gaps[0] >= gaps.Skip(1).Min() - 1, $"Measures between phrases: {string.Join(", ", gaps)}.");
+        Assert.IsGreaterThanOrEqualTo(gaps.Skip(1).Min() - 1, gaps[0], $"Measures between phrases: {string.Join(", ", gaps)}.");
     }
 
     [TestMethod]

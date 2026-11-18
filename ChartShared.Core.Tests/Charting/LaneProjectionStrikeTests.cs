@@ -116,7 +116,7 @@ public sealed class LaneProjectionStrikeTests
     {
         var projection = LaneProjection.AtCursor(LaneView.Highway, 0, 1000, 0, 50, Slots, 5, 0.13, secondsAhead: 0);
 
-        Assert.IsTrue(projection.SecondsOnScreen > 0);
+        Assert.IsGreaterThan(0, projection.SecondsOnScreen);
         Assert.AreEqual(870, projection.AlongOf(5), 1e-9);
     }
 }

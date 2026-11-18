@@ -79,13 +79,12 @@ public sealed class JumpListComInterfaceTests
     private static void AssertOrder(Type type, params string[] expected)
     {
         var inherited = type.GetInterfaces().SelectMany(i => i.GetMethods()).Select(m => m.Name).ToHashSet();
-        string[] declared = type
+        string[] declared = [.. type
             .GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly)
             .Where(m => !inherited.Contains(m.Name))
             .OrderBy(m => m.MetadataToken)
-            .Select(m => m.Name)
-            .ToArray();
+            .Select(m => m.Name)];
 
-        CollectionAssert.AreEqual(expected, declared, $"{type.Name}'s methods, in the order declared");
+        Assert.AreSequenceEqual(expected, declared, $"{type.Name}'s methods, in the order declared");
     }
 }

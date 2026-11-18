@@ -131,7 +131,7 @@ namespace ChartBuilder.ViewModels
             return Joined(groups);
         }
 
-        private static List<LaneMenuItem> VocalNoteMenu(EditorSession session, VocalTrack vocal)
+        private List<LaneMenuItem> VocalNoteMenu(EditorSession session, VocalTrack vocal)
         {
             if (session.VocalContentOf(vocal) is not { } content)
                 return [];
@@ -140,8 +140,15 @@ namespace ChartBuilder.ViewModels
             bool spoken = ticks.All(t => VocalEdits.IsSpoken(content, t));
             bool sung = ticks.All(t => !VocalEdits.IsSpoken(content, t));
             bool slide = ticks.All(t => VocalEdits.IsSlide(content, t));
+            bool lyric = ticks.Any(t => VocalEdits.LyricAt(content, t) is { } text && !VocalEdits.IsSlide(content, t) && VocalEdits.SplitSpokenMarks(text).Shown.Length > 0);
+
+            // The note the lyric box opens on, as the key opens it: the first selected that isn't a slide, which has none.
+            int editable = ticks.FindIndex(t => !VocalEdits.IsSlide(content, t));
             return
             [
+                LaneMenuItem.Action(Strings.NoteMenuEditLyric, editable >= 0, () => LyricEditRequested?.Invoke(ticks[editable]), null, BuilderKeys.NoteEditLyric),
+                LaneMenuItem.Action(Strings.NoteMenuDeleteLyric, lyric, tools.DeleteVocalLyric),
+                LaneMenuItem.Separator,
                 LaneMenuItem.Choice(Strings.NoteMenuSung, sung, () => tools.SetVocalSpoken(false)),
                 LaneMenuItem.Choice(Strings.PropertiesSpoken, spoken, () => tools.SetVocalSpoken(true)),
                 LaneMenuItem.Separator,
