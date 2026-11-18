@@ -138,6 +138,38 @@ public sealed class VocalLaneTests
     }
 
     [TestMethod]
+    public void SlideAtFindsTheGapBeforeASungSlideAndHowFarThroughItIs()
+    {
+        // A note, a gap, then a slide on to it; a gap to a note that isn't a slide; a spoken note, a gap, then a slide.
+        var lane = new VocalLane(Part(
+            [new(0, 100, 60), new(200, 100, 64), new(400, 100, 62), new(600, 100, 50), new(800, 100, 52)],
+            [new(0, "la"), new(200, "+"), new(400, "lo"), new(600, "hey#"), new(800, "+")]));
+
+        Assert.IsNull(lane.SlideAt(50));
+        Assert.AreEqual(new VocalLaneSlide(0, 1, 0), lane.SlideAt(100));
+        Assert.AreEqual(new VocalLaneSlide(0, 1, 0.5), lane.SlideAt(150));
+        Assert.AreEqual(0.99, lane.SlideAt(199)!.Value.Progress, 1e-9);
+        Assert.IsNull(lane.SlideAt(200));
+        Assert.IsNull(lane.SlideAt(350));
+        Assert.IsNull(lane.SlideAt(750));
+        Assert.IsNull(lane.SlideAt(950));
+    }
+
+    [TestMethod]
+    public void SungPitchAtWalksEachPitchBetweenASlidesNotesInTurn()
+    {
+        var lane = new VocalLane(Part(
+            [new(0, 100, 60), new(200, 100, 64), new(400, 100, 50)],
+            [new(0, "la"), new(200, "+"), new(400, "hey#")]));
+
+        Assert.AreEqual(60, lane.SungPitchAt(50));
+        Assert.AreSequenceEqual([60, 61, 62, 63, 64], [.. new[] { 100, 125, 150, 175, 199 }.Select(t => lane.SungPitchAt(t)!.Value)]);
+        Assert.AreEqual(64, lane.SungPitchAt(250));
+        Assert.IsNull(lane.SungPitchAt(350));
+        Assert.IsNull(lane.SungPitchAt(450));
+    }
+
+    [TestMethod]
     public void LyricsBetweenFindsTheSyllablesInTheSpan()
     {
         var lane = new VocalLane(Part([], [new(0, "a"), new(480, "b"), new(960, "c"), new(1440, "d")]));

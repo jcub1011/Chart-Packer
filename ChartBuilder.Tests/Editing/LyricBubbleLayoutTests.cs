@@ -112,6 +112,45 @@ public sealed class LyricBubbleLayoutTests
     }
 
     [TestMethod]
+    public void PlacingStartsFromTheFirstNoteBeforeThatNoBubbleBeforeItCanReach()
+    {
+        double[] lefts = [0, 10, 200, 210, 220, 230];
+        Func<int, double> leftOf = i => lefts[i];
+
+        // 190 between the second and third notes is past the reach of 100; the rest are closer.
+        Assert.AreEqual(2, LyricBubbleLayout.IndependentFrom(5, leftOf, 100, 256));
+        Assert.AreEqual(2, LyricBubbleLayout.IndependentFrom(2, leftOf, 100, 256));
+        Assert.AreEqual(0, LyricBubbleLayout.IndependentFrom(1, leftOf, 100, 256));
+        Assert.AreEqual(0, LyricBubbleLayout.IndependentFrom(0, leftOf, 100, 256));
+
+        // No further back than it's let walk.
+        Assert.AreEqual(4, LyricBubbleLayout.IndependentFrom(5, leftOf, 100, 1));
+    }
+
+    [TestMethod]
+    public void BubblesPlacedFromWherePlacingCanStartGoWhereTheyWouldWithEveryBubbleBeforeThem()
+    {
+        // A run that stacks bubbles up, a gap past any bubble's reach, then another that does; the first notes are left
+        // out as they scroll off, yet the second run's bubbles stay where they were.
+        double[] lefts = [0, 12, 24, 36, 300, 310, 320, 330, 340];
+        var inputs = lefts.Select(l => new LyricBubbleInput(Note(l), 80)).ToArray();
+        double reach = 80 + (Padding * 2) + GapX;
+        var all = Place(3, 0, inputs);
+
+        for (int view = 0; view < lefts.Length; view++)
+        {
+            int start = LyricBubbleLayout.IndependentFrom(view, i => lefts[i], reach, 256);
+            var some = Place(3, 0, inputs[start..]);
+            var wanted = all.Where(b => b.Index >= view).Select(b => (b.Index, b.Bubble)).ToArray();
+            var got = some.Where(b => b.Index + start >= view).Select(b => (b.Index + start, b.Bubble)).ToArray();
+            CollectionAssert.AreEqual(wanted, got, $"from note {view}");
+        }
+
+        // Without it, leaving the first of the second run out moves the next one down a level.
+        Assert.AreNotEqual(all.Single(b => b.Index == 5).Bubble, Place(3, 0, inputs[5..]).Single(b => b.Index == 0).Bubble);
+    }
+
+    [TestMethod]
     public void NoInputsPlaceNoBubbles()
     {
         Assert.IsEmpty(Place(3, 0));
