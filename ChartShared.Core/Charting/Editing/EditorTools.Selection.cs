@@ -1,4 +1,5 @@
 using ChartShared.Core.Charting.Commands;
+using ChartShared.Core.Charting.Layout;
 using ChartShared.Core.Charts;
 
 namespace ChartShared.Core.Charting.Editing;
@@ -199,39 +200,49 @@ public sealed partial class EditorTools
     }
 
     /// <summary>
-    /// Drags out a synchronized region on the pressed lane's track, both ends on the grid (the Sync tool), or with Ctrl
-    /// + Shift held, which picks the tool up for as long as they're held. Once it's drawn, the tool picked before Sync
-    /// comes back; a click draws nothing. Pressed on a passage synced with the region, a click makes that passage the
-    /// region's source instead (a drag there draws a new region).
+    /// Drags out a synchronized region on the pressed lane's track or vocal part, both ends on the grid (the Sync tool),
+    /// or with Ctrl + Shift held, which picks the tool up for as long as they're held. Once it's drawn, the tool picked
+    /// before Sync comes back; a click draws nothing. Pressed on a passage synced with the region, a click makes that
+    /// passage the region's source instead (a drag there draws a new region).
     /// </summary>
-    private sealed class SyncGesture(EditorTools tools, ChartPoint pressed, long? clickedMatch = null) : Gesture(tools)
+    private sealed class SyncGesture(EditorTools tools, LanePart part, double tick, double tolerance, long? clickedMatch = null) : Gesture(tools)
     {
         private bool _moved;
 
-        public override void Drag(ChartPoint point)
+        public override void Drag(ChartPoint point) => DragTo(point.Tick);
+
+        public override void Drag(VocalPoint point) => DragTo(point.Tick);
+
+        public override void Release(ChartPoint point) => ReleaseAt(point.Tick);
+
+        public override void Release(VocalPoint point) => ReleaseAt(point.Tick);
+
+        public override void Cancel() => Session.Sync.Draft = null;
+
+        private void DragTo(double pointer)
         {
-            _moved |= Math.Abs(point.Tick - pressed.Tick) > pressed.Tolerance;
+            _moved |= Math.Abs(pointer - tick) > tolerance;
             if (!_moved)
                 return;
-            long a = Tools.Snap.Nearest(Math.Max(0, pressed.Tick), Tools.Map);
-            long b = Tools.SyncEdgeAt(point.Tick, a, after: point.Tick >= pressed.Tick);
+            long a = Tools.Snap.Nearest(Math.Max(0, tick), Tools.Map);
+            long b = Tools.SyncEdgeAt(pointer, a, after: pointer >= tick);
             if (a == b)
             {
                 Session.Sync.Draft = null;
                 return;
             }
 
-            Session.Sync.Draft = (pressed.Track, Math.Min(a, b), Math.Max(a, b));
+            Session.Sync.Draft = (part, Math.Min(a, b), Math.Max(a, b));
         }
 
-        public override void Release(ChartPoint point)
+        private void ReleaseAt(double pointer)
         {
-            Drag(point);
+            DragTo(pointer);
             var draft = Session.Sync.Draft;
             Session.Sync.Draft = null;
-            if (draft is var (track, from, to))
+            if (draft is var (lane, from, to))
             {
-                if (Session.Sync.Define(track, from, to) && Session.Tool == EditorTool.Sync)
+                if (Session.Sync.Define(lane, from, to) && Session.Tool == EditorTool.Sync)
                     Session.Tool = Session.ToolBeforeSync;
             }
             else if (clickedMatch is { } start)
@@ -239,8 +250,6 @@ public sealed partial class EditorTools
                 Session.Sync.MakeSource(start);
             }
         }
-
-        public override void Cancel() => Session.Sync.Draft = null;
     }
 
     /// <summary>
@@ -248,7 +257,7 @@ public sealed partial class EditorTools
     /// passages matching it are found again where it lands. Nothing moves until the pointer has, so a click only
     /// picks the region up.
     /// </summary>
-    private sealed class SyncMoveGesture(EditorTools tools, ChartPoint pressed) : Gesture(tools)
+    private sealed class SyncMoveGesture(EditorTools tools, double tick, double tolerance) : Gesture(tools)
     {
         private readonly (long From, long To) _span = tools._session.Sync.Span!.Value;
 
@@ -256,30 +265,38 @@ public sealed partial class EditorTools
         private (long From, long To)? _dragged;
         private bool _moved;
 
-        public override void Drag(ChartPoint point)
+        public override void Drag(ChartPoint point) => DragTo(point.Tick);
+
+        public override void Drag(VocalPoint point) => DragTo(point.Tick);
+
+        public override void Release(ChartPoint point) => ReleaseAt(point.Tick);
+
+        public override void Release(VocalPoint point) => ReleaseAt(point.Tick);
+
+        public override void Cancel()
         {
-            _moved |= Math.Abs(point.Tick - pressed.Tick) > pressed.Tolerance;
+            if (_moved)
+                Session.Sync.DragTo(_span.From, _span.To);
+        }
+
+        private void DragTo(double pointer)
+        {
+            _moved |= Math.Abs(pointer - tick) > tolerance;
             if (!_moved)
                 return;
             long length = _span.To - _span.From;
-            long from = Math.Max(0, Tools.Snap.Nearest(_span.From + (point.Tick - pressed.Tick), Tools.Map));
+            long from = Math.Max(0, Tools.Snap.Nearest(_span.From + (pointer - tick), Tools.Map));
             if (_dragged == (from, from + length))
                 return;
             _dragged = (from, from + length);
             Session.Sync.DragTo(from, from + length);
         }
 
-        public override void Release(ChartPoint point)
+        private void ReleaseAt(double pointer)
         {
-            Drag(point);
+            DragTo(pointer);
             if (_moved && Session.Sync.Span is var (from, to))
                 Session.Sync.Redefine(from, to);
-        }
-
-        public override void Cancel()
-        {
-            if (_moved)
-                Session.Sync.DragTo(_span.From, _span.To);
         }
     }
 
@@ -288,7 +305,7 @@ public sealed partial class EditorTools
     /// end, and is never shorter than a 32nd note, which the end snaps down to. The passages matching it are found again
     /// as it's resized.
     /// </summary>
-    private sealed class SyncResizeGesture(EditorTools tools, ChartPoint pressed, bool start) : Gesture(tools)
+    private sealed class SyncResizeGesture(EditorTools tools, double tick, double tolerance, bool start) : Gesture(tools)
     {
         private readonly (long From, long To) _span = tools._session.Sync.Span!.Value;
 
@@ -296,12 +313,26 @@ public sealed partial class EditorTools
         private (long From, long To)? _dragged;
         private bool _moved;
 
-        public override void Drag(ChartPoint point)
+        public override void Drag(ChartPoint point) => DragTo(point.Tick);
+
+        public override void Drag(VocalPoint point) => DragTo(point.Tick);
+
+        public override void Release(ChartPoint point) => ReleaseAt(point.Tick);
+
+        public override void Release(VocalPoint point) => ReleaseAt(point.Tick);
+
+        public override void Cancel()
         {
-            _moved |= Math.Abs(point.Tick - pressed.Tick) > pressed.Tolerance;
+            if (_moved)
+                Session.Sync.DragTo(_span.From, _span.To);
+        }
+
+        private void DragTo(double pointer)
+        {
+            _moved |= Math.Abs(pointer - tick) > tolerance;
             if (!_moved)
                 return;
-            long at = Tools.SyncEdgeAt(point.Tick, start ? _span.To : _span.From, after: !start);
+            long at = Tools.SyncEdgeAt(pointer, start ? _span.To : _span.From, after: !start);
             (long From, long To) span = start ? (at, _span.To) : (_span.From, at);
             if (span == _span || span == _dragged)
                 return;
@@ -309,17 +340,11 @@ public sealed partial class EditorTools
             Session.Sync.DragTo(span.From, span.To);
         }
 
-        public override void Release(ChartPoint point)
+        private void ReleaseAt(double pointer)
         {
-            Drag(point);
+            DragTo(pointer);
             if (_moved && Session.Sync.Span is var (from, to))
                 Session.Sync.Redefine(from, to);
-        }
-
-        public override void Cancel()
-        {
-            if (_moved)
-                Session.Sync.DragTo(_span.From, _span.To);
         }
     }
 

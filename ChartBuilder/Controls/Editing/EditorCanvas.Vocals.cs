@@ -241,17 +241,20 @@ namespace ChartBuilder.Controls.Editing
                 return;
             e.Pointer.Capture(this);
             _isPressed = true;
-            _lyricOnRelease = _pressButton == MouseButton.Left && e.ClickCount >= 2 && session.Tool == EditorTool.Select && !point.InPhrases
-                && !point.InStarPower && session.Tools.HitTest(point) is { } doubled
-                    ? doubled.Note.Tick
-                    : null;
+            var modifiers = ModifiersOf(e.KeyModifiers);
+
+            // Ctrl + Shift lends the press to the Sync tool, which neither opens a lyric nor draws a box.
+            bool selects = _pressButton == MouseButton.Left && session.Tool == EditorTool.Select && !session.Tools.IsSyncPress(modifiers)
+                && !point.InPhrases && !point.InStarPower;
+            _lyricOnRelease = selects && e.ClickCount >= 2 && session.Tools.HitTest(point) is { } doubled
+                ? doubled.Note.Tick
+                : null;
             _lastVocalPoint = point;
-            _boxFrom = _pressButton == MouseButton.Left && session.Tool == EditorTool.Select && !session.Tools.LoopActive && !point.InPhrases && !point.InStarPower && session.Tools.HitTest(point) is null ? position : null;
+            _boxFrom = selects && !session.Tools.LoopActive && session.Tools.HitTest(point) is null ? position : null;
             _boxTo = position;
             _boxFromSeconds = _boxFrom is not null && CurrentProjection() is { } anchorScreen
                 ? anchorScreen.SecondsAt(AlongOf(position))
                 : null;
-            var modifiers = ModifiersOf(e.KeyModifiers);
             if (_pressButton == MouseButton.Middle)
                 session.Tools.PressErase(point);
             else if (_pressButton == MouseButton.Right)
@@ -296,7 +299,8 @@ namespace ChartBuilder.Controls.Editing
                     else if ((_keys & KeyModifiers.Shift) == 0 && session.Tools.VocalStarPowerDrawStart(point) is not null)
                         wanted = StandardCursorType.Cross;
                 }
-                else if (session.Tool is EditorTool.Select or EditorTool.Place && session.Tools.HitTest(point) is { Grip: VocalNoteGrip.End })
+                else if (session.Tool is EditorTool.Select or EditorTool.Place && !session.Tools.IsSyncPress(ModifiersOf(_keys))
+                    && session.Tools.HitTest(point) is { Grip: VocalNoteGrip.End })
                 {
                     wanted = StandardCursorType.SizeWestEast;
                 }
@@ -365,6 +369,7 @@ namespace ChartBuilder.Controls.Editing
                     DrawVocalPhraseStrip(context, session, vocal, projection, fromTick, toTick, size);
                     DrawVocalStarPowerRail(context, session, vocal, projection, fromTick, toTick, size);
                     DrawSpans(context, session, projection);
+                    DrawSyncBands(context, session, projection);
                     DrawBeats(context, session, session.TempoMap, projection, fromTick, toTick, size, RailPass.Both);
                     DrawTempoMarkers(context, session, projection, fromTick, toTick, size, RailPass.Both);
                     DrawTempoProposal(context, session, projection, size, RailPass.Both);
@@ -543,6 +548,38 @@ namespace ChartBuilder.Controls.Editing
             }
         }
 
+        /// <summary>
+        /// The notes the synchronized region holds on this vocal part, and each passage synced with it holds, marked over in
+        /// orange while the Sync tool is active, as a highway's are: just which notes are synced.
+        /// </summary>
+        private void DrawVocalSyncNotes(DrawingContext context, EditorSession session, VocalTrack vocal, VocalLane vocals, LaneProjection projection)
+        {
+            if (session.Sync is not { IsActive: true } sync || !sync.IsOn(vocal) || sync.Span is not var (from, to))
+                return;
+            if (!session.Tools.IsSyncPress(ModifiersOf(_keys)))
+                return;
+            long length = to - from;
+            double thickness = VocalNoteThickness(projection);
+            double radius = thickness / 2;
+            var notes = vocals.Notes;
+            var matches = sync.Matches;
+
+            // The region's own notes first, then each passage's.
+            for (int m = -1; m < matches.Count; m++)
+            {
+                long start = m < 0 ? from : matches[m];
+                var (first, last) = vocals.NotesBetween(start, start + length - 1);
+                for (int i = first; i < last; i++)
+                {
+                    var note = notes[i];
+                    if (note.Tick < start || note.Tick >= start + length)
+                        continue;
+                    var bar = VocalNoteRect(session, vocals, projection, note, thickness);
+                    context.DrawRectangle(SyncedBrush, SyncRegionPen, bar.Inflate(2), radius + 2, radius + 2);
+                }
+            }
+        }
+
         /// <summary>The phrase the strike line is in, shaded a little more than the others, behind the notes.</summary>
         private void DrawSingingPhrase(DrawingContext context, EditorSession session, VocalLane vocals, LaneProjection screen)
         {
@@ -703,9 +740,9 @@ namespace ChartBuilder.Controls.Editing
         }
 
         /// <summary>
-        /// What's on the strike line, lit; the place tool's ghost; the octaves' names at the rows' left edge; where the Loop
-        /// tool would start drawing the loop region, and its X and what of it the pointer would take hold of; the cursor; a
-        /// box being drawn; and the focus's edge.
+        /// What's on the strike line, lit; the place tool's ghost; the octaves' names at the rows' left edge; the notes the
+        /// synchronized region syncs, where the Loop or Sync tool would start drawing its region, and each region's X and
+        /// what of it the pointer would take hold of; the cursor; a box being drawn; and the focus's edge.
         /// </summary>
         private void RenderVocalOverlay(DrawingContext context, EditorSession session, VocalTrack vocal, VocalLane vocals, LaneProjection screen, Size size)
         {
@@ -715,7 +752,11 @@ namespace ChartBuilder.Controls.Editing
             DrawVocalHover(context, session, vocal, vocals, screen);
             DrawVocalStripHover(context, session, screen, size);
             DrawVocalTempoHover(context, session, screen);
+            using (context.PushClip(RowsOf(screen)))
+                DrawVocalSyncNotes(context, session, vocal, vocals, screen);
             DrawLoopLine(context, session, screen, screen.Slots);
+            DrawSyncLine(context, session, screen, screen.Slots);
+            DrawSyncHover(context, session, screen, screen.Slots);
             DrawLoopHover(context, session, screen, screen.Slots);
 
             DrawCursor(context, session, screen, RowsOf(screen));
@@ -839,7 +880,7 @@ namespace ChartBuilder.Controls.Editing
         /// <summary>The note the place tool would place under the pointer, faint: on the grid, a grid step long.</summary>
         private void DrawVocalHover(DrawingContext context, EditorSession session, VocalTrack vocal, VocalLane vocals, LaneProjection screen)
         {
-            if (_hover is not { } hover || _isPressed || session.Tool != EditorTool.Place
+            if (_hover is not { } hover || _isPressed || session.Tool != EditorTool.Place || session.Tools.IsSyncPress(ModifiersOf(_keys))
                 || VocalPointAt(hover, clamp: false) is not { Pitch: { } pitch } point || session.Tools.HitTest(point) is not null)
                 return;
             var map = session.TempoMap;

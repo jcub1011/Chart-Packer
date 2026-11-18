@@ -34,6 +34,8 @@ public sealed partial class EditorTools
     /// <summary>
     /// Starts a gesture at <paramref name="point"/> in a vocal part's lane with the current tool (charter-spec C3 item 7);
     /// in the phrase strip, with any tool, a gesture on the phrase there, and in the star power rail on its star power.
+    /// In the rows, the Sync tool's press, or Ctrl + Shift held, draws or takes hold of a synchronized region on the part,
+    /// as in a highway's lane.
     /// </summary>
     public void Press(VocalPoint point, EditorModifiers modifiers = EditorModifiers.None)
     {
@@ -71,6 +73,13 @@ public sealed partial class EditorTools
             return;
         }
 
+        // The Sync tool's press, or Ctrl + Shift held, as in a highway's lane: only inside the rows, as the Loop tool's.
+        if (IsSyncPress(modifiers))
+        {
+            _gesture = point.Pitch is null ? null : PressSync(LanePart.Vocals(point.Track), point.Tick, point.Tolerance);
+            return;
+        }
+
         _gesture = _session.Tool switch
         {
             EditorTool.Select => PressVocalSelect(point, content, shift),
@@ -85,7 +94,8 @@ public sealed partial class EditorTools
     /// <summary>
     /// Starts erasing at <paramref name="point"/> in a vocal part's lane, as the middle button does: each note the pointer
     /// passes over goes, with its lyrics, and in the phrase strip each phrase, as one step. With the Tempo tool, it removes
-    /// the tempo marker there instead, and with the Loop tool active, it takes the loop region away.
+    /// the tempo marker there instead; with the Loop tool active, it takes the loop region away, and with the Sync tool
+    /// active the synchronized region.
     /// </summary>
     public void PressErase(VocalPoint point)
     {
@@ -93,6 +103,8 @@ public sealed partial class EditorTools
         _modifiers = EditorModifiers.None;
         if (LoopActive)
             _session.ClearLoop();
+        else if (SyncActive)
+            _session.Sync.Clear();
         else if (_session.Tool == EditorTool.VocalAlign)
             return;
         else if (_session.Tool == EditorTool.Tempo)

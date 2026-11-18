@@ -968,6 +968,14 @@ Acceptance criteria:
    - **Erase** removes each note passed over, **Sustain** drags the selected notes' end, **Phrase**
      draws a phrase from the grid step pressed (in the rows, as in the strip), and **Tempo** adds and
      drags tempo and time-signature changes as in a highway's lane.
+   - **Sync** (issue 272), or Ctrl+Shift held, draws, moves and resizes a synchronized region in the
+     rows as in a highway's lane (not in the phrase strip or star power rail, which keep their own
+     presses). A passage of the part matches the region when it holds exactly the same notes, by
+     offset, length and pitch (not velocity), and the same lyrics, by offset and text, so `+`, `#`
+     and hyphens count. An edit of the notes or lyrics in the region is made in each passage still
+     matching as one undoable step; phrases, star power and the track's other events are neither
+     matched nor copied. Another vocal part is never searched. The middle button, or the region's
+     X, takes it away; Delete and Ctrl+X do nothing while the tool is active, as on a highway.
    - **The phrase strip** works with any tool, as a highway's phrase rail does: a press on a bar
      selects its phrase (Shift adds it or takes it away), and a drag moves the selected phrases, or
      resizes one by the end grabbed. A drag in an empty part of the strip draws a new phrase, from
@@ -3193,7 +3201,7 @@ one is picked up by the other when its window is next activated.
 | `PgUp` / `PgDn` | Move the cursor one measure |
 | `Home` / `End` | Move the cursor to the chart's start / to where its last note lets go |
 | `Ctrl+G` | Go to a measure: asks for a measure number (1 up to the last measure with notes) and moves the cursor to its start |
-| `Ctrl+F` | Find the passages of the lane that match the selected notes (matched as the Sync tool matches), and go to the next after the cursor; again goes on to the next |
+| `Ctrl+F` | Find the passages of the lane that match the selected notes (matched as the Sync tool matches, a vocal part's notes too), and go to the next after the cursor; again goes on to the next |
 | `F3` / `Shift+F3` | Go to the next / previous passage found, wrapping round |
 | `Ctrl`+`↑` / `Ctrl`+`↓` | Next or previous section |
 | `Ctrl`+`Shift`+`↑` / `Ctrl`+`Shift`+`↓` | Next or previous tempo or time signature change |
