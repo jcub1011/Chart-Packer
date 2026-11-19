@@ -1148,6 +1148,14 @@ namespace ChartBuilder.Controls.Editing
                 return;
             }
 
+            // While the song plays the lanes aren't edited; only the loop region, which steers playback, still takes a press.
+            if (_editor?.Playback.IsPlaying == true && !session.Tools.LoopActive)
+            {
+                Focus();
+                e.Handled = true;
+                return;
+            }
+
             if (_lane is { Vocal: not null })
             {
                 PressVocals(session, current.Position, e);
@@ -1300,10 +1308,10 @@ namespace ChartBuilder.Controls.Editing
             _overlay.Redraw();
         }
 
-        /// <summary>Opens the note menu at the pointer, for the selected notes, after a right click; nothing with none.</summary>
+        /// <summary>Opens the note menu at the pointer, for the selected notes, after a right click; nothing with none, or while the song plays.</summary>
         private void ShowNoteMenu()
         {
-            if (_lane?.BuildNoteMenu() is not { Count: > 0 } items)
+            if (_editor?.Playback.IsPlaying == true || _lane?.BuildNoteMenu() is not { Count: > 0 } items)
                 return;
             new MenuFlyout { ItemsSource = LaneMenu.MenuItems(items) }.ShowAt(this, showAtPointer: true);
         }
@@ -1369,13 +1377,10 @@ namespace ChartBuilder.Controls.Editing
 
             public double FineFactor => LaneScrub.DefaultFineFactor;
 
-            public void ScrubStarted()
-            {
-            }
+            // The song is held still while the lane is dragged, and plays on from where it's left if it was playing.
+            public void ScrubStarted() => canvas._editor?.Playback.BeginScrub();
 
-            public void ScrubEnded()
-            {
-            }
+            public void ScrubEnded() => canvas._editor?.Playback.EndScrub();
 
             // The cursor moves, and playback seeks there, as it does for every move of it by hand.
             public void ScrubTo(double seconds)

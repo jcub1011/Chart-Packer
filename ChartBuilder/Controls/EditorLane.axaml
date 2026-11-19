@@ -333,6 +333,7 @@
                         </Button>
                         <Button Classes="tool"
                                 IsVisible="{Binding ShowsEditMenu}"
+                                IsEnabled="{Binding !Editor.Playback.IsPlaying, FallbackValue=True}"
                                 bctl:LaneMenu.Items="{Binding EditMenu}"
                                 ToolTip.Tip="{x:Static res:Strings.LaneEditToolTip}"
                                 AutomationProperties.Name="{x:Static res:Strings.LaneEditToolTip}">
@@ -390,6 +391,7 @@
                                     </MenuItem>
                                     <MenuItem Header="{x:Static res:Strings.LaneMoreEdit}"
                                               IsVisible="{Binding ShowsEditMenu}"
+                                              IsEnabled="{Binding !Editor.Playback.IsPlaying, FallbackValue=True}"
                                               bctl:LaneMenu.Items="{Binding EditMenu}">
                                         <MenuItem.Icon><ctl:LineIcon Data="{StaticResource EditChartStroke}" /></MenuItem.Icon>
                                     </MenuItem>
