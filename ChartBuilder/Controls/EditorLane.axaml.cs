@@ -1,6 +1,9 @@
+using System.Linq;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 
 namespace ChartBuilder.Controls
 {
@@ -32,6 +35,25 @@ namespace ChartBuilder.Controls
             DifficultyPicker.SizeChanged += (_, _) => FitHeader();
             OverflowTools.SizeChanged += (_, _) => FitHeader();
             MoreHost.SizeChanged += (_, _) => FitHeader();
+            Body.AddHandler(PointerPressedEvent, OnBodyPressed, RoutingStrategies.Bubble);
+        }
+
+        /// <summary>
+        /// Focuses the lane's canvas on a press anywhere in the body. The canvas only takes a press on what it draws, which in
+        /// perspective is the tilted plane, so the corners and the far end around it would otherwise do nothing. A press the
+        /// canvas or another control handled never gets here.
+        /// </summary>
+        private void OnBodyPressed(object? sender, PointerPressedEventArgs e)
+        {
+            if (e.Handled || e.Source is Avalonia.Visual source && (source.FindAncestorOfType<Button>(true) is not null
+                    || Navigation.IsVisualAncestorOf(source) || ReferenceEquals(source, Navigation)))
+                return;
+
+            if (Body.GetVisualDescendants().OfType<Editing.EditorCanvas>().FirstOrDefault(c => c.IsVisible) is { } canvas)
+            {
+                canvas.Focus();
+                e.Handled = true;
+            }
         }
 
         private ViewModels.EditorLaneViewModel? _lane;
