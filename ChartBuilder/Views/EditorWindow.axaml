@@ -1008,6 +1008,7 @@
                                Loop="{Binding Playback.Loop}"
                                LoopBrush="{DynamicResource LoopRegionLineBrush}"
                                SpanBrush="{DynamicResource AccentTintBrush}"
+                               AccentBrush="{DynamicResource AccentTextBrush}"
                                WaveformBrush="{DynamicResource WaveformBrush}"
                                BeatBrush="{DynamicResource SubtleBorderBrush}"
                                MeasureBrush="#4A4D66"

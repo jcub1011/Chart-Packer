@@ -44,7 +44,7 @@ namespace ChartBuilder.ViewModels
         private readonly ChartLintScheduler _scheduler = new(new ChartLinter(ChartLintRules.ForEditor));
         private readonly DispatcherTimer _timer;
         private readonly List<TaskCompletionSource> _settling = [];
-        private ChartTrackKey? _focused;
+        private (ChartTrackKey? Highway, VocalTrack? Vocal) _focused;
         private TempoMap? _shownMap;
         private bool _disposed;
 
@@ -95,10 +95,14 @@ namespace ChartBuilder.ViewModels
             return settled.Task;
         }
 
-        /// <summary>The marks again, for the lane now in focus.</summary>
+        /// <summary>
+        /// The marks again, for the lane now in focus: a highway's or a vocal part's findings only while it is, and the
+        /// song's whichever is.
+        /// </summary>
         public void RefreshMarks()
         {
-            var focused = _editor.Session.Focused;
+            var vocal = _editor.Session.FocusedVocal;
+            var focused = vocal is null ? _editor.Session.Focused : null;
             var marks = new List<FindingMark>();
             foreach (var item in Issues.Items)
             {
@@ -108,7 +112,7 @@ namespace ChartBuilder.ViewModels
                     if (focused is { } key && key.Instrument == location.Part && (location.Difficulty is null || location.Difficulty == key.Difficulty))
                         marks.Add(new FindingMark(_editor.Session.AudioAt(location.Tick), finding.Severity));
                 }
-                else if (finding.Tick is { } tick)
+                else if (finding.Tick is { } tick && (finding.Track is null || (vocal is { } part && VocalTracks.Of(finding.Track) == part)))
                 {
                     marks.Add(new FindingMark(_editor.Session.AudioAt(tick), finding.Severity));
                 }
@@ -147,9 +151,10 @@ namespace ChartBuilder.ViewModels
         // The marks follow the lane in focus.
         private void OnSessionState(object? sender, EventArgs e)
         {
-            if (_editor.Session.Focused == _focused)
+            var focused = (_editor.Session.Focused, _editor.Session.FocusedVocal);
+            if (focused == _focused)
                 return;
-            _focused = _editor.Session.Focused;
+            _focused = focused;
             RefreshMarks();
         }
 

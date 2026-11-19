@@ -25,27 +25,19 @@ namespace ChartBuilder.Controls.Editing
     // lane, and the tools edit the part from there.
     public abstract partial class EditorCanvas
     {
-        // The parts' colours: the lead and the first harmony as the games colour them, the others apart from it.
-        private static readonly Color[] VocalColors =
-        [
-            Color.FromRgb(0x7F, 0xE9, 0xFF),
-            Color.FromRgb(0x7F, 0xE9, 0xFF),
-            Color.FromRgb(0xFF, 0xB5, 0x47),
-            Color.FromRgb(0xFF, 0x7A, 0x50),
-        ];
-
-        private static readonly IBrush[] VocalNoteBrushes = [.. Array.ConvertAll(VocalColors, c => (IBrush)new ImmutableSolidColorBrush(c))];
-        private static readonly IPen[] VocalEdgePens = [.. Array.ConvertAll(VocalColors, c => (IPen)new ImmutablePen(HighwayPalette.Darken(c, 0.45).ToUInt32(), 1))];
-        private static readonly IPen[] VocalSlidePens = [.. Array.ConvertAll(VocalColors, c => (IPen)new ImmutablePen(HighwayPalette.WithAlpha(c, 0xB0).ToUInt32(), 2))];
-        private static readonly IPen[] VocalUnpitchedPens = [.. Array.ConvertAll(VocalColors, c => (IPen)new ImmutablePen(c.ToUInt32(), 1.5))];
-        private static readonly IPen[] VocalBadgePens = [.. Array.ConvertAll(VocalColors, c => (IPen)new ImmutablePen(c.ToUInt32(), 1))];
+        // The parts' brushes and pens, indexed by their VocalTrack, in their colours (VocalPalette).
+        private static readonly IBrush[] VocalNoteBrushes = VocalPalette.Each(c => (IBrush)new ImmutableSolidColorBrush(c));
+        private static readonly IPen[] VocalEdgePens = VocalPalette.Each(c => (IPen)new ImmutablePen(HighwayPalette.Darken(c, 0.45).ToUInt32(), 1));
+        private static readonly IPen[] VocalSlidePens = VocalPalette.Each(c => (IPen)new ImmutablePen(HighwayPalette.WithAlpha(c, 0xB0).ToUInt32(), 2));
+        private static readonly IPen[] VocalUnpitchedPens = VocalPalette.Each(c => (IPen)new ImmutablePen(c.ToUInt32(), 1.5));
+        private static readonly IPen[] VocalBadgePens = VocalPalette.Each(c => (IPen)new ImmutablePen(c.ToUInt32(), 1));
 
         // What's on the strike line, lit as the inspector's lyrics lane lights it: the note being sung near white in its
         // part's tint, with a glow around where it crosses the line; its syllable in the same tint; and its phrase shaded.
-        private static readonly IBrush[] VocalSingingBrushes = [.. Array.ConvertAll(VocalColors, c => (IBrush)new ImmutableSolidColorBrush(HighwayPalette.Lighten(c, 0.75)))];
-        private static readonly IPen[] VocalSingingPens = [.. Array.ConvertAll(VocalColors, c => (IPen)new ImmutablePen(HighwayPalette.Lighten(c, 0.75).ToUInt32(), 2))];
-        private static readonly IPen[] VocalSlideSingingPens = [.. Array.ConvertAll(VocalColors, c => (IPen)new ImmutablePen(HighwayPalette.Lighten(c, 0.75).ToUInt32(), 3))];
-        private static readonly IBrush[] VocalGlowBrushes = [.. Array.ConvertAll(VocalColors, c => (IBrush)new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(c, 0x60)))];
+        private static readonly IBrush[] VocalSingingBrushes = VocalPalette.Each(c => (IBrush)new ImmutableSolidColorBrush(HighwayPalette.Lighten(c, 0.75)));
+        private static readonly IPen[] VocalSingingPens = VocalPalette.Each(c => (IPen)new ImmutablePen(HighwayPalette.Lighten(c, 0.75).ToUInt32(), 2));
+        private static readonly IPen[] VocalSlideSingingPens = VocalPalette.Each(c => (IPen)new ImmutablePen(HighwayPalette.Lighten(c, 0.75).ToUInt32(), 3));
+        private static readonly IBrush[] VocalGlowBrushes = VocalPalette.Each(c => (IBrush)new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(c, 0x60)));
 
         // A black key's row, a little darker than a white key's. The line under each C, the phrases' shading and bars, and the
         // key being sung are the accent's, in tints of it (AccentFill, AccentLine), so they follow the theme's.
@@ -772,7 +764,7 @@ namespace ChartBuilder.Controls.Editing
                 return;
 
             var placed = LyricBubbleLayout.Place(CollectionsMarshal.AsSpan(_bubbleInputs), BubbleHeight, BubblePaddingX, BubbleLine, BubbleGapX, BubbleGapY, BubbleLevels, rows.Top, rows.Bottom);
-            var edge = _gems.Pen(HighwayPalette.WithAlpha(VocalColors[color], 0x90), 1);
+            var edge = _gems.Pen(HighwayPalette.WithAlpha(VocalPalette.All[color], 0x90), 1);
             var selectedPen = AccentPens().Selected;
             var editPen = AccentLine(0xFF, 2);
             using (context.PushClip(rows))
