@@ -125,7 +125,7 @@ namespace ChartBuilder.Controls.Editing
         private double _gapWithoutGc;
         private TimeSpan _paused;
         private long _allocated;
-        private long _tilesBuilt;
+        private long _chunksBuilt;
 
         // The render thread's playing of the SkiaSharp drawings, at the window's start (SkiaHost.Played).
         private (long Plays, long Ticks) _played;
@@ -141,7 +141,7 @@ namespace ChartBuilder.Controls.Editing
             _collections = [GC.CollectionCount(0), GC.CollectionCount(1), GC.CollectionCount(2)];
             _paused = GC.GetTotalPauseDuration();
             _allocated = GC.GetTotalAllocatedBytes();
-            _tilesBuilt = LaneWaveformPainter.TilesBuilt;
+            _chunksBuilt = LaneWaveformPainter.ChunksBuilt;
             _played = SkiaHost.Played;
         }
 
@@ -426,18 +426,18 @@ namespace ChartBuilder.Controls.Editing
             _played = played;
 
             int g0 = GC.CollectionCount(0), g1 = GC.CollectionCount(1), g2 = GC.CollectionCount(2);
-            long built = LaneWaveformPainter.TilesBuilt;
+            long built = LaneWaveformPainter.ChunksBuilt;
             // What the whole program allocated and how long the collector held every thread, the drawing's too, in the window.
             var paused = GC.GetTotalPauseDuration();
             long allocated = GC.GetTotalAllocatedBytes();
-            text.AppendLine(string.Create(culture, $"GC {g0 - _collections[0]}/{g1 - _collections[1]}/{g2 - _collections[2]} paused {(paused - _paused).TotalMilliseconds:F1}ms  alloc {(allocated - _allocated) / (1024.0 * 1024.0) / seconds:F1}MB/s  waveform built {built - _tilesBuilt} kept {LaneWaveformPainter.TileCount}"));
+            text.AppendLine(string.Create(culture, $"GC {g0 - _collections[0]}/{g1 - _collections[1]}/{g2 - _collections[2]} paused {(paused - _paused).TotalMilliseconds:F1}ms  alloc {(allocated - _allocated) / (1024.0 * 1024.0) / seconds:F1}MB/s  waveform chunks built {built - _chunksBuilt} kept {LaneWaveformPainter.ChunkCount}"));
             text.Append(_gcWorstGen < 0
                 ? string.Create(culture, $"no GC  worst frame {_gapWithoutGc:F1}ms")
                 : string.Create(culture, $"worst GC pause {_gcWorstPause:F1}ms (gen{_gcWorstGen})  worst frame with a GC {_gapWithGc:F1}ms, without {_gapWithoutGc:F1}ms"));
             _collections = [g0, g1, g2];
             _paused = paused;
             _allocated = allocated;
-            _tilesBuilt = built;
+            _chunksBuilt = built;
 
             _lines = text.ToString();
             _text?.Dispose();

@@ -13,9 +13,12 @@ namespace ChartShared.UI.Controls.Skia
     public sealed class HighwayPath
     {
         private readonly Figure[] _figures;
+
+        // Whether every figure is filled, so the filled path covers what the edged one would.
+        private readonly bool _allFilled;
         private SKPath? _fill;
         private SKPath? _stroke;
-        private bool _madeSkia;
+        private bool _madeFill;
 
         // Where the shape reaches drawn with each pen it's been drawn with: few, as a shape keeps to a pen or two.
         private Dictionary<PenKey, Rect>? _reach;
@@ -28,6 +31,7 @@ namespace ChartShared.UI.Controls.Skia
         {
             _figures = figures;
             Bounds = BoundsOf(figures);
+            _allFilled = Array.TrueForAll(figures, figure => figure.Filled);
         }
 
         /// <summary>The smallest rectangle round every corner.</summary>
@@ -47,40 +51,31 @@ namespace ChartShared.UI.Controls.Skia
         {
             get
             {
-                MakeSkia();
+                if (!_madeFill)
+                {
+                    _fill = MakeSkia(filledOnly: true);
+                    _madeFill = true;
+                }
+
                 return _fill;
             }
         }
 
-        /// <summary>For SkiaSharp: every figure, for an edge drawn along it.</summary>
-        internal SKPath StrokePath
-        {
-            get
-            {
-                MakeSkia();
-                return _stroke!;
-            }
-        }
+        /// <summary>For SkiaSharp: every figure, for an edge drawn along it. Made only when an edge is, as a filled shape needs none.</summary>
+        internal SKPath StrokePath => _stroke ??= MakeSkia(filledOnly: false) ?? new SKPath { FillType = SKPathFillType.EvenOdd };
 
-        private void MakeSkia()
+        /// <summary>A path of the figures, or of only the filled ones; none if there are none.</summary>
+        private SKPath? MakeSkia(bool filledOnly)
         {
-            if (_madeSkia)
-                return;
-
-            var stroke = new SKPath { FillType = SKPathFillType.EvenOdd };
-            SKPath? fill = null;
+            SKPath? path = null;
             foreach (var figure in _figures)
             {
-                if (figure.Points.Length == 0)
+                if (figure.Points.Length == 0 || (filledOnly && !figure.Filled))
                     continue;
-                Add(stroke, figure);
-                if (figure.Filled)
-                    Add(fill ??= new SKPath { FillType = SKPathFillType.EvenOdd }, figure);
+                Add(path ??= new SKPath { FillType = SKPathFillType.EvenOdd }, figure);
             }
 
-            _stroke = stroke;
-            _fill = fill;
-            _madeSkia = true;
+            return path;
 
             static void Add(SKPath path, Figure figure)
             {
@@ -102,14 +97,15 @@ namespace ChartShared.UI.Controls.Skia
             if (_reach?.TryGetValue(key, out var known) == true)
                 return known;
 
-            var stroke = StrokePath;
             Rect reach;
             if (pen is null || pen.Thickness == 0)
             {
-                reach = ToRect(stroke.TightBounds);
+                // With every figure filled, the filled path is every figure, and the edged one needn't be made.
+                reach = _allFilled ? (FillPath is { } filled ? ToRect(filled.TightBounds) : default) : ToRect(StrokePath.TightBounds);
             }
             else
             {
+                var stroke = StrokePath;
                 s_stroker.StrokeWidth = (float)pen.Thickness;
                 s_stroker.StrokeCap = pen.LineCap switch { PenLineCap.Round => SKStrokeCap.Round, PenLineCap.Square => SKStrokeCap.Square, _ => SKStrokeCap.Butt };
                 s_stroker.StrokeJoin = pen.LineJoin switch { PenLineJoin.Bevel => SKStrokeJoin.Bevel, PenLineJoin.Round => SKStrokeJoin.Round, _ => SKStrokeJoin.Miter };
