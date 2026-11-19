@@ -861,14 +861,16 @@ namespace ChartBuilder.Controls.Editing
 
         /// <summary>
         /// Whether the place tool's ghost, the erase tool's red, the Phrase tool's line or the Tempo tool's marker preview
-        /// is shown under the pointer, which follow the song as it moves under it; or a Select tool's rail hover, whose
-        /// placement line does too; or, with a synchronized region or the loop region drawn, its X and hover, which do too.
+        /// is shown under the pointer, which follow the song as it moves under it; or the note or bar a press would grab,
+        /// with the Select tool or with Shift lending it, which is lit wherever the song brings one under the pointer and
+        /// let go of when it moves on; or, with a synchronized region or the loop region drawn, its X and hover, which do too.
         /// </summary>
         private bool IsHoverShown => _hover is { } hover && !_isPressed
             && (Session?.Tool is EditorTool.Place or EditorTool.Erase or EditorTool.Phrase or EditorTool.Tempo or EditorTool.VocalAlign
                 || Session?.Sync.IsActive == true
                 || Session?.Loop?.Span is not null
-                || (Session?.Tool == EditorTool.Select && PointAt(hover) is { Rail: not null }));
+                || ((Session?.Tool == EditorTool.Select || (_keys & KeyModifiers.Shift) != 0)
+                    && PointAt(hover) is { Lane: not null } or { Rail: not null }));
 
         /// <summary>
         /// Follows the cursor: the song and the notes are moved, as far as their page reaches, and drawn again around the
