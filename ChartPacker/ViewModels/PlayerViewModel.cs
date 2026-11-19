@@ -136,6 +136,7 @@ namespace ChartPacker.ViewModels
             ShowSpectrum = settings.Settings.ShowSpectrum;
             AlbumArtTheming = settings.Settings.AlbumArtTheming;
             WaveformFidelity = settings.Settings.WaveformFidelity;
+            PeaksCacheMb = settings.Settings.PeaksCacheMb;
             ScrubStep = settings.Settings.ScrubStep;
             FineScrubMilliseconds = settings.Settings.FineScrubMilliseconds;
             LaneFineScrubFactor = settings.Settings.LaneFineScrubFactor;
@@ -288,6 +289,10 @@ namespace ChartPacker.ViewModels
 
         private WaveformResolution Resolution => WaveformResolution.Of(WaveformFidelity);
 
+        /// <summary>How much memory the tracks' waveforms are kept in once read, in MB (<see cref="StemPeaksCache.Shared"/>). Kept in the settings.</summary>
+        [ObservableProperty]
+        public partial int PeaksCacheMb { get; set; }
+
         /// <summary>How far Ctrl and a notch of the wheel move the audio over the seek bar or a lane. Kept in the settings.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(SeekBarToolTip))]
@@ -411,6 +416,7 @@ namespace ChartPacker.ViewModels
             ShowSpectrum = _settings.Settings.ShowSpectrum;
             AlbumArtTheming = _settings.Settings.AlbumArtTheming;
             WaveformFidelity = _settings.Settings.WaveformFidelity;
+            PeaksCacheMb = _settings.Settings.PeaksCacheMb;
             ScrubStep = _settings.Settings.ScrubStep;
             FineScrubMilliseconds = _settings.Settings.FineScrubMilliseconds;
             LaneFineScrubFactor = _settings.Settings.LaneFineScrubFactor;
@@ -1147,6 +1153,14 @@ namespace ChartPacker.ViewModels
         }
 
         partial void OnAlbumArtThemingChanged(bool value) => _settings.Settings.AlbumArtTheming = value;
+
+        partial void OnPeaksCacheMbChanged(int value)
+        {
+            _settings.Settings.PeaksCacheMb = value;
+
+            // Made smaller, the waveforms shown least recently go at once.
+            StemPeaksCache.Shared.CapacityBytes = Math.Clamp(value, AppSettings.MinPeaksCacheMb, AppSettings.MaxPeaksCacheMb) * 1024L * 1024;
+        }
 
         partial void OnShowSpectrumChanged(bool value)
         {

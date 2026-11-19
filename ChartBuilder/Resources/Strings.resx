@@ -2643,7 +2643,7 @@ Saving also changes song.ini:
     <comment>Settings: the row that picks how finely waveforms are read.</comment>
   </data>
   <data name="WaveformFidelityDescription" xml:space="preserve">
-    <value>How finely each track's waveform is read: finer detail shows note starts more sharply in the lanes but takes longer to read and more memory. Changing it re-reads the tracks.</value>
+    <value>How finely waveforms are read and drawn.</value>
     <comment>Settings: what the Waveform detail row does.</comment>
   </data>
   <data name="WaveformFidelityKeywords" xml:space="preserve">
@@ -2651,20 +2651,20 @@ Saving also changes song.ini:
     <comment>Settings: search words for the Waveform detail row, separated by spaces.</comment>
   </data>
   <data name="WaveformFidelityLow" xml:space="preserve">
-    <value>Low (20 ms)</value>
-    <comment>A choice of Waveform detail: how long each bar of the waveform is.</comment>
+    <value>Low</value>
+    <comment>A choice of Waveform detail.</comment>
   </data>
   <data name="WaveformFidelityMedium" xml:space="preserve">
-    <value>Medium (10 ms)</value>
-    <comment>A choice of Waveform detail: how long each bar of the waveform is.</comment>
+    <value>Medium</value>
+    <comment>A choice of Waveform detail.</comment>
   </data>
   <data name="WaveformFidelityHigh" xml:space="preserve">
-    <value>High (5 ms)</value>
-    <comment>A choice of Waveform detail: how long each bar of the waveform is.</comment>
+    <value>High</value>
+    <comment>A choice of Waveform detail.</comment>
   </data>
   <data name="WaveformFidelityUltra" xml:space="preserve">
-    <value>Ultra (2.5 ms)</value>
-    <comment>A choice of Waveform detail: how long each bar of the waveform is.</comment>
+    <value>Ultra</value>
+    <comment>A choice of Waveform detail.</comment>
   </data>
   <data name="SpectrogramBudgetLabel" xml:space="preserve">
     <value>Spectrogram Memory Budget (MB)</value>
@@ -2674,6 +2674,18 @@ Saving also changes song.ini:
   </data>
   <data name="SpectrogramBudgetKeywords" xml:space="preserve">
     <value>spectrogram memory budget ram megabytes</value>
+  </data>
+  <data name="PeaksCacheLabel" xml:space="preserve">
+    <value>Waveform Cache (MB)</value>
+    <comment>Settings: the row that sets how much memory waveforms already read are kept in.</comment>
+  </data>
+  <data name="PeaksCacheDescription" xml:space="preserve">
+    <value>How much memory waveforms already read are kept in, so a chart opened again shows its waveforms at once.</value>
+    <comment>Settings: what the Waveform Cache row does.</comment>
+  </data>
+  <data name="PeaksCacheKeywords" xml:space="preserve">
+    <value>waveform cache memory ram megabytes peaks</value>
+    <comment>Settings: search words for the Waveform Cache row, separated by spaces.</comment>
   </data>
   <data name="SpectrogramSharpeningLabel" xml:space="preserve">
     <value>Sharpen Spectrograms</value>

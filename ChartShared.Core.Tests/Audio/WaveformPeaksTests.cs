@@ -24,7 +24,8 @@ public sealed class WaveformPeaksTests
 
         Assert.AreEqual("guitar", peaks.Name);
         Assert.AreSequenceEqual([0f, -0.25f, 0f], [.. peaks.Min]);
-        Assert.AreSequenceEqual([0.5f, 0.75f, 0.1f], [.. peaks.Max]);
+        // Kept at half precision, which holds 0.5 and 0.75 exactly.
+        Assert.AreSequenceEqual([0.5f, 0.75f, (float)(Half)0.1f], [.. peaks.Max]);
     }
 
     [TestMethod]
@@ -50,7 +51,7 @@ public sealed class WaveformPeaksTests
 
         var peaks = WaveformPeaks.Compute("x", source, TestContext.CancellationToken);
 
-        Assert.AreEqual(0.3f, peaks.Max[0], 1e-6f);
+        Assert.AreEqual(0.3f, peaks.Max[0], 1e-3f, "Kept at half precision.");
     }
 
     [TestMethod]
@@ -191,7 +192,7 @@ public sealed class WaveformPeaksTests
 
         var mix = WaveformPeaks.Mix([new AudibleStem(spike, false, false, 0.5f), Stem(0.25f, muted: true)]);
 
-        Assert.AreEqual(0.45f, mix.Max[0], 1e-6f);
+        Assert.AreEqual(0.45f, mix.Max[0], 1e-3f, "Kept at half precision.");
     }
 
     [TestMethod]

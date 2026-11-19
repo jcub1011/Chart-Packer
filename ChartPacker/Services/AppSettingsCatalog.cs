@@ -267,6 +267,19 @@ namespace ChartPacker.Services
                         Get = () => player.WaveformFidelity,
                         Set = fidelity => player.WaveformFidelity = fidelity,
                     },
+                    new IntegerSetting
+                    {
+                        Id = "playback.peaksCache",
+                        Category = visualizers,
+                        Label = Strings.PeaksCacheLabel,
+                        Description = Strings.PeaksCacheDescription,
+                        Keywords = SettingKeywords.Split(Strings.PeaksCacheKeywords),
+                        DefaultValue = AppSettings.DefaultPeaksCacheMb,
+                        Minimum = AppSettings.MinPeaksCacheMb,
+                        Maximum = AppSettings.MaxPeaksCacheMb,
+                        Get = () => player.PeaksCacheMb,
+                        Set = megabytes => player.PeaksCacheMb = megabytes,
+                    },
                     new ToggleSetting
                     {
                         Id = "playback.showSpectrum",

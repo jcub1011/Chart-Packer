@@ -96,9 +96,10 @@ namespace ChartBuilder.ViewModels
             RefreshAudible();
         }
 
-        /// <summary>Takes up what may have changed in Settings: the memory budget, spectrogram sharpening, and the waveform detail.</summary>
+        /// <summary>Takes up what may have changed in Settings: the memory budgets, spectrogram sharpening, and the waveform detail.</summary>
         public void ReloadSettings(BuilderSettings settings)
         {
+            StemPeaksCache.Shared.CapacityBytes = settings.PeaksCacheMb * 1024L * 1024;
             _budget = BudgetOf(settings);
             Analysis.SetBudget(_budget);
             _decoded.BudgetBytes = _budget;

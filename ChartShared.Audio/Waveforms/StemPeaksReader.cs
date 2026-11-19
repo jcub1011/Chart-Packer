@@ -49,7 +49,7 @@ public sealed class StemPeaksReader
     /// on two at once. Not at all when the length isn't known.
     /// </param>
     /// <param name="chunkBuckets">How long each chunk is, in buckets; <see cref="DefaultChunkSeconds"/> unless given.</param>
-    /// <param name="resolution">How finely to read it; <see cref="WaveformResolution.Low"/> unless given.</param>
+    /// <param name="resolution">How finely to read it; <see cref="WaveformResolution.Default"/> unless given.</param>
     /// <param name="channels">Read the left and right channels' peaks too (<see cref="StemPeaks.HasChannels"/>).</param>
     public StemPeaksReader(string name, IPcmSource source, Action<StemPeaks>? progress = null, TimeSpan progressInterval = default, int? chunkBuckets = null, WaveformResolution? resolution = null, bool channels = false)
     {
@@ -57,7 +57,7 @@ public sealed class StemPeaksReader
         ArgumentNullException.ThrowIfNull(source);
 
         _name = name;
-        _resolution = resolution ?? WaveformResolution.Low;
+        _resolution = resolution ?? WaveformResolution.Default;
         _rate = source.SampleRate;
         _channels = source.Channels;
         long length = source.LengthFrames;
@@ -309,63 +309,54 @@ public sealed class StemPeaksReader
     /// <summary>
     /// One set of peaks being filled: the averaged channels', or one channel's. As long as the whole stem when that's
     /// known, so they're filled rather than grown: other threads write them, and snapshots share them. What the last
-    /// chunk finds past the length goes to the overflow instead, which only it writes and only finishing reads.
+    /// chunk finds past the length goes to the overflow instead, which only it writes and only finishing reads. Stretches
+    /// that are silent take no memory (<see cref="HalfChunks"/>).
     /// </summary>
     private sealed class Lane(int buckets, int ticks)
     {
-        private readonly float[] _min = new float[buckets];
-        private readonly float[] _max = new float[buckets];
-        private readonly float[] _rms = new float[buckets];
-        private readonly Half[] _signal = new Half[ticks];
-        private readonly List<float> _minOverflow = [];
-        private readonly List<float> _maxOverflow = [];
-        private readonly List<float> _rmsOverflow = [];
+        private readonly HalfChunks _min = new(buckets, HalfChunks.BucketShift);
+        private readonly HalfChunks _max = new(buckets, HalfChunks.BucketShift);
+        private readonly HalfChunks _rms = new(buckets, HalfChunks.BucketShift);
+        private readonly HalfChunks _signal = new(ticks, HalfChunks.SignalShift);
+        private readonly List<Half> _minOverflow = [];
+        private readonly List<Half> _maxOverflow = [];
+        private readonly List<Half> _rmsOverflow = [];
         private readonly List<Half> _signalOverflow = [];
 
         public void PutBucket(int index, float low, float high, float rms)
         {
-            if (index < _min.Length)
+            if (index < _min.Count)
             {
-                _min[index] = low;
-                _max[index] = high;
-                _rms[index] = rms;
+                _min.Set(index, low);
+                _max.Set(index, high);
+                _rms.Set(index, rms);
             }
             else
             {
                 // Only the last chunk reaches past the length, one bucket after another.
-                _minOverflow.Add(low);
-                _maxOverflow.Add(high);
-                _rmsOverflow.Add(rms);
+                _minOverflow.Add((Half)low);
+                _maxOverflow.Add((Half)high);
+                _rmsOverflow.Add((Half)rms);
             }
         }
 
         public void PutTick(int index, Half value)
         {
-            if (index < _signal.Length)
-                _signal[index] = value;
+            if (index < _signal.Count)
+                _signal.Set(index, value);
             else
                 _signalOverflow.Add(value);
         }
 
         public StemPeaks Finished(string name, WaveformResolution resolution, int buckets, int ticks) =>
-            new(name, resolution, Trim(_min, _minOverflow, buckets), Trim(_max, _maxOverflow, buckets), Trim(_rms, _rmsOverflow, buckets), Trim(_signal, _signalOverflow, ticks), buckets, buckets, ticks);
+            new(name, resolution, Fit(_min, _minOverflow, buckets), Fit(_max, _maxOverflow, buckets), Fit(_rms, _rmsOverflow, buckets), Fit(_signal, _signalOverflow, ticks), buckets, buckets, ticks);
 
         public StemPeaks SoFar(string name, WaveformResolution resolution, int count, int buckets, int ticks) =>
-            new(name, resolution, _min, _max, _rms, _signal, count, buckets, Math.Min(ticks, _signal.Length));
+            new(name, resolution, _min, _max, _rms, _signal, count, buckets, Math.Min(ticks, _signal.Count));
 
-        /// <summary>The first <paramref name="count"/> of <paramref name="array"/> then <paramref name="overflow"/>: the array itself when that's all of it.</summary>
-        private static T[] Trim<T>(T[] array, List<T> overflow, int count)
-        {
-            if (array.Length == count && overflow.Count == 0)
-                return array;
-
-            var trimmed = new T[count];
-            int fromArray = Math.Min(count, array.Length);
-            array.AsSpan(0, fromArray).CopyTo(trimmed);
-            for (int i = fromArray; i < count; i++)
-                trimmed[i] = overflow[i - array.Length];
-            return trimmed;
-        }
+        /// <summary>The first <paramref name="count"/> of <paramref name="values"/> then <paramref name="overflow"/>: the values themselves when that's all of them.</summary>
+        private static HalfChunks Fit(HalfChunks values, List<Half> overflow, int count) =>
+            count <= values.Count ? values.Trimmed(count) : values.Extended(values.Count, overflow.GetRange(0, count - values.Count));
     }
 
     /// <summary>One chunk's buckets, and how far it has been read, published after the arrays are written.</summary>

@@ -6,16 +6,16 @@ namespace ChartShared.Audio.Waveforms;
 /// <summary>How finely a waveform is read: each a <see cref="WaveformResolution"/>, from coarsest to finest.</summary>
 public enum WaveformFidelity
 {
-    /// <summary>20 ms a bucket.</summary>
+    /// <summary>8 ms a bucket.</summary>
     Low,
 
-    /// <summary>10 ms a bucket.</summary>
+    /// <summary>4 ms a bucket.</summary>
     Medium,
 
-    /// <summary>5 ms a bucket.</summary>
+    /// <summary>2 ms a bucket.</summary>
     High,
 
-    /// <summary>2.5 ms a bucket.</summary>
+    /// <summary>1 ms a bucket.</summary>
     Ultra,
 }
 
@@ -25,17 +25,20 @@ public enum WaveformFidelity
 /// </summary>
 public readonly record struct WaveformResolution
 {
-    /// <summary>20 ms a bucket, sampled 40 times a bucket.</summary>
-    public static readonly WaveformResolution Low = new(50);
+    /// <summary>8 ms a bucket, sampled 16 times a bucket.</summary>
+    public static readonly WaveformResolution Low = new(125);
 
-    /// <summary>10 ms a bucket, sampled 20 times a bucket.</summary>
-    public static readonly WaveformResolution Medium = new(100);
+    /// <summary>4 ms a bucket, sampled 10 times a bucket.</summary>
+    public static readonly WaveformResolution Medium = new(250);
 
-    /// <summary>5 ms a bucket, sampled 10 times a bucket.</summary>
-    public static readonly WaveformResolution High = new(200);
+    /// <summary>2 ms a bucket, sampled 10 times a bucket.</summary>
+    public static readonly WaveformResolution High = new(500);
 
-    /// <summary>2.5 ms a bucket, sampled 10 times a bucket.</summary>
-    public static readonly WaveformResolution Ultra = new(400);
+    /// <summary>1 ms a bucket, sampled 10 times a bucket.</summary>
+    public static readonly WaveformResolution Ultra = new(1000);
+
+    /// <summary>20 ms a bucket, sampled 40 times a bucket: what a read that doesn't say how finely is read at.</summary>
+    public static readonly WaveformResolution Default = new(50);
 
     // Sampled fewer times a bucket than this, a mix's peaks would be guesswork.
     private const int MinTicksPerBucket = 10;
@@ -81,9 +84,9 @@ public sealed class StemPeaks
     private StemPeaks? _left;
     private StemPeaks? _right;
 
-    // The arrays may be longer than what has been read, and a progress snapshot's are still being filled past
+    // The series may be longer than what has been read, and a progress snapshot's are still being filled past
     // it: only the first readBuckets and readTicks are ever looked at, and the reader never writes those again.
-    internal StemPeaks(string name, WaveformResolution resolution, float[] min, float[] max, float[] rms, Half[] signal, int count, int readBuckets, int readTicks)
+    internal StemPeaks(string name, WaveformResolution resolution, HalfChunks min, HalfChunks max, HalfChunks rms, HalfChunks signal, int count, int readBuckets, int readTicks)
     {
         Name = name;
         Resolution = resolution;
@@ -94,9 +97,9 @@ public sealed class StemPeaks
         Count = count;
         ReadBuckets = readBuckets;
         ReadTicks = readTicks;
-        Min = ReadSoFar.Of(min, readBuckets, count);
-        Max = ReadSoFar.Of(max, readBuckets, count);
-        Rms = ReadSoFar.Of(rms, readBuckets, count);
+        Min = new ReadSoFar(min, readBuckets, count);
+        Max = new ReadSoFar(max, readBuckets, count);
+        Rms = new ReadSoFar(rms, readBuckets, count);
         Peak = PeakOf(min, max, readBuckets);
     }
 
@@ -141,23 +144,24 @@ public sealed class StemPeaks
     public float Peak { get; }
 
     /// <summary>Roughly how much memory the peaks take, each channel's included.</summary>
+    /// <remarks>Stretches where the stem is silent take none: see <see cref="HalfChunks"/>.</remarks>
     public long SizeBytes => OwnSizeBytes + (_left?.OwnSizeBytes ?? 0) + (_right?.OwnSizeBytes ?? 0);
 
-    private long OwnSizeBytes => ((long)(MinBuckets.Length + MaxBuckets.Length + RmsBuckets.Length) * sizeof(float)) + ((long)Signal.Length * 2);
+    private long OwnSizeBytes => MinBuckets.SizeBytes + MaxBuckets.SizeBytes + RmsBuckets.SizeBytes + Signal.SizeBytes;
 
-    // The same buckets as arrays, so that mixing indexes them directly; those from ReadBuckets on are silent.
-    internal float[] MinBuckets { get; }
+    // The same buckets, as half-precision floats, so that mixing reads them directly; those from ReadBuckets on are silent.
+    internal HalfChunks MinBuckets { get; }
 
-    internal float[] MaxBuckets { get; }
+    internal HalfChunks MaxBuckets { get; }
 
-    internal float[] RmsBuckets { get; }
+    internal HalfChunks RmsBuckets { get; }
 
     internal int ReadBuckets { get; }
 
     // The stem's samples, channels averaged, at each tick of the Resolution.SignalRate grid: tick k is the first frame
     // at or after k / SignalRate seconds, so every stem is sampled at the same instants whatever its rate.
     // Those from ReadTicks on are silent.
-    internal Half[] Signal { get; }
+    internal HalfChunks Signal { get; }
 
     internal int ReadTicks { get; }
 
@@ -171,41 +175,47 @@ public sealed class StemPeaks
     }
 
     /// <summary>How far the first <paramref name="read"/> buckets of <paramref name="min"/> and <paramref name="max"/> reach.</summary>
-    internal static float PeakOf(float[] min, float[] max, int read)
+    internal static float PeakOf(HalfChunks min, HalfChunks max, int read)
     {
         float peak = 0;
-        for (int i = 0; i < read; i++)
-            peak = Math.Max(peak, Math.Max(-min[i], max[i]));
+        foreach (var span in min.Spans(0, read))
+        {
+            foreach (var value in span.Values)
+                peak = Math.Max(peak, -(float)value);
+        }
+
+        foreach (var span in max.Spans(0, read))
+        {
+            foreach (var value in span.Values)
+                peak = Math.Max(peak, (float)value);
+        }
+
         return peak;
     }
+}
 
-    /// <summary>The first <c>read</c> values of an array being filled, then silence up to <c>count</c>.</summary>
-    private sealed class ReadSoFar(float[] values, int read, int count) : IReadOnlyList<float>
+/// <summary>The first <c>read</c> values of a series being filled, then silence up to <c>count</c>.</summary>
+internal sealed class ReadSoFar(HalfChunks values, int read, int count) : IReadOnlyList<float>
+{
+    public int Count => count;
+
+    public float this[int index]
     {
-        /// <summary><paramref name="values"/> itself when it's all read and as long as it should be, else a view of what's read.</summary>
-        public static IReadOnlyList<float> Of(float[] values, int read, int count) =>
-            read == count && values.Length == count ? values : new ReadSoFar(values, read, count);
-
-        public int Count => count;
-
-        public float this[int index]
+        get
         {
-            get
-            {
-                ArgumentOutOfRangeException.ThrowIfNegative(index);
-                ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, count);
-                return index < read ? values[index] : 0f;
-            }
+            ArgumentOutOfRangeException.ThrowIfNegative(index);
+            ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, count);
+            return index < read ? (float)values[index] : 0f;
         }
-
-        public IEnumerator<float> GetEnumerator()
-        {
-            for (int i = 0; i < count; i++)
-                yield return i < read ? values[i] : 0f;
-        }
-
-        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
+
+    public IEnumerator<float> GetEnumerator()
+    {
+        for (int i = 0; i < count; i++)
+            yield return i < read ? (float)values[i] : 0f;
+    }
+
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 }
 
 /// <summary>A stem's peaks with the switches that decide whether it's heard, and how loudly.</summary>
@@ -215,22 +225,23 @@ public readonly record struct AudibleStem(StemPeaks Peaks, bool IsMuted, bool Is
 /// <summary>The peaks of everything that is heard, as drawn; see <see cref="WaveformPeaks.Mix"/>.</summary>
 public sealed class Waveform
 {
-    public static readonly Waveform Empty = new(WaveformResolution.Low, [], [], [], [], [], [], 0, 0);
+    public static readonly Waveform Empty = new(WaveformResolution.Default, HalfChunks.Empty, HalfChunks.Empty, HalfChunks.Empty, 0, 0, 0, 0);
 
-    // The buckets as arrays too, at least readCount long, so that drawing reads them directly.
-    private readonly float[] _min;
-    private readonly float[] _max;
-    private readonly float[] _rms;
+    // The buckets, as half-precision floats in chunks, so that drawing reads them directly and skips silent stretches whole.
+    private readonly HalfChunks _min;
+    private readonly HalfChunks _max;
+    private readonly HalfChunks _rms;
 
-    internal Waveform(WaveformResolution resolution, IReadOnlyList<float> min, IReadOnlyList<float> max, IReadOnlyList<float> rms, float[] minBuckets, float[] maxBuckets, float[] rmsBuckets, int readCount, float peak)
+    /// <param name="listed">How many of the values <see cref="Min"/>, <see cref="Max"/> and <see cref="Rms"/> show; the rest are silent.</param>
+    internal Waveform(WaveformResolution resolution, HalfChunks min, HalfChunks max, HalfChunks rms, int count, int listed, int readCount, float peak)
     {
         Resolution = resolution;
-        Min = min;
-        Max = max;
-        Rms = rms;
-        _min = minBuckets;
-        _max = maxBuckets;
-        _rms = rmsBuckets;
+        Min = new ReadSoFar(min, listed, count);
+        Max = new ReadSoFar(max, listed, count);
+        Rms = new ReadSoFar(rms, listed, count);
+        _min = min;
+        _max = max;
+        _rms = rms;
         ReadCount = readCount;
         Peak = peak;
     }
@@ -277,13 +288,25 @@ public sealed class Waveform
         first = Math.Max(0, first);
         last = Math.Min(ReadCount, last);
 
+        // A chunk at a time, skipping silent ones whole.
         float low = 0, high = 0;
         double squares = 0;
-        for (int i = first; i < last; i++)
+        foreach (var span in _min.Spans(first, last))
         {
-            low = Math.Min(low, _min[i]);
-            high = Math.Max(high, _max[i]);
-            squares += (double)_rms[i] * _rms[i];
+            foreach (var value in span.Values)
+                low = Math.Min(low, (float)value);
+        }
+
+        foreach (var span in _max.Spans(first, last))
+        {
+            foreach (var value in span.Values)
+                high = Math.Max(high, (float)value);
+        }
+
+        foreach (var span in _rms.Spans(first, last))
+        {
+            foreach (var value in span.Values)
+                squares += (double)(float)value * (float)value;
         }
 
         return (low, high, last > first ? Math.Sqrt(squares / (last - first)) : 0);
@@ -322,7 +345,7 @@ public static class WaveformPeaks
     /// what had been read when it was taken. The result is the same as without progress.
     /// </remarks>
     /// <exception cref="OperationCanceledException"><paramref name="cancellationToken"/> was cancelled.</exception>
-    /// <param name="resolution">How finely to read it; <see cref="WaveformResolution.Low"/> unless given.</param>
+    /// <param name="resolution">How finely to read it; <see cref="WaveformResolution.Default"/> unless given.</param>
     /// <param name="channels">Read the left and right channels' peaks too (<see cref="StemPeaks.HasChannels"/>).</param>
     public static StemPeaks Compute(string name, IPcmSource source, Action<StemPeaks>? progress, TimeSpan progressInterval, CancellationToken cancellationToken = default, WaveformResolution? resolution = null, bool channels = false)
     {
@@ -351,14 +374,14 @@ public static class WaveformPeaks
     {
         ArgumentNullException.ThrowIfNull(stems);
 
-        var resolution = stems.Count > 0 ? stems[0].Peaks.Resolution : WaveformResolution.Low;
+        var resolution = stems.Count > 0 ? stems[0].Peaks.Resolution : WaveformResolution.Default;
         if (stems.Any(s => s.Peaks.Resolution != resolution))
             throw new ArgumentException("The stems were read at different resolutions.", nameof(stems));
 
         int count = stems.Select(s => s.Peaks.Count).DefaultIfEmpty(0).Max();
-        var min = new float[count];
-        var max = new float[count];
-        var rms = new float[count];
+        var min = new HalfChunks(count, HalfChunks.BucketShift);
+        var max = new HalfChunks(count, HalfChunks.BucketShift);
+        var rms = new HalfChunks(count, HalfChunks.BucketShift);
 
         bool anySolo = stems.Any(s => s.IsSolo);
         var heard = stems.Where(s => (anySolo ? s.IsSolo : !s.IsMuted) && s.Volume > 0).ToList();
@@ -371,15 +394,20 @@ public static class WaveformPeaks
 
         if (heard.Count == 1)
         {
+            // Its silent stretches stay silent, and take nothing.
             float volume = heard[0].Volume;
-            float[] stemMin = heard[0].Peaks.MinBuckets;
-            float[] stemMax = heard[0].Peaks.MaxBuckets;
-            float[] stemRms = heard[0].Peaks.RmsBuckets;
-            for (int i = 0; i < heard[0].Peaks.ReadBuckets; i++)
+            int read = heard[0].Peaks.ReadBuckets;
+            Scale(heard[0].Peaks.MinBuckets, min, -1f, 0f);
+            Scale(heard[0].Peaks.MaxBuckets, max, 0f, 1f);
+            Scale(heard[0].Peaks.RmsBuckets, rms, 0f, 1f);
+
+            void Scale(HalfChunks from, HalfChunks into, float lowest, float highest)
             {
-                min[i] = Math.Clamp(stemMin[i] * volume, -1f, 0f);
-                max[i] = Math.Clamp(stemMax[i] * volume, 0f, 1f);
-                rms[i] = Math.Clamp(stemRms[i] * volume, 0f, 1f);
+                foreach (var span in from.Spans(0, read))
+                {
+                    for (int i = 0; i < span.Values.Length; i++)
+                        into.Set(span.Start + i, Math.Clamp((float)span.Values[i] * volume, lowest, highest));
+                }
             }
         }
         else if (heard.Count > 1)
@@ -395,10 +423,13 @@ public static class WaveformPeaks
                 int covered = 0;
                 foreach (var stem in heard)
                 {
-                    Half[] stemSignal = stem.Peaks.Signal;
                     int end = Math.Min(stem.Peaks.ReadTicks, first + ticksPerBucket);
-                    for (int k = first; k < end; k++)
-                        sum[k - first] += (float)stemSignal[k] * stem.Volume;
+                    foreach (var span in stem.Peaks.Signal.Spans(first, end))
+                    {
+                        for (int k = 0; k < span.Values.Length; k++)
+                            sum[span.Start - first + k] += (float)span.Values[k] * stem.Volume;
+                    }
+
                     covered = Math.Max(covered, end - first);
                 }
 
@@ -414,14 +445,14 @@ public static class WaveformPeaks
                     squares += (double)clipped * clipped;
                 }
 
-                min[b] = low;
-                max[b] = high;
-                rms[b] = RootMeanSquare(squares, covered);
+                min.Set(b, low);
+                max.Set(b, high);
+                rms.Set(b, RootMeanSquare(squares, covered));
             }
         }
 
         readCount = Math.Min(readCount, count);
-        return new Waveform(resolution, min, max, rms, min, max, rms, readCount, StemPeaks.PeakOf(min, max, readCount));
+        return new Waveform(resolution, min, max, rms, count, count, readCount, StemPeaks.PeakOf(min, max, readCount));
     }
 
     /// <summary>
@@ -444,7 +475,7 @@ public static class WaveformPeaks
     public static Waveform Of(StemPeaks peaks)
     {
         ArgumentNullException.ThrowIfNull(peaks);
-        return new Waveform(peaks.Resolution, peaks.Min, peaks.Max, peaks.Rms, peaks.MinBuckets, peaks.MaxBuckets, peaks.RmsBuckets, peaks.ReadBuckets, peaks.Peak);
+        return new Waveform(peaks.Resolution, peaks.MinBuckets, peaks.MaxBuckets, peaks.RmsBuckets, peaks.Count, peaks.ReadBuckets, peaks.ReadBuckets, peaks.Peak);
     }
 
     internal static float RootMeanSquare(double squares, int count) => count <= 0 ? 0f : (float)Math.Sqrt(squares / count);

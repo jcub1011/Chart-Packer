@@ -35,6 +35,9 @@ namespace ChartPacker.Services
         public const double DefaultGenerateDifficultiesPixelsPerSecond = ChartShared.Core.Charting.HighwayPixelsPerSecond.Default;
         public const HighwayPlacement DefaultHighwayPlacement = HighwayPlacement.Background;
         public const WaveformFidelity DefaultWaveformFidelity = WaveformFidelity.High;
+        public const int DefaultPeaksCacheMb = 128;
+        public const int MinPeaksCacheMb = 16;
+        public const int MaxPeaksCacheMb = 1024;
         public const ScrubStep DefaultScrubStep = ScrubStep.Quarter;
         public const double DefaultFineScrubMilliseconds = 5;
         public const double MinFineScrubMilliseconds = 0.5;
@@ -134,6 +137,12 @@ namespace ChartPacker.Services
         /// <summary>How finely the tracks' waveforms are read.</summary>
         [JsonConverter(typeof(JsonStringEnumConverter<WaveformFidelity>))]
         public WaveformFidelity WaveformFidelity { get; set; } = DefaultWaveformFidelity;
+
+        /// <summary>
+        /// How much memory the tracks' waveforms are kept in once read, in MB, so a song shown again shows them at once
+        /// (<c>StemPeaksCache.Shared</c>).
+        /// </summary>
+        public int PeaksCacheMb { get; set; } = DefaultPeaksCacheMb;
 
         /// <summary>Whether the spectrum is drawn behind the details panel. Off, it isn't worked out at all.</summary>
         public bool ShowSpectrum { get; set; } = true;
