@@ -7,7 +7,7 @@ namespace ChartShared.Core.Tests.Audio;
 [TestClass]
 public sealed class AudibleSpansTests
 {
-    // At 8000 Hz and the editor's resolution, a bucket is 40 frames, 5 ms.
+    // At 8000 Hz and the editor's resolution, a bucket is 16 frames, 2 ms.
     private const int Rate = 8000;
 
     public TestContext TestContext { get; set; } = null!;
@@ -33,10 +33,10 @@ public sealed class AudibleSpansTests
     [TestMethod]
     public void SoundTheStemEndsInCountsHoweverShort()
     {
-        // 25 ms at the very end: it's cut off, not a click.
-        var stem = Peaks("song", 16000, n => n >= 15800 ? 0.5f : 0f);
+        // 24 ms at the very end, from the start of a bucket: it's cut off, not a click.
+        var stem = Peaks("song", 16000, n => n >= 15808 ? 0.5f : 0f);
 
-        Assert.AreEqual(new AudibleRange(15800.0 / Rate, 2.0), AudibleSpans.Of([stem]));
+        Assert.AreEqual(new AudibleRange(15808.0 / Rate, 2.0), AudibleSpans.Of([stem]));
     }
 
     [TestMethod]
@@ -67,7 +67,7 @@ public sealed class AudibleSpansTests
     [TestMethod]
     public void AStemNotReadToItsEndIsRefused()
     {
-        var partial = new StemPeaks("song", WaveformResolution.High, new float[10], new float[10], new float[10], [], 10, 5, 0);
+        var partial = new StemPeaks("song", WaveformResolution.High, new HalfChunks(10, HalfChunks.BucketShift), new HalfChunks(10, HalfChunks.BucketShift), new HalfChunks(10, HalfChunks.BucketShift), HalfChunks.Empty, 10, 5, 0);
 
         Assert.ThrowsExactly<ArgumentException>(() => AudibleSpans.Of([partial]));
     }

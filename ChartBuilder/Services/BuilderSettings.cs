@@ -179,6 +179,24 @@ namespace ChartBuilder.Services
         /// <summary>The spectrogram memory budget of fresh settings, in MB: room for six 10-minute stems.</summary>
         public const int DefaultSpectrogramBudgetMb = 512;
 
+        /// <summary>The least the waveform cache can be, in MB.</summary>
+        public const int MinPeaksCacheMb = 16;
+
+        /// <summary>The most the waveform cache can be, in MB.</summary>
+        public const int MaxPeaksCacheMb = 1024;
+
+        /// <summary>
+        /// How much memory the waveforms read are kept in, in MB, so a chart opened again, or its song saved, shows them at once
+        /// (<c>StemPeaksCache.Shared</c>).
+        /// </summary>
+        public int PeaksCacheMb { get; set; } = DefaultPeaksCacheMb;
+
+        /// <summary>
+        /// The waveform cache of fresh settings, in MB: six 10-minute stems at the finest detail, about 16 MB each with their channels
+        /// averaged. Read by channel, as stereo lanes are, a stem takes three times as much, so fewer fit.
+        /// </summary>
+        public const int DefaultPeaksCacheMb = 128;
+
         /// <summary>
         /// Whether spectrograms are sharpened: each part of the sound drawn at the pitch and the time it's really at, so
         /// notes are thin lines and hits thin columns, rather than as blurred as the analysis's windows are wide

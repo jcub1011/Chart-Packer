@@ -6,10 +6,10 @@ namespace ChartShared.Core.Tests.Audio;
 public sealed class WaveformResolutionTests
 {
     [TestMethod]
-    [DataRow(WaveformFidelity.Low, 50, 2000)]
-    [DataRow(WaveformFidelity.Medium, 100, 2000)]
-    [DataRow(WaveformFidelity.High, 200, 2000)]
-    [DataRow(WaveformFidelity.Ultra, 400, 4000)]
+    [DataRow(WaveformFidelity.Low, 125, 2000)]
+    [DataRow(WaveformFidelity.Medium, 250, 2500)]
+    [DataRow(WaveformFidelity.High, 500, 5000)]
+    [DataRow(WaveformFidelity.Ultra, 1000, 10000)]
     public void EachFidelityHasItsBucketsAndSamplesForMixing(WaveformFidelity fidelity, int bucketsPerSecond, int signalRate)
     {
         var resolution = WaveformResolution.Of(fidelity);
@@ -46,14 +46,15 @@ public sealed class WaveformResolutionTests
     [TestMethod]
     public void AFinerResolutionShowsWhatACoarserOneBlursTogether()
     {
-        // A click 2 ms long, 10 ms in: 20 ms buckets hold it whole; 2.5 ms ones place it.
-        static TestAudio.FakeSource Click() => new(48000, 1, 4800, (n, _) => n is >= 480 and < 576 ? 0.8f : 0f);
+        // A click half a millisecond long, 10 ms in: 8 ms buckets hold it with what's around it; 1 ms ones place it.
+        static TestAudio.FakeSource Click() => new(48000, 1, 4800, (n, _) => n is >= 480 and < 504 ? 0.8f : 0f);
 
         var low = WaveformPeaks.Compute("x", Click(), WaveformResolution.Low, TestContext.CancellationToken);
         var ultra = WaveformPeaks.Compute("x", Click(), WaveformResolution.Ultra, TestContext.CancellationToken);
 
-        Assert.AreSequenceEqual([0.8f, 0f, 0f, 0f, 0f], [.. low.Max]);
-        Assert.AreEqual(4, ultra.Max.ToList().FindIndex(v => v > 0), "The click starts in the fifth 2.5 ms bucket.");
+        float click = (float)(Half)0.8f;
+        Assert.AreSequenceEqual([0f, click, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f], [.. low.Max]);
+        Assert.AreEqual(10, ultra.Max.ToList().FindIndex(v => v > 0), "The click is in the eleventh 1 ms bucket.");
         Assert.ContainsSingle(v => v > 0, ultra.Max);
     }
 

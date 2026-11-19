@@ -95,6 +95,7 @@ namespace ChartBuilder.Services
             if (!Enum.IsDefined(settings.WaveformFidelity))
                 settings.WaveformFidelity = BuilderSettings.DefaultWaveformFidelity;
             settings.SpectrogramBudgetMb = Math.Clamp(settings.SpectrogramBudgetMb, BuilderSettings.MinSpectrogramBudgetMb, BuilderSettings.MaxSpectrogramBudgetMb);
+            settings.PeaksCacheMb = Math.Clamp(settings.PeaksCacheMb, BuilderSettings.MinPeaksCacheMb, BuilderSettings.MaxPeaksCacheMb);
             settings.EditorHighwaySpeed = double.IsFinite(settings.EditorHighwaySpeed)
                 ? Math.Clamp(settings.EditorHighwaySpeed, BuilderSettings.MinEditorHighwaySpeed, BuilderSettings.MaxEditorHighwaySpeed)
                 : 1;

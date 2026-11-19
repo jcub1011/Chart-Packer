@@ -51,7 +51,11 @@ public sealed class AlignmentAudio
         return energy > 0 ? new AlignmentAudio(onsets, energy) : null;
     }
 
-    /// <summary>The stems summed, at <see cref="AudioAligner.MixRate"/>: each stem's samples for mixing averaged down to it.</summary>
+    /// <summary>
+    /// The stems summed, at <see cref="AudioAligner.MixRate"/>: each stem's samples for mixing averaged down to it, over just the time
+    /// each sample of the mix covers. Where the stem's rate isn't a multiple of the mix's, the samples it shares with its neighbours
+    /// count for as much of each as falls in it, so every sample of the mix is an average over the same length of time.
+    /// </summary>
     private static float[] Mix(IReadOnlyList<StemPeaks> stems)
     {
         int length = stems.Select(s => (int)((long)s.ReadTicks * AudioAligner.MixRate / s.Resolution.SignalRate)).DefaultIfEmpty(0).Max();
@@ -59,18 +63,24 @@ public sealed class AlignmentAudio
         foreach (var stem in stems)
         {
             int rate = stem.Resolution.SignalRate;
-            Half[] signal = stem.Signal;
+            var signal = stem.Signal;
+
+            // Sample n of the mix covers the stem's samples from n * rate / MixRate to (n + 1) * rate / MixRate, in units of 1 / MixRate
+            // of a sample, so the fractions at its ends are whole numbers.
             for (int n = 0; n < length; n++)
             {
-                long first = (long)n * rate / AudioAligner.MixRate;
-                long end = Math.Min((long)(n + 1) * rate / AudioAligner.MixRate, stem.ReadTicks);
-                if (first >= end)
+                long from = (long)n * rate, to = Math.Min((long)(n + 1) * rate, (long)stem.ReadTicks * AudioAligner.MixRate);
+                if (from >= to)
                     break;
 
-                float sum = 0;
-                for (long k = first; k < end; k++)
-                    sum += (float)signal[k];
-                mix[n] += sum / (end - first);
+                double sum = 0;
+                for (long k = from / AudioAligner.MixRate; k * AudioAligner.MixRate < to; k++)
+                {
+                    long overlap = Math.Min((k + 1) * AudioAligner.MixRate, to) - Math.Max(k * AudioAligner.MixRate, from);
+                    sum += (double)(float)signal[(int)k] * overlap;
+                }
+
+                mix[n] += (float)(sum / (to - from));
             }
         }
 

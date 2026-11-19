@@ -89,6 +89,7 @@ namespace ChartPacker.Services
 
             if (!Enum.IsDefined(settings.WaveformFidelity))
                 settings.WaveformFidelity = AppSettings.DefaultWaveformFidelity;
+            settings.PeaksCacheMb = Math.Clamp(settings.PeaksCacheMb, AppSettings.MinPeaksCacheMb, AppSettings.MaxPeaksCacheMb);
 
             if (!Enum.IsDefined(settings.ScrubStep))
                 settings.ScrubStep = AppSettings.DefaultScrubStep;

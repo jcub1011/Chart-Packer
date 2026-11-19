@@ -5,6 +5,7 @@ using Avalonia.Markup.Xaml;
 using ChartBuilder.Resources;
 using ChartBuilder.Services;
 using ChartShared.Audio.Playback;
+using ChartShared.Audio.Waveforms;
 using ChartShared.Core;
 using ChartShared.Core.Charting.Recovery;
 using ChartShared.Core.Charting.Saving;
@@ -37,6 +38,8 @@ namespace ChartBuilder
                 // Composition root: services are wired by hand, as in Chart Packer. BuilderWindows opens the
                 // first Editor, then swaps it for a new one for each song or chart opened.
                 var settings = BuilderSettingsService.Load(UserConfigPaths.BuilderSettingsFile);
+                // The waveforms read are kept within the setting from the first one read.
+                StemPeaksCache.Shared.CapacityBytes = settings.Settings.PeaksCacheMb * 1024L * 1024;
                 // Every window opens as it last closed, the Editor where it was too, so this comes before any is made.
                 WindowMemory.Use(settings.Settings, settings.Save);
                 // The keys come before any window, which registers its handlers and shows them in its menus as it's made.

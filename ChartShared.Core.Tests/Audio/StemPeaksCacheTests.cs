@@ -133,10 +133,52 @@ public sealed class StemPeaksCacheTests
     [TestMethod]
     public void PeaksTakeRoughlyTheirSamplesSize()
     {
-        // One second: 50 buckets of three floats (low, high and loudness), and 2000 samples of two bytes.
-        var peaks = WaveformPeaks.Compute("x", new TestAudio.FakeSource(48000, 2, 48000, (_, _) => 0.5f), TestContext.CancellationToken);
+        // A minute, sounding both ways throughout: 3000 buckets of three half-precision floats (low, high and loudness), in
+        // chunks of 1024, and 120000 samples for mixing of two bytes, in chunks of 8192; and a pointer to each chunk.
+        var peaks = WaveformPeaks.Compute("x", new TestAudio.FakeSource(1000, 1, 60000, (n, _) => n % 2 == 0 ? 0.5f : -0.5f), TestContext.CancellationToken);
 
-        Assert.AreEqual((50 * 3 * sizeof(float)) + (2000 * 2), peaks.SizeBytes);
+        long buckets = 3 * ((3 * 1024 * 2) + (3 * IntPtr.Size));
+        long signal = (15 * 8192 * 2) + (15 * IntPtr.Size);
+        Assert.AreEqual(buckets + signal, peaks.SizeBytes);
+    }
+
+    [TestMethod]
+    public void SilenceTakesNoRoom()
+    {
+        // A minute, silent but for its last two seconds.
+        static TestAudio.FakeSource Mostly(float level) => new(1000, 1, 60000, (n, _) => n >= 58000 ? 0.5f : level);
+        var loud = WaveformPeaks.Compute("loud", Mostly(0.25f), TestContext.CancellationToken);
+        var quiet = WaveformPeaks.Compute("quiet", Mostly(0f), TestContext.CancellationToken);
+
+        Assert.IsLessThan(loud.SizeBytes / 5, quiet.SizeBytes);
+        Assert.AreEqual(0f, quiet.Max.Take(2900).Max());
+        Assert.AreEqual(0.5f, quiet.Max.Skip(2900).Min());
+        var waveform = WaveformPeaks.Of(quiet);
+        Assert.AreEqual((0.0, 0.0, 0.0), waveform.LevelsOf(0, 2900));
+        Assert.AreEqual(0.5, waveform.LevelsOf(0, 3000).High);
+        Assert.AreEqual(0.5, waveform.LevelsOf(2900, 3000).Rms, 1e-3);
+    }
+
+    [TestMethod]
+    public void SmallerTheLeastRecentlyUsedGoAndLargerTheyStay()
+    {
+        var cache = new StemPeaksCache(long.MaxValue);
+        var peaks = WaveformPeaks.Compute("x", new TestAudio.FakeSource(1000, 1, 1000, (_, _) => 0.5f), TestContext.CancellationToken);
+        var first = new StemPeaksKey("C:\\songs\\a.wav", "a.wav", 1, new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+        var second = first with { FilePath = "C:\\songs\\b.wav", StoredName = "b.wav" };
+        cache.Add(first, peaks);
+        cache.Add(second, peaks);
+
+        cache.CapacityBytes = peaks.SizeBytes * 3;
+        Assert.IsTrue(cache.TryGet(second, out _));
+        Assert.IsTrue(cache.TryGet(first, out _));
+
+        // Looked at last, the first stays.
+        cache.CapacityBytes = peaks.SizeBytes;
+        Assert.IsTrue(cache.TryGet(first, out _));
+        Assert.IsFalse(cache.TryGet(second, out _));
+        Assert.AreEqual(peaks.SizeBytes, cache.SizeBytes);
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => cache.CapacityBytes = -1);
     }
 
     private (SongEntry Entry, SongTrack Track) FolderSong(string name, int bytes)

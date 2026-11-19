@@ -17,19 +17,42 @@ public readonly record struct StemPeaksKey(string FilePath, string StoredName, l
 /// </remarks>
 public sealed class StemPeaksCache
 {
-    /// <summary>The cache the app shares: about the last ten songs of several stems, read at <see cref="WaveformResolution.High"/>.</summary>
-    public static StemPeaksCache Shared { get; } = new(128L * 1024 * 1024);
+    /// <summary>How much the app's cache takes until the app sets it from its settings (<see cref="CapacityBytes"/>).</summary>
+    public const long DefaultCapacityBytes = 128L * 1024 * 1024;
+
+    /// <summary>The cache the app shares, as large as its settings say.</summary>
+    public static StemPeaksCache Shared { get; } = new(DefaultCapacityBytes);
 
     private readonly Lock _lock = new();
     private readonly SizedLru<StemPeaksKey, StemPeaks> _entries = new();
+    private long _capacity;
 
     public StemPeaksCache(long capacityBytes)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(capacityBytes);
-        CapacityBytes = capacityBytes;
+        _capacity = capacityBytes;
     }
 
-    public long CapacityBytes { get; }
+    /// <summary>How much the peaks held may take: set smaller, the least recently used go until they fit.</summary>
+    /// <exception cref="ArgumentOutOfRangeException">The value is negative.</exception>
+    public long CapacityBytes
+    {
+        get
+        {
+            lock (_lock)
+                return _capacity;
+        }
+
+        set
+        {
+            ArgumentOutOfRangeException.ThrowIfNegative(value);
+            lock (_lock)
+            {
+                _capacity = value;
+                _entries.MakeRoom(0, value);
+            }
+        }
+    }
 
     /// <summary>How much the peaks held take.</summary>
     public long SizeBytes
@@ -106,11 +129,11 @@ public sealed class StemPeaksCache
         lock (_lock)
         {
             _entries.Remove(key, out _);
-            if (peaks.SizeBytes > CapacityBytes)
+            if (peaks.SizeBytes > _capacity)
                 return;
 
             _entries.Add(key, peaks, peaks.SizeBytes);
-            _entries.MakeRoom(0, CapacityBytes);
+            _entries.MakeRoom(0, _capacity);
         }
     }
 }

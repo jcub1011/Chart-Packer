@@ -440,6 +440,19 @@ namespace ChartBuilder.Services
                         Get = () => settings.Settings.SpectrogramBudgetMb,
                         Set = megabytes => settings.Settings.SpectrogramBudgetMb = megabytes,
                     },
+                    new IntegerSetting
+                    {
+                        Id = "playback.peaksCache",
+                        Category = visualizers,
+                        Label = Strings.PeaksCacheLabel,
+                        Description = Strings.PeaksCacheDescription,
+                        Keywords = SettingKeywords.Split(Strings.PeaksCacheKeywords),
+                        DefaultValue = BuilderSettings.DefaultPeaksCacheMb,
+                        Minimum = BuilderSettings.MinPeaksCacheMb,
+                        Maximum = BuilderSettings.MaxPeaksCacheMb,
+                        Get = () => settings.Settings.PeaksCacheMb,
+                        Set = megabytes => settings.Settings.PeaksCacheMb = megabytes,
+                    },
                     new ToggleSetting
                     {
                         Id = "playback.spectrogramSharpening",

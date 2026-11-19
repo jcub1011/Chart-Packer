@@ -1293,27 +1293,39 @@
     <value>Waveform Detail</value>
   </data>
   <data name="WaveformFidelityDescription" xml:space="preserve">
-    <value>How finely each track's waveform is read: finer detail shows note starts more sharply in the lanes but takes longer to read and more memory. Changing it re-reads the tracks. Needs Show Waveforms.</value>
+    <value>How finely waveforms are read and drawn. Needs Show Waveforms.</value>
   </data>
   <data name="WaveformFidelityKeywords" xml:space="preserve">
     <value>waveform resolution fidelity detail quality precision sharp fine lanes highway</value>
     <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
   </data>
+  <data name="PeaksCacheLabel" xml:space="preserve">
+    <value>Waveform Cache (MB)</value>
+    <comment>Settings: the row that sets how much memory waveforms already read are kept in.</comment>
+  </data>
+  <data name="PeaksCacheDescription" xml:space="preserve">
+    <value>How much memory waveforms already read are kept in, so songs shown again show their waveforms at once.</value>
+    <comment>Settings: what the Waveform Cache row does.</comment>
+  </data>
+  <data name="PeaksCacheKeywords" xml:space="preserve">
+    <value>waveform cache memory ram megabytes peaks</value>
+    <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
+  </data>
   <data name="WaveformFidelityLow" xml:space="preserve">
-    <value>Low (20 ms)</value>
-    <comment>A choice of Waveform detail: how long each bar of the waveform is.</comment>
+    <value>Low</value>
+    <comment>A choice of Waveform detail.</comment>
   </data>
   <data name="WaveformFidelityMedium" xml:space="preserve">
-    <value>Medium (10 ms)</value>
-    <comment>A choice of Waveform detail: how long each bar of the waveform is.</comment>
+    <value>Medium</value>
+    <comment>A choice of Waveform detail.</comment>
   </data>
   <data name="WaveformFidelityHigh" xml:space="preserve">
-    <value>High (5 ms)</value>
-    <comment>A choice of Waveform detail: how long each bar of the waveform is.</comment>
+    <value>High</value>
+    <comment>A choice of Waveform detail.</comment>
   </data>
   <data name="WaveformFidelityUltra" xml:space="preserve">
-    <value>Ultra (2.5 ms)</value>
-    <comment>A choice of Waveform detail: how long each bar of the waveform is.</comment>
+    <value>Ultra</value>
+    <comment>A choice of Waveform detail.</comment>
   </data>
   <data name="LaneWaveformsToolTip" xml:space="preserve">
     <value>Show the audio behind the notes, to line them up with it</value>

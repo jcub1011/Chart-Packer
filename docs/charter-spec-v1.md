@@ -2087,10 +2087,12 @@ Acceptance criteria:
   each one's own options, and the onsets (C14). They're kept with the lane layout
   (`LaneAudioOptions`). The **Lanes show** setting picks waveform or spectrogram for a lane that
   hasn't been switched.
-- **Resolution.** Every stem is read once at 5 ms a bucket (`WaveformResolution.High`), and drawn
-  with a power of two of buckets to a bar, as many as fit in a screen pixel, so one read serves
-  every zoom. The editor's waveforms come from one place, `StemWaveforms`, which also gives the
-  bottom timeline its mix.
+- **Resolution.** Every stem is read once at the Waveform Detail setting (2 ms a bucket by default,
+  `WaveformResolution.High`), and drawn a bar to a screen pixel at any zoom: zoomed out, a bar holds
+  the levels of the buckets it covers; zoomed in, the bars follow a monotone curve through the
+  buckets' middles, so one read serves every zoom. Peaks are kept as half-precision floats, and
+  stretches where a stem is silent take no memory. The editor's waveforms come from one place,
+  `StemWaveforms`, which also gives the bottom timeline its mix.
 - **Stereo.** A stem's channels are read only when a lane first shows it in stereo
   (`StemPeaksReader`'s `channels`); until then it's drawn in mono. Left is drawn beside right on a
   highway, above it on a timeline, both at one gain.

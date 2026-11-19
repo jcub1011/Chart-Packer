@@ -168,7 +168,7 @@ public sealed class StemDecoderTests
         Assert.AreSequenceEqual([.. fromFile.Max], [.. fromDecode.Max]);
         Assert.AreSequenceEqual([.. fromFile.Min], [.. fromDecode.Min]);
         Assert.AreSequenceEqual([.. fromFile.Rms], [.. fromDecode.Rms]);
-        Assert.AreSequenceEqual([.. fromFile.Signal], [.. fromDecode.Signal]);
+        Assert.AreSequenceEqual(fromFile.Signal.ToArray(), fromDecode.Signal.ToArray());
     }
 
     [TestMethod]

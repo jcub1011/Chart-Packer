@@ -42,6 +42,16 @@ public sealed class WaveformFidelitySettingTests
     }
 
     [TestMethod]
+    [DataRow(0, BuilderSettings.MinPeaksCacheMb)]
+    [DataRow(100000, BuilderSettings.MaxPeaksCacheMb)]
+    [DataRow(300, 300)]
+    public void TheWaveformCacheIsKeptWithinItsRangeOnLoad(int saved, int loaded)
+    {
+        File.WriteAllText(_path, $$"""{ "PeaksCacheMb": {{saved}} }""");
+        Assert.AreEqual(loaded, BuilderSettingsService.Load(_path).Settings.PeaksCacheMb);
+    }
+
+    [TestMethod]
     public void AFidelityReadsBack()
     {
         File.WriteAllText(_path, """{ "WaveformFidelity": "Medium" }""");
@@ -78,6 +88,12 @@ public sealed class WaveformFidelitySettingTests
         Assert.IsFalse(sharpening.DefaultValue, "Spectrograms are not sharpened until it's switched on.");
         Assert.AreEqual(sharpening.DefaultValue, new BuilderSettings().SpectrogramSharpening, "Fresh settings are at the setting's default.");
         Assert.AreEqual(BuilderSettings.DefaultSpectrogramBudgetMb, new BuilderSettings().SpectrogramBudgetMb);
+
+        var cache = catalog.Definitions.Single(d => d.Id == "playback.peaksCache") as IntegerSetting;
+        Assert.IsNotNull(cache, "The waveform cache's size is a setting of its own, apart from Chart Packer's.");
+        Assert.AreEqual("playback.visualizers", cache.Category.Id);
+        Assert.AreEqual(128, cache.DefaultValue);
+        Assert.AreEqual(cache.DefaultValue, new BuilderSettings().PeaksCacheMb, "Fresh settings are at the setting's default.");
         Assert.DoesNotContain(d => d.Id == "audio.masterVolume" || d.Id == "charter.laneBackdrop" || d.Id == "charter.spectrogramBudget", catalog.Definitions);
     }
 }
