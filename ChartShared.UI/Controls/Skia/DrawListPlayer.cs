@@ -102,6 +102,9 @@ namespace ChartShared.UI.Controls.Skia
             paint.Color = op.Color;
             paint.IsAntialias = op.Antialias;
             paint.Shader = op.Res2 >= 0 ? (SKShader)list.Resource(op.Res2)! : null;
+
+            // A gradient dithered, so a faint one, such as a strike glow's beam, doesn't show 8-bit colour's steps.
+            paint.IsDither = op.Res2 >= 0;
             if (op.Stroke)
             {
                 paint.Style = SKPaintStyle.Stroke;
@@ -126,6 +129,7 @@ namespace ChartShared.UI.Controls.Skia
             paint.Color = op.Color;
             paint.IsAntialias = op.Antialias;
             paint.Shader = op.Res2 >= 0 ? (SKShader)list.Resource(op.Res2)! : null;
+            paint.IsDither = op.Res2 >= 0;
             paint.Style = SKPaintStyle.Fill;
             paint.PathEffect = null;
             return paint;
@@ -139,6 +143,7 @@ namespace ChartShared.UI.Controls.Skia
             paint.Color = op.Color;
             paint.IsAntialias = op.Antialias;
             paint.Shader = null;
+            paint.IsDither = false;
             paint.PathEffect = null;
             paint.Style = SKPaintStyle.Fill;
             var sampling = op.Sampling switch
