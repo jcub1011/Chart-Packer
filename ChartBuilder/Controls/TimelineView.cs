@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Media;
@@ -89,6 +90,9 @@ namespace ChartBuilder.Controls
         private static readonly Dictionary<(uint Color, double Opacity), IBrush> NoteBrushes = [];
         private static readonly IPen SectionPen = new ImmutablePen(Color.FromArgb(0x90, 0xFF, 0xFF, 0xFF).ToUInt32(), 1);
 
+        // The accent a vocal part's lines of lyrics are drawn in without the theme's, as the lanes fall back to.
+        private static readonly Color DefaultAccent = Color.FromRgb(0x7C, 0xB4, 0xFF);
+
         // The chart's tempo and time signature changes, in the tempo markers' amber, down the timeline.
         private static readonly IPen TempoPen = new ImmutablePen(Color.FromArgb(0xC0, 0xFF, 0xB0, 0x40).ToUInt32(), 1);
 
@@ -142,6 +146,7 @@ namespace ChartBuilder.Controls
         private static readonly IPen SelectedProposalPen = new ImmutablePen(Colors.White.ToUInt32(), 2);
 
         private readonly PlayheadLayer _playhead;
+        private (Color Accent, IBrush Brush)? _lyricBand;
         private Pen? _tickPen;
         private Pen? _beatPen;
         private Pen? _measurePen;
@@ -166,6 +171,9 @@ namespace ChartBuilder.Controls
         // Where the pointer is over the timeline, in its own coordinates; null while it's elsewhere. A tip opens above the
         // timeline at this x, so it never covers the waveform and playhead being scrubbed.
         private Point? _pointer;
+
+        // The lyric lens over the timeline, in its window's adorner layer, made the first time it's shown.
+        private LyricLens? _lens;
 
         // The picture of everything but the playhead, the size and scaling it was drawn at, and whether what it shows has
         // changed since.
@@ -234,11 +242,14 @@ namespace ChartBuilder.Controls
         public static readonly StyledProperty<StarPowerTimelineExtras?> StarPowerExtrasProperty =
             AvaloniaProperty.Register<TimelineView, StarPowerTimelineExtras?>(nameof(StarPowerExtras));
 
+        public static readonly StyledProperty<IBrush?> AccentBrushProperty =
+            AvaloniaProperty.Register<TimelineView, IBrush?>(nameof(AccentBrush));
+
         // What the picture of the ruler, waveform, overview, beat lines and loop lines shows: when one changes, it's drawn again.
         private static readonly AvaloniaProperty[] ContentProperties =
         [
             LengthProperty, WaveformProperty, BeatsProperty, WaveformBrushProperty, TickBrushProperty, BeatBrushProperty, MeasureBrushProperty,
-            OverviewProperty, FindingMarksProperty, LoopProperty, LoopBrushProperty, StarPowerExtrasProperty,
+            OverviewProperty, FindingMarksProperty, LoopProperty, LoopBrushProperty, StarPowerExtrasProperty, AccentBrushProperty,
         ];
 
         static TimelineView()
@@ -252,7 +263,14 @@ namespace ChartBuilder.Controls
             _playhead = new PlayheadLayer(this);
             VisualChildren.Add(_playhead);
             ToolTip.SetPlacement(this, PlacementMode.Custom);
-            ToolTip.SetCustomPopupPlacementCallback(this, placement => TipPlacement.PlaceAbove(placement, this, _pointer));
+            ToolTip.SetCustomPopupPlacementCallback(this, placement =>
+            {
+                TipPlacement.PlaceAbove(placement, this, _pointer);
+
+                // Above the lyric lens while it shows, so neither covers the other.
+                if (_lens is { IsVisible: true })
+                    placement.Offset = new Point(placement.Offset.X, placement.Offset.Y - LyricLens.Reach);
+            });
         }
 
         /// <summary>The playhead while stopped, and where scrubbing puts it, in seconds of audio.</summary>
@@ -377,6 +395,13 @@ namespace ChartBuilder.Controls
             set => SetValue(LoopBrushProperty, value);
         }
 
+        /// <summary>The theme's accent, which a vocal part's lines of lyrics are drawn in, as its lane draws them.</summary>
+        public IBrush? AccentBrush
+        {
+            get => GetValue(AccentBrushProperty);
+            set => SetValue(AccentBrushProperty, value);
+        }
+
         /// <summary>The meter ribbon, hard passages and selected proposal the star power window adds, or null for none.</summary>
         public StarPowerTimelineExtras? StarPowerExtras
         {
@@ -418,6 +443,12 @@ namespace ChartBuilder.Controls
                 _playhead.InvalidateVisual();
                 RequestFrame();
             }
+
+            // The lens follows the lane in focus as it changes under the pointer, as a vocal part is edited; the time under
+            // the pointer as the timeline is resized; and the theme's colours as it changes.
+            if (change.Property == OverviewProperty || change.Property == LengthProperty || change.Property == BoundsProperty
+                || change.Property == TickBrushProperty || change.Property == AccentBrushProperty || change.Property == ThemeVariantScope.ActualThemeVariantProperty)
+                UpdateLens();
         }
 
         protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
@@ -432,7 +463,44 @@ namespace ChartBuilder.Controls
             _content?.Dispose();
             _content = null;
             _isContentStale = true;
+            if (_lens is { Parent: AdornerLayer layer } lens)
+                layer.Children.Remove(lens);
+            _lens = null;
         }
+
+        /// <summary>
+        /// Shows the lyric lens over the pointer while it's over the timeline and the song has lyrics
+        /// (<see cref="OverviewData.Lyrics"/>), whichever lane is in focus, scrubbing or not; hides it otherwise.
+        /// </summary>
+        private void UpdateLens()
+        {
+            if (_pointer is not { } pointer || Overview is not { Lyrics: { Count: > 0 } lyrics } || Bounds.Width <= 0 || Length <= 0)
+            {
+                _lens?.Hide();
+                return;
+            }
+
+            if (_lens is null)
+            {
+                if (AdornerLayer.GetAdornerLayer(this) is not { } layer)
+                    return;
+                _lens = new LyricLens();
+                AdornerLayer.SetAdornedElement(_lens, this);
+                AdornerLayer.SetIsClipEnabled(_lens, false);
+                layer.Children.Add(_lens);
+            }
+
+            _lens.Background = ResourceBrush("SurfaceBrush") ?? Brushes.Black;
+            _lens.BorderBrush = ResourceBrush("SubtleBorderBrush") ?? Brushes.Gray;
+            _lens.TextBrush = ResourceBrush("SystemControlForegroundBaseHighBrush") ?? Brushes.White;
+            _lens.MutedBrush = TickBrush ?? Brushes.Gray;
+            _lens.AccentBrush = AccentBrush ?? new ImmutableSolidColorBrush(DefaultAccent);
+            double x = Math.Clamp(pointer.X, 0, Bounds.Width);
+            _lens.Show(lyrics, TimeOf(x, Bounds.Width), x);
+        }
+
+        private IBrush? ResourceBrush(string key) =>
+            this.TryFindResource(key, ActualThemeVariant, out var found) ? found as IBrush : null;
 
         protected override Size ArrangeOverride(Size finalSize)
         {
@@ -547,14 +615,23 @@ namespace ChartBuilder.Controls
                     context.DrawRectangle(FoundCurrentBrush, FoundCurrentPen, band.Deflate(0.5));
             }
 
-            DrawNotes(context, overview, width, top + (overview.Rows.Count * (BandHeight + BandGap)), bounds.Bottom);
+            // A vocal part's lines of lyrics in a row above the rest, in the accent, as its lane draws them.
+            int lyricRows = overview.LyricPhrases is null ? 0 : 1;
+            DrawNotes(context, overview, width, top + ((lyricRows + overview.Rows.Count) * (BandHeight + BandGap)), bounds.Bottom);
+
+            if (overview.LyricPhrases is { } lyricPhrases)
+            {
+                var brush = LyricBandBrush();
+                foreach (var (start, end) in lyricPhrases)
+                    context.FillRectangle(brush, new Rect(XOf(start, width), top, Math.Max(1, XOf(end, width) - XOf(start, width)), BandHeight));
+            }
 
             foreach (var phrase in overview.Phrases)
             {
                 int row = IndexOf(overview.Rows, phrase.Row);
                 if (row < 0)
                     continue;
-                double y = top + (row * (BandHeight + BandGap));
+                double y = top + ((lyricRows + row) * (BandHeight + BandGap));
                 context.FillRectangle(phrase.Replaced ? ReplacedBandBrush : BandBrush(phrase.Row), new Rect(XOf(phrase.Start, width), y, Math.Max(1, XOf(phrase.End, width) - XOf(phrase.Start, width)), BandHeight));
             }
 
@@ -725,13 +802,19 @@ namespace ChartBuilder.Controls
         /// </summary>
         private void DrawNotes(DrawingContext context, OverviewData overview, double width, double top, double bottom)
         {
+            // A vocal part (its overview has a row for its lines of lyrics) that sings over a wide range can have more rows
+            // than pixels: its gems still show, a pixel high, as its notes are a melody to follow. A highway's rows are its
+            // lanes, so with less than a pixel each its gems would only run together, and aren't drawn.
+            bool vocal = overview.LyricPhrases is not null;
             int rows = overview.NoteRows;
-            if (rows <= 0 || overview.Notes.Count == 0 || bottom - top < rows)
+            if (rows <= 0 || overview.Notes.Count == 0 || bottom <= top || (!vocal && bottom - top < rows))
                 return;
 
             double rowHeight = (bottom - top) / rows;
             double inset = Math.Min(1, rowHeight / 4);
             double gemHeight = rowHeight - (2 * inset);
+            if (vocal)
+                gemHeight = Math.Max(1, gemHeight);
 
             // Where a gem was last drawn in each row, and across them all at the end; where a top-half gem was last drawn
             // in each row; and how far right each row's sustains reach.
@@ -788,6 +871,15 @@ namespace ChartBuilder.Controls
             if (!NoteBrushes.TryGetValue(key, out var brush))
                 NoteBrushes[key] = brush = new ImmutableSolidColorBrush(color, opacity);
             return brush;
+        }
+
+        // A line of lyrics' band: the accent at the bands' alpha, made again only when the theme's accent changes.
+        private IBrush LyricBandBrush()
+        {
+            var accent = (AccentBrush as ISolidColorBrush)?.Color ?? DefaultAccent;
+            if (_lyricBand is not { } known || known.Accent != accent)
+                _lyricBand = known = (accent, new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(accent, BandAlpha)));
+            return known.Brush;
         }
 
         private static IBrush BandBrush(RailKind row)
@@ -968,12 +1060,14 @@ namespace ChartBuilder.Controls
         {
             base.OnPointerEntered(e);
             _pointer = e.GetPosition(this);
+            UpdateLens();
         }
 
         protected override void OnPointerMoved(PointerEventArgs e)
         {
             base.OnPointerMoved(e);
             _pointer = e.GetPosition(this);
+            UpdateLens();
             if (ReferenceEquals(e.Pointer.Captured, this))
                 Scrub(e);
             else
@@ -984,6 +1078,7 @@ namespace ChartBuilder.Controls
         {
             base.OnPointerExited(e);
             _pointer = null;
+            UpdateLens();
             ShowSectionTip(null);
         }
 

@@ -1,8 +1,10 @@
+using ChartBuilder.Controls.Editing;
 using ChartBuilder.ViewModels;
 using ChartShared.Core.Charting;
 using ChartShared.Core.Charting.Authoring;
 using ChartShared.Core.Charting.Commands;
 using ChartShared.Core.Charting.Editing;
+using ChartShared.Core.Charting.Layout;
 using ChartShared.Core.Charts;
 using ChartShared.UI.Controls.Highway;
 using static ChartBuilder.Tests.Editing.EditorSessions;
@@ -224,5 +226,151 @@ public sealed class OverviewDataTests
     public void NothingIsShownUntilTheSongsLengthIsKnown() =>
         Assert.IsNull(OverviewData.Of(Of(Guitar()), GuitarExpert, 0));
 
+    [TestMethod]
+    public void AVocalPartsNotesAreOnARowForEachPitchItSings()
+    {
+        var chart = WithVocals([new(0, Beat, 64), new(Beat, Beat, 60), new(2 * Beat, 0, 67)], [new(0, "la"), new(Beat, "la"), new(2 * Beat, "la")]);
+
+        var overview = Overview(Of(chart), VocalTrack.Vocals);
+
+        Assert.AreEqual(8, overview.NoteRows, "A row for each pitch from the lowest sung to the highest.");
+        Assert.AreSequenceEqual(
+            [(0.0, 0.5, 3), (0.5, 1.0, 7), (1.0, 1.0, 0)],
+            overview.Notes.Select(n => (n.Start, n.End, n.Row)).ToList(),
+            "The highest pitch is the top row, and each note runs from its start to its end.");
+        Assert.IsTrue(overview.Notes.All(n => n.Color == VocalPalette.Of(VocalTrack.Vocals) && !n.Top));
+    }
+
+    [TestMethod]
+    public void ASpokenNoteIsOnTheMiddleRow()
+    {
+        var chart = WithVocals([new(0, Beat, 60), new(Beat, Beat, 70), new(2 * Beat, Beat, 50)], [new(0, "la"), new(Beat, "la"), new(2 * Beat, "hey#")]);
+
+        var overview = Overview(Of(chart), VocalTrack.Vocals);
+
+        Assert.AreEqual(11, overview.NoteRows, "A spoken note's pitch isn't one of the part's.");
+        Assert.AreEqual(5, overview.Notes[2].Row);
+    }
+
+    [TestMethod]
+    public void AHarmonysNotesAreInItsColour()
+    {
+        var chart = WithVocals([new(0, Beat, 60)], [new(0, "la")], track: VocalTrack.Harmony2);
+
+        var overview = Overview(Of(chart), VocalTrack.Harmony2);
+
+        Assert.AreEqual(VocalPalette.Of(VocalTrack.Harmony2), overview.Notes.Single().Color);
+        Assert.AreNotEqual(VocalPalette.Of(VocalTrack.Vocals), VocalPalette.Of(VocalTrack.Harmony2));
+    }
+
+    [TestMethod]
+    public void AVocalPartsLinesOfLyricsAndStarPowerAreInTheirRows()
+    {
+        var chart = WithVocals(
+            [new(0, Beat, 60), new(Measure, Beat, 60)],
+            [new(0, "la"), new(Measure, "la")],
+            [new(0, Beat), new(Measure, 2 * Beat)],
+            starPower: [new(Measure, 2 * Beat)]);
+
+        var overview = Overview(Of(chart), VocalTrack.Vocals);
+
+        Assert.AreSequenceEqual([(0.0, 0.5), (2.0, 3.0)], overview.LyricPhrases!.Select(p => (p.Start, p.End)).ToList());
+        Assert.AreSequenceEqual([new RailKind(PhraseKind.StarPower)], overview.Rows.ToList());
+        Assert.AreSequenceEqual([new OverviewPhrase(2, 3, PhraseKind.StarPower)], overview.Phrases.ToList());
+        Assert.IsEmpty(overview.Found);
+    }
+
+    [TestMethod]
+    public void AVocalPartsSyllablesAreTimedAndKnowWhereTheirLinesEnd()
+    {
+        var chart = WithVocals(
+            [
+                new(0, 120, 60), new(120, 120, 62), new(240, 120, 64), new(360, 120, 65), new(480, 120, 67), new(Measure, Beat, 60),
+                new(3 * Measure, Beat, 60), new((3 * Measure) + Beat, Beat, 60),
+            ],
+            [new(0, "Hel-"), new(120, "lo"), new(240, "+"), new(360, "world#"), new(480, "a="), new(Measure, "again"), new(3 * Measure, "out"), new((3 * Measure) + Beat, "side")],
+            [new(0, Beat + 120), new(Measure, Beat), new(2 * Measure, Beat)]);
+
+        var lyrics = OverviewData.SongLyricsOf(Of(chart), VocalTrack.Vocals);
+
+        Assert.AreSequenceEqual(
+            [
+                new OverviewLyric(0, 0.125, "Hel", JoinsNext: true, EndsLine: false),
+                new OverviewLyric(0.125, 0.375, "lo", JoinsNext: false, EndsLine: false),
+                new OverviewLyric(0.375, 0.5, "world", JoinsNext: false, EndsLine: false),
+                new OverviewLyric(0.5, 0.625, "a-", JoinsNext: true, EndsLine: true),
+                new OverviewLyric(2, 2.5, "again", JoinsNext: false, EndsLine: true),
+                new OverviewLyric(6, 6.5, "out", JoinsNext: false, EndsLine: false),
+                new OverviewLyric(6.5, 7, "side", JoinsNext: false, EndsLine: true),
+            ],
+            lyrics!.ToList(),
+            "A syllable is sung to the end of its slide, its symbols are taken off but for = as a hyphen, and the syllables outside every phrase are a line of their own.");
+    }
+
+    [TestMethod]
+    public void AnOverviewLeavesTheLyricsToTheEditor()
+    {
+        var session = Of(WithVocals([new(0, Beat, 60)], [new(0, "la")]));
+
+        Assert.IsNull(Overview(session, GuitarExpert).Lyrics, "A generation window's timeline has no lens.");
+        Assert.IsNull(Overview(session, VocalTrack.Vocals).Lyrics, "The editor keeps the song's lyrics, so the lens keeps its layout.");
+    }
+
+    [TestMethod]
+    public void TheSongsLyricsAreTheLeadVocalsBeforeAHarmonys()
+    {
+        var chart = WithVocals([new(0, Beat, 60)], [new(0, "harm")], track: VocalTrack.Harmony1);
+        WithVocals([new(Beat, Beat, 60)], [new(Beat, "lead")], chart: chart);
+
+        Assert.AreSequenceEqual(["lead"], OverviewData.SongLyricsOf(Of(chart))!.Select(l => l.Text).ToList());
+    }
+
+    [TestMethod]
+    public void TheSongsLyricsAreAHarmonysWithoutTheLeadVocals()
+    {
+        var chart = WithVocals([new(0, Beat, 60)], [new(0, "harm")], track: VocalTrack.Harmony2);
+
+        Assert.AreSequenceEqual(["harm"], OverviewData.SongLyricsOf(Of(chart))!.Select(l => l.Text).ToList());
+    }
+
+    [TestMethod]
+    public void AFocusedVocalPartsLyricsAreTheLenssWhenItHasAny()
+    {
+        var chart = WithVocals([new(0, Beat, 60)], [new(0, "lead")]);
+        WithVocals([new(Beat, Beat, 60)], [new(Beat, "harm")], track: VocalTrack.Harmony1, chart: chart);
+        WithVocals([new(Beat, Beat, 60)], track: VocalTrack.Harmony2, chart: chart);
+        var session = Of(chart);
+
+        Assert.AreSequenceEqual(["harm"], OverviewData.SongLyricsOf(session, VocalTrack.Harmony1)!.Select(l => l.Text).ToList());
+        Assert.AreSequenceEqual(["lead"], OverviewData.SongLyricsOf(session, VocalTrack.Harmony2)!.Select(l => l.Text).ToList(), "A part with no lyrics has the song's.");
+    }
+
+    [TestMethod]
+    public void ASongWithoutLyricsHasNoLens()
+    {
+        Assert.IsNull(OverviewData.SongLyricsOf(Of(Guitar())), "No vocal part.");
+        Assert.IsNull(OverviewData.SongLyricsOf(Of(WithVocals([new(0, Beat, 60)]))), "A vocal part with notes but no lyrics.");
+        Assert.IsNull(OverviewData.SongLyricsOf(Of(WithVocals([new(0, Beat, 60)])), VocalTrack.Vocals), "Not even the part preferred.");
+    }
+
+    [TestMethod]
+    public void AVocalPartWithoutLinesOfLyricsStillHasTheirRow()
+    {
+        var overview = Overview(Of(WithVocals([new(0, Beat, 60)], [new(0, "la")])), VocalTrack.Vocals);
+
+        Assert.IsNotNull(overview.LyricPhrases);
+        Assert.IsEmpty(overview.LyricPhrases);
+    }
+
+    [TestMethod]
+    public void AHighwaysLaneHasNoRowForLinesOfLyrics() =>
+        Assert.IsNull(Overview(Of(WithVocals([new(0, Beat, 60)])), GuitarExpert).LyricPhrases);
+
+    [TestMethod]
+    public void NothingOfAVocalPartIsShownUntilTheSongsLengthIsKnown() =>
+        Assert.IsNull(OverviewData.Of(Of(WithVocals([new(0, Beat, 60)])), VocalTrack.Vocals, 0));
+
     private static OverviewData Overview(EditorSession session, ChartTrackKey key) => OverviewData.Of(session, key, Length)!;
+
+    private static OverviewData Overview(EditorSession session, VocalTrack vocal) => OverviewData.Of(session, vocal, Length)!;
 }
