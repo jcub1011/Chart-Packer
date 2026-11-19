@@ -418,7 +418,8 @@
             </Grid>
         </Border>
 
-        <Panel>
+        <!-- Transparent, so a press anywhere in the body (not just on the tilted plane) reaches EditorLane.axaml.cs and focuses the lane. -->
+        <Panel x:Name="Body" Background="Transparent">
             <!-- The highway, flat or tilted back in perspective, which fades into the lane's background. -->
             <hw:PerspectiveHost IsVisible="{Binding ShowsHighway}"
                                   IsPerspective="{Binding IsPerspective}"
