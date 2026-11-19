@@ -887,7 +887,13 @@ namespace ChartBuilder.ViewModels
                 case nameof(PlaybackViewModel.IsPlaying):
                     _devices?.Sample();
                     if (Playback.IsPlaying)
+                    {
+                        // The lanes aren't edited while the song plays, so a gesture under way is taken back; the loop
+                        // region's isn't, as it steers playback.
+                        if (Session.Tools.IsActive && !Session.Tools.LoopActive)
+                            Session.Tools.Cancel();
                         StartPlaying();
+                    }
                     else
                         StopPlaying();
                     break;

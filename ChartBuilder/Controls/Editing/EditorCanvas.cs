@@ -861,14 +861,16 @@ namespace ChartBuilder.Controls.Editing
 
         /// <summary>
         /// Whether the place tool's ghost, the erase tool's red, the Phrase tool's line or the Tempo tool's marker preview
-        /// is shown under the pointer, which follow the song as it moves under it; or a Select tool's rail hover, whose
-        /// placement line does too; or, with a synchronized region or the loop region drawn, its X and hover, which do too.
+        /// is shown under the pointer, which follow the song as it moves under it; or the note or bar a press would grab,
+        /// with the Select tool or with Shift lending it, which is lit wherever the song brings one under the pointer and
+        /// let go of when it moves on; or, with a synchronized region or the loop region drawn, its X and hover, which do too.
         /// </summary>
         private bool IsHoverShown => _hover is { } hover && !_isPressed
             && (Session?.Tool is EditorTool.Place or EditorTool.Erase or EditorTool.Phrase or EditorTool.Tempo or EditorTool.VocalAlign
                 || Session?.Sync.IsActive == true
                 || Session?.Loop?.Span is not null
-                || (Session?.Tool == EditorTool.Select && PointAt(hover) is { Rail: not null }));
+                || ((Session?.Tool == EditorTool.Select || (_keys & KeyModifiers.Shift) != 0)
+                    && PointAt(hover) is { Lane: not null } or { Rail: not null }));
 
         /// <summary>
         /// Follows the cursor: the song and the notes are moved, as far as their page reaches, and drawn again around the
@@ -1146,6 +1148,14 @@ namespace ChartBuilder.Controls.Editing
                 return;
             }
 
+            // While the song plays the lanes aren't edited; only the loop region, which steers playback, still takes a press.
+            if (_editor?.Playback.IsPlaying == true && !session.Tools.LoopActive)
+            {
+                Focus();
+                e.Handled = true;
+                return;
+            }
+
             if (_lane is { Vocal: not null })
             {
                 PressVocals(session, current.Position, e);
@@ -1298,10 +1308,10 @@ namespace ChartBuilder.Controls.Editing
             _overlay.Redraw();
         }
 
-        /// <summary>Opens the note menu at the pointer, for the selected notes, after a right click; nothing with none.</summary>
+        /// <summary>Opens the note menu at the pointer, for the selected notes, after a right click; nothing with none, or while the song plays.</summary>
         private void ShowNoteMenu()
         {
-            if (_lane?.BuildNoteMenu() is not { Count: > 0 } items)
+            if (_editor?.Playback.IsPlaying == true || _lane?.BuildNoteMenu() is not { Count: > 0 } items)
                 return;
             new MenuFlyout { ItemsSource = LaneMenu.MenuItems(items) }.ShowAt(this, showAtPointer: true);
         }
@@ -1367,13 +1377,10 @@ namespace ChartBuilder.Controls.Editing
 
             public double FineFactor => LaneScrub.DefaultFineFactor;
 
-            public void ScrubStarted()
-            {
-            }
+            // The song is held still while the lane is dragged, and plays on from where it's left if it was playing.
+            public void ScrubStarted() => canvas._editor?.Playback.BeginScrub();
 
-            public void ScrubEnded()
-            {
-            }
+            public void ScrubEnded() => canvas._editor?.Playback.EndScrub();
 
             // The cursor moves, and playback seeks there, as it does for every move of it by hand.
             public void ScrubTo(double seconds)
