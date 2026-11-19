@@ -124,6 +124,25 @@ public sealed class SkiaDrawListTests
     }
 
     [TestMethod]
+    public void WithNoPenAShapeReachesAsFarAsAllItsFiguresWhetherFilledOrNot()
+    {
+        Assert.AreEqual(new Rect(0, 0, 40, 20), Hexagon.ReachWith(null), "Every figure filled.");
+
+        // A filled square, and a line out past it that isn't.
+        var builder = new HighwayPath.Builder();
+        builder.BeginFigure(new Point(0, 0), true);
+        builder.LineTo(new Point(10, 0));
+        builder.LineTo(new Point(10, 10));
+        builder.LineTo(new Point(0, 10));
+        builder.EndFigure(true);
+        builder.BeginFigure(new Point(10, 10), false);
+        builder.LineTo(new Point(30, 10));
+        builder.EndFigure(false);
+
+        Assert.AreEqual(new Rect(0, 0, 30, 10), builder.Build().ReachWith(null), "Some figures only edged.");
+    }
+
+    [TestMethod]
     public void WhatsRecordedIsDrawnWhereItWasRecorded()
     {
         var canvas = SkiaRaster.Begin();

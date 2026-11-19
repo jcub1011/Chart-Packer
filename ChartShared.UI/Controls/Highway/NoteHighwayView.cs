@@ -249,6 +249,9 @@ namespace ChartShared.UI.Controls.Highway
         // Where the strike line sits, as a fraction of the height from the top; the instrument's name sits below it. In perspective
         // the name stands up beside the plane, and the line is lower, for the plane is long and nothing is drawn below it.
         private const double FlatStrikeFraction = 0.87;
+
+        // The least a tilted lane's near end is taken to be foreshortened by when sizing its waveform's pictures, so a steep tilt doesn't ask for huge ones.
+        private const double MinWaveformDepthScale = 0.25;
         private const double PerspectiveStrikeFraction = 1 - EditorViewport.PerspectiveStrikeFraction;
 
         private double StrikeFraction => _camera is null ? FlatStrikeFraction : PerspectiveStrikeFraction;
@@ -992,8 +995,19 @@ namespace ChartShared.UI.Controls.Highway
                 // so its loudest peak fills the highway, so a quiet track's beats show as clearly as a loud one's.
                 if (waveform is not null)
                 {
+                    // Tilted, a bar a pixel long is foreshortened on the screen, and more so the further it is: the painter draws bands of bars
+                    // as long as the screen shows them (issue #300).
+                    double scaling = 1 / (TopLevel.GetTopLevel(this)?.RenderScaling ?? 1);
+                    Func<double, double>? foreshortening = null;
+                    if (_camera is { } camera)
+                    {
+                        double near = Math.Max(camera.DepthScaleAt(camera.PlaneHeight), MinWaveformDepthScale);
+                        scaling /= near;
+                        foreshortening = planeY => camera.DepthScaleAt(planeY) / near;
+                    }
+
                     LaneWaveformPainter.Draw(context, waveform, bounds.Deflate(new Thickness(4, 0)), isVertical: true, from, to, y,
-                        WaveformPeakBrush, WaveformLoudBrush, LaneWaveformPainter.FullScaleGain(waveform), 1 / (TopLevel.GetTopLevel(this)?.RenderScaling ?? 1), smooth: _camera is not null);
+                        WaveformPeakBrush, WaveformLoudBrush, LaneWaveformPainter.FullScaleGain(waveform), scaling, foreshortening: foreshortening);
                 }
 
                 // A beam of light rises from a lane as it's struck.

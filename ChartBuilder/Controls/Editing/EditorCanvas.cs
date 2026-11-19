@@ -1952,7 +1952,7 @@ namespace ChartBuilder.Controls.Editing
                 audio.Options.FloorDb, audio.Options.CeilingDb, audio.Options.Band, scaling, frame);
         }
 
-        /// <returns>Whether all of it was drawn.</returns>
+        /// <returns>Whether all of it was drawn as it is now: <see langword="false"/> when the paint budget ran out, so it's drawn again soon.</returns>
         private bool DrawWaveform(IHighwayCanvas context, ChartEditorViewModel editor, LaneAudioViewModel audio, AudioSource source, Rect area, LaneProjection projection, bool full)
         {
             if (area.Width <= 1 || area.Height <= 1)
@@ -1966,10 +1966,18 @@ namespace ChartBuilder.Controls.Editing
             // The painter's position is evaluated at two times and must be linear, as the projection is.
             double scaling = 1 / (TopLevel.GetTopLevel(this)?.RenderScaling ?? 1);
 
-            // Tilted, the plane's pixels are foreshortened, even at its near end, where a bar one pixel long is half a pixel on the
-            // screen: its pictures are made with bars as long as the screen shows them, a bar to a pixel there, and as few again to draw.
+            // Tilted, the plane's pixels are foreshortened, even at its near end, where a column one pixel long is half a pixel on the
+            // screen: the outline's columns are as long as the screen shows them, a column to a pixel there, and as few again to draw.
+            // Further up it's more so, so the painter gives it fewer, longer columns as the screen shows them there (issue #300).
+            Func<double, double>? foreshortening = null;
             if (_camera is { } camera)
-                scaling /= Math.Max(camera.DepthScaleAt(camera.PlaneHeight), MinWaveformDepthScale);
+            {
+                double near = Math.Max(camera.DepthScaleAt(camera.PlaneHeight), MinWaveformDepthScale);
+                scaling /= near;
+                if (vertical)
+                    foreshortening = planeY => camera.DepthScaleAt(planeY) / near;
+            }
+
             using (new OptionalClip(context, area, !FramePerf.IsOff(FramePerf.Part.PlaneClips)))
             {
                 if (audio.IsStereo && editor.Audio.Waveforms.Stereo(source) is var (left, right))
@@ -1978,8 +1986,8 @@ namespace ChartBuilder.Controls.Editing
                     double gain = LaneWaveformPainter.FullScaleGain(left.Peak >= right.Peak ? left : right) * boost;
                     var first = vertical ? new Rect(area.X, area.Y, area.Width / 2, area.Height) : new Rect(area.X, area.Y, area.Width, area.Height / 2);
                     var second = vertical ? new Rect(area.X + (area.Width / 2), area.Y, area.Width / 2, area.Height) : new Rect(area.X, area.Y + (area.Height / 2), area.Width, area.Height / 2);
-                    bool done = LaneWaveformPainter.Draw(context, left, first, vertical, projection.Start, projection.End, AlongOf(projection), peak, loud, gain, scaling, budgeted: true, smooth: _camera is not null, clip: !FramePerf.IsOff(FramePerf.Part.PlaneClips));
-                    done &= LaneWaveformPainter.Draw(context, right, second, vertical, projection.Start, projection.End, AlongOf(projection), peak, loud, gain, scaling, budgeted: true, smooth: _camera is not null, clip: !FramePerf.IsOff(FramePerf.Part.PlaneClips));
+                    bool done = LaneWaveformPainter.Draw(context, left, first, vertical, projection.Start, projection.End, AlongOf(projection), peak, loud, gain, scaling, budgeted: true, clip: !FramePerf.IsOff(FramePerf.Part.PlaneClips), foreshortening: foreshortening);
+                    done &= LaneWaveformPainter.Draw(context, right, second, vertical, projection.Start, projection.End, AlongOf(projection), peak, loud, gain, scaling, budgeted: true, clip: !FramePerf.IsOff(FramePerf.Part.PlaneClips), foreshortening: foreshortening);
                     Line(context, ChannelPen, vertical ? first.TopRight : first.BottomLeft, vertical ? first.BottomRight : first.BottomRight);
                     return done;
                 }
@@ -1987,7 +1995,7 @@ namespace ChartBuilder.Controls.Editing
                 if (editor.Audio.Waveforms.Mono(source) is not { } waveform)
                     return true;
                 return LaneWaveformPainter.Draw(context, waveform, area, vertical, projection.Start, projection.End, AlongOf(projection),
-                    peak, loud, LaneWaveformPainter.FullScaleGain(waveform) * boost, scaling, budgeted: true, smooth: _camera is not null, clip: !FramePerf.IsOff(FramePerf.Part.PlaneClips));
+                    peak, loud, LaneWaveformPainter.FullScaleGain(waveform) * boost, scaling, budgeted: true, clip: !FramePerf.IsOff(FramePerf.Part.PlaneClips), foreshortening: foreshortening);
             }
         }
 

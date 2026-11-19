@@ -2088,8 +2088,8 @@ Acceptance criteria:
   (`LaneAudioOptions`). The **Lanes show** setting picks waveform or spectrogram for a lane that
   hasn't been switched.
 - **Resolution.** Every stem is read once at the Waveform Detail setting (2 ms a bucket by default,
-  `WaveformResolution.High`), and drawn a bar to a screen pixel at any zoom: zoomed out, a bar holds
-  the levels of the buckets it covers; zoomed in, the bars follow a monotone curve through the
+  `WaveformResolution.High`), and drawn as an anti-aliased outline of columns a screen pixel long or less at any zoom: zoomed out, a column holds
+  the levels of the buckets it covers; zoomed in, the columns follow a monotone curve through the
   buckets' middles, so one read serves every zoom. Peaks are kept as half-precision floats, and
   stretches where a stem is silent take no memory. The editor's waveforms come from one place,
   `StemWaveforms`, which also gives the bottom timeline its mix.
@@ -2100,9 +2100,12 @@ Acceptance criteria:
   scale.
 - **Beside** is a column right of a highway's phrase rail. A timeline's strip is always drawn at
   full strength; Behind also draws the audio faintly behind its rows.
-- **AC C12.1.** Pictures of the waveform are drawn within a budget of 6 ms in each 16 ms
-  (`PaintBudget`). One there's no time for is stood in for by the neighbouring zoom's picture, and
-  drawn once the frame is out.
+- **Drawing.** The outline is a shape, so a lane tilted back draws it through the tilt with nothing
+  to resample: a lane that the screen shows smaller further up has fewer, longer columns there, in
+  the same outline. Its columns are kept in chunks, and the outline is made again only when a chunk
+  comes into view or changes its detail, so a lane scrolling every frame only moves it. Chunks are
+  made within a budget of 6 ms in each 16 ms (`PaintBudget`); one there's no time for is stood in
+  for by the same buckets at a neighbouring detail, or left out, and made once the frame is out.
 
 Acceptance criteria:
 
@@ -2191,7 +2194,7 @@ Acceptance criteria:
   the last 2 s isn't released to make room for another: the newcomer is refused, and the editor
   says so, so two lanes that don't both fit don't take turns releasing each other. The budget is
   64 MB to 4096 MB.
-- **Drawing.** As the waveform's, in pictures drawn within the same budget, and drawn again as
+- **Drawing.** In pictures drawn within a budget of 6 ms in each 16 ms (`PaintBudget`), one there's no time for stood in for by the neighbouring zoom's, and drawn again as
   more of their columns are ready, at most every 100 ms. A picture is drawn at the size it's shown
   at: 256 pixels along the time axis, each a column, the loudest of a power of two of them, or,
   zoomed in, a half or a quarter of one; and across it as many pixels as the rows shown take on
