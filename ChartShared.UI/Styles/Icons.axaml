@@ -202,8 +202,8 @@
     <StreamGeometry x:Key="HighlighterStroke">M6,7.333 l-4,4 v2 h6 l2,-2 M14.667,8 l-3.067,3.067 a1.333,1.333 0 0 1 -1.867,0 l-3.467,-3.467 a1.333,1.333 0 0 1 0,-1.867 L9.333,2.667</StreamGeometry>
     <!-- "metronome": the Tempo tool. -->
     <StreamGeometry x:Key="MetronomeStroke">M8,7.6 V6.067 M8,11.333 l4.393,-4.393 M10.033,3.8 l-0.145,-0.461 a2,2 0 0 0 -3.775,0 L2.945,13.13 A0.667,0.667 0 0 0 3.58,14 h8.835 a0.667,0.667 0 0 0 0.634,-0.873 L12.3,10.8 M12,6 A1.333,1.333 0 1 0 14.667,6 A1.333,1.333 0 1 0 12,6 Z</StreamGeometry>
-    <!-- "mic-vocal": the Vocal Alignment tool. -->
-    <StreamGeometry x:Key="MicVocalStroke">M7.333,5.067 l-3.996,5.46 a0.667,0.667 0 0 0 0.067,0.865 l0.545,0.545 a0.667,0.667 0 0 0 0.876,0.058 L10.06,8 M11,14.116 C10.333,13.667 9.581,13.333 8.667,13.333 c-1.372,0 -2.619,1.571 -4,1.333 c-1.381,-0.237 -1.85,-2.246 -1,-3 M7.333,4.667 A3.333,3.333 0 1 0 14,4.667 A3.333,3.333 0 1 0 7.333,4.667 Z</StreamGeometry>
+    <!-- "move-horizontal": the Alignment tool, which shifts and stretches notes in time. -->
+    <StreamGeometry x:Key="AlignStroke">M12,5.333 l2.667,2.667 l-2.667,2.667 M1.333,8 h13.333 M4,5.333 l-2.667,2.667 l2.667,2.667</StreamGeometry>
     <!-- "link": the Sync tool. -->
     <StreamGeometry x:Key="LinkStroke">M6.667,8.667 a3.333,3.333 0 0 0 5.027,0.36 l2,-2 a3.333,3.333 0 0 0 -4.713,-4.713 l-1.147,1.14 M9.333,7.333 a3.333,3.333 0 0 0 -5.027,-0.36 l-2,2 a3.333,3.333 0 0 0 4.713,4.713 l1.14,-1.14</StreamGeometry>
     <!-- "sparkles": generate star power or fills. -->

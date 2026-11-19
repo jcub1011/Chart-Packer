@@ -44,9 +44,9 @@ The file's times are the audio's, so the song's delay is taken off them. A word 
 
 ### Lining Up Imported Lyrics
 
-A lyrics file downloaded from the internet is often timed to a different recording of the song: one with a longer intro, or one that plays slightly faster or slower. The first lyrics are then late or early, and a speed difference makes them drift further out as the song goes on. The **Vocal Alignment** tool fixes both.
+A lyrics file downloaded from the internet is often timed to a different recording of the song: one with a longer intro, or one that plays slightly faster or slower. The first lyrics are then late or early, and a speed difference makes them drift further out as the song goes on. The **Alignment** tool fixes both.
 
-**Open it from:** the toolbar's microphone button, or **Alt+7**. It only shows while a vocal lane has focus, so click a vocal lane first.
+**Open it from:** the toolbar's double-arrow button, or **Alt+7**. It works on the lane in focus, so click a vocal lane first. (On an instrument's lane it lines up that instrument's notes the same way: see [Chart Builder](Chart-Builder.md).)
 
 While the tool is picked, every note is outlined, the stretch from the first note to the last note's end is shaded, and a handle sits before the first note and after the last. While snap is on, a drag puts the first note, or the handle you're dragging, on the grid; the notes in between are stretched to fit and don't snap. Turn snap off to drag freely.
 

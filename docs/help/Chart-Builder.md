@@ -20,7 +20,16 @@ The stopwatch button beside the box, **Auto Align by Waveform**, lines the video
 
 ## Importing And Exporting Lyrics
 
-**File → Import Lyrics…** brings lyrics into a vocal part from an `.lrc` file (with or without the A2 word timing), or from `.srt`, `.vtt`, `.ttml`, `.kar`, an UltraStar `.txt`, or the lyrics tags of an audio file. Words from an UltraStar song, or a karaoke file with a melody, are sung at their pitches, and an UltraStar duet goes into Harmony 1 and 2; every other word is spoken. You choose whether the part's own lyrics are replaced or merged with, and the import is undoable. **File → Export Lyrics…** writes a part, or Harmony 1 and 2 as a duet, as an UltraStar `.txt` with its pitches, or a part as an `.lrc`, with or without A2 word timing. Lyrics timed to a different recording can be lined up with the **Vocal Alignment** tool (Alt+7, shown while a vocal lane has focus), which shifts and stretches every vocal part to fit. See [Lyric Import and Export](Lyric-Import-and-Export.md).
+**File → Import Lyrics…** brings lyrics into a vocal part from an `.lrc` file (with or without the A2 word timing), or from `.srt`, `.vtt`, `.ttml`, `.kar`, an UltraStar `.txt`, or the lyrics tags of an audio file. Words from an UltraStar song, or a karaoke file with a melody, are sung at their pitches, and an UltraStar duet goes into Harmony 1 and 2; every other word is spoken. You choose whether the part's own lyrics are replaced or merged with, and the import is undoable. **File → Export Lyrics…** writes a part, or Harmony 1 and 2 as a duet, as an UltraStar `.txt` with its pitches, or a part as an `.lrc`, with or without A2 word timing. Lyrics timed to a different recording can be lined up with the **Alignment** tool (Alt+7), which shifts and stretches every vocal part to fit. See [Lyric Import and Export](Lyric-Import-and-Export.md).
+
+## Lining Up A Part With The Audio
+
+A chart or lyrics timed to a different recording of the song start late or early, and drift if that recording plays faster or slower. The **Alignment** tool (the toolbar's double-arrow button, or **Alt+7**) shifts and stretches the part in focus to fit, in the audio's time, so tempo changes don't bend it. Click the lane first:
+
+- **On a vocal lane** it moves every vocal part's notes, lyrics, phrases and star power. Turn off **All Vocal Parts** to move only the part in focus.
+- **On an instrument's lane** it moves every difficulty that has notes, with their HOPO, strum and tap markings and disco flips, and the star power, solos, drum fills, rolls, trills and tom markers they share. Turn off **All Difficulties** to move only the difficulty in focus; the shared phrases then stay where they are.
+
+Drag inside the shaded span to shift, or drag the handle before the first note or after the last to stretch with the other end kept. Hold **Shift** for fine dragging, or type an **Offset (ms)** and **Speed (%)** (50–200%) in the toolbar. Each change is one undo step. If speeding up puts two notes on the same place, only one is kept, and the status bar says so. See [Lining Up Imported Lyrics](Lyric-Import-and-Export.md#lining-up-imported-lyrics) for a walkthrough.
 
 ## Saving And Loading Lane Layouts
 

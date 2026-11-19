@@ -27,7 +27,7 @@ public sealed class ToolShortcutTests
     [DataRow(PhysicalKey.Digit4, Key.D4, EditorTool.Phrase)]
     [DataRow(PhysicalKey.Digit5, Key.D5, EditorTool.Tempo)]
     [DataRow(PhysicalKey.Digit6, Key.D6, EditorTool.Sync)]
-    [DataRow(PhysicalKey.Digit7, Key.D7, EditorTool.VocalAlign)]
+    [DataRow(PhysicalKey.Digit7, Key.D7, EditorTool.Align)]
     public void AltAndADigitPicksTheToolInToolbarOrder(PhysicalKey key, Key typed, EditorTool expected) =>
         Assert.AreEqual(expected, ToolPicked(key, typed, KeyModifiers.Alt));
 

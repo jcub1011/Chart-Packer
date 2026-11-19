@@ -22,10 +22,10 @@ public enum EditorTool
     Loop,
 
     /// <summary>
-    /// Shifts and stretches the vocal parts in time (<see cref="Editing.VocalAlignment"/>), the dragged edge snapping to the
-    /// grid while snap is on: only while a vocal part's lane has focus.
+    /// Shifts and stretches the part in focus in time (<see cref="Editing.Alignment"/>), the dragged edge snapping to the
+    /// grid while snap is on: the vocal parts, or an instrument's difficulties, by the lane in focus.
     /// </summary>
-    VocalAlign,
+    Align,
 }
 
 /// <summary>The modifier keys held with a click or a key.</summary>
@@ -109,7 +109,7 @@ public sealed class EditorSession
         Reduce = new ReduceProposals(this);
         Sync = new SyncRegion(this);
         Find = new EditorFind(this);
-        VocalAlignment = new VocalAlignment(this);
+        Alignment = new Alignment(this);
         SongEventMarks = SongEventsWith(null);
         undo.Changed += OnUndoChanged;
     }
@@ -234,8 +234,8 @@ public sealed class EditorSession
     /// <summary>The passages found matching the selected notes (Ctrl+F), to jump between.</summary>
     public EditorFind Find { get; }
 
-    /// <summary>The Vocal Alignment tool's shift and stretch of the vocal parts, and what it's moved them by.</summary>
-    public VocalAlignment VocalAlignment { get; }
+    /// <summary>The Alignment tool's shift and stretch of the part in focus, and what it's moved it by.</summary>
+    public Alignment Alignment { get; }
 
     /// <summary>
     /// The loop region the Loop tool draws, moves and resizes (charter-spec C10 item 2): playback's, in seconds of audio,
@@ -313,8 +313,8 @@ public sealed class EditorSession
     } = SnapGrid.Default;
 
     /// <summary>
-    /// The tool a press in the lanes uses. Changing it keeps the selection. The Vocal Alignment tool is only picked while a
-    /// vocal part's lane has focus (<see cref="FocusedVocal"/>); otherwise the status says so and the tool stays.
+    /// The tool a press in the lanes uses. Changing it keeps the selection. The Alignment tool is only picked while a lane
+    /// has focus (<see cref="Focused"/> or <see cref="FocusedVocal"/>); otherwise the status says so and the tool stays.
     /// </summary>
     public EditorTool Tool
     {
@@ -323,9 +323,9 @@ public sealed class EditorSession
         {
             if (field == value)
                 return;
-            if (value == EditorTool.VocalAlign && FocusedVocal is null)
+            if (value == EditorTool.Align && FocusedVocal is null && Focused is null)
             {
-                Status = VocalAlignNeedsVocals;
+                Status = AlignNeedsFocus;
                 RaiseState();
                 return;
             }
@@ -336,13 +336,13 @@ public sealed class EditorSession
             if (value == EditorTool.Loop)
                 ToolBeforeLoop = field;
             field = value;
-            if (value == EditorTool.VocalAlign)
-                VocalAlignment.Refresh();
+            if (value == EditorTool.Align)
+                Alignment.Refresh();
             RaiseState();
         }
     }
 
-    private const string VocalAlignNeedsVocals = "The Vocal Alignment tool works on the vocal parts: click a vocal lane first.";
+    private const string AlignNeedsFocus = "The Alignment tool works on the part in focus: click a lane first.";
 
     /// <summary>The tool picked before the Sync tool, which a region drawn goes back to.</summary>
     internal EditorTool ToolBeforeSync { get; private set; }
@@ -435,14 +435,16 @@ public sealed class EditorSession
                 return;
             field = value;
             KeepPhraseKindOffered();
+            if (Tool == EditorTool.Align)
+                Alignment.Refresh();
             RaiseState();
         }
     }
 
     /// <summary>
     /// The vocal part's lane the keys act on, when the lane last clicked or chosen was one; null when it was a highway's
-    /// (<see cref="Focused"/>). The Edit menu's Select all and Paste follow it, as the lane's own keys do. A highway's lane
-    /// taking focus puts the Vocal Alignment tool down for the Select tool.
+    /// (<see cref="Focused"/>). The Edit menu's Select all and Paste follow it, as the lane's own keys do. The Alignment
+    /// tool aligns the vocal parts while it's set, and <see cref="Focused"/>'s instrument otherwise.
     /// </summary>
     public VocalTrack? FocusedVocal
     {
@@ -452,12 +454,12 @@ public sealed class EditorSession
             if (field == value)
                 return;
             field = value;
-            if (Tool == EditorTool.VocalAlign)
+            if (Tool == EditorTool.Align)
             {
-                if (value is null)
+                if (value is null && Focused is null)
                     Tool = EditorTool.Select;
                 else
-                    VocalAlignment.Refresh();
+                    Alignment.Refresh();
             }
 
             RaiseState();
@@ -847,8 +849,8 @@ public sealed class EditorSession
             KeepPhraseKindOffered();
             Reduce.OnChanged();
             Sync.OnChanged();
-            if (Tool == EditorTool.VocalAlign)
-                VocalAlignment.Refresh();
+            if (Tool == EditorTool.Align)
+                Alignment.Refresh();
             PlaceSongEvents();
         }
 
