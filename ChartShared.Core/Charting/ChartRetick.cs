@@ -145,30 +145,53 @@ internal static class ChartRetick
         int moved = 0;
         foreach (var track in part.Tracks)
         {
-            moved += Move(track.Notes, n => MoveSpan(n, n.Tick, n.Length, map, static (x, tick, length) => x with { Tick = tick, Length = length }), previous, (from, to) =>
-            {
-                string lane = to.Lane == ChartNote.OpenLane ? "open" : Invariant($"lane {to.Lane}");
-                collisions.Add(new RetickCollision(ModelDifferenceKind.Note, part.Instrument, track.Difficulty, from.Tick, to.Tick, Invariant(
-                    $"{part.Instrument} {track.Difficulty}: the {lane}{(to.DoubleKick ? " 2x kick" : "")} note at tick {from.Tick} moved to tick {to.Tick}, where another already is, so it was left out.")));
-            });
+            moved += Move(track.Notes, n => MoveNote(n, map), previous, (from, to) =>
+                collisions.Add(NoteLeftOut(part.Instrument, track.Difficulty, from, to)));
             moved += Move(track.FlaggedChords, c => c with { Tick = map(c.Tick) }, previous, (from, to) =>
-                collisions.Add(new RetickCollision(ModelDifferenceKind.ChordFlags, part.Instrument, track.Difficulty, from.Tick, to.Tick, Invariant(
-                    $"{part.Instrument} {track.Difficulty}: the chord marking ({from.Flags}) at tick {from.Tick} moved to tick {to.Tick}, which is already marked, so it was left out."))));
+                collisions.Add(ChordLeftOut(part.Instrument, track.Difficulty, from, to)));
             moved += Move(track.Mixes, m => m with { Tick = map(m.Tick) }, previous);
         }
 
-        moved += Move(part.Phrases, p => MoveSpan(p, p.Tick, p.Length, map, static (x, tick, length) => x with { Tick = tick, Length = length }), previous);
-        moved += Move(part.TomMarkers, m => MoveSpan(m, m.Tick, m.Length, map, static (x, tick, length) => x with { Tick = tick, Length = length }), previous);
+        moved += Move(part.Phrases, p => MovePhrase(p, map), previous);
+        moved += Move(part.TomMarkers, m => MoveTomMarker(m, map), previous);
         moved += Move(part.TextEvents, e => e with { Tick = map(e.Tick) }, previous);
         moved += Move(part.RawEvents, e => e.At(map(e.Tick)), previous);
         return moved;
     }
 
+    /// <summary>
+    /// <paramref name="note"/> with its start and sustain end each moved by <paramref name="map"/>. With
+    /// <paramref name="keepHeld"/>, a note held for some ticks is held for at least one.
+    /// </summary>
+    internal static EditableNote MoveNote(EditableNote note, Func<long, long> map, bool keepHeld = false) =>
+        MoveSpan(note, note.Tick, note.Length, map, static (x, tick, length) => x with { Tick = tick, Length = length }, keepHeld);
+
+    /// <summary><paramref name="phrase"/> with its start and end each moved by <paramref name="map"/>; with <paramref name="keepHeld"/>, at least a tick long if it was.</summary>
+    internal static Phrase MovePhrase(Phrase phrase, Func<long, long> map, bool keepHeld = false) =>
+        MoveSpan(phrase, phrase.Tick, phrase.Length, map, static (x, tick, length) => x with { Tick = tick, Length = length }, keepHeld);
+
+    /// <summary><paramref name="marker"/> with its start and end each moved by <paramref name="map"/>; with <paramref name="keepHeld"/>, at least a tick long if it was.</summary>
+    internal static TomMarker MoveTomMarker(TomMarker marker, Func<long, long> map, bool keepHeld = false) =>
+        MoveSpan(marker, marker.Tick, marker.Length, map, static (x, tick, length) => x with { Tick = tick, Length = length }, keepHeld);
+
+    /// <summary>A note moved from <paramref name="from"/> to <paramref name="to"/>, where another already was, and so left out.</summary>
+    internal static RetickCollision NoteLeftOut(ChartInstrument part, ChartDifficulty difficulty, EditableNote from, EditableNote to)
+    {
+        string lane = to.Lane == ChartNote.OpenLane ? "open" : Invariant($"lane {to.Lane}");
+        return new RetickCollision(ModelDifferenceKind.Note, part, difficulty, from.Tick, to.Tick, Invariant(
+            $"{part} {difficulty}: the {lane}{(to.DoubleKick ? " 2x kick" : "")} note at tick {from.Tick} moved to tick {to.Tick}, where another already is, so it was left out."));
+    }
+
+    /// <summary>A chord marking moved from <paramref name="from"/> to <paramref name="to"/>, a tick already marked, and so left out.</summary>
+    internal static RetickCollision ChordLeftOut(ChartInstrument part, ChartDifficulty difficulty, FlaggedChord from, FlaggedChord to) =>
+        new(ModelDifferenceKind.ChordFlags, part, difficulty, from.Tick, to.Tick, Invariant(
+            $"{part} {difficulty}: the chord marking ({from.Flags}) at tick {from.Tick} moved to tick {to.Tick}, which is already marked, so it was left out."));
+
     /// <summary>An item from <paramref name="tick"/> for <paramref name="length"/>, its start and end each moved by <paramref name="map"/>.</summary>
-    private static T MoveSpan<T>(T item, long tick, long length, Func<long, long> map, Func<T, long, long, T> with)
+    private static T MoveSpan<T>(T item, long tick, long length, Func<long, long> map, Func<T, long, long, T> with, bool keepHeld)
     {
         long start = map(tick);
-        return with(item, start, Math.Max(0, map(tick + length) - start));
+        return with(item, start, Math.Max(keepHeld && length > 0 ? 1 : 0, map(tick + length) - start));
     }
 
     /// <summary>

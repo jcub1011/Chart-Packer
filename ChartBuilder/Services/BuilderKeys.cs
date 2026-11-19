@@ -36,7 +36,8 @@ namespace ChartBuilder.Services
         public const string ToolPhrase = "builder.tool.phrase";
         public const string ToolTempo = "builder.tool.tempo";
         public const string ToolSync = "builder.tool.sync";
-        public const string ToolVocalAlign = "builder.tool.vocalAlign";
+        // The id from when it aligned only the vocals, kept so a key the user has set for it still works.
+        public const string ToolAlign = "builder.tool.vocalAlign";
         public const string LoopTool = "builder.tool.loopHold";
         public const string PlaytestToggle = "builder.playtest.toggle";
         public const string PlaytestNext = "builder.playtest.next";
@@ -114,7 +115,7 @@ namespace ChartBuilder.Services
 
         /// <summary>The tool actions, in the toolbar's order.</summary>
         public static IReadOnlyList<string> ToolActions { get; } =
-            [ToolSelect, ToolPlace, ToolErase, ToolPhrase, ToolTempo, ToolSync, ToolVocalAlign];
+            [ToolSelect, ToolPlace, ToolErase, ToolPhrase, ToolTempo, ToolSync, ToolAlign];
 
         /// <summary>The lane keys 1 to 6, in the order of a highway's columns.</summary>
         public static IReadOnlyList<string> LaneActions { get; } =
@@ -168,7 +169,7 @@ namespace ChartBuilder.Services
             yield return Make(ToolPhrase, Strings.KeyActionToolPhrase, tools, Tools, "Alt+Digit4", yields: true);
             yield return Make(ToolTempo, Strings.KeyActionToolTempo, tools, Tools, "Alt+Digit5", yields: true);
             yield return Make(ToolSync, Strings.KeyActionToolSync, tools, Tools, "Alt+Digit6", yields: true);
-            yield return Make(ToolVocalAlign, Strings.KeyActionToolVocalAlign, tools, Tools, "Alt+Digit7", yields: true);
+            yield return Make(ToolAlign, Strings.KeyActionToolAlign, tools, Tools, "Alt+Digit7", yields: true);
             yield return Make(LoopTool, Strings.KeyActionLoopTool, tools, Tools, "L", bare: true, hold: true);
 
             yield return Make(PlaytestToggle, Strings.KeyActionPlaytestToggle, playtest, Canvas, "P", bare: true, reserved: true);

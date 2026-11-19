@@ -722,6 +722,8 @@ namespace ChartBuilder.Controls.Editing
             if (_camera is null)
                 _perf?.Draw(context, new Point(4, 4));
 
+            DrawTrackAlignment(context, session, key, screen, slots);
+
             var lanes = LanesOf(screen, slots);
             using (context.PushClip(lanes))
             {
@@ -866,7 +868,7 @@ namespace ChartBuilder.Controls.Editing
         /// let go of when it moves on; or, with a synchronized region or the loop region drawn, its X and hover, which do too.
         /// </summary>
         private bool IsHoverShown => _hover is { } hover && !_isPressed
-            && (Session?.Tool is EditorTool.Place or EditorTool.Erase or EditorTool.Phrase or EditorTool.Tempo or EditorTool.VocalAlign
+            && (Session?.Tool is EditorTool.Place or EditorTool.Erase or EditorTool.Phrase or EditorTool.Tempo or EditorTool.Align
                 || Session?.Sync.IsActive == true
                 || Session?.Loop?.Span is not null
                 || ((Session?.Tool == EditorTool.Select || (_keys & KeyModifiers.Shift) != 0)
@@ -912,7 +914,9 @@ namespace ChartBuilder.Controls.Editing
                 _strike.Redraw();
             if (_editor?.Playtest.HasFeedback == true)
                 _playtest.Redraw();
-            if (IsHoverShown || vocal)
+            // The Alignment tool's span is on the overlay, which stays put on the screen: it's drawn again to follow the notes,
+            // wherever the pointer is, as when the song is scrubbed from the timeline.
+            if (IsHoverShown || vocal || IsAligningLane)
             {
                 _overlay.Redraw();
             }
@@ -1184,9 +1188,11 @@ namespace ChartBuilder.Controls.Editing
             _lastPoint = point;
 
             // A box is drawn from a press in the lanes that's on no note, with the select tool or Shift, which lends any tool
-            // the select tool's press. The Sync and Loop tools' presses draw no box.
+            // the select tool's press. The Sync, Loop and Alignment tools' presses draw no box: Shift makes an alignment
+            // drag fine instead.
             bool sync = session.Tools.IsSyncPress(ModifiersOf(e.KeyModifiers));
-            bool selecting = !sync && !session.Tools.LoopActive && (session.Tool == EditorTool.Select || (e.KeyModifiers & KeyModifiers.Shift) != 0);
+            bool selecting = !sync && !session.Tools.LoopActive && session.Tool != EditorTool.Align
+                && (session.Tool == EditorTool.Select || (e.KeyModifiers & KeyModifiers.Shift) != 0);
             _boxFrom = button == MouseButton.Left && selecting && point.Rail is null && session.TrackOf(point.Track) is not null && session.Tools.HitTest(point) is null
                 ? current.Position
                 : null;
@@ -1252,7 +1258,7 @@ namespace ChartBuilder.Controls.Editing
                     if (!ShowLoopCursor(position) && !ShowSyncCursor(position) && !ShowVocalTempoCursor(position))
                         ShowVocalCursor(position);
                 }
-                else if (!ShowLoopCursor(position) && !ShowSyncCursor(position) && !ShowTempoCursor(position))
+                else if (!ShowLoopCursor(position) && !ShowSyncCursor(position) && !ShowTempoCursor(position) && !ShowTrackAlignCursor(position))
                 {
                     ShowRailCursor(position);
                 }
@@ -1739,7 +1745,7 @@ namespace ChartBuilder.Controls.Editing
             {
                 editor.Session.ChartChanged += OnChartChanged;
                 editor.Session.StateChanged += OnRedraw;
-                editor.Session.VocalAlignment.Changed += OnRedraw;
+                editor.Session.Alignment.Changed += OnRedraw;
                 editor.Session.Selection.Changed += OnRedraw;
                 editor.Session.Viewport.Changed += OnViewportChanged;
                 editor.Playback.PropertyChanged += OnPlaybackChanged;
@@ -1773,7 +1779,7 @@ namespace ChartBuilder.Controls.Editing
             {
                 editor.Session.ChartChanged -= OnChartChanged;
                 editor.Session.StateChanged -= OnRedraw;
-                editor.Session.VocalAlignment.Changed -= OnRedraw;
+                editor.Session.Alignment.Changed -= OnRedraw;
                 editor.Session.Selection.Changed -= OnRedraw;
                 editor.Session.Viewport.Changed -= OnViewportChanged;
                 editor.Playback.PropertyChanged -= OnPlaybackChanged;
@@ -2727,7 +2733,7 @@ namespace ChartBuilder.Controls.Editing
             }
 
             _flagged.Clear();
-            _decorations.Begin(session, key, track, projection, slots, AccentPens().Selected, isGhost, isGhost ? ghostRing : null, upright: ReferenceEquals(painter, _uprightNotes));
+            _decorations.Begin(session, key, track, projection, slots, AccentPens().Selected, isGhost, isGhost ? ghostRing : null, upright: ReferenceEquals(painter, _uprightNotes), aligning: !isGhost && IsAligning(session, key));
             painter.Draw(context, projection, kind, CollectionsMarshal.AsSpan(glyphs), size, _decorations, _alongLimit.From, _alongLimit.To, pass);
         }
 
@@ -2744,14 +2750,17 @@ namespace ChartBuilder.Controls.Editing
             private bool _isGhost;
             private IPen? _ghostRing;
             private bool _isUpright;
+            private bool _isAligning;
 
             public NoteDecorations(EditorCanvas canvas)
             {
                 _canvas = canvas;
             }
 
-            public void Begin(EditorSession session, ChartTrackKey key, EditableTrack track, LaneProjection projection, LaneSlots slots, IPen selectedPen, bool isGhost, IPen? ghostRing, bool upright)
+            /// <param name="aligning">Whether the Alignment tool aligns the track, so every note is ringed as they all move together.</param>
+            public void Begin(EditorSession session, ChartTrackKey key, EditableTrack track, LaneProjection projection, LaneSlots slots, IPen selectedPen, bool isGhost, IPen? ghostRing, bool upright, bool aligning)
             {
+                _isAligning = aligning;
                 _session = session;
                 _key = key;
                 _track = track;
@@ -2784,7 +2793,7 @@ namespace ChartBuilder.Controls.Editing
 
                 var note = _canvas._glyphNotes[glyph.Index];
                 bool across = glyph.Has(NoteGlyphParts.Across);
-                if (_session!.Selection.IsMarked(_key, note))
+                if (_isAligning || _session!.Selection.IsMarked(_key, note))
                     DrawRing(context, rect, _selectedPen!);
 
                 if (!across && _track!.Kind != ChartInstrumentKind.Drums && _canvas._flagged.Add(note.Tick) && _track.FlagsAt(note.Tick) is var flags and not ChordFlags.None)

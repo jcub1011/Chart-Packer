@@ -154,7 +154,8 @@ namespace ChartBuilder.Controls.Editing
 
         /// <summary>
         /// Draws what follows the pointer, as much of it as stands up on a perspective highway: the place tool's ghost, and the gems the
-        /// erase tool would take away and a synchronized region syncs, marked over. The rest, a sustain's tail and the rail, is on the plane.
+        /// erase tool would take away and a synchronized region syncs, marked over, and the Alignment tool's offset and speed. The rest, a
+        /// sustain's tail and the rail, is on the plane.
         /// </summary>
         public void PaintGemMarks(IHighwayCanvas context)
         {
@@ -181,6 +182,7 @@ namespace ChartBuilder.Controls.Editing
             DrawNoteHover(context, scene.Session, scene.Key, scene.Screen, scene.Slots, upright: true);
             DrawEraseHover(context, scene.Session, scene.Key, scene.Track, scene.Part, scene.Rows, scene.Screen, scene.Slots, upright: true);
             DrawSyncNotes(context, scene.Session, scene.Key, scene.Track, scene.Screen, scene.Slots, upright: true);
+            DrawStandingAlignReadout(context, scene.Session, scene.Key, scene.Screen);
             if (PlaytestOf(scene.Key) is { } run)
                 DrawPlaytestMarks(context, scene.Session, scene.Key, run, scene.Slots, scene.Screen, upright: true);
         }

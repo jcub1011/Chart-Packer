@@ -124,7 +124,7 @@ namespace ChartBuilder.ViewModels
             _tapEnd.Tick += (_, _) => _ = ApplyTapsAsync();
 
             Session.StateChanged += OnSessionState;
-            Session.VocalAlignment.Changed += OnVocalAlignmentChanged;
+            Session.Alignment.Changed += OnAlignmentChanged;
             Session.StatusPosted += OnStatusPosted;
             Session.ChartChanged += OnChartChanged;
             Session.SongSettingsChanged += OnSongSettingsChanged;
@@ -678,8 +678,8 @@ namespace ChartBuilder.ViewModels
         {
             _refresh.Stop();
             _tapEnd.Stop();
-            _vocalAlignApply?.Stop();
-            Session.VocalAlignment.Changed -= OnVocalAlignmentChanged;
+            _alignApply?.Stop();
+            Session.Alignment.Changed -= OnAlignmentChanged;
             StopCountdown();
             Playback.DeferPlayStart = null;
             Session.StateChanged -= OnSessionState;
@@ -735,7 +735,7 @@ namespace ChartBuilder.ViewModels
             OnPropertyChanged(nameof(IsTempoTool));
             OnPropertyChanged(nameof(IsSyncTool));
             OnPropertyChanged(nameof(IsLoopTool));
-            RefreshVocalAlign();
+            RefreshAlign();
             OnPropertyChanged(nameof(IsRecording));
             OnPropertyChanged(nameof(RecordToolTip));
 

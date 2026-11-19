@@ -151,6 +151,13 @@ public sealed partial class EditorTools
             return;
         }
 
+        // The Alignment tool takes hold of the whole lane, the phrase rail and all, as it moves the phrases with the notes.
+        if (_session.Tool == EditorTool.Align)
+        {
+            _gesture = PressAlign(_session.Alignment.Aligns(point.Track), point.Tick, point.Tolerance);
+            return;
+        }
+
         if (point.Rail is not null)
         {
             // The erase tool erases there too, as it shows.
@@ -347,7 +354,7 @@ public sealed partial class EditorTools
 
         if (_session.Tool == EditorTool.Tempo)
             RemoveTempoNear(point.Tick, point.Tolerance);
-        else
+        else if (_session.Tool != EditorTool.Align)
             _gesture = new EraseGesture(this, point);
     }
 
@@ -363,7 +370,7 @@ public sealed partial class EditorTools
         Cancel();
         _modifiers = modifiers;
         _session.Focused = point.Track;
-        if (_session.TrackOf(point.Track) is null || point.Rail is not null)
+        if (_session.Tool == EditorTool.Align || _session.TrackOf(point.Track) is null || point.Rail is not null)
             return;
 
         var selection = _session.Selection;

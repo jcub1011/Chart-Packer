@@ -43,17 +43,26 @@ public static class DrumFills
         if (chart.PartOf(ChartInstrument.Drums) is not { } drums)
             return ChartChange.None;
         long? coda = FirstCoda(chart);
-        var wrong = drums.Phrases.Where(p => p.Kind is PhraseKind.DrumFill or PhraseKind.BigRockEnding && p.Kind != KindAt(coda, p.Tick)).ToList();
+        var wrong = drums.Phrases.Where(p => Classified(p, coda) != p).ToList();
         var regions = new List<ChartLocation>(wrong.Count);
         foreach (var phrase in wrong)
         {
             log.RemoveAt(drums.Phrases, drums.Phrases.IndexOf(phrase));
-            log.Place(drums.Phrases, phrase with { Kind = KindAt(coda, phrase.Tick) });
+            log.Place(drums.Phrases, Classified(phrase, coda));
             regions.Add(new ChartLocation(ChartInstrument.Drums, null, phrase.Tick, phrase.Tick + phrase.Length));
         }
 
         return ChartChange.Of(regions);
     }
+
+    /// <summary>
+    /// <paramref name="phrase"/>, a drums phrase, as the kind its tick makes it against <paramref name="coda"/>
+    /// (<see cref="FirstCoda"/>) when it's a fill or big rock ending; any other phrase as it is.
+    /// </summary>
+    internal static Phrase Classified(Phrase phrase, long? coda) =>
+        phrase.Kind is PhraseKind.DrumFill or PhraseKind.BigRockEnding && phrase.Kind != KindAt(coda, phrase.Tick)
+            ? phrase with { Kind = KindAt(coda, phrase.Tick) }
+            : phrase;
 
     private static PhraseKind KindAt(long? coda, long tick) => tick >= coda ? PhraseKind.BigRockEnding : PhraseKind.DrumFill;
 }

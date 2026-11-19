@@ -372,26 +372,27 @@
                                 </ToolTip.Tip>
                                 <ctl:LineIcon Data="{StaticResource LoopRegionStroke}" />
                             </ToggleButton>
-                            <!-- Only while a vocal lane has focus: it works on the vocal parts alone. -->
-                            <ToggleButton Classes="tool" IsChecked="{Binding Editor.IsVocalAlignTool}" IsVisible="{Binding Editor.ShowsVocalAlignTool}"
-                                          AutomationProperties.Name="{x:Static res:Strings.ToolVocalAlign}"
-                                          kb:Shortcut.Action="{x:Static svc:BuilderKeys.ToolVocalAlign}">
+                            <!-- The part in focus: the vocal parts on a vocal lane, an instrument's difficulties on its lane. -->
+                            <ToggleButton Classes="tool" IsChecked="{Binding Editor.IsAlignTool}"
+                                          AutomationProperties.Name="{x:Static res:Strings.ToolAlign}"
+                                          kb:Shortcut.Action="{x:Static svc:BuilderKeys.ToolAlign}">
                                 <ToolTip.Tip>
                                     <StackPanel MaxWidth="320" Spacing="4">
-                                        <TextBlock FontWeight="SemiBold" kb:Shortcut.Action="{x:Static svc:BuilderKeys.ToolVocalAlign}" kb:Shortcut.Text="{x:Static res:Strings.ToolVocalAlign}" />
-                                        <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.ToolVocalAlignToolTip}" />
+                                        <TextBlock FontWeight="SemiBold" kb:Shortcut.Action="{x:Static svc:BuilderKeys.ToolAlign}" kb:Shortcut.Text="{x:Static res:Strings.ToolAlign}" />
+                                        <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.ToolAlignToolTip}" />
                                     </StackPanel>
                                 </ToolTip.Tip>
-                                <ctl:LineIcon Data="{StaticResource MicVocalStroke}" />
+                                <ctl:LineIcon Data="{StaticResource AlignStroke}" />
                             </ToggleButton>
                         </StackPanel>
                     </Border>
 
-                    <!-- The Vocal Alignment tool's options, while it's picked: how far the vocal parts are shifted and how fast
-                         they're played, typed or scrubbed, and whether every part is aligned or only the one in focus. -->
-                    <Border Classes="toolbar-group" IsVisible="{Binding Editor.IsVocalAlignTool}">
+                    <!-- The Alignment tool's options, while it's picked: how far the notes are shifted and how fast
+                         they're played, typed or scrubbed, and whether every vocal part or difficulty is aligned, or only
+                         the one in focus. -->
+                    <Border Classes="toolbar-group" IsVisible="{Binding Editor.IsAlignTool}">
                         <StackPanel Orientation="Horizontal" Spacing="6">
-                            <TextBlock Classes="muted" FontSize="12" VerticalAlignment="Center" Margin="4,0,0,0" Text="{x:Static res:Strings.VocalAlignOffsetLabel}" />
+                            <TextBlock Classes="muted" FontSize="12" VerticalAlignment="Center" Margin="4,0,0,0" Text="{x:Static res:Strings.AlignOffsetLabel}" />
                             <!-- As tall as the toolbar's buttons, the text centred: stretched, a number's digits sit high. -->
                             <NumericUpDown Width="88"
                                            Height="28"
@@ -405,10 +406,10 @@
                                            Minimum="-3600000"
                                            Maximum="3600000"
                                            FormatString="0.#"
-                                           Value="{Binding Editor.VocalAlignOffsetMs}"
-                                           ToolTip.Tip="{x:Static res:Strings.VocalAlignOffsetToolTip}"
-                                           AutomationProperties.Name="{x:Static res:Strings.VocalAlignOffsetLabel}" />
-                            <TextBlock Classes="muted" FontSize="12" VerticalAlignment="Center" Margin="6,0,0,0" Text="{x:Static res:Strings.VocalAlignSpeedLabel}" />
+                                           Value="{Binding Editor.AlignOffsetMs}"
+                                           ToolTip.Tip="{x:Static res:Strings.AlignOffsetToolTip}"
+                                           AutomationProperties.Name="{x:Static res:Strings.AlignOffsetLabel}" />
+                            <TextBlock Classes="muted" FontSize="12" VerticalAlignment="Center" Margin="6,0,0,0" Text="{x:Static res:Strings.AlignSpeedLabel}" />
                             <NumericUpDown Width="80"
                                            Height="28"
                                            FontSize="12"
@@ -418,14 +419,15 @@
                                            ctl:DragScrub.IsEnabled="True"
                                            ctl:DragScrub.Step="0.01"
                                            Increment="0.01"
-                                           Minimum="{x:Static vm:ChartEditorViewModel.VocalAlignMinSpeedPercent}"
-                                           Maximum="{x:Static vm:ChartEditorViewModel.VocalAlignMaxSpeedPercent}"
+                                           Minimum="{x:Static vm:ChartEditorViewModel.AlignMinSpeedPercent}"
+                                           Maximum="{x:Static vm:ChartEditorViewModel.AlignMaxSpeedPercent}"
                                            FormatString="0.###"
-                                           Value="{Binding Editor.VocalAlignSpeedPercent}"
-                                           ToolTip.Tip="{x:Static res:Strings.VocalAlignSpeedToolTip}"
-                                           AutomationProperties.Name="{x:Static res:Strings.VocalAlignSpeedLabel}" />
+                                           Value="{Binding Editor.AlignSpeedPercent}"
+                                           ToolTip.Tip="{x:Static res:Strings.AlignSpeedToolTip}"
+                                           AutomationProperties.Name="{x:Static res:Strings.AlignSpeedLabel}" />
                             <Border Classes="choice-divider" />
-                            <ToggleButton Classes="labelled" Content="{x:Static res:Strings.VocalAlignAllParts}" IsChecked="{Binding Editor.IsVocalAlignAllParts}" ToolTip.Tip="{x:Static res:Strings.VocalAlignAllPartsToolTip}" />
+                            <ToggleButton Classes="labelled" Content="{x:Static res:Strings.AlignAllVocalParts}" IsChecked="{Binding Editor.IsAlignAllVocalParts}" IsVisible="{Binding Editor.AlignsVocals}" ToolTip.Tip="{x:Static res:Strings.AlignAllVocalPartsToolTip}" />
+                            <ToggleButton Classes="labelled" Content="{x:Static res:Strings.AlignAllDifficulties}" IsChecked="{Binding Editor.IsAlignAllDifficulties}" IsVisible="{Binding !Editor.AlignsVocals}" ToolTip.Tip="{x:Static res:Strings.AlignAllDifficultiesToolTip}" />
                         </StackPanel>
                     </Border>
 

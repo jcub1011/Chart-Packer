@@ -510,7 +510,7 @@ namespace ChartBuilder.Controls.Editing
         /// <summary>
         /// The notes: a bar on its pitch's row for each sung one, a line from the note before for a slide, and an outline
         /// along the middle row for a spoken one, which has no pitch. A selected note has the accent's edge around it, and so
-        /// does every note while the Vocal Alignment tool aligns the part, as they all move together.
+        /// does every note while the Alignment tool aligns the part, as they all move together.
         /// </summary>
         private void DrawVocalNotes(IHighwayCanvas context, EditorSession session, VocalTrack vocal, VocalLane vocals, LaneProjection projection, double fromTick, double toTick)
         {

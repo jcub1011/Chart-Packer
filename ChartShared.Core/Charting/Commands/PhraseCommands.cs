@@ -94,6 +94,59 @@ public sealed class ChangePhrase : ChartCommand
     }
 }
 
+/// <summary>
+/// Puts new phrases and tom markers in a part in place of all it had, as the Alignment tool moves every difficulty
+/// (charter-spec C3 item 7). On drums, each fill and big rock ending becomes the kind its tick makes it against
+/// <c>[coda]</c> (<see cref="DrumFills.KindAt"/>), as one moved across it is read as the other.
+/// </summary>
+public sealed class ReplacePartSpans : ChartCommand
+{
+    private readonly Phrase[] _phrases;
+    private readonly TomMarker[] _tomMarkers;
+    private (Phrase[] Phrases, TomMarker[] TomMarkers)? _old;
+
+    public ReplacePartSpans(ChartInstrument part, IEnumerable<Phrase> phrases, IEnumerable<TomMarker> tomMarkers)
+    {
+        ArgumentNullException.ThrowIfNull(phrases);
+        ArgumentNullException.ThrowIfNull(tomMarkers);
+        Part = part;
+        _phrases = [.. phrases];
+        _tomMarkers = [.. tomMarkers];
+    }
+
+    public ChartInstrument Part { get; }
+
+    private protected override ChartChange Do(EditableChart chart)
+    {
+        var part = PartOf(chart, Part);
+        long? coda = DrumFills.FirstCoda(chart);
+        Phrase[] phrases = part.Kind == ChartInstrumentKind.Drums ? [.. _phrases.Select(p => DrumFills.Classified(p, coda))] : _phrases;
+        foreach (var phrase in phrases)
+            PhraseEdits.Check(chart, part, phrase);
+        foreach (var marker in _tomMarkers)
+        {
+            part.TomMarkers.Check(marker);
+            if (part.Kind != ChartInstrumentKind.Drums)
+                throw new InvalidOperationException($"Only drums have tom markers, and {Part} isn't drums.");
+        }
+
+        _old = (part.Phrases.AsSpan().ToArray(), part.TomMarkers.AsSpan().ToArray());
+        ChartTickSnapshot.Refill(part.Phrases, phrases);
+        ChartTickSnapshot.Refill(part.TomMarkers, _tomMarkers);
+        return ChartChange.Of(Part, null, 0, long.MaxValue);
+    }
+
+    private protected override void Undo(EditableChart chart)
+    {
+        if (_old is not { } old)
+            return;
+        var part = PartOf(chart, Part);
+        ChartTickSnapshot.Refill(part.Phrases, old.Phrases);
+        ChartTickSnapshot.Refill(part.TomMarkers, old.TomMarkers);
+        _old = null;
+    }
+}
+
 /// <summary>What the phrase commands share.</summary>
 internal static class PhraseEdits
 {

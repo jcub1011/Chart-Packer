@@ -51,10 +51,10 @@ public sealed partial class EditorTools
             return;
         }
 
-        // The Vocal Alignment tool takes hold of every part at once, wherever in the lane it's pressed.
-        if (_session.Tool == EditorTool.VocalAlign)
+        // The Alignment tool takes hold of every part it aligns at once, wherever in the lane it's pressed.
+        if (_session.Tool == EditorTool.Align)
         {
-            _gesture = PressVocalAlign(point);
+            _gesture = PressAlign(_session.Alignment.Aligns(point.Track), point.Tick, point.Tolerance);
             return;
         }
 
@@ -105,7 +105,7 @@ public sealed partial class EditorTools
             _session.ClearLoop();
         else if (SyncActive)
             _session.Sync.Clear();
-        else if (_session.Tool == EditorTool.VocalAlign)
+        else if (_session.Tool == EditorTool.Align)
             return;
         else if (_session.Tool == EditorTool.Tempo)
             RemoveTempoNear(point.Tick, point.Tolerance);
@@ -123,7 +123,7 @@ public sealed partial class EditorTools
     {
         Cancel();
         _modifiers = modifiers;
-        if (_session.Tool == EditorTool.VocalAlign || point.InPhrases || point.InStarPower || VocalContentOrSay(point.Track) is not { } content)
+        if (_session.Tool == EditorTool.Align || point.InPhrases || point.InStarPower || VocalContentOrSay(point.Track) is not { } content)
             return;
 
         var selection = _session.Selection;
