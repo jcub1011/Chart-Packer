@@ -3,6 +3,7 @@ using Avalonia;
 using Avalonia.Media;
 using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charts;
+using ChartShared.UI.Controls.Skia;
 
 namespace ChartShared.UI.Controls.Highway
 {
@@ -92,10 +93,10 @@ namespace ChartShared.UI.Controls.Highway
     public interface INoteDecorator
     {
         /// <summary>Draws a tail of <paramref name="glyph"/> that isn't a sustain to the games, only an outline of one, in its place at <paramref name="tail"/>.</summary>
-        void DrawDashedTail(DrawingContext context, in NoteGlyph glyph, Rect tail);
+        void DrawDashedTail(IHighwayCanvas context, in NoteGlyph glyph, Rect tail);
 
         /// <summary>Draws over <paramref name="glyph"/>'s note, which was drawn at <paramref name="rect"/>.</summary>
-        void AfterNote(DrawingContext context, in NoteGlyph glyph, Rect rect);
+        void AfterNote(IHighwayCanvas context, in NoteGlyph glyph, Rect rect);
     }
 
     /// <summary>
@@ -137,7 +138,7 @@ namespace ChartShared.UI.Controls.Highway
         /// <param name="size">How long a gem is, along the time axis, in pixels.</param>
         /// <param name="alongFrom">The nearest along the time axis anything is drawn, in pixels, so something reaching far past what's shown stays within it.</param>
         /// <param name="pass">Which pass to make. A host that draws its notes apart from their tails, as a perspective highway does, makes each in its own place.</param>
-        public void Draw(DrawingContext context, LaneProjection projection, ChartInstrumentKind kind, ReadOnlySpan<NoteGlyph> glyphs, double size, INoteDecorator? decorator = null, double alongFrom = double.NegativeInfinity, double alongTo = double.PositiveInfinity, NotePass pass = NotePass.All)
+        public void Draw(IHighwayCanvas context, LaneProjection projection, ChartInstrumentKind kind, ReadOnlySpan<NoteGlyph> glyphs, double size, INoteDecorator? decorator = null, double alongFrom = double.NegativeInfinity, double alongTo = double.PositiveInfinity, NotePass pass = NotePass.All)
         {
             if ((pass & NotePass.Tails) != 0)
                 DrawTails(context, projection, kind, glyphs, decorator, alongFrom, alongTo);
@@ -145,7 +146,7 @@ namespace ChartShared.UI.Controls.Highway
                 DrawNotes(context, projection, kind, glyphs, size, decorator, alongFrom, alongTo);
         }
 
-        private void DrawTails(DrawingContext context, LaneProjection projection, ChartInstrumentKind kind, ReadOnlySpan<NoteGlyph> glyphs, INoteDecorator? decorator, double alongFrom, double alongTo)
+        private void DrawTails(IHighwayCanvas context, LaneProjection projection, ChartInstrumentKind kind, ReadOnlySpan<NoteGlyph> glyphs, INoteDecorator? decorator, double alongFrom, double alongTo)
         {
             var view = projection.View;
             double across1 = projection.LaneFrom;
@@ -185,7 +186,7 @@ namespace ChartShared.UI.Controls.Highway
             }
         }
 
-        private void DrawNotes(DrawingContext context, LaneProjection projection, ChartInstrumentKind kind, ReadOnlySpan<NoteGlyph> glyphs, double size, INoteDecorator? decorator, double alongFrom, double alongTo)
+        private void DrawNotes(IHighwayCanvas context, LaneProjection projection, ChartInstrumentKind kind, ReadOnlySpan<NoteGlyph> glyphs, double size, INoteDecorator? decorator, double alongFrom, double alongTo)
         {
             var view = projection.View;
             double across1 = projection.LaneFrom;
@@ -233,14 +234,14 @@ namespace ChartShared.UI.Controls.Highway
         }
 
         // Draws what follows faint, when the glyph is. A struct used directly by `using`, so it isn't boxed for each glyph drawn.
-        private static FadeScope Faded(DrawingContext context, in NoteGlyph glyph) => new(context, glyph.Opacity);
+        private static FadeScope Faded(IHighwayCanvas context, in NoteGlyph glyph) => new(context, glyph.Opacity);
 
         private readonly struct FadeScope : IDisposable
         {
-            private readonly DrawingContext.PushedState _pushed;
+            private readonly CanvasState _pushed;
             private readonly bool _isFaded;
 
-            public FadeScope(DrawingContext context, double opacity)
+            public FadeScope(IHighwayCanvas context, double opacity)
             {
                 _isFaded = opacity < 1;
                 if (_isFaded)

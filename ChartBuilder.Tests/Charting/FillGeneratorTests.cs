@@ -284,7 +284,7 @@ public sealed class FillGeneratorTests
         drums.Phrases.Add(existing);
 
         var added = Propose(chart, DrumsVariant.Pro, mode: GenerationMode.Add);
-        Assert.IsFalse(added.Proposals.Any(p => p.Fill.Overlaps(existing)));
+        Assert.DoesNotContain(p => p.Fill.Overlaps(existing), added.Proposals);
         Assert.AreSequenceEqual([8L, 12L, 16L], StartMeasures(added));
 
         var replaced = Propose(chart, DrumsVariant.Pro, mode: GenerationMode.Replace);

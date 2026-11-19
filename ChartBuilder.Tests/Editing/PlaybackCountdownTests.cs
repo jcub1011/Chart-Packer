@@ -89,7 +89,7 @@ public sealed class PlaybackCountdownTests
         while (!countdown.Tick())
             shown.Add(countdown.Remaining);
 
-        CollectionAssert.AreEqual(new[] { 3, 2, 1 }, shown);
+        Assert.AreSequenceEqual([3, 2, 1], shown);
         Assert.IsTrue(countdown.IsDone);
         Assert.AreEqual(0, countdown.Remaining);
     }
@@ -156,7 +156,7 @@ public sealed class PlaybackCountdownTests
         while (!countdown.Tick())
             shown.Add(countdown.Remaining);
 
-        CollectionAssert.AreEqual(Enumerable.Range(1, seconds).Reverse().ToList(), shown);
+        Assert.AreSequenceEqual(Enumerable.Range(1, seconds).Reverse().ToList(), shown);
     }
 
     [TestMethod]
@@ -208,7 +208,7 @@ public sealed class PlaybackCountdownTests
 
         probe.Run.Tick();
 
-        CollectionAssert.AreEqual(new[] { 2, 1 }, probe.Shown);
+        Assert.AreSequenceEqual([2, 1], probe.Shown);
         Assert.AreEqual(1, probe.Starts);
         Assert.IsFalse(probe.Run.IsActive);
     }
@@ -227,7 +227,7 @@ public sealed class PlaybackCountdownTests
 
         Assert.AreEqual(0, probe.Starts);
         Assert.IsFalse(probe.Run.IsActive);
-        CollectionAssert.AreEqual(new[] { 2 }, probe.Shown);
+        Assert.AreSequenceEqual([2], probe.Shown);
     }
 
     [TestMethod]
@@ -256,7 +256,7 @@ public sealed class PlaybackCountdownTests
 
         Assert.IsFalse(probe.Run.IsActive);
         Assert.AreEqual(0, probe.Starts);
-        CollectionAssert.AreEqual(new[] { 2 }, probe.Shown);
+        Assert.AreSequenceEqual([2], probe.Shown);
     }
 
     [TestMethod]
@@ -269,6 +269,6 @@ public sealed class PlaybackCountdownTests
         probe.Run.Tick();
 
         Assert.AreEqual(1, probe.Starts);
-        Assert.AreEqual(0, probe.Shown.Count);
+        Assert.IsEmpty(probe.Shown);
     }
 }

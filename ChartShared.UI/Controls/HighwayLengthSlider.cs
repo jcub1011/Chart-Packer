@@ -102,8 +102,11 @@ namespace ChartShared.UI.Controls
         {
             Minimum = Math.Min(Minimum, minimum);
             Maximum = Math.Max(Maximum, maximum);
-            // Not a local value, which would win over a style or a binding that sets Value.
-            SetCurrentValue(ValueProperty, value);
+            // A local value, not SetCurrentValue: with no local value Avalonia keeps the property at its (coerced) default,
+            // and re-evaluating the theme when the control is attached to a flyout's popup reset the thumb to the range's
+            // minimum, which then followed itself into PixelsPerSecond and the lane's saved speed as 25 (#261). Nothing
+            // styles or binds Value here, so there's nothing for a local value to win over.
+            Value = value;
             Minimum = minimum;
             Maximum = maximum;
         }

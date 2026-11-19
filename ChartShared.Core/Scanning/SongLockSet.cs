@@ -12,11 +12,11 @@ namespace ChartShared.Core.Scanning;
 public sealed class SongLockSet(SongLockHolder holder)
 {
     private readonly Lock _gate = new();
-    private readonly Dictionary<string, Held> _held = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, Held> _held = [with(StringComparer.Ordinal)];
 
     // The songs whose lock is being taken, each by one thread at a time; a lock taken waits for the file system, and
     // mustn't hold up holds of other songs, or checks, while it does.
-    private readonly Dictionary<string, Taking> _taking = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, Taking> _taking = [with(StringComparer.Ordinal)];
 
     /// <summary>Which app this is.</summary>
     public SongLockHolder Holder { get; } = holder;

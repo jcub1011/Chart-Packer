@@ -174,13 +174,36 @@ namespace ChartBuilder.Services
         public const int MaxSpectrogramBudgetMb = 4096;
 
         /// <summary>How much memory every stem's spectrogram may take together, in MB (charter-spec C13 item 3).</summary>
-        public int SpectrogramBudgetMb { get; set; } = 256;
+        public int SpectrogramBudgetMb { get; set; } = DefaultSpectrogramBudgetMb;
+
+        /// <summary>The spectrogram memory budget of fresh settings, in MB: room for six 10-minute stems.</summary>
+        public const int DefaultSpectrogramBudgetMb = 512;
+
+        /// <summary>
+        /// Whether spectrograms are sharpened: each part of the sound drawn at the pitch and the time it's really at, so
+        /// notes are thin lines and hits thin columns, rather than as blurred as the analysis's windows are wide
+        /// (charter-spec C13 item 1).
+        /// </summary>
+        public bool SpectrogramSharpening { get; set; } = false;
 
         /// <summary>The master volume of fresh settings: full.</summary>
         public const double DefaultMasterVolume = 1;
 
+        /// <summary>Whether low-latency audio is on by default.</summary>
+        public const bool DefaultLowLatencyAudio = true;
+
         /// <summary>The master volume, from silence to full.</summary>
         public double MasterVolume { get; set; } = DefaultMasterVolume;
+
+        /// <summary>Whether audio is played on Windows' low-latency WASAPI path, with a small device buffer, instead of the default one. Applies when the app starts.</summary>
+        public bool LowLatencyAudio { get; set; } = DefaultLowLatencyAudio;
+
+        /// <summary>
+        /// The output device audio plays on, as <see cref="ChartShared.Audio.Playback.AudioDevices"/> identifies it:
+        /// on Windows the endpoint's ID, elsewhere SDL's device name. Empty — the default — plays on the default output
+        /// device, which is also used when the chosen device isn't connected.
+        /// </summary>
+        public string OutputDevice { get; set; } = "";
 
         /// <summary>The metronome's volume, in percent of full.</summary>
         public int MetronomeVolume { get; set; } = 50;
@@ -228,6 +251,13 @@ namespace ChartBuilder.Services
 
         /// <summary>The editor's lanes, where each is docked and how big. Null for the default layout.</summary>
         public LaneDockState? EditorLanes { get; set; }
+
+        /// <summary>
+        /// The layout templates (issue 263), in the order the View menu lists them, which load in place of the lanes open.
+        /// Null in a file that's never had them, which starts with the default one (<see cref="LayoutTemplateStore"/>);
+        /// empty once the user has deleted them all.
+        /// </summary>
+        public List<LayoutTemplate>? LayoutTemplates { get; set; }
 
         /// <summary>How each window was shown when it last closed, by its type's name (<see cref="ChartShared.UI.Views.WindowMemory"/>). Null for none yet.</summary>
         public Dictionary<string, SavedWindow>? Windows { get; set; }

@@ -26,8 +26,8 @@ namespace ChartBuilder.ViewModels
         private readonly Action<LaneAudioOptions> _keep;
 
         // The source last resolved, and what from, as it's asked for every frame the lane is drawn. The tracks are part of
-        // it, as the audio takes new ones in place when a track is added or removed.
-        private (EditorAudio Audio, IReadOnlyList<SongTrack> Tracks, LaneAudioOptions Options, ChartInstrument Instrument, AudioSource? Source)? _source;
+        // it, as the audio takes new ones in place when a track is added or removed. Whose it is: a highway's instrument or a vocal part.
+        private (EditorAudio Audio, IReadOnlyList<SongTrack> Tracks, LaneAudioOptions Options, ChartInstrument? Instrument, VocalTrack? Vocal, AudioSource? Source)? _source;
 
         // The picker's choices, made again only when they change: a new list clears the picker's selection first.
         private IReadOnlyList<AudioSourceChoice> _choices = [];
@@ -48,6 +48,12 @@ namespace ChartBuilder.ViewModels
 
         private EditorAudio? Audio => _lane.Editor?.Audio;
 
+        /// <summary>
+        /// Whether the lane is a vocal part's: its audio is always behind the piano roll's rows, and has no onsets, so the
+        /// picker leaves out where it goes and the onsets.
+        /// </summary>
+        public bool IsVocalLane => _lane.IsVocal;
+
         /// <summary>Whether the song has audio to show.</summary>
         public bool HasAudio => Audio?.HasAudio == true;
 
@@ -56,13 +62,15 @@ namespace ChartBuilder.ViewModels
         {
             get
             {
-                if (Audio is not { } audio || _lane.Track is not { } track)
+                if (Audio is not { } audio || (_lane.Track is null && _lane.Vocal is null))
                     return null;
+                var instrument = _lane.Track?.Instrument;
+                var vocal = _lane.Vocal;
                 if (_source is { } known && ReferenceEquals(known.Audio, audio) && ReferenceEquals(known.Tracks, audio.Tracks)
-                    && ReferenceEquals(known.Options, Options) && known.Instrument == track.Instrument)
+                    && ReferenceEquals(known.Options, Options) && known.Instrument == instrument && known.Vocal == vocal)
                     return known.Source;
-                var source = audio.SourceFor(Options, track.Instrument);
-                _source = (audio, audio.Tracks, Options, track.Instrument, source);
+                var source = vocal is { } part ? audio.SourceFor(Options, part) : audio.SourceFor(Options, instrument!.Value);
+                _source = (audio, audio.Tracks, Options, instrument, vocal, source);
                 return source;
             }
         }
@@ -206,7 +214,10 @@ namespace ChartBuilder.ViewModels
         /// <summary>Takes in the lane's part, the song's audio or the setting, which change the choices and what's shown.</summary>
         internal void Refresh()
         {
-            var choices = Audio is { } audio && _lane.Track is { } track ? AudioSource.ChoicesFor(track.Instrument, audio.Tracks) : [];
+            var choices = Audio is not { } audio ? []
+                : _lane.Vocal is { } vocal ? AudioSource.ChoicesFor(LaneStems.For(vocal), audio.Tracks)
+                : _lane.Track is { } track ? AudioSource.ChoicesFor(track.Instrument, audio.Tracks)
+                : [];
             if (!choices.SequenceEqual(_choices))
             {
                 _choices = choices;
@@ -231,6 +242,7 @@ namespace ChartBuilder.ViewModels
         {
             OnPropertyChanged(nameof(Options));
             OnPropertyChanged(nameof(HasAudio));
+            OnPropertyChanged(nameof(IsVocalLane));
             OnPropertyChanged(nameof(Source));
             OnPropertyChanged(nameof(SelectedSource));
             OnPropertyChanged(nameof(Backdrop));

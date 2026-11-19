@@ -71,7 +71,7 @@ namespace ChartPacker.ViewModels
         private bool _isSyncing;
 
         // The track picked for the lane's waveform in place of the vocals, for each song, by its path. Never saved.
-        private readonly Dictionary<string, string> _waveformStems = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, string> _waveformStems = [with(StringComparer.Ordinal)];
 
         // The stems the lane draws the waveform of; empty while it draws none.
         private IReadOnlyList<string> _laneStems = [];

@@ -33,7 +33,7 @@ public sealed class TempoMapTabTests
 
         var rows = TempoMapRows.Of(chart.TempoMap);
 
-        CollectionAssert.AreEqual(new[] { 0L, Measure, 2 * Measure }, rows.Select(r => r.Tick).ToArray());
+        Assert.AreSequenceEqual([0L, Measure, 2 * Measure], [.. rows.Select(r => r.Tick)]);
         Assert.IsTrue(rows[0].HasTempo && rows[0].HasSignature);
         Assert.IsTrue(rows[1].HasTempo);
         Assert.IsFalse(rows[1].HasSignature);
@@ -144,7 +144,7 @@ public sealed class TempoMapTabTests
         // The box is bounded by this, so what it holds can always be applied: the longest beat MIDI has, rounded up to
         // the three decimals the box shows, as rounding down would make a tempo too slow for it.
         long tempo = EditableTempoMap.MicrosecondsPerQuarterOf((double)TempoMapViewModel.MinBpm);
-        Assert.IsTrue(tempo <= EditableTempoMap.MaxMicrosecondsPerQuarter);
+        Assert.IsLessThanOrEqualTo(EditableTempoMap.MaxMicrosecondsPerQuarter, tempo);
         Assert.ThrowsExactly<ArgumentOutOfRangeException>(
             () => EditableTempoMap.MicrosecondsPerQuarterOf((double)(TempoMapViewModel.MinBpm - 0.001m)));
     }
@@ -344,7 +344,7 @@ public sealed class TempoMapTabTests
 
         Assert.AreEqual(Measure, tick);
         Assert.AreEqual(new TempoChange(Measure, 500_000), session.Chart.TempoMap.Tempos[1]);
-        CollectionAssert.AreEqual(new[] { Measure }, session.Selection.TempoTicks.ToArray());
+        Assert.AreSequenceEqual([Measure], [.. session.Selection.TempoTicks]);
         Assert.IsNull(session.Tools.AddTempoChangeAtCursor(), "There's a marker there now.");
         Assert.IsNotNull(session.Status);
     }

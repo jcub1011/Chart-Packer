@@ -6,7 +6,7 @@ namespace ChartShared.Core.Tests.Audio.Analysis;
 [TestClass]
 public sealed class SpectrogramCacheTests
 {
-    // 10 s at 8 kHz: 313 columns of 256 bytes, about 80 KB.
+    // 10 s at 8 kHz: 313 columns of 768 bytes, about 240 KB.
     private const int Rate = 8000;
     private static readonly long Size = ((10 * Rate / Spectrogram.Hop) + 1) * Spectrogram.Rows;
 
@@ -98,6 +98,23 @@ public sealed class SpectrogramCacheTests
 
         Assert.IsTrue(a.IsReleased && b.IsReleased);
         Assert.AreEqual(0, cache.SizeBytes);
+    }
+
+    [TestMethod]
+    public void ChangingSharpeningReleasesEverythingAndStartsTheOtherWay()
+    {
+        using var workers = new AnalysisWorkers(1);
+        using var cache = new SpectrogramCache(workers);
+        var plain = Start(cache, "a");
+
+        cache.Sharpen = false;
+        Assert.IsFalse(plain.IsReleased, "It wasn't sharpened already.");
+        cache.Sharpen = true;
+        var sharp = Start(cache, "a");
+
+        Assert.IsTrue(!plain.IsSharpened && plain.IsReleased);
+        Assert.IsTrue(sharp.IsSharpened);
+        Assert.AreNotSame(plain, sharp);
     }
 
     private static Spectrogram Start(SpectrogramCache cache, string name) => cache.GetOrStart(Key(name), Input, 0).Spectrogram!;

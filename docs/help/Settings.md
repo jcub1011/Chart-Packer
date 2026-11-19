@@ -18,8 +18,10 @@ Both this window and **Shortcuts** take on the colours of the song selected in C
 
 Library (scanning, duplicates), output (pack and unpack, downloads), playback (audio, visualizers, scrubbing), and general (appearance, logging).
 
+The audio section holds **Low Latency Audio**, which plays audio on Windows' low-latency audio path so it's heard sooner (on by default, applies when the app starts), **Output Device**, which chooses the device audio plays on (**Default output device** plays on the system's default device, as does a chosen device that isn't connected, until it is connected again), and **Audio/Visual Latency**, measured per output device.
+
 ## Chart Builder's Settings
 
-Playback (audio latency and visualizers, including **Highway length**: how far ahead a highway shows, by a look-ahead in seconds or by pixels per second, which keeps the distance between notes the same at any height), input (including the playback countdown, and a link to [Input Devices](Input-Devices.md)), charter (new charts and editing, including the pack folder and the default reduction rules, which open [Reduce](Reduce.md)), and general (what opens on startup, logging, updates).
+Playback (audio latency and visualizers, including **Highway length**: how far ahead a highway shows, by a look-ahead in seconds or by pixels per second, which keeps the distance between notes the same at any height; **Low Latency Audio** and **Output Device**, as in Chart Packer), input (including the playback countdown, and a link to [Input Devices](Input-Devices.md)), charter (new charts and editing, including the pack folder and the default reduction rules, which open [Reduce](Reduce.md)), and general (what opens on startup, logging, updates).
 
 [Back to Home](Home.md)

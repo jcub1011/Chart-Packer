@@ -36,9 +36,15 @@ namespace ChartBuilder.ViewModels
         /// The stems <paramref name="instrument"/>'s lane is drawn over by default: its own (<see cref="LaneStems.For"/>),
         /// the first group the song has any of, else the mix.
         /// </summary>
-        public static AudioSource? AutoOf(ChartInstrument instrument, IReadOnlyList<SongTrack> tracks)
+        public static AudioSource? AutoOf(ChartInstrument instrument, IReadOnlyList<SongTrack> tracks) => AutoOf(LaneStems.For(instrument), tracks);
+
+        /// <summary>
+        /// The stems a lane is drawn over by default, from <paramref name="stems"/>, its own groups of them as <see cref="LaneStems.For(ChartInstrument)"/>
+        /// and <see cref="LaneStems.For(VocalTrack)"/> give them: the first group the song has any of, else the mix.
+        /// </summary>
+        public static AudioSource? AutoOf(IReadOnlyList<IReadOnlyList<string>> stems, IReadOnlyList<SongTrack> tracks)
         {
-            foreach (var group in LaneStems.For(instrument))
+            foreach (var group in stems)
             {
                 var present = tracks.Where(t => group.Contains(t.Stem, StringComparer.OrdinalIgnoreCase)).ToList();
                 if (present.Count > 0)
@@ -52,21 +58,29 @@ namespace ChartBuilder.ViewModels
         /// The audio <paramref name="options"/> picks for <paramref name="instrument"/>'s lane: the stem chosen, the mix, or
         /// the part's own (<see cref="AutoOf"/>), which a stem the song no longer has falls back to.
         /// </summary>
-        public static AudioSource? Resolve(LaneAudioOptions options, ChartInstrument instrument, IReadOnlyList<SongTrack> tracks)
+        public static AudioSource? Resolve(LaneAudioOptions options, ChartInstrument instrument, IReadOnlyList<SongTrack> tracks) =>
+            Resolve(options, LaneStems.For(instrument), tracks);
+
+        /// <summary>The audio <paramref name="options"/> picks for a lane whose own stems are <paramref name="stems"/>; as <see cref="Resolve(LaneAudioOptions, ChartInstrument, IReadOnlyList{SongTrack})"/>.</summary>
+        public static AudioSource? Resolve(LaneAudioOptions options, IReadOnlyList<IReadOnlyList<string>> stems, IReadOnlyList<SongTrack> tracks)
         {
             ArgumentNullException.ThrowIfNull(options);
             if (options.Source == LaneAudioOptions.MixSource)
                 return MixOf(tracks);
             if (options.Source is { } stem && tracks.Where(t => t.Stem.Equals(stem, StringComparison.OrdinalIgnoreCase)).ToList() is { Count: > 0 } chosen)
                 return Of(chosen, isMix: false);
-            return AutoOf(instrument, tracks);
+            return AutoOf(stems, tracks);
         }
 
         /// <summary>The choices a lane's audio picker offers: the part's own, the mix, then each stem.</summary>
-        public static IReadOnlyList<AudioSourceChoice> ChoicesFor(ChartInstrument instrument, IReadOnlyList<SongTrack> tracks)
+        public static IReadOnlyList<AudioSourceChoice> ChoicesFor(ChartInstrument instrument, IReadOnlyList<SongTrack> tracks) =>
+            ChoicesFor(LaneStems.For(instrument), tracks);
+
+        /// <summary>The choices a picker offers a lane whose own stems are <paramref name="stems"/>.</summary>
+        public static IReadOnlyList<AudioSourceChoice> ChoicesFor(IReadOnlyList<IReadOnlyList<string>> stems, IReadOnlyList<SongTrack> tracks)
         {
             var choices = new List<AudioSourceChoice>();
-            if (AutoOf(instrument, tracks) is { } auto)
+            if (AutoOf(stems, tracks) is { } auto)
                 choices.Add(new AudioSourceChoice(null, string.Format(CultureInfo.CurrentCulture, Strings.LaneAudioAutoFormat, auto.Label)));
             if (MixOf(tracks) is not null)
                 choices.Add(new AudioSourceChoice(LaneAudioOptions.MixSource, Strings.LaneAudioMix));

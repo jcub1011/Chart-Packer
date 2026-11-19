@@ -18,6 +18,19 @@ public static class FfmpegLibrary
     /// <summary>Why FFmpeg can't be used, or <see langword="null"/> when it can.</summary>
     public static string? UnavailableReason => Problem.Value;
 
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, bool> Encoders = new(StringComparer.Ordinal);
+
+    /// <summary>Whether FFmpeg's libraries loaded and have the encoder called <paramref name="name"/>.</summary>
+    /// <remarks>
+    /// Builds made before libvpx was added have no encoders at all, so this is how a caller tells. The VP8 encoder is
+    /// <c>libvpx</c> (<c>--enable-encoder=libvpx_vp8</c> is the name of its build component, not of the encoder).
+    /// </remarks>
+    public static unsafe bool HasEncoder(string name)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+        return IsAvailable && Encoders.GetOrAdd(name, static n => Native.avcodec_find_encoder_by_name(n) != null);
+    }
+
     /// <exception cref="InvalidOperationException">FFmpeg can't be used.</exception>
     internal static void EnsureAvailable()
     {
@@ -39,6 +52,7 @@ public static class FfmpegLibrary
         try
         {
             // Loaded in dependency order, so each finds the ones it links against.
+            Native.av_log_set_level(Native.LogLevelWarning);
             return Check("libavutil", Native.avutil_version(), Native.AvUtilMajor)
                 ?? Check("libswscale", Native.swscale_version(), Native.SwScaleMajor)
                 ?? Check("libavcodec", Native.avcodec_version(), Native.AvCodecMajor)

@@ -1,6 +1,7 @@
 using System;
 using Avalonia;
 using Avalonia.Media;
+using ChartShared.UI.Controls.Skia;
 
 namespace ChartShared.UI.Controls
 {
@@ -10,11 +11,11 @@ namespace ChartShared.UI.Controls
     /// </summary>
     public readonly struct OptionalClip : IDisposable
     {
-        private readonly DrawingContext.PushedState _state;
+        private readonly CanvasState _state;
         private readonly bool _pushed;
 
         /// <param name="push">Whether to clip to <paramref name="rect"/>.</param>
-        public OptionalClip(DrawingContext context, Rect rect, bool push)
+        public OptionalClip(IHighwayCanvas context, Rect rect, bool push)
         {
             _pushed = push;
             _state = push ? context.PushClip(rect) : default;

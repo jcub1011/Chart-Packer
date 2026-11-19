@@ -45,6 +45,23 @@ public sealed class SongFileTests
     }
 
     [TestMethod]
+    public void ReadingOnTheCallingThreadGivesWhatReadAsyncDoes()
+    {
+        var folder = Folder(CreateFolder(("Video.MP4", Data), ("notes.chart", [1])));
+        var builder = new SngBuilder();
+        builder.AddFile("notes.chart", Masked(builder, [5])).AddFile("video.webm", Masked(builder, Data));
+        var sng = WriteSng(builder);
+
+        Assert.AreSequenceEqual(Data, SongFile.Read(folder, "video.mp4", long.MaxValue, TestContext.CancellationToken));
+        Assert.IsNull(SongFile.Read(folder, "video.mp4", Data.Length - 1, TestContext.CancellationToken));
+        Assert.IsNull(SongFile.Read(folder, "background.png", long.MaxValue, TestContext.CancellationToken));
+        Assert.AreSequenceEqual(Data, SongFile.Read(sng, "VIDEO.webm", long.MaxValue, TestContext.CancellationToken));
+        Assert.IsNull(SongFile.Read(sng, "video.webm", Data.Length - 1, TestContext.CancellationToken));
+        Assert.IsNull(SongFile.Read(sng, "video.mp4", long.MaxValue, TestContext.CancellationToken));
+        Assert.ThrowsExactly<OperationCanceledException>(() => SongFile.Read(folder, "video.mp4", long.MaxValue, new CancellationToken(canceled: true)));
+    }
+
+    [TestMethod]
     public async Task AnOpenStreamDoesNotStopTheSngBeingReplaced()
     {
         var builder = new SngBuilder();

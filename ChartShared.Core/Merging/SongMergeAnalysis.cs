@@ -136,14 +136,14 @@ public sealed class MergeSource
 /// <summary>The songs to merge, read, with the parts and metadata they have and where they differ.</summary>
 public sealed class SongMergeAnalysis
 {
-    private static readonly HashSet<string> BaseKeys = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "hopo_frequency", "hopofreq", "eighthnote_hopo", "end_events", "sysex_slider", "sysex_pro_slide",
-    };
+    private static readonly HashSet<string> BaseKeys =
+    [
+with(StringComparer.OrdinalIgnoreCase),         "hopo_frequency", "hopofreq", "eighthnote_hopo", "end_events", "sysex_slider", "sysex_pro_slide",
+    ];
 
-    private static readonly HashSet<string> AudioKeys = new(StringComparer.OrdinalIgnoreCase) { "preview_start_time", "preview_end_time", "preview", "tuning_offset_cents" };
+    private static readonly HashSet<string> AudioKeys = [with(StringComparer.OrdinalIgnoreCase), "preview_start_time", "preview_end_time", "preview", "tuning_offset_cents"];
 
-    private static readonly HashSet<string> VideoKeys = new(StringComparer.OrdinalIgnoreCase) { "video", "video_loop", "video_start_time", "video_end_time" };
+    private static readonly HashSet<string> VideoKeys = [with(StringComparer.OrdinalIgnoreCase), "video", "video_loop", "video_start_time", "video_end_time"];
 
     private SongMergeAnalysis(IReadOnlyList<MergeSource> sources)
     {

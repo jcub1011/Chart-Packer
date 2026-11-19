@@ -1,4 +1,5 @@
 using ChartShared.Core.Charting.Commands;
+using ChartShared.Core.Charting.Layout;
 using ChartShared.Core.Charts;
 
 namespace ChartShared.Core.Charting.Editing;
@@ -41,6 +42,18 @@ public sealed partial class EditorTools
 
     /// <summary>Whether a gesture is going on.</summary>
     public bool IsActive => _gesture is not null;
+
+    /// <summary>
+    /// The notes of <paramref name="key"/> a move going on has lifted from where they were, as they were, to be drawn as a
+    /// ghost there until the move ends, with the longest one's length; null while no move is previewed off their places.
+    /// </summary>
+    public (EditableTrack Notes, long Longest)? MoveGhost(ChartTrackKey key) => _gesture is MoveGesture move ? move.GhostOf(key) : null;
+
+    /// <summary>
+    /// The notes of vocal part <paramref name="track"/> a move going on has lifted from where they were, as its lane drew
+    /// them; empty while no move is previewed off their places.
+    /// </summary>
+    public IReadOnlyList<VocalLaneNote> VocalMoveGhost(VocalTrack track) => _gesture is VocalMoveGesture move ? move.GhostOf(track) : [];
 
     /// <summary>Whether the Sync tool is active: picked, or held on with Ctrl + Shift.</summary>
     public bool SyncActive => _session.Tool == EditorTool.Sync
@@ -138,6 +151,13 @@ public sealed partial class EditorTools
             return;
         }
 
+        // The Alignment tool takes hold of the whole lane, the phrase rail and all, as it moves the phrases with the notes.
+        if (_session.Tool == EditorTool.Align)
+        {
+            _gesture = PressAlign(_session.Alignment.Aligns(point.Track), point.Tick, point.Tolerance);
+            return;
+        }
+
         if (point.Rail is not null)
         {
             // The erase tool erases there too, as it shows.
@@ -150,7 +170,7 @@ public sealed partial class EditorTools
         // over Shift's and Ctrl's presses of their own.
         if (IsSyncPress(modifiers))
         {
-            _gesture = point.Lane is null ? null : PressSync(point);
+            _gesture = point.Lane is null ? null : PressSync(LanePart.Highway(point.Track), point.Tick, point.Tolerance);
             return;
         }
 
@@ -189,17 +209,17 @@ public sealed partial class EditorTools
     }
 
     /// <summary>
-    /// A press with the Sync tool, or Ctrl + Shift held, in the lanes: on the synchronized region's end, a drag resizes
-    /// it; on its body, a drag moves it; on a passage synced with it, a click makes that passage the region's source;
-    /// anywhere else, a drag draws a new region in place of any drawn.
+    /// A press with the Sync tool, or Ctrl + Shift held, at <paramref name="tick"/> of <paramref name="part"/>'s lane: on
+    /// the synchronized region's end, a drag resizes it; on its body, a drag moves it; on a passage synced with it, a
+    /// click makes that passage the region's source; anywhere else, a drag draws a new region in place of any drawn.
     /// </summary>
-    private Gesture PressSync(ChartPoint point) => SyncHitOf(point) switch
+    private Gesture PressSync(LanePart part, double tick, double tolerance) => SyncHitOf(_session.Sync.IsOn(part), tick, tolerance) switch
     {
-        { Grip: SyncGrip.Match } hit => new SyncGesture(this, point, hit.Start),
-        { Grip: SyncGrip.Start } => new SyncResizeGesture(this, point, start: true),
-        { Grip: SyncGrip.End } => new SyncResizeGesture(this, point, start: false),
-        { Grip: SyncGrip.Body } => new SyncMoveGesture(this, point),
-        _ => new SyncGesture(this, point),
+        { Grip: SyncGrip.Match } hit => new SyncGesture(this, part, tick, tolerance, hit.Start),
+        { Grip: SyncGrip.Start } => new SyncResizeGesture(this, tick, tolerance, start: true),
+        { Grip: SyncGrip.End } => new SyncResizeGesture(this, tick, tolerance, start: false),
+        { Grip: SyncGrip.Body } => new SyncMoveGesture(this, tick, tolerance),
+        _ => new SyncGesture(this, part, tick, tolerance),
     };
 
     /// <summary>
@@ -207,24 +227,37 @@ public sealed partial class EditorTools
     /// to move it, or a passage synced with it to make the region's source (<see cref="SyncGrip.Match"/>, at the
     /// passage's start). Null where there's nothing to take hold of: a press draws a new region.
     /// </summary>
-    public SyncHit? SyncHitOf(ChartPoint point)
+    public SyncHit? SyncHitOf(ChartPoint point) => SyncHitOf(_session.Sync.IsOn(point.Track), point.Tick, point.Tolerance);
+
+    /// <summary>
+    /// What a press at <paramref name="point"/> in a vocal part's lane takes hold of on the synchronized region, as
+    /// <see cref="SyncHitOf(ChartPoint)"/> has it in a highway's. Null outside the rows: in the phrase strip, the star
+    /// power rail, or past the highest or lowest pitch.
+    /// </summary>
+    public SyncHit? SyncHitOf(VocalPoint point) => InVocalRows(point) ? SyncHitOf(_session.Sync.IsOn(point.Track), point.Tick, point.Tolerance) : null;
+
+    // What a press at tick takes hold of on the synchronized region, when it's on the lane pressed (onLane).
+    private SyncHit? SyncHitOf(bool onLane, double tick, double tolerance)
     {
         var sync = _session.Sync;
-        if (!sync.IsActive || point.Track != sync.Track || sync.Span is not var (from, to))
+        if (!onLane || sync.Span is not var (from, to))
             return null;
         long length = to - from;
         foreach (long start in sync.Matches)
         {
-            if (point.Tick >= start && point.Tick < start + length)
+            if (tick >= start && tick < start + length)
                 return new SyncHit(SyncGrip.Match, start);
         }
 
-        if (Math.Abs(point.Tick - from) <= point.Tolerance)
+        if (Math.Abs(tick - from) <= tolerance)
             return new SyncHit(SyncGrip.Start, from);
-        if (Math.Abs(point.Tick - to) <= point.Tolerance)
+        if (Math.Abs(tick - to) <= tolerance)
             return new SyncHit(SyncGrip.End, to);
-        return point.Tick > from && point.Tick < to ? new SyncHit(SyncGrip.Body, from) : null;
+        return tick > from && tick < to ? new SyncHit(SyncGrip.Body, from) : null;
     }
+
+    // Whether a vocal point is in the rows, where the Sync and Loop tools draw their regions.
+    private static bool InVocalRows(VocalPoint point) => !point.InPhrases && !point.InStarPower && point.Pitch is not null;
 
     /// <summary>
     /// Where a press at <paramref name="point"/>, with <paramref name="modifiers"/> held, starts drawing a new
@@ -235,6 +268,18 @@ public sealed partial class EditorTools
     public long? SyncDrawStart(ChartPoint point, EditorModifiers modifiers = EditorModifiers.None)
     {
         if (!IsSyncPress(modifiers) || point.Lane is null || Chart.PartOf(point.Track.Instrument) is null)
+            return null;
+        return SyncHitOf(point) is null ? Snap.Nearest(point.Tick, Map) : null;
+    }
+
+    /// <summary>
+    /// Where a press at <paramref name="point"/> in a vocal part's lane, with <paramref name="modifiers"/> held, starts
+    /// drawing a new synchronized region, as <see cref="SyncDrawStart(ChartPoint, EditorModifiers)"/> has it in a
+    /// highway's. Null outside the rows, or where the part can't be read.
+    /// </summary>
+    public long? SyncDrawStart(VocalPoint point, EditorModifiers modifiers = EditorModifiers.None)
+    {
+        if (!IsSyncPress(modifiers) || !InVocalRows(point) || _session.VocalContentOf(point.Track) is null)
             return null;
         return SyncHitOf(point) is null ? Snap.Nearest(point.Tick, Map) : null;
     }
@@ -309,7 +354,7 @@ public sealed partial class EditorTools
 
         if (_session.Tool == EditorTool.Tempo)
             RemoveTempoNear(point.Tick, point.Tolerance);
-        else
+        else if (_session.Tool != EditorTool.Align)
             _gesture = new EraseGesture(this, point);
     }
 
@@ -325,7 +370,7 @@ public sealed partial class EditorTools
         Cancel();
         _modifiers = modifiers;
         _session.Focused = point.Track;
-        if (_session.TrackOf(point.Track) is null || point.Rail is not null)
+        if (_session.Tool == EditorTool.Align || _session.TrackOf(point.Track) is null || point.Rail is not null)
             return;
 
         var selection = _session.Selection;
@@ -1555,9 +1600,14 @@ public sealed partial class EditorTools
         private readonly List<int> _shown;
         private readonly IReadOnlyCollection<NotePlace> _selected;
 
-        // The move previewed, and the notes where it put them; null with none.
+        // The move previewed, and the notes where it put them; null with none. Set only once a preview is taken, so the
+        // notes are off their places exactly while it's set.
         private (long Ticks, int Lanes)? _delta;
         private IReadOnlyList<EditableNote>? _moved;
+
+        // The notes as they were pressed, as a track to draw where they've left, and the longest one's length; built when
+        // they're first lifted.
+        private (EditableTrack Notes, long Longest)? _ghost;
 
         public MoveGesture(EditorTools tools, ChartPoint pressed, EditableNote grabbed)
             : base(tools)
@@ -1568,6 +1618,27 @@ public sealed partial class EditorTools
             _notes = Session.Selection.Notes;
             _shown = Tools.ShownLanes(_track, _notes);
             _selected = [.. Session.Selection.Places];
+        }
+
+        /// <summary>The notes where they were pressed, while a move previewed has them off their places, if they're of <paramref name="key"/>.</summary>
+        public (EditableTrack Notes, long Longest)? GhostOf(ChartTrackKey key)
+        {
+            if (_delta is null || key != _track)
+                return null;
+            if (_ghost is null)
+            {
+                var ghost = new EditableTrack(ChartInstruments.KindOf(_track.Instrument), _track.Difficulty);
+                long longest = 0;
+                foreach (var note in _notes)
+                {
+                    ghost.Notes.Add(note);
+                    longest = Math.Max(longest, note.Length);
+                }
+
+                _ghost = (ghost, longest);
+            }
+
+            return _ghost;
         }
 
         public override void Drag(ChartPoint point)

@@ -197,11 +197,11 @@ public sealed class ExportSngViewModelTests
     {
         var vm = Dialog();
 
-        Assert.IsTrue(vm.StemDisplays.Any(s => s.Note == Strings.ExportSngStemAsIs));
+        Assert.Contains(s => s.Note == Strings.ExportSngStemAsIs, vm.StemDisplays);
 
         vm.TranscodeToOpus = true;
 
-        Assert.IsTrue(vm.StemDisplays.Any(s => s.Note == Strings.ExportSngStemWillTranscode));
+        Assert.Contains(s => s.Note == Strings.ExportSngStemWillTranscode, vm.StemDisplays);
         Assert.IsTrue(vm.StemDisplays.Where(s => s.FileName == "song.opus").All(s => s.Note == Strings.ExportSngStemPassthrough));
     }
 

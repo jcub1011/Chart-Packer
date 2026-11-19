@@ -72,11 +72,14 @@ namespace ChartBuilder.ViewModels
         // Whether the song was playing when its audio was let go of, which opening it again carries on with.
         private bool _resumeAfterRelease;
 
+        // Whether a lane's scrub paused the song, which it plays again from once the scrub ends.
+        private bool _resumeAfterScrub;
+
         // Counts the opens, so an open that finishes after a later one began is let go of.
         private int _openings;
 
         // Each stem's mute, solo and volume as last set, kept as the tracks are opened again; a stem not set has its default.
-        private readonly Dictionary<string, (bool IsMuted, bool IsSolo, double Volume)> _switches = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, (bool IsMuted, bool IsSolo, double Volume)> _switches = [with(StringComparer.Ordinal)];
 
         // Clock and DrawClock, made once: they're read every frame.
         private Func<TimeSpan>? _clock;
@@ -371,6 +374,27 @@ namespace ChartBuilder.ViewModels
                 player.PauseWhereDrawn(LatencyMilliseconds);
                 SetPlaying(false);
             }
+        }
+
+        /// <summary>
+        /// A lane is dragged to scrub: the song is held still while it goes on, and played again from where it's left by
+        /// <see cref="EndScrub"/> if it was playing.
+        /// </summary>
+        public void BeginScrub()
+        {
+            _resumeAfterScrub = IsPlaying;
+            Pause();
+        }
+
+        /// <summary>The scrub is over: the song plays on from where it was left, if <see cref="BeginScrub"/> paused it.</summary>
+        public void EndScrub()
+        {
+            if (!_resumeAfterScrub)
+                return;
+            _resumeAfterScrub = false;
+
+            // Straight to playing, as after a reload: carrying on after a scrub isn't the user starting the song, so no countdown.
+            StartPlayback();
         }
 
         /// <summary>Redraws the beats, and moves the metronome onto them, once the chart's tempo map has changed.</summary>

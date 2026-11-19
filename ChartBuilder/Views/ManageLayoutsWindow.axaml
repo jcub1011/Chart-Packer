@@ -1,0 +1,145 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:help="using:ChartShared.Core.Help"
+        xmlns:ui="using:ChartShared.UI.Controls"
+        xmlns:vm="using:ChartBuilder.ViewModels"
+        xmlns:res="using:ChartBuilder.Resources"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="520" d:DesignHeight="400"
+        x:Class="ChartBuilder.Views.ManageLayoutsWindow"
+        x:DataType="vm:ManageLayoutsViewModel"
+        Icon="/Assets/ChartBuilder.ico"
+        Title="{x:Static res:Strings.ManageLayoutsTitle}"
+        Background="{DynamicResource AppBackgroundBrush}"
+        WindowStartupLocation="CenterOwner"
+        CanMinimize="False"
+        ShowInTaskbar="False"
+        Width="520" Height="400"
+        MinWidth="420" MinHeight="320"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaTitleBarHeightHint="30"
+        WindowDecorationsTheme="{StaticResource TitleBarDecorations}">
+
+    <Window.Styles>
+        <!-- The actions down the side: each the width of the column, its icon before its label. -->
+        <Style Selector="StackPanel.actions > Button">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+        </Style>
+    </Window.Styles>
+
+    <!-- The layout templates (issue 263), in the View menu's order, and the selected one's actions. -->
+    <DockPanel>
+        <ui:TitleBar x:Name="WindowTitleBar"
+                     HelpPage="{x:Static help:HelpPages.ManageLayouts}"
+                     DockPanel.Dock="Top"
+                     Height="31"
+                     BorderThickness="0,0,0,1"
+                     BorderBrush="{DynamicResource SubtleBorderBrush}">
+            <TextBlock Margin="8,0,12,0"
+                       FontSize="12"
+                       VerticalAlignment="Center"
+                       TextTrimming="CharacterEllipsis"
+                       Text="{x:Static res:Strings.ManageLayoutsTitle}" />
+        </ui:TitleBar>
+
+        <Border DockPanel.Dock="Bottom" Classes="toolbar" BorderThickness="0,1,0,0">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button MinWidth="80"
+                        HorizontalContentAlignment="Center"
+                        Classes="accent"
+                        Content="{x:Static res:Strings.ManageLayoutsCloseButton}"
+                        IsCancel="True"
+                        Click="OnClose"
+                        AutomationProperties.Name="{x:Static res:Strings.ManageLayoutsCloseButton}" />
+            </StackPanel>
+        </Border>
+
+        <DockPanel Margin="20,16,20,20">
+            <TextBlock DockPanel.Dock="Top"
+                       Classes="muted"
+                       FontSize="12"
+                       TextWrapping="Wrap"
+                       Margin="0,0,0,12"
+                       Text="{x:Static res:Strings.ManageLayoutsIntro}" />
+
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                <Border Grid.Column="0"
+                        BorderThickness="1"
+                        BorderBrush="{DynamicResource SubtleBorderBrush}"
+                        CornerRadius="4">
+                    <Panel>
+                        <ListBox x:Name="LayoutList"
+                                 ItemsSource="{Binding Layouts}"
+                                 SelectedItem="{Binding Selected}"
+                                 Background="Transparent"
+                                 AutomationProperties.Name="{x:Static res:Strings.ManageLayoutsListName}">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate x:DataType="x:String">
+                                    <TextBlock Text="{Binding}" TextTrimming="CharacterEllipsis" />
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                        <TextBlock Classes="muted"
+                                   FontSize="12"
+                                   Margin="12"
+                                   TextWrapping="Wrap"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   TextAlignment="Center"
+                                   IsVisible="{Binding !HasLayouts}"
+                                   Text="{x:Static res:Strings.ManageLayoutsEmpty}" />
+                    </Panel>
+                </Border>
+
+                <StackPanel Grid.Column="1" Classes="actions" Spacing="6" MinWidth="150">
+                    <Button Command="{Binding NewCommand}"
+                            ToolTip.Tip="{x:Static res:Strings.ManageLayoutsNewToolTip}"
+                            AutomationProperties.Name="{x:Static res:Strings.ManageLayoutsNewButton}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ui:LineIcon Data="{StaticResource AddStroke}" />
+                            <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.ManageLayoutsNewButton}" />
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding RenameCommand}"
+                            AutomationProperties.Name="{x:Static res:Strings.ManageLayoutsRenameButton}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ui:LineIcon Data="{StaticResource PencilStroke}" />
+                            <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.ManageLayoutsRenameButton}" />
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding MoveUpCommand}"
+                            AutomationProperties.Name="{x:Static res:Strings.ManageLayoutsMoveUpButton}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ui:LineIcon Data="{StaticResource ChevronDownStroke}" RenderTransform="scaleY(-1)" />
+                            <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.ManageLayoutsMoveUpButton}" />
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding MoveDownCommand}"
+                            AutomationProperties.Name="{x:Static res:Strings.ManageLayoutsMoveDownButton}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ui:LineIcon Data="{StaticResource ChevronDownStroke}" />
+                            <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.ManageLayoutsMoveDownButton}" />
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding OverwriteCommand}"
+                            ToolTip.Tip="{x:Static res:Strings.ManageLayoutsOverwriteToolTip}"
+                            AutomationProperties.Name="{x:Static res:Strings.ManageLayoutsOverwriteButton}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ui:LineIcon Data="{StaticResource OverwriteStroke}" />
+                            <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.ManageLayoutsOverwriteButton}" />
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding DeleteCommand}"
+                            AutomationProperties.Name="{x:Static res:Strings.ManageLayoutsDeleteButton}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ui:LineIcon Data="{StaticResource TrashStroke}" />
+                            <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.ManageLayoutsDeleteButton}" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </DockPanel>
+    </DockPanel>
+</Window>

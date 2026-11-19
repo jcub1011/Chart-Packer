@@ -359,8 +359,8 @@ public sealed class ChartRuleTests
         var findings = new ChartLinter().LintAll(Snapshot(chart, input)).Findings;
 
         Assert.DoesNotContain(f => f.RuleId == ChrRules.Chr021, findings);
-        Assert.IsTrue(ChrRules.All.Contains(ChrRules.Chr021), "The ID is kept.");
-        Assert.IsFalse(ChartLintRules.All.Any(r => r.RuleId == ChrRules.Chr021), "The rule no longer runs.");
+        Assert.Contains(ChrRules.Chr021, ChrRules.All, "The ID is kept.");
+        Assert.DoesNotContain(r => r.RuleId == ChrRules.Chr021, ChartLintRules.All, "The rule no longer runs.");
     }
 
     [TestMethod]

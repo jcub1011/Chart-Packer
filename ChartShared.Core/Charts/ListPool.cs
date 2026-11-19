@@ -65,7 +65,7 @@ internal static class ListPool<T>
             }
         }
 
-        return new List<T>(capacity);
+        return [with(capacity)];
     }
 
     /// <summary>Gives <paramref name="list"/> back, to be rented again. Nothing may use it after.</summary>

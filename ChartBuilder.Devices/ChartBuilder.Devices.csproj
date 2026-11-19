@@ -3,7 +3,6 @@
        input through winmm on Windows. Chart Builder's own rather than a ChartShared project, as only Chart Builder
        plays instruments. The SDL3 package is the one Audio uses, so there's one copy of its native library. -->
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <IsAotCompatible>true</IsAotCompatible>

@@ -5,6 +5,7 @@ using Avalonia;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using ChartShared.Audio.Waveforms;
+using ChartShared.UI.Controls.Skia;
 
 namespace ChartShared.UI.Controls
 {
@@ -60,7 +61,7 @@ namespace ChartShared.UI.Controls
         public static void Clear()
         {
             foreach (var tile in Tiles.Values)
-                tile.Bitmap?.Dispose();
+                tile.Image?.Dispose();
             Tiles.Clear();
             s_pixels = 0;
         }
@@ -77,7 +78,7 @@ namespace ChartShared.UI.Controls
         /// <param name="budgeted">Draw new pictures only within the <see cref="PaintBudget"/>.</param>
         /// <param name="smooth">Smooth the pictures as they are drawn, rather than pixel for pixel: for a lane a transform shrinks, as a tilt does.</param>
         /// <returns>Whether all of it was drawn: <see langword="false"/> when the budget ran out, so it should be drawn again soon.</returns>
-        public static bool Draw(DrawingContext context, Waveform waveform, Rect bounds, bool isVertical, double from, double to, Func<double, double> position, IBrush peakBrush, IBrush loudBrush, double gain = 1, double pixel = 1, bool budgeted = false, bool smooth = false, bool clip = true)
+        public static bool Draw(IHighwayCanvas context, Waveform waveform, Rect bounds, bool isVertical, double from, double to, Func<double, double> position, IBrush peakBrush, IBrush loudBrush, double gain = 1, double pixel = 1, bool budgeted = false, bool smooth = false, bool clip = true)
         {
             int perSecond = waveform.BucketsPerSecond;
             double origin = position(0);
@@ -146,7 +147,7 @@ namespace ChartShared.UI.Controls
 
             return complete;
 
-            void DrawTile(RenderTargetBitmap tile, TileKey key)
+            void DrawTile(HighwayImage tile, TileKey key)
             {
                 int tileBuckets = key.BucketsPerBar * BarsPerTile;
                 double along = origin + (perBucket * key.Index * tileBuckets);
@@ -169,7 +170,7 @@ namespace ChartShared.UI.Controls
         /// The picture for <paramref name="key"/>, drawn if it isn't kept and <paramref name="build"/> allows; <see langword="null"/>
         /// when there's nothing in it, or it wasn't drawn.
         /// </summary>
-        private static RenderTargetBitmap? TileOf(TileKey key, bool build)
+        private static HighwayImage? TileOf(TileKey key, bool build)
         {
             if (!Tiles.TryGetValue(key, out var tile))
             {
@@ -189,7 +190,7 @@ namespace ChartShared.UI.Controls
             }
 
             tile.Drawn = ++s_drawn;
-            return tile.Bitmap;
+            return tile.Image;
         }
 
         private static void DropLeastRecent()
@@ -205,14 +206,14 @@ namespace ChartShared.UI.Controls
             s_pixels -= oldest.Value?.Pixels ?? 0;
 
             // A frame already drawn with it keeps what it needs of it.
-            oldest.Value?.Bitmap?.Dispose();
+            oldest.Value?.Image?.Dispose();
         }
 
         /// <summary>
         /// The bars of picture <paramref name="key"/>, from its own start, at its gain and as far as -1 and 1; the bar at
         /// the edge of what's been read ends there.
         /// </summary>
-        private static RenderTargetBitmap? Build(TileKey key)
+        private static HighwayImage? Build(TileKey key)
         {
             var waveform = key.Waveform;
             int bucketsPerBar = key.BucketsPerBar;
@@ -221,9 +222,9 @@ namespace ChartShared.UI.Controls
             if (end <= start)
                 return null;
 
-            var bitmap = new RenderTargetBitmap(new PixelSize(key.Length, key.Across), new Vector(96, 96));
+            // Drawn on a picture in memory, a pixel to a unit.
+            var context = SkiaRaster.Begin();
             double perBar = (double)key.Length / BarsPerTile;
-            using (var context = bitmap.CreateDrawingContext())
             using (context.PushRenderOptions(Sharp))
             {
                 for (int pass = 0; pass < 2; pass++)
@@ -245,11 +246,11 @@ namespace ChartShared.UI.Controls
                 }
             }
 
-            return bitmap;
+            return HighwayImage.Of(SkiaRaster.End(key.Length, key.Across));
         }
 
         /// <summary>A bar from <paramref name="low"/> to <paramref name="high"/>, from -1 at the picture's top to 1 at its bottom.</summary>
-        private static void Bar(DrawingContext context, IBrush brush, int height, double near, double far, double low, double high)
+        private static void Bar(IHighwayCanvas context, IBrush brush, int height, double near, double far, double low, double high)
         {
             double top = Math.Round((Math.Clamp(low, -1, 1) + 1) / 2 * height);
             double bottom = Math.Round((Math.Clamp(high, -1, 1) + 1) / 2 * height);
@@ -264,9 +265,9 @@ namespace ChartShared.UI.Controls
         private readonly record struct TileKey(Waveform Waveform, IBrush PeakBrush, IBrush LoudBrush, double Gain, int BucketsPerBar, int Index, int Length, int Across);
 
         /// <summary>A picture of a stretch of bars, or none when there's nothing in it, its size, and when it was last drawn.</summary>
-        private sealed class Tile(RenderTargetBitmap? bitmap, long pixels)
+        private sealed class Tile(HighwayImage? image, long pixels)
         {
-            public RenderTargetBitmap? Bitmap { get; } = bitmap;
+            public HighwayImage? Image { get; } = image;
 
             public long Pixels { get; } = pixels;
 

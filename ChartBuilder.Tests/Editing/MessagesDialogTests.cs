@@ -26,7 +26,7 @@ public sealed class MessagesDialogTests
         var refused = Message(Severity.Warning, "Can't place a note there", 1);
         using var dialog = new MessagesDialogViewModel(Log(saved, refused), saved);
 
-        CollectionAssert.AreEqual(new[] { saved, refused }, dialog.Shown.ToArray());
+        Assert.AreSequenceEqual([saved, refused], [.. dialog.Shown]);
         Assert.IsTrue(dialog.HasEntries);
         Assert.IsFalse(dialog.ShowNoMatches);
         Assert.AreSame(saved, dialog.Selected);
@@ -41,7 +41,7 @@ public sealed class MessagesDialogTests
 
         dialog.SearchText = "  PLACE ";
 
-        CollectionAssert.AreEqual(new[] { refused }, dialog.Shown.ToArray());
+        Assert.AreSequenceEqual([refused], [.. dialog.Shown]);
     }
 
     [TestMethod]
@@ -52,10 +52,10 @@ public sealed class MessagesDialogTests
         using var dialog = new MessagesDialogViewModel(Log(failed, saved), failed);
 
         dialog.SearchText = failed.SeverityText;
-        CollectionAssert.AreEqual(new[] { failed }, dialog.Shown.ToArray());
+        Assert.AreSequenceEqual([failed], [.. dialog.Shown]);
 
         dialog.SearchText = saved.TimeText;
-        CollectionAssert.AreEqual(new[] { saved }, dialog.Shown.ToArray());
+        Assert.AreSequenceEqual([saved], [.. dialog.Shown]);
     }
 
     [TestMethod]
@@ -71,7 +71,7 @@ public sealed class MessagesDialogTests
         dialog.ClearSearchCommand.Execute(null);
 
         Assert.IsNull(dialog.SearchText);
-        CollectionAssert.AreEqual(new[] { saved, refused }, dialog.Shown.ToArray());
+        Assert.AreSequenceEqual([saved, refused], [.. dialog.Shown]);
     }
 
     [TestMethod]
@@ -123,12 +123,12 @@ public sealed class MessagesDialogTests
 
         log.Insert(0, Message(Severity.Info, "Saved notes.mid", 1));
         Assert.IsTrue(dialog.HasEntries);
-        Assert.IsTrue(changed.Contains(nameof(MessagesDialogViewModel.HasEntries)), "The empty-list text hides once something is said");
+        Assert.Contains(nameof(MessagesDialogViewModel.HasEntries), changed, "The empty-list text hides once something is said");
         Assert.AreEqual(0, dialog.Shown.Count);
 
         var tapped = Message(Severity.Info, "Tap tempo: 120 BPM", 2);
         log.Insert(0, tapped);
-        CollectionAssert.AreEqual(new[] { tapped }, dialog.Shown.ToArray());
+        Assert.AreSequenceEqual([tapped], [.. dialog.Shown]);
         Assert.AreSame(tapped, dialog.Selected);
     }
 

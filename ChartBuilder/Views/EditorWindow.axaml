@@ -70,6 +70,18 @@
         </Style>
     </Window.Styles>
 
+    <Window.Resources>
+        <!-- An item of the View menu's Load Layout and Save Layout submenus (issue 263), which runs its own submenu's
+             command. Its name is shown as text, so an underscore in it isn't an access key. -->
+        <DataTemplate x:Key="LayoutMenuItemTemplate" x:DataType="vm:LayoutMenuItem">
+            <TextBlock MinWidth="160" MaxWidth="360" TextTrimming="CharacterEllipsis" Text="{Binding Header}" />
+        </DataTemplate>
+        <ControlTheme x:Key="LayoutMenuItemTheme" TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:DataType="vm:LayoutMenuItem">
+            <Setter Property="Command" Value="{Binding Command}" />
+            <Setter Property="CommandParameter" Value="{Binding}" />
+        </ControlTheme>
+    </Window.Resources>
+
     <Grid x:Name="RootGrid">
         <Grid.RowDefinitions>
             <!-- Toolbar (0), panels (1), splitter (2), timeline (3), message bar (4). EditorWindow.axaml.cs indexes these. -->
@@ -136,6 +148,13 @@
                                           ToolTip.Tip="{Binding ExportCopyToolTip}"
                                           ToolTip.ShowOnDisabled="True">
                                     <MenuItem.Icon><ctl:LineIcon Data="{StaticResource OutputFolderStroke}" /></MenuItem.Icon>
+                                </MenuItem>
+                                <Separator />
+                                <MenuItem Header="{x:Static res:Strings.MenuImportLyrics}" Command="{Binding ImportLyricsCommand}">
+                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource TextEventStroke}" /></MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="{x:Static res:Strings.MenuExportLyrics}" Command="{Binding ExportLyricsCommand}">
+                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource TextEventStroke}" /></MenuItem.Icon>
                                 </MenuItem>
                                 <Separator />
                                 <!-- Settings is the program's, last under File as in Chart Packer; the chart's are a tab in the
@@ -206,6 +225,19 @@
                                 </MenuItem>
                                 <MenuItem Header="{x:Static res:Strings.MenuShowDifficulty}" Command="{Binding ShowDifficultyCommand}">
                                     <MenuItem.Icon><ctl:LineIcon Data="{StaticResource SortAscendingStroke}" /></MenuItem.Icon>
+                                </MenuItem>
+                                <Separator />
+                                <!-- The layout templates (issue 263), each item shown and run as LayoutMenuItemTheme says. -->
+                                <MenuItem Header="{x:Static res:Strings.MenuLoadLayout}" ItemsSource="{Binding LoadLayoutItems}" IsEnabled="{Binding HasLayouts}"
+                                          ItemTemplate="{StaticResource LayoutMenuItemTemplate}" ItemContainerTheme="{StaticResource LayoutMenuItemTheme}">
+                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource ViewStroke}" /></MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="{x:Static res:Strings.MenuSaveLayout}" ItemsSource="{Binding SaveLayoutItems}"
+                                          ItemTemplate="{StaticResource LayoutMenuItemTemplate}" ItemContainerTheme="{StaticResource LayoutMenuItemTheme}">
+                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource SaveStroke}" /></MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="{x:Static res:Strings.MenuManageLayouts}" Command="{Binding ManageLayoutsCommand}">
+                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource SettingsStroke}" /></MenuItem.Icon>
                                 </MenuItem>
                             </MenuItem>
                             <ctl:AboutMenuItem />
@@ -340,6 +372,62 @@
                                 </ToolTip.Tip>
                                 <ctl:LineIcon Data="{StaticResource LoopRegionStroke}" />
                             </ToggleButton>
+                            <!-- The part in focus: the vocal parts on a vocal lane, an instrument's difficulties on its lane. -->
+                            <ToggleButton Classes="tool" IsChecked="{Binding Editor.IsAlignTool}"
+                                          AutomationProperties.Name="{x:Static res:Strings.ToolAlign}"
+                                          kb:Shortcut.Action="{x:Static svc:BuilderKeys.ToolAlign}">
+                                <ToolTip.Tip>
+                                    <StackPanel MaxWidth="320" Spacing="4">
+                                        <TextBlock FontWeight="SemiBold" kb:Shortcut.Action="{x:Static svc:BuilderKeys.ToolAlign}" kb:Shortcut.Text="{x:Static res:Strings.ToolAlign}" />
+                                        <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.ToolAlignToolTip}" />
+                                    </StackPanel>
+                                </ToolTip.Tip>
+                                <ctl:LineIcon Data="{StaticResource AlignStroke}" />
+                            </ToggleButton>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- The Alignment tool's options, while it's picked: how far the notes are shifted and how fast
+                         they're played, typed or scrubbed, and whether every vocal part or difficulty is aligned, or only
+                         the one in focus. -->
+                    <Border Classes="toolbar-group" IsVisible="{Binding Editor.IsAlignTool}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBlock Classes="muted" FontSize="12" VerticalAlignment="Center" Margin="4,0,0,0" Text="{x:Static res:Strings.AlignOffsetLabel}" />
+                            <!-- As tall as the toolbar's buttons, the text centred: stretched, a number's digits sit high. -->
+                            <NumericUpDown Width="88"
+                                           Height="28"
+                                           FontSize="12"
+                                           VerticalAlignment="Center"
+                                           VerticalContentAlignment="Center"
+                                           ShowButtonSpinner="False"
+                                           ctl:DragScrub.IsEnabled="True"
+                                           ctl:DragScrub.Step="1"
+                                           Increment="1"
+                                           Minimum="-3600000"
+                                           Maximum="3600000"
+                                           FormatString="0.#"
+                                           Value="{Binding Editor.AlignOffsetMs}"
+                                           ToolTip.Tip="{x:Static res:Strings.AlignOffsetToolTip}"
+                                           AutomationProperties.Name="{x:Static res:Strings.AlignOffsetLabel}" />
+                            <TextBlock Classes="muted" FontSize="12" VerticalAlignment="Center" Margin="6,0,0,0" Text="{x:Static res:Strings.AlignSpeedLabel}" />
+                            <NumericUpDown Width="80"
+                                           Height="28"
+                                           FontSize="12"
+                                           VerticalAlignment="Center"
+                                           VerticalContentAlignment="Center"
+                                           ShowButtonSpinner="False"
+                                           ctl:DragScrub.IsEnabled="True"
+                                           ctl:DragScrub.Step="0.01"
+                                           Increment="0.01"
+                                           Minimum="{x:Static vm:ChartEditorViewModel.AlignMinSpeedPercent}"
+                                           Maximum="{x:Static vm:ChartEditorViewModel.AlignMaxSpeedPercent}"
+                                           FormatString="0.###"
+                                           Value="{Binding Editor.AlignSpeedPercent}"
+                                           ToolTip.Tip="{x:Static res:Strings.AlignSpeedToolTip}"
+                                           AutomationProperties.Name="{x:Static res:Strings.AlignSpeedLabel}" />
+                            <Border Classes="choice-divider" />
+                            <ToggleButton Classes="labelled" Content="{x:Static res:Strings.AlignAllVocalParts}" IsChecked="{Binding Editor.IsAlignAllVocalParts}" IsVisible="{Binding Editor.AlignsVocals}" ToolTip.Tip="{x:Static res:Strings.AlignAllVocalPartsToolTip}" />
+                            <ToggleButton Classes="labelled" Content="{x:Static res:Strings.AlignAllDifficulties}" IsChecked="{Binding Editor.IsAlignAllDifficulties}" IsVisible="{Binding !Editor.AlignsVocals}" ToolTip.Tip="{x:Static res:Strings.AlignAllDifficultiesToolTip}" />
                         </StackPanel>
                     </Border>
 
@@ -922,6 +1010,7 @@
                                Loop="{Binding Playback.Loop}"
                                LoopBrush="{DynamicResource LoopRegionLineBrush}"
                                SpanBrush="{DynamicResource AccentTintBrush}"
+                               AccentBrush="{DynamicResource AccentTextBrush}"
                                WaveformBrush="{DynamicResource WaveformBrush}"
                                BeatBrush="{DynamicResource SubtleBorderBrush}"
                                MeasureBrush="#4A4D66"

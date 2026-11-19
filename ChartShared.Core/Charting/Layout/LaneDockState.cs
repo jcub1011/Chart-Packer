@@ -43,6 +43,12 @@ public sealed class LaneDockNodeState
 
     /// <summary>How a lane shows its audio; null for the defaults.</summary>
     public LaneAudioState? Audio { get; set; }
+
+    /// <summary>The highest pitch a vocal lane's piano roll shows; null, with <see cref="PitchSpan"/>, for every pitch.</summary>
+    public int? PitchTop { get; set; }
+
+    /// <summary>How many pitches a vocal lane's piano roll shows.</summary>
+    public int? PitchSpan { get; set; }
 }
 
 /// <summary>

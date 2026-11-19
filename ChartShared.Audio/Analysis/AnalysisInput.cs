@@ -65,8 +65,16 @@ public sealed class AnalysisInput
     /// Opened tracks of <paramref name="audio"/> mixed, at the rate most of them have (<see cref="StemMixer.CommonRate"/>).
     /// Tracks that didn't open are left out.
     /// </summary>
+    /// <param name="decoded">
+    /// The tracks' stems as decoded once (<see cref="StemDecoder"/>), read in place of decoding the tracks again: the input
+    /// takes each one's rate and length from it. Only stems decoded whole are; the other tracks are decoded from their files.
+    /// </param>
+    /// <param name="cache">
+    /// Where <paramref name="decoded"/> are kept. A reader looks there as it opens, rather than holding the stems, so one the
+    /// cache has released since is let go of, and read from its file. Without it, the stems are held.
+    /// </param>
     /// <exception cref="ArgumentException">None of the tracks opened.</exception>
-    public static AnalysisInput Mix(SongAudio audio, IReadOnlyList<OpenedTrack> tracks)
+    public static AnalysisInput Mix(SongAudio audio, IReadOnlyList<OpenedTrack> tracks, IReadOnlyDictionary<SongTrack, DecodedStem>? decoded = null, DecodedAudioCache? cache = null)
     {
         ArgumentNullException.ThrowIfNull(audio);
         ArgumentNullException.ThrowIfNull(tracks);
@@ -75,7 +83,29 @@ public sealed class AnalysisInput
         if (opened.Count == 0)
             throw new ArgumentException("None of the tracks opened.", nameof(tracks));
 
-        return FromSources([.. opened.Select(t => (Func<IPcmSource>)(() => audio.OpenSource(t.Track)))], [.. opened.Select(t => t.Source!)]);
+        var stems = opened.Select(t => decoded?.GetValueOrDefault(t.Track) is { IsComplete: true } stem ? stem : null).ToList();
+        return FromSources(
+            [.. opened.Select((t, i) => OpenerOf(audio, t, stems[i], cache))],
+            [.. opened.Select((t, i) => stems[i] is { } stem ? new CachedMonoSource(stem) : t.Source!)]);
+    }
+
+    /// <summary>
+    /// Opens <paramref name="track"/>'s audio from <paramref name="stem"/> while <paramref name="cache"/> keeps it as it
+    /// was, of the rate and length the input was made with, and from its file otherwise.
+    /// </summary>
+    private static Func<IPcmSource> OpenerOf(SongAudio audio, OpenedTrack track, DecodedStem? stem, DecodedAudioCache? cache)
+    {
+        if (stem is null)
+            return () => audio.OpenSource(track.Track);
+        if (cache is null)
+            return () => new CachedMonoSource(stem);
+
+        var key = stem.Key;
+        int rate = stem.SampleRate;
+        long length = stem.LengthFrames;
+        return () => cache.TryGet(key, out var kept) && kept.IsComplete && kept.SampleRate == rate && kept.LengthFrames == length
+            ? new CachedMonoSource(kept)
+            : audio.OpenSource(track.Track);
     }
 
     /// <summary>The whole song as playback mixes it, less the preview and the crowd; <see langword="null"/> when nothing opened.</summary>

@@ -20,6 +20,7 @@ public sealed class VocalTrackContentTests
         ["notes and lyrics"] = t => t.Note(0, 60, 240).Meta(0, 0x05, "Hel-"u8.ToArray()).Note(240, 62, 240).Meta(240, 0x05, "lo"u8.ToArray()).Note(0, 105, 960),
         ["note-off events"] = t => t.Raw(0, 0x90, 60, 100).Raw(240, 0x80, 60, 0).Raw(480, 0x91, 62, 90).Raw(600, 0x81, 62, 64),
         ["percussion and overdrive"] = t => t.Note(0, 96, 10).Note(120, 97, 10).Note(0, 116, 960).Note(0, 60, 240).Meta(0, 0x05, "a"u8.ToArray()),
+        ["overdrive over phrases"] = t => t.Note(0, 105, 960).Note(1920, 105, 960).Note(480, 116, 2400).Note(5000, 116, 480).Note(0, 60, 240),
         ["animations"] = t => t.Text(0, "[idle]").Note(0, 60, 240).Text(0, "word").Text(480, "[play]"),
         ["text lyrics"] = t => t.Note(0, 60, 240).Text(0, "old-").Note(240, 64, 240).Text(240, "school"),
         ["an unended note"] = t => t.Raw(0, 0x90, 60, 100).Note(480, 62, 240),
@@ -71,6 +72,61 @@ public sealed class VocalTrackContentTests
         Assert.IsFalse(content.IsChanged);
         Assert.AreSame(track, content.Write());
         Assert.IsTrue(content.Write().IsOriginal);
+    }
+
+    [TestMethod]
+    public void StarPowerIsReadFromNote116AndIsNotAKeptEvent()
+    {
+        var content = VocalTrackContent.Of(Track("overdrive over phrases"));
+
+        Assert.AreSequenceEqual([new VocalStarPowerEvent(480, 2400), new VocalStarPowerEvent(5000, 480)], [.. content.StarPower]);
+        Assert.AreSequenceEqual([new VocalPhraseEvent(0, 960), new VocalPhraseEvent(1920, 960)], [.. content.Phrases], "A phrase and the star power over it are two things.");
+        Assert.DoesNotContain(e => e.Bytes.Length >= 2 && e.Bytes[1] == VocalTrackContent.StarPowerPitch, content.Kept);
+    }
+
+    [TestMethod]
+    public void EditedStarPowerIsWrittenAsNote116AndReadsBack()
+    {
+        var content = VocalTrackContent.Of(Track("notes and lyrics"));
+        var edited = content.With(starPower: [new VocalStarPowerEvent(240, 480), new VocalStarPowerEvent(2400, 120)]);
+
+        var reread = VocalTrackContent.Of(edited.Write());
+
+        Assert.IsTrue(edited.IsChanged);
+        Assert.AreSequenceEqual([new VocalStarPowerEvent(240, 480), new VocalStarPowerEvent(2400, 120)], [.. reread.StarPower]);
+        AssertSamePart(content.ToPart(), VocalReader.ReadPart(edited.Write()));
+        Assert.AreSequenceEqual([.. content.Notes], [.. reread.Notes]);
+    }
+
+    [TestMethod]
+    public void StarPowerSavedWithoutChangeWritesItsOwnTrack()
+    {
+        var track = Track("overdrive over phrases");
+        var content = VocalTrackContent.Of(track);
+
+        Assert.AreSame(content, content.With(starPower: content.StarPower));
+        Assert.AreSame(track, content.Write());
+    }
+
+    [TestMethod]
+    public void StarPowerIsKeptToOnePhraseAtATimeEachCutWhereTheNextStarts()
+    {
+        var content = VocalTrackContent.Of(Track("notes and lyrics"));
+
+        var cut = content.With(starPower: [new VocalStarPowerEvent(0, 1000), new VocalStarPowerEvent(480, 960)]);
+        var same = content.With(starPower: [new VocalStarPowerEvent(0, 240), new VocalStarPowerEvent(0, 960)]);
+
+        Assert.AreSequenceEqual([new VocalStarPowerEvent(0, 480), new VocalStarPowerEvent(480, 960)], [.. cut.StarPower]);
+        Assert.AreSequenceEqual([new VocalStarPowerEvent(0, 960)], [.. same.StarPower], "Of two at a tick the longer is kept.");
+    }
+
+    [TestMethod]
+    public void StarPowerOfNoLengthOrBeforeTheStartIsRefused()
+    {
+        var content = VocalTrackContent.Of(Track("notes and lyrics"));
+
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => content.With(starPower: [new VocalStarPowerEvent(0, 0)]));
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => content.With(starPower: [new VocalStarPowerEvent(-1, 10)]));
     }
 
     [TestMethod]
@@ -170,5 +226,5 @@ public sealed class VocalTrackContentTests
 
     // The events kept, each as its tick and bytes.
     private static string[] Described(VocalTrackContent content) =>
-        [.. content.Kept.Select(e => $"{e.Tick}: {Convert.ToHexString(e.Bytes)}")];
+        [.. content.Kept.Select(e => $"{e.Tick}: {Convert.ToHexString(e.Bytes)}"), .. content.StarPower.Select(p => $"star power {p.Tick}+{p.Length}")];
 }

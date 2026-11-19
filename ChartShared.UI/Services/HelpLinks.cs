@@ -18,7 +18,7 @@ namespace ChartShared.UI.Services
 
         private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(4) };
 
-        private static readonly object Gate = new();
+        private static readonly Lock Gate = new();
 
         // The one lookup there is: presses while it runs share it, and a definite answer is kept, as a tag doesn't come and go
         // while the app runs.

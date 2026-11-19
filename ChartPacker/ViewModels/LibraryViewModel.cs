@@ -72,20 +72,21 @@ namespace ChartPacker.ViewModels
         private readonly IDedupWindowService _dedupWindow;
         private readonly IValidatorWindowService _validatorWindow;
         private readonly ILowerDifficultiesWindowService? _lowerDifficultiesWindow;
+        private readonly IOptimizeWindowService? _optimizeWindow;
         private readonly IFileRevealService _reveal;
         private readonly IDownloadService _downloads;
         private readonly IChartBuilderLauncher _chartBuilder;
         private readonly NoticeViewModel _notice;
-        private readonly Dictionary<string, LibraryItemViewModel> _itemsByPath = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, LibraryItemViewModel> _itemsByPath = [with(StringComparer.Ordinal)];
 
         // The songs opened in Chart Builder, and what each was on disk when last read, to re-read them once it has
         // changed them (charter-spec §4.8). A background poller re-reads them a save or two after Chart Builder
         // writes, so the library shows the latest version without waiting for the window to be activated.
-        private readonly Dictionary<string, (SongEntry Entry, EntryStamp? Stamp)> _editedSongs = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, (SongEntry Entry, EntryStamp? Stamp)> _editedSongs = [with(StringComparer.Ordinal)];
 
         // A changed stamp seen once by the poller but not yet re-read, waiting for a second sighting so a
         // folder save caught between its files isn't read half-written. The activation path re-reads at once.
-        private readonly Dictionary<string, EntryStamp?> _pendingEditedStamps = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, EntryStamp?> _pendingEditedStamps = [with(StringComparer.Ordinal)];
 
         // How often songs opened in Chart Builder are checked for saves while this app runs.
         private static readonly TimeSpan EditedSongsPollInterval = TimeSpan.FromSeconds(2);
@@ -138,6 +139,7 @@ namespace ChartPacker.ViewModels
         /// <param name="chartBuilder">Starts Chart Builder to edit the selected song's chart.</param>
         /// <param name="notice">Says why Chart Builder couldn't be started.</param>
         /// <param name="lowerDifficultiesWindow">Generates the selected songs' lower difficulties; none to offer it.</param>
+        /// <param name="optimizeWindow">Optimizes the selected songs, or the whole library; none to offer it.</param>
         public LibraryViewModel(
             IFolderPickerService folderPicker,
             SettingsService settings,
@@ -151,7 +153,8 @@ namespace ChartPacker.ViewModels
             IDownloadService downloads,
             IChartBuilderLauncher chartBuilder,
             NoticeViewModel notice,
-            ILowerDifficultiesWindowService? lowerDifficultiesWindow = null)
+            ILowerDifficultiesWindowService? lowerDifficultiesWindow = null,
+            IOptimizeWindowService? optimizeWindow = null)
         {
             _folderPicker = folderPicker;
             _settings = settings;
@@ -160,6 +163,7 @@ namespace ChartPacker.ViewModels
             _dedupWindow = dedupWindow;
             _validatorWindow = validatorWindow;
             _lowerDifficultiesWindow = lowerDifficultiesWindow;
+            _optimizeWindow = optimizeWindow;
             _reveal = reveal;
             _downloads = downloads;
             _chartBuilder = chartBuilder;
@@ -258,6 +262,7 @@ namespace ChartPacker.ViewModels
         [NotifyCanExecuteChangedFor(nameof(MergeCommand))]
         [NotifyCanExecuteChangedFor(nameof(ValidateCommand))]
         [NotifyCanExecuteChangedFor(nameof(GenerateLowerDifficultiesCommand))]
+        [NotifyCanExecuteChangedFor(nameof(OptimizeCommand))]
         [NotifyCanExecuteChangedFor(nameof(CancelScanCommand))]
         public partial bool IsScanning { get; set; }
 
@@ -310,6 +315,7 @@ namespace ChartPacker.ViewModels
         [NotifyCanExecuteChangedFor(nameof(MergeCommand))]
         [NotifyCanExecuteChangedFor(nameof(ValidateCommand))]
         [NotifyCanExecuteChangedFor(nameof(GenerateLowerDifficultiesCommand))]
+        [NotifyCanExecuteChangedFor(nameof(OptimizeCommand))]
         [NotifyCanExecuteChangedFor(nameof(EditChartCommand))]
         [NotifyPropertyChangedFor(nameof(IsSingleSelection))]
         [NotifyPropertyChangedFor(nameof(IsMultipleSelection))]
@@ -772,6 +778,30 @@ namespace ChartPacker.ViewModels
                 ScanParallelism);
             var result = await _dedupWindow.ShowAsync(request);
             RemoveEntries(result.RemovedPaths);
+            if (result.OutputsChanged)
+                _outputsChanged = true;
+            RefreshState();
+        }
+
+        // Unlike the other jobs it needs no selection: with none it works on the whole library.
+        private bool CanOptimize() => _optimizeWindow is not null && FolderPath is not null && HasScanned && !IsScanning && !Job.IsRunning;
+
+        /// <summary>
+        /// Opens the Optimize window for the selected songs, or for the whole library when none is selected. The window
+        /// reads the charts itself, so the library isn't scanned for it and the list stays as it is. Once it closes, charts
+        /// it rewrote in place are scanned again.
+        /// </summary>
+        [RelayCommand(CanExecute = nameof(CanOptimize))]
+        private async Task OptimizeAsync()
+        {
+            if (_optimizeWindow is null || FolderPath is not { } folder)
+                return;
+
+            var request = new OptimizeRequest(SelectedEntries, [.. _allItems.Select(i => i.Entry)]);
+            var result = await _optimizeWindow.ShowAsync(request);
+            // A scan starts with the output folder as unchanged, so it's flagged after it.
+            if (result.ChangedInPlace)
+                _ = StartScan(folder, _settings.Settings.ScanMaxDepth);
             if (result.OutputsChanged)
                 _outputsChanged = true;
             RefreshState();
@@ -1247,6 +1277,7 @@ namespace ChartPacker.ViewModels
             MergeCommand.NotifyCanExecuteChanged();
             ValidateCommand.NotifyCanExecuteChanged();
             GenerateLowerDifficultiesCommand.NotifyCanExecuteChanged();
+            OptimizeCommand.NotifyCanExecuteChanged();
             DeduplicateCommand.NotifyCanExecuteChanged();
             EditChartCommand.NotifyCanExecuteChanged();
         }

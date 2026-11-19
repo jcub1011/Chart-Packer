@@ -28,6 +28,10 @@ Easily create star power phrases for the whole track.
 
 ![Automatic star power phrase generation](<screenshots/Auto Star Power Generation Demo.webp>)
 
+### Lyric Import & Export
+
+Import lyrics from `.lrc` (including A2 word timing), `.srt`, `.vtt`, `.ttml`, `.kar`, UltraStar `.txt`, or an audio file's lyrics tags, with the pitches of UltraStar songs and karaoke melodies and UltraStar duets into the harmonies. Export a vocal part, or two harmonies as a duet, as an UltraStar `.txt` with its pitches, or as `.lrc`.
+
 ### Waveform Visualization
 
 See audio waveforms and spectrograms while charting.
@@ -86,11 +90,16 @@ Generate lower difficulties for songs across your entire library.
 
 ![Bulk difficulty reduction screen](<screenshots/Bulk Difficulty Reduction Generation.webp>)
 
+### Library Optimization
+
+Make your library smaller. Recompress audio to Opus, background videos to VP8 WebM, and album art and background images to JPEG, mix stems down, and clean up metadata no game needs. Every chart is listed with what it would save before anything is changed; then optimize the selected songs or the whole library. Changed charts are written to a separate folder unless you choose to overwrite the originals, which can't be undone, so back up your charts first. See the [Optimize Library help page](docs/help/Optimize.md).
+
 ## Good to Know
 
 - Chart Builder opens `.sng` files directly and converts `.chart` to `.mid` on save. Back up the original first, because that conversion loses information.
 - Lower difficulties are generated as drafts. Treat them as a starting point, not a finished chart.
 - The installer isn't code-signed. Windows SmartScreen shows "Windows protected your PC" the first time; choose **More info → Run anyway**.
+- On a 64-bit Intel or AMD PC, the processor needs AVX2: Intel from 2013 (Haswell) or AMD from 2015 (Excavator) onwards. The apps don't start on anything older.
 
 ## Building from Source
 

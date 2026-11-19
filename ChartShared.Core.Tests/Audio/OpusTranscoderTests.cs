@@ -34,7 +34,7 @@ public sealed class OpusTranscoderTests
         Assert.AreEqual(1, decoded.Channels);
         Assert.AreEqual(48000, decoded.LengthFrames);
         float[] samples = TestAudio.ReadAll(decoded);
-        Assert.AreEqual(48000, samples.Length);
+        Assert.HasCount(48000, samples);
 
         double xy = 0, xx = 0, yy = 0;
         for (int i = 4800; i < 43200; i++)
@@ -59,7 +59,7 @@ public sealed class OpusTranscoderTests
         using var decoded = AudioDecoder.Open(File.OpenRead(opus), "guitar.opus");
         Assert.AreEqual(48000, decoded.SampleRate);
         Assert.AreEqual(2, decoded.Channels);
-        Assert.IsTrue(Math.Abs(decoded.LengthFrames - 48000) <= 48, $"Length was {decoded.LengthFrames}.");
+        Assert.IsLessThanOrEqualTo(48, Math.Abs(decoded.LengthFrames - 48000), $"Length was {decoded.LengthFrames}.");
         Assert.IsGreaterThan(0.9, TestAudio.CorrelationWithChirp(TestAudio.ReadAll(decoded), 2, 48000));
     }
 
@@ -75,7 +75,7 @@ public sealed class OpusTranscoderTests
         using var decoded = AudioDecoder.Open(File.OpenRead(opus), "song.opus");
         Assert.AreEqual(48000, decoded.SampleRate);
         Assert.AreEqual(2, decoded.Channels);
-        Assert.IsTrue(Math.Abs(decoded.LengthFrames - 48000) <= 144, $"Length was {decoded.LengthFrames}.");
+        Assert.IsLessThanOrEqualTo(144, Math.Abs(decoded.LengthFrames - 48000), $"Length was {decoded.LengthFrames}.");
         Assert.IsGreaterThan(0.85, TestAudio.CorrelationWithChirp(TestAudio.ReadAll(decoded), 2, 48000));
     }
 
@@ -126,7 +126,7 @@ public sealed class OpusTranscoderTests
         var guitar = included.Single(f => f.StoredName == "guitar.opus");
         StringAssert.StartsWith(guitar.SourcePath, temp);
         using var decoded = AudioDecoder.Open(File.OpenRead(guitar.SourcePath), "guitar.opus");
-        Assert.IsTrue(Math.Abs(decoded.LengthFrames - 24000) <= 48, $"Length was {decoded.LengthFrames}.");
+        Assert.IsLessThanOrEqualTo(48, Math.Abs(decoded.LengthFrames - 24000), $"Length was {decoded.LengthFrames}.");
     }
 
     [TestMethod]
@@ -167,8 +167,8 @@ public sealed class OpusTranscoderTests
         var read = SngReader.Read(packed.OutputPath!, TestContext.CancellationToken);
         Assert.IsFalse(read.HasErrors);
         Assert.AreSequenceEqual(["guitar.opus"], [.. read.Files.Select(f => f.Name)]);
-        Assert.IsTrue(phases.Any(p => p.Phase == ExportPhase.Transcoding));
-        Assert.IsTrue(phases.Any(p => p.Phase == ExportPhase.Packing));
+        Assert.Contains(p => p.Phase == ExportPhase.Transcoding, phases);
+        Assert.Contains(p => p.Phase == ExportPhase.Packing, phases);
         Assert.IsEmpty(Directory.GetFileSystemEntries(_root.FullName, "*.chartpacker-tmp", SearchOption.AllDirectories));
     }
 
@@ -184,7 +184,7 @@ public sealed class OpusTranscoderTests
         int written = resampler.Convert(input, output, finished: true);
 
         Assert.AreEqual(input.Length / 2, written);
-        CollectionAssert.AreEqual(input, output);
+        Assert.AreSequenceEqual(input, output);
     }
 
     [TestMethod]
@@ -199,7 +199,7 @@ public sealed class OpusTranscoderTests
 
         int written = resampler.Convert(input, output, finished: true);
 
-        Assert.IsTrue(Math.Abs(written - (frames * 6)) <= 6, $"Wrote {written}.");
+        Assert.IsLessThanOrEqualTo(6, Math.Abs(written - (frames * 6)), $"Wrote {written}.");
         double xy = 0, xx = 0, yy = 0;
         for (int i = 4800; i < output.Length - 4800; i++)
         {

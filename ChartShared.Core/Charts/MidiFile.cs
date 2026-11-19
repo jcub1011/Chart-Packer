@@ -85,7 +85,7 @@ internal static class MidiFile
     /// <summary>The events of the track <paramref name="chunk"/>, with their ticks from the start of the track.</summary>
     /// <exception cref="ChartFormatException">The track is malformed.</exception>
     public static List<MidiEvent> ReadEvents(byte[] bytes, MidiChunk chunk) =>
-        ReadEvents(bytes, chunk, new List<MidiEvent>(CapacityFor(chunk)));
+        ReadEvents(bytes, chunk, [with(CapacityFor(chunk))]);
 
     /// <summary>
     /// As <see cref="ReadEvents(byte[], MidiChunk)"/>, into a list rented from <see cref="ListPool{T}"/>, which the

@@ -40,5 +40,10 @@ for lib in avutil swresample swscale avcodec avformat; do
   esac
 done
 
+# These builds have libvpx linked in; the marker is what build/publish.ps1 looks for, as the libraries alone don't say.
+echo "libvpx VP8 encoder (BSD-3-Clause), linked into libavcodec." > "$out/libvpx.txt"
+# They have libopus linked in too, for the Opus encoder.
+echo "libopus Opus encoder (BSD-3-Clause), linked into libavcodec." > "$out/libopus.txt"
+
 echo "FFmpeg for $rid is in $out:"
 ls -l "$out"

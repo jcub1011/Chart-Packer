@@ -4,6 +4,7 @@ using Avalonia;
 using Avalonia.Media;
 using Avalonia.Media.Immutable;
 using ChartShared.Core.Charts;
+using ChartShared.UI.Controls.Skia;
 
 namespace ChartShared.UI.Controls.Highway
 {
@@ -57,10 +58,10 @@ namespace ChartShared.UI.Controls.Highway
         private const int PointSteps = 64;
         private const int SweepSteps = 32;
         private const int MaxUnitHexagons = 1024;
-        private readonly LruCache<(int Point, int Sweep), StreamGeometry> _unitHexagons = new(MaxUnitHexagons);
+        private readonly LruCache<(int Point, int Sweep), HighwayPath> _unitHexagons = new(MaxUnitHexagons);
 
         // The same for a band of a cymbal's sides between two of its steps: the hexagon's lower edge, swept down by the band's height.
-        private readonly LruCache<(int Point, int Thickness), StreamGeometry> _unitBands = new(MaxUnitHexagons);
+        private readonly LruCache<(int Point, int Thickness), HighwayPath> _unitBands = new(MaxUnitHexagons);
 
         // A box's sides are shaded in steps from dark at the floor to light under the top. Each step's colour would be a brush of its own
         // for each note colour, and Avalonia lists each distinct brush a drawing uses, afresh for each frame's drawing; so the sides
@@ -71,7 +72,7 @@ namespace ChartShared.UI.Controls.Highway
         private static readonly IBrush[] StepShades = MakeStepShades();
 
         private readonly GemPainter _flat;
-        private readonly Dictionary<(int, int), StreamGeometry> _hexagons = [];
+        private readonly Dictionary<(int, int), HighwayPath> _hexagons = [];
 
         // What was drawn last, in the order it was, from the back: where each note stands on the screen, and where on the plane.
         private readonly List<(Rect Silhouette, Point Floor)> _scene = [];
@@ -149,7 +150,7 @@ namespace ChartShared.UI.Controls.Highway
         }
 
         /// <inheritdoc />
-        public void DrawGem(DrawingContext context, ChartInstrumentKind kind, ChartNote note, Color color, Rect rect, bool outlined)
+        public void DrawGem(IHighwayCanvas context, ChartInstrumentKind kind, ChartNote note, Color color, Rect rect, bool outlined)
         {
             if (Camera is null)
             {
@@ -182,7 +183,7 @@ namespace ChartShared.UI.Controls.Highway
         }
 
         /// <inheritdoc />
-        public void DrawBar(DrawingContext context, ChartInstrumentKind kind, ChartNote note, Color color, Rect bar, bool outlined)
+        public void DrawBar(IHighwayCanvas context, ChartInstrumentKind kind, ChartNote note, Color color, Rect bar, bool outlined)
         {
             if (Camera is null)
             {
@@ -222,15 +223,15 @@ namespace ChartShared.UI.Controls.Highway
         }
 
         /// <summary>A tail lies flat on the plane, so it is drawn as it is on a flat highway.</summary>
-        public void DrawTail(DrawingContext context, ChartInstrumentKind kind, ChartNote note, Color color, Rect tail, bool outlined) =>
+        public void DrawTail(IHighwayCanvas context, ChartInstrumentKind kind, ChartNote note, Color color, Rect tail, bool outlined) =>
             _flat.DrawTail(context, kind, note, color, tail, outlined);
 
         /// <summary>A tail lies flat on the plane, so it is drawn as it is on a flat highway.</summary>
-        public void DrawWideTail(DrawingContext context, Color color, Rect tail, bool outlined) =>
+        public void DrawWideTail(IHighwayCanvas context, Color color, Rect tail, bool outlined) =>
             _flat.DrawWideTail(context, color, tail, outlined);
 
         /// <inheritdoc />
-        public void DrawRing(DrawingContext context, ChartNote note, Rect rect, Color color)
+        public void DrawRing(IHighwayCanvas context, ChartNote note, Rect rect, Color color)
         {
             if (Camera is null)
             {
@@ -248,7 +249,7 @@ namespace ChartShared.UI.Controls.Highway
         }
 
         /// <summary>Draws a ring in <paramref name="pen"/> round the note that stands in <paramref name="rect"/>, as the editor marks one it has selected.</summary>
-        public void DrawSelection(DrawingContext context, Rect rect, IPen pen)
+        public void DrawSelection(IHighwayCanvas context, Rect rect, IPen pen)
         {
             if (Camera is null)
             {
@@ -265,7 +266,7 @@ namespace ChartShared.UI.Controls.Highway
         /// Marks over the note that stands in <paramref name="rect"/>, in <paramref name="brush"/> and <paramref name="pen"/>: what the
         /// erase tool would take away, in red, or the notes a synchronized region syncs, in orange. It covers all of the note, box and floor.
         /// </summary>
-        public void DrawMark(DrawingContext context, Rect rect, IBrush? brush, IPen? pen)
+        public void DrawMark(IHighwayCanvas context, Rect rect, IBrush? brush, IPen? pen)
         {
             if (Camera is null)
             {
@@ -279,7 +280,7 @@ namespace ChartShared.UI.Controls.Highway
         }
 
         /// <summary>An X across the face of the note standing in <paramref name="rect"/>: a playtest's missed note.</summary>
-        public void DrawCross(DrawingContext context, Rect rect, IPen pen)
+        public void DrawCross(IHighwayCanvas context, Rect rect, IPen pen)
         {
             if (FaceOf(rect) is not { } face)
                 return;
@@ -289,7 +290,7 @@ namespace ChartShared.UI.Controls.Highway
         }
 
         /// <summary>A slash across the face of the note standing in <paramref name="rect"/>: a playtest's dropped sustain.</summary>
-        public void DrawSlash(DrawingContext context, Rect rect, IPen pen)
+        public void DrawSlash(IHighwayCanvas context, Rect rect, IPen pen)
         {
             if (FaceOf(rect) is { } face)
                 context.DrawLine(pen, face.BottomLeft, face.TopRight);
@@ -348,7 +349,7 @@ namespace ChartShared.UI.Controls.Highway
         }
 
         /// <summary>Draws the gem as its flags say: a cymbal, a tap, or a box with a HOPO's mark.</summary>
-        private void DrawBody(DrawingContext context, ChartInstrumentKind kind, ChartNote note, Color color, Stand stand, bool outlined)
+        private void DrawBody(IHighwayCanvas context, ChartInstrumentKind kind, ChartNote note, Color color, Stand stand, bool outlined)
         {
             bool black = HighwayPalette.IsBlackFret(kind, note.Lane);
 
@@ -404,14 +405,14 @@ namespace ChartShared.UI.Controls.Highway
         /// Only the box's edges, so what's behind shows through: round all it covers, from its top to the near edge of its floor, and
         /// round its top face, which together show it is a box and where it stands.
         /// </summary>
-        private static void DrawOutlinedBox(DrawingContext context, Stand stand, IPen pen)
+        private static void DrawOutlinedBox(IHighwayCanvas context, Stand stand, IPen pen)
         {
             context.DrawRectangle(null, pen, stand.Silhouette.Deflate(0.75), stand.RadiusX, stand.RadiusY);
             context.DrawRectangle(null, pen, stand.Top.Deflate(0.75), stand.RadiusX, stand.RadiusY);
         }
 
         /// <summary>The box's top face, filled in <paramref name="fill"/>, edged in <paramref name="edge"/> darkened, or in <paramref name="outline"/> when there is one.</summary>
-        private void DrawTop(DrawingContext context, Stand stand, Color fill, Color edge, Color? outline)
+        private void DrawTop(IHighwayCanvas context, Stand stand, Color fill, Color edge, Color? outline)
         {
             var rim = outline ?? HighwayPalette.Darken(edge, 0.45);
             FillEdged(context, _flat.Brush(fill), _flat.Brush(rim), 1, stand.Top, stand.RadiusX, stand.RadiusY);
@@ -422,7 +423,7 @@ namespace ChartShared.UI.Controls.Highway
         /// <see cref="SideLayers"/> steps from dark to light, each the floor's rounded rectangle slid up from where its step starts to the
         /// top, which sweeps out a rounded rectangle as round, only taller. However shallow the floor, the steps leave no gap.
         /// </summary>
-        private void DrawSides(DrawingContext context, Stand stand, Color color)
+        private void DrawSides(IHighwayCanvas context, Stand stand, Color color)
         {
             var floor = stand.Floor;
             double radiusX = stand.RadiusX, radiusY = stand.RadiusY;
@@ -465,7 +466,7 @@ namespace ChartShared.UI.Controls.Highway
         }
 
         /// <summary><paramref name="rect"/> filled, its corners rounded as said unless that's under half a pixel, when they're square.</summary>
-        private static void FillRounded(DrawingContext context, IBrush brush, Rect rect, double radiusX, double radiusY)
+        private static void FillRounded(IHighwayCanvas context, IBrush brush, Rect rect, double radiusX, double radiusY)
         {
             if (rect.Width <= 0 || rect.Height <= 0)
                 return;
@@ -480,7 +481,7 @@ namespace ChartShared.UI.Controls.Highway
         /// <paramref name="rect"/> filled in <paramref name="fill"/> with an edge <paramref name="thickness"/> wide in <paramref name="edge"/>,
         /// on its outline, as a pen would draw it: the edge's colour filled out to the edge's outside, then the fill inside it.
         /// </summary>
-        private static void FillEdged(DrawingContext context, IBrush fill, IBrush edge, double thickness, Rect rect, double radiusX, double radiusY)
+        private static void FillEdged(IHighwayCanvas context, IBrush fill, IBrush edge, double thickness, Rect rect, double radiusX, double radiusY)
         {
             double half = thickness / 2;
             FillRounded(context, edge, rect.Inflate(half), radiusX + half, radiusY + half);
@@ -492,7 +493,7 @@ namespace ChartShared.UI.Controls.Highway
         /// A cymbal, as a box is drawn (see <see cref="DrawSides"/>): its shadow, its floor dark and edged, its sides in
         /// steps, and its top face, lighter and edged; each hexagon one of the few unit shapes stretched to fit.
         /// </summary>
-        private void FillCymbal(DrawingContext context, Stand stand, Color color)
+        private void FillCymbal(IHighwayCanvas context, Stand stand, Color color)
         {
             var floor = stand.Floor;
             var top = stand.Top;
@@ -524,7 +525,7 @@ namespace ChartShared.UI.Controls.Highway
         /// The band under a cymbal's hexagon filling <paramref name="rect"/>, its points <paramref name="point"/> in from its sides: the
         /// hexagon's lower edge swept down by <paramref name="thickness"/>, all it covers on the way. A unit shape, kept, stretched to it.
         /// </summary>
-        private void FillHexagonBand(DrawingContext context, IBrush brush, Rect rect, double point, double thickness)
+        private void FillHexagonBand(IHighwayCanvas context, IBrush brush, Rect rect, double point, double thickness)
         {
             if (rect.Width <= 0 || rect.Height <= 0 || thickness <= 0)
                 return;
@@ -538,23 +539,20 @@ namespace ChartShared.UI.Controls.Highway
         }
 
         /// <summary>A unit hexagon's lower edge, its points <paramref name="point"/> in, swept down by <paramref name="thickness"/>.</summary>
-        private static StreamGeometry HexagonBand(double point, double thickness)
+        private static HighwayPath HexagonBand(double point, double thickness)
         {
-            var band = new StreamGeometry();
-            using (var g = band.Open())
-            {
-                g.BeginFigure(new Point(0, 0.5), true);
-                g.LineTo(new Point(point, 1));
-                g.LineTo(new Point(1 - point, 1));
-                g.LineTo(new Point(1, 0.5));
-                g.LineTo(new Point(1, 0.5 + thickness));
-                g.LineTo(new Point(1 - point, 1 + thickness));
-                g.LineTo(new Point(point, 1 + thickness));
-                g.LineTo(new Point(0, 0.5 + thickness));
-                g.EndFigure(true);
-            }
+            var g = new HighwayPath.Builder();
+            g.BeginFigure(new Point(0, 0.5), true);
+            g.LineTo(new Point(point, 1));
+            g.LineTo(new Point(1 - point, 1));
+            g.LineTo(new Point(1, 0.5));
+            g.LineTo(new Point(1, 0.5 + thickness));
+            g.LineTo(new Point(1 - point, 1 + thickness));
+            g.LineTo(new Point(point, 1 + thickness));
+            g.LineTo(new Point(0, 0.5 + thickness));
+            g.EndFigure(true);
 
-            return band;
+            return g.Build();
         }
 
         private static Rect Shrunk(Rect rect, double by) =>
@@ -564,7 +562,7 @@ namespace ChartShared.UI.Controls.Highway
         /// A cymbal's hexagon filling <paramref name="rect"/>, its points <paramref name="point"/> in from its sides, slid down by
         /// <paramref name="sweep"/> with all it covers on the way: a unit shape, kept, stretched to it.
         /// </summary>
-        private void FillHexagon(DrawingContext context, IBrush brush, Rect rect, double point, double sweep)
+        private void FillHexagon(IHighwayCanvas context, IBrush brush, Rect rect, double point, double sweep)
         {
             if (rect.Width <= 0 || rect.Height <= 0)
                 return;
@@ -577,7 +575,7 @@ namespace ChartShared.UI.Controls.Highway
                 context.DrawGeometry(brush, null, unit);
         }
 
-        private void DrawCymbal(DrawingContext context, Stand stand, Color color, Color edge, bool outlined)
+        private void DrawCymbal(IHighwayCanvas context, Stand stand, Color color, Color edge, bool outlined)
         {
             if (outlined)
             {
@@ -595,14 +593,14 @@ namespace ChartShared.UI.Controls.Highway
         }
 
         /// <summary>The edge of a note's shape in <paramref name="rect"/>: a rounded rectangle, as round as the note's box is.</summary>
-        private static void DrawEdge(DrawingContext context, Rect rect, Stand stand, IPen pen) =>
+        private static void DrawEdge(IHighwayCanvas context, Rect rect, Stand stand, IPen pen) =>
             context.DrawRectangle(null, pen, rect, stand.RadiusX, stand.RadiusY);
 
         // A size to the half pixel, as Hexagon makes its shapes.
         private static double HalfPixel(double pixels) => Math.Round(pixels * 2) / 2;
 
         /// <summary>A cymbal's hexagon filling <paramref name="size"/> from the origin, made once for each size to the half pixel.</summary>
-        private StreamGeometry Hexagon(Size size)
+        private HighwayPath Hexagon(Size size)
         {
             var key = ((int)Math.Round(size.Width * 2), (int)Math.Round(size.Height * 2));
             if (_hexagons.TryGetValue(key, out var hexagon))
@@ -621,26 +619,23 @@ namespace ChartShared.UI.Controls.Highway
 
         /// <summary>A cymbal's hexagon of <paramref name="width"/> and <paramref name="height"/> from the origin, slid down by <paramref name="sweep"/>: the hull of where it starts and ends.</summary>
         /// <param name="point">How far in from the sides its points are; by default as a cymbal's are for its size.</param>
-        private static StreamGeometry SweptHexagon(double width, double height, double sweep, double? point = null)
+        private static HighwayPath SweptHexagon(double width, double height, double sweep, double? point = null)
         {
             double inset = point ?? Math.Min(height * 0.6, width * 0.25);
-            var hexagon = new StreamGeometry();
-            using (var g = hexagon.Open())
-            {
-                g.BeginFigure(new Point(0, height / 2), true);
-                g.LineTo(new Point(inset, 0));
-                g.LineTo(new Point(width - inset, 0));
-                g.LineTo(new Point(width, height / 2));
-                if (sweep > 0)
-                    g.LineTo(new Point(width, (height / 2) + sweep));
-                g.LineTo(new Point(width - inset, height + sweep));
-                g.LineTo(new Point(inset, height + sweep));
-                if (sweep > 0)
-                    g.LineTo(new Point(0, (height / 2) + sweep));
-                g.EndFigure(true);
-            }
+            var g = new HighwayPath.Builder();
+            g.BeginFigure(new Point(0, height / 2), true);
+            g.LineTo(new Point(inset, 0));
+            g.LineTo(new Point(width - inset, 0));
+            g.LineTo(new Point(width, height / 2));
+            if (sweep > 0)
+                g.LineTo(new Point(width, (height / 2) + sweep));
+            g.LineTo(new Point(width - inset, height + sweep));
+            g.LineTo(new Point(inset, height + sweep));
+            if (sweep > 0)
+                g.LineTo(new Point(0, (height / 2) + sweep));
+            g.EndFigure(true);
 
-            return hexagon;
+            return g.Build();
         }
 
         private static Color Blend(Color from, Color to, double amount) => Color.FromArgb(

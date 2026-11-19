@@ -25,6 +25,7 @@ public static class HelpPages
     public const string Merge = "Merge";
     public const string MergeCompare = "Merge-Compare";
     public const string MessageDialog = "Message-Dialog";
+    public const string Optimize = "Optimize";
     public const string Validator = "Validator";
     public const string ValidatorProgress = "Validator-Progress";
 
@@ -37,6 +38,8 @@ public static class HelpPages
     public const string GeneratePhrases = "Generate-Phrases";
     public const string InputDevices = "Input-Devices";
     public const string LaneMapping = "Lane-Mapping";
+    public const string LyricImportExport = "Lyric-Import-and-Export";
+    public const string ManageLayouts = "Manage-Layouts";
     public const string Messages = "Messages";
     public const string Preview = "Preview";
     public const string Reduce = "Reduce";

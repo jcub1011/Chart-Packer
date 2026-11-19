@@ -202,7 +202,7 @@ public sealed class ChartIssuesTests
         Assert.IsFalse(issues.ShowNoMatches);
         Assert.IsFalse(issues.IsNarrowed);
         Assert.AreEqual(1, issues.ShownCount);
-        Assert.IsFalse(issues.InstrumentChips.Any(c => c.Id == bass), "A chip turned off with nothing to match goes.");
+        Assert.DoesNotContain(c => c.Id == bass, issues.InstrumentChips, "A chip turned off with nothing to match goes.");
     }
 
     [TestMethod]

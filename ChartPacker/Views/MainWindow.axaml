@@ -211,6 +211,12 @@
                                   ToolTip.ShowOnDisabled="True">
                             <MenuItem.Icon><ctl:LineIcon Data="{StaticResource DedupStroke}" /></MenuItem.Icon>
                         </MenuItem>
+                        <MenuItem Header="{x:Static res:Strings.MenuOptimize}"
+                                  Command="{Binding Library.OptimizeCommand}"
+                                  ToolTip.Tip="{x:Static res:Strings.OptimizeToolTip}"
+                                  ToolTip.ShowOnDisabled="True">
+                            <MenuItem.Icon><ctl:LineIcon Data="{StaticResource SqueezeStroke}" /></MenuItem.Icon>
+                        </MenuItem>
                     </MenuItem>
                     <ctl:AboutMenuItem />
                 </Menu>

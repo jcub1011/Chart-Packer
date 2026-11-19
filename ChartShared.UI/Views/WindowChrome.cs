@@ -55,7 +55,7 @@ namespace ChartShared.UI.Views
         public static void ShowIcon(Window window, TitleBar titleBar) =>
             titleBar.Bind(TitleBar.IconProperty, window.GetObservable(Window.IconProperty, ImageOf));
 
-        private static readonly ConditionalWeakTable<WindowIcon, IImage> IconImages = new();
+        private static readonly ConditionalWeakTable<WindowIcon, IImage> IconImages = [];
 
         private static IImage Decode(WindowIcon icon)
         {

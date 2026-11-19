@@ -66,8 +66,8 @@ namespace ChartPacker.ViewModels
 
         // The songs whose star power is being generated and not yet staged, and those of them whose drafts changed
         // meanwhile, here or anywhere: what was generated for those was worked out from drafts that are gone.
-        private readonly HashSet<string> _generating = new(StringComparer.Ordinal);
-        private readonly HashSet<string> _changedWhileGenerating = new(StringComparer.Ordinal);
+        private readonly HashSet<string> _generating = [with(StringComparer.Ordinal)];
+        private readonly HashSet<string> _changedWhileGenerating = [with(StringComparer.Ordinal)];
 
         // Holds the songs saved, so none another Chart Builder or Chart Packer has open is written over (charter-spec §4.8).
         private readonly SongLocks? _locks;
@@ -79,19 +79,19 @@ namespace ChartPacker.ViewModels
         private readonly TaskCompletionSource<bool> _firstFailure = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         // The listed songs, by full path.
-        private readonly Dictionary<string, ValidatorSongViewModel> _byPath = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, ValidatorSongViewModel> _byPath = [with(StringComparer.Ordinal)];
 
         // The songs with a draft when the check started, whose charts are linted once they're read, with the draft.
-        private readonly HashSet<string> _draftedAtStart = new(StringComparer.Ordinal);
+        private readonly HashSet<string> _draftedAtStart = [with(StringComparer.Ordinal)];
 
         // The songs in ShownSongs, to look up without walking it.
         private readonly HashSet<ValidatorSongViewModel> _shown = [];
 
         // The IDs of the type chips that are on.
-        private readonly HashSet<string> _typesOn = new(StringComparer.Ordinal);
+        private readonly HashSet<string> _typesOn = [with(StringComparer.Ordinal)];
 
         // The keys of the key chips that are on; keys are compared ignoring case, as song.ini does.
-        private readonly HashSet<string> _keysOn = new(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> _keysOn = [with(StringComparer.OrdinalIgnoreCase)];
 
         // Set while the search is cleared and every chip is turned off at once, so the list is filtered once at the end.
         private bool _clearingFilters;

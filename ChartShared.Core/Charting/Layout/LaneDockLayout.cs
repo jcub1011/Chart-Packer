@@ -1,3 +1,4 @@
+using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charts;
 
 namespace ChartShared.Core.Charting.Layout;
@@ -63,6 +64,9 @@ public sealed class DockLane : DockNode
 
     /// <summary>How the lane shows its audio (charter-spec C12–C14).</summary>
     public LaneAudioOptions Audio { get; internal set; } = LaneAudioOptions.Default;
+
+    /// <summary>The pitches a vocal lane's piano roll shows, as the user scrolled and zoomed its keyboard; null for every pitch.</summary>
+    public VocalPitchView? Pitches { get; internal set; }
 }
 
 /// <summary>Two or more nodes side by side or stacked, each given a share of the room in proportion to its weight.</summary>
@@ -112,24 +116,21 @@ public sealed class LaneDockLayout
     /// <summary>The whole dock: a lane, a split, or null when every lane is closed.</summary>
     public DockNode? Root { get; private set; }
 
-    /// <summary>Raised when lanes are added, moved, closed or change part. Not raised by <see cref="SetWeights"/>.</summary>
+    /// <summary>Raised when lanes are added, moved, closed, change part or are loaded. Not raised by <see cref="SetWeights"/>.</summary>
     public event EventHandler? Changed;
 
     /// <summary>The open lanes, in reading order: left to right, then top to bottom within each split.</summary>
     public IEnumerable<DockLane> Lanes => Root is null ? [] : LanesOf(Root);
 
-    /// <summary>Three Expert highways in a row (guitar, bass, drums) with Vocals the full width below them.</summary>
+    /// <summary>Two Expert highways side by side, guitar and drums, each half the width.</summary>
     public static LaneDockLayout CreateDefault()
     {
         var layout = new LaneDockLayout();
         var row = new DockSplit(DockOrientation.Horizontal);
-        foreach (var instrument in new[] { ChartInstrument.Guitar, ChartInstrument.Bass, ChartInstrument.Drums })
+        foreach (var instrument in new[] { ChartInstrument.Guitar, ChartInstrument.Drums })
             row.Insert(row.ChildList.Count, layout.NewLane(LanePart.Highway(instrument, ChartDifficulty.Expert)), 1);
 
-        var root = new DockSplit(DockOrientation.Vertical);
-        root.Insert(0, row, 3);
-        root.Insert(1, layout.NewLane(LanePart.Vocals(VocalTrack.Vocals)), 1);
-        layout.Root = root;
+        layout.Root = row;
         layout.Normalize();
         return layout;
     }
@@ -266,6 +267,16 @@ public sealed class LaneDockLayout
     }
 
     /// <summary>
+    /// Sets the pitches <paramref name="lane"/>'s piano roll shows, or null for every pitch. Kept with the layout like
+    /// <see cref="SetLookAhead"/>, and raises no <see cref="Changed"/>. The view is brought into range.
+    /// </summary>
+    public void SetPitches(DockLane lane, VocalPitchView? pitches)
+    {
+        RequireOpen(lane);
+        lane.Pitches = pitches is { } view && !view.IsFull ? VocalPitchView.Of(view.Top, view.Span) : null;
+    }
+
+    /// <summary>
     /// Sets the weights of <paramref name="split"/>'s children, such as the sizes they were dragged to. Ignored unless
     /// there's one positive, finite weight per child.
     /// </summary>
@@ -289,23 +300,49 @@ public sealed class LaneDockLayout
     /// </summary>
     public static LaneDockLayout? FromState(LaneDockState? state)
     {
-        if (state is null)
-            return null;
-
         var layout = new LaneDockLayout();
-        if (state.Root is not null)
-        {
-            if (layout.NodeOf(state.Root) is not { } root)
-                return null;
-            layout.Root = root;
-        }
-
-        var parts = layout.Lanes.Select(l => l.Part).ToList();
-        if (parts.Distinct().Count() != parts.Count)
+        if (!layout.TryBuild(state, out var root))
             return null;
 
+        layout.Root = root;
         layout.Normalize();
         return layout;
+    }
+
+    /// <summary>
+    /// Puts the layout <paramref name="state"/> describes in place of this one's lanes, as a layout template is loaded.
+    /// Its lanes are new ones, with ids none of this layout's lanes had, so a view of the old lanes is never taken for
+    /// one of the new.
+    /// </summary>
+    /// <returns>False, changing nothing, when <paramref name="state"/> doesn't describe a layout, as <see cref="FromState"/>.</returns>
+    public bool Load(LaneDockState? state)
+    {
+        if (!TryBuild(state, out var root))
+            return false;
+
+        Root = root;
+        Normalize();
+        OnChanged();
+        return true;
+    }
+
+    /// <summary>The tree <paramref name="state"/> describes, its lanes given this layout's next ids, or false when it isn't a layout.</summary>
+    private bool TryBuild(LaneDockState? state, out DockNode? root)
+    {
+        root = null;
+        if (state is null)
+            return false;
+        if (state.Root is null)
+            return true;
+        if (NodeOf(state.Root) is not { } node)
+            return false;
+
+        var parts = LanesOf(node).Select(l => l.Part).ToList();
+        if (parts.Distinct().Count() != parts.Count)
+            return false;
+
+        root = node;
+        return true;
     }
 
     private DockLane NewLane(LanePart part) => new(_nextId++, part);
@@ -477,6 +514,8 @@ public sealed class LaneDockLayout
                 PixelsPerSecond = lane.PixelsPerSecond,
                 Perspective = lane.Perspective,
                 Audio = lane.Audio == LaneAudioOptions.Default ? null : LaneAudioState.Of(lane.Audio),
+                PitchTop = lane.Pitches?.Top,
+                PitchSpan = lane.Pitches?.Span,
             };
         }
 
@@ -500,6 +539,7 @@ public sealed class LaneDockLayout
             lane.PixelsPerSecond = state.PixelsPerSecond is { } pixels && IsWeight(pixels) ? pixels : null;
             lane.Perspective = state.Perspective;
             lane.Audio = state.Audio?.ToOptions() ?? LaneAudioOptions.Default;
+            lane.Pitches = state.PitchTop is not null && state.PitchSpan is not null && VocalPitchView.FromSaved(state.PitchTop, state.PitchSpan) is { IsFull: false } pitches ? pitches : null;
             return lane;
         }
 

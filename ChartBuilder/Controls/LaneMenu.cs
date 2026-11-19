@@ -28,7 +28,7 @@ namespace ChartBuilder.Controls
             AvaloniaProperty.RegisterAttached<Control, IReadOnlyList<LaneMenuItem>?>("Items", typeof(LaneMenu));
 
         // The button each followed flyout belongs to, for its items when it opens.
-        private static readonly ConditionalWeakTable<MenuFlyout, Button> Owners = new();
+        private static readonly ConditionalWeakTable<MenuFlyout, Button> Owners = [];
 
         static LaneMenu()
         {

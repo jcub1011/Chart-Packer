@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Avalonia;
 using Avalonia.Media;
 using Avalonia.Media.Immutable;
+using ChartShared.UI.Controls.Skia;
 
 namespace ChartShared.UI.Controls.Highway
 {
@@ -35,14 +36,14 @@ namespace ChartShared.UI.Controls.Highway
         /// <summary>How opaque a column's beam is at full brightness.</summary>
         public const double BeamOpacity = 0.8;
 
-        // How opaque a beam is at the strike line, at full brightness, before BeamOpacity, out of 255; and how many layers it's
-        // built of at most (see DrawBeam). Each layer's blend is rounded to a 255th, and over many layers that adds up: 48 came out
-        // 16/255 off the fade they were laid for, 16 within about 9/255, their steps a little coarser than 8-bit colour's own.
-        private const int BeamAlpha = 0x70;
-        private const int BeamLayers = 16;
+        // How opaque a beam is at the strike line, at full brightness, before BeamOpacity, out of 255.
+        private const byte BeamAlpha = 0x70;
 
-        // The brushes beams are filled with, for each colour and opacity: a few opacities, all faint (see DrawBeam).
-        private static readonly Dictionary<(Color, byte), IBrush> Beams = [];
+        // The unit square a beam's gradient is drawn over, stretched onto the column (see DrawBeam).
+        private static readonly Rect Unit = new(0, 0, 1, 1);
+
+        // The gradients beams are filled with, for each colour, up a highway or across a timeline (see DrawBeam).
+        private static readonly Dictionary<(Color, bool), IBrush> Beams = [];
 
         /// <summary>
         /// How brightly a note lights its column, from 0 to 1, <paramref name="since"/> seconds after it reached the strike
@@ -93,49 +94,42 @@ namespace ChartShared.UI.Controls.Highway
         /// at the bottom; across for a timeline, with the strike line on the left.
         /// </summary>
         /// <remarks>
-        /// <para>The fade is up to <see cref="BeamLayers"/> rectangles laid over each other from the strike line, each a little
-        /// shorter, all in one faint brush of the column's colour: where more of them overlap the beam is brighter.</para>
-        /// <para>The opacity is in the brush, the faintest that reaches it in so many layers, not pushed on the drawing:
-        /// pushed, Avalonia lays it on each fill, whose opacity is kept to a 255th, and a dim beam's layers came to nothing.
-        /// A dim beam needs a fainter brush or fewer layers, a handful of brushes for each colour.</para>
-        /// <para>Not a picture stretched over the column, as it was, nor a gradient brush: a beam is drawn every frame for
-        /// every lit column, and Avalonia allocates a finalizable reference each time a picture is drawn, and makes a
-        /// gradient's shader again, with garbage, each time it's drawn. A fill is a few bytes of the drawing's own, and the
-        /// brush is only one more thing the drawing keeps.</para>
+        /// <para>One rectangle filled with a straight gradient, from the column's colour at the strike line to clear at the far
+        /// end, faded as a whole by <paramref name="opacity"/>. It was once rectangles laid over each other, each a little
+        /// shorter, which showed as steps up the beam, plainest over a sustain's long glow.</para>
+        /// <para>The gradient is drawn over the unit square, stretched onto <paramref name="rect"/> by a transform, so the
+        /// shader SkiaSharp draws it with is made once for each colour and kept (see <see cref="SkiaShaders"/>), however the
+        /// beam moves or grows from frame to frame: a gradient over the beam's own rectangle would be made again each time
+        /// it moved.</para>
         /// </remarks>
-        public static void DrawBeam(DrawingContext context, Color color, bool isVertical, Rect rect, double opacity)
+        public static void DrawBeam(IHighwayCanvas context, Color color, bool isVertical, Rect rect, double opacity)
         {
-            // How opaque the beam is at the strike line, and the faintest layer that, BeamLayers over each other, is that opaque.
-            double full = BeamAlpha / 255.0 * Math.Clamp(opacity, 0, 1);
-            int alpha = (int)Math.Ceiling(255 * (1 - Math.Pow(1 - full, 1.0 / BeamLayers)) - 1e-9);
-            if (full <= 0 || alpha <= 0)
+            double alpha = Math.Clamp(opacity, 0, 1);
+            if (alpha <= 0 || rect.Width <= 0 || rect.Height <= 0)
                 return;
 
-            var brush = BeamOf(color, (byte)alpha);
-            double layer = alpha / 255.0;
-            double clear = 1, under = 0;
-            for (int n = 1; n <= BeamLayers; n++)
-            {
-                // How opaque n layers are over each other, and n - 1: the n-th shortest layer ends where the straight fade,
-                // from full at the strike line to clear at the far end, is halfway between them. The longest comes first.
-                clear *= 1 - layer;
-                double over = 1 - clear;
-                double reach = Math.Min(1, 1 - ((over + under) / 2 / full));
-                if (reach <= 0)
-                    break;
-
-                context.FillRectangle(brush, isVertical
-                    ? new Rect(rect.X, rect.Bottom - (rect.Height * reach), rect.Width, rect.Height * reach)
-                    : new Rect(rect.X, rect.Y, rect.Width * reach, rect.Height));
-                under = over;
-            }
+            using (context.PushTransform(new Matrix(rect.Width, 0, 0, rect.Height, rect.X, rect.Y)))
+            using (context.PushOpacity(alpha))
+                context.FillRectangle(BeamOf(color, isVertical), Unit);
         }
 
-        /// <summary>The brush a beam's layers are filled with: the column's colour, <paramref name="alpha"/> 255ths opaque.</summary>
-        private static IBrush BeamOf(Color color, byte alpha)
+        /// <summary>
+        /// The gradient a beam is filled with over the unit square: the column's colour, <see cref="BeamAlpha"/> 255ths opaque,
+        /// at the strike line (the bottom up a highway, the left across a timeline), clear at the far end.
+        /// </summary>
+        private static IBrush BeamOf(Color color, bool isVertical)
         {
-            if (!Beams.TryGetValue((color, alpha), out var brush))
-                Beams[(color, alpha)] = brush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(color, alpha));
+            if (Beams.TryGetValue((color, isVertical), out var brush))
+                return brush;
+
+            brush = new ImmutableLinearGradientBrush(
+                [
+                    new ImmutableGradientStop(0, HighwayPalette.WithAlpha(color, BeamAlpha)),
+                    new ImmutableGradientStop(1, HighwayPalette.WithAlpha(color, 0)),
+                ],
+                startPoint: new RelativePoint(0, isVertical ? 1 : 0, RelativeUnit.Relative),
+                endPoint: new RelativePoint(isVertical ? 0 : 1, 0, RelativeUnit.Relative));
+            Beams[(color, isVertical)] = brush;
             return brush;
         }
     }

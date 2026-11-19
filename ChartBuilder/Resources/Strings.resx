@@ -270,6 +270,66 @@
     <value>Loop tool</value>
     <comment>The Loop tool's button for a screen reader, said apart from the transport bar's Loop button, which repeats the region.</comment>
   </data>
+  <data name="ToolAlign" xml:space="preserve">
+    <value>Alignment</value>
+    <comment>An editing tool: shifts and stretches the part in focus in time (every vocal part, or every difficulty of an instrument), to line its notes up with the audio.</comment>
+  </data>
+  <data name="ToolAlignToolTip" xml:space="preserve">
+    <value>Shift and stretch the part in focus in time to line it up with the audio: every vocal part on a vocal lane, or every difficulty of the instrument on an instrument's lane, with its star power and other phrases. Drag the notes to shift them. Drag the handle before the first note, or after the last, to stretch them: the other end stays where it is. While snap is on, the first note or the handle dragged snaps to the grid. Hold Shift to drag finely, or type an offset and speed beside the tool.</value>
+    <comment>The Alignment tool's tooltip.</comment>
+  </data>
+  <data name="KeyActionToolAlign" xml:space="preserve">
+    <value>Alignment Tool</value>
+    <comment>Name of the Alignment tool shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="AlignOffsetLabel" xml:space="preserve">
+    <value>Offset (ms)</value>
+    <comment>The Alignment tool's option: how far the notes are shifted, in milliseconds.</comment>
+  </data>
+  <data name="AlignOffsetToolTip" xml:space="preserve">
+    <value>How far the first note is moved, in milliseconds: later when positive. Type a value, or drag across the box: Shift for ten times as far, Ctrl for a tenth.</value>
+    <comment>The Alignment tool's offset field's tooltip.</comment>
+  </data>
+  <data name="AlignSpeedLabel" xml:space="preserve">
+    <value>Speed (%)</value>
+    <comment>The Alignment tool's option: how fast the notes are played, as a percentage.</comment>
+  </data>
+  <data name="AlignSpeedToolTip" xml:space="preserve">
+    <value>How fast the notes are played, from the first note: above 100% they finish sooner, below it later. Type a value, or drag across the box: Shift for ten times as far, Ctrl for a tenth.</value>
+    <comment>The Alignment tool's speed field's tooltip.</comment>
+  </data>
+  <data name="AlignAllVocalParts" xml:space="preserve">
+    <value>All Vocal Parts</value>
+    <comment>The Alignment tool's option on a vocal lane: every vocal part is aligned together, rather than only the one whose lane has focus.</comment>
+  </data>
+  <data name="AlignAllVocalPartsToolTip" xml:space="preserve">
+    <value>Align every vocal part together, so harmonies stay with the lead. Turn it off to align only the part whose lane has focus.</value>
+    <comment>The Alignment tool's All Vocal Parts option's tooltip.</comment>
+  </data>
+  <data name="AlignAllDifficulties" xml:space="preserve">
+    <value>All Difficulties</value>
+    <comment>The Alignment tool's option on an instrument's lane: every difficulty of the instrument is aligned together, rather than only the one whose lane has focus.</comment>
+  </data>
+  <data name="AlignAllDifficultiesToolTip" xml:space="preserve">
+    <value>Align every difficulty of this instrument together, with its star power, solos and other phrases they share. Turn it off to align only the difficulty whose lane has focus: the shared phrases then stay where they are.</value>
+    <comment>The Alignment tool's All Difficulties option's tooltip.</comment>
+  </data>
+  <data name="AlignMoveToolTip" xml:space="preserve">
+    <value>Drag to shift the notes in time</value>
+    <comment>A lane with the Alignment tool, over the notes: a drag shifts everything aligned.</comment>
+  </data>
+  <data name="AlignStretchStartToolTip" xml:space="preserve">
+    <value>Drag to stretch the notes, keeping the last note's end where it is</value>
+    <comment>A lane with the Alignment tool, over the handle before the first note.</comment>
+  </data>
+  <data name="AlignStretchEndToolTip" xml:space="preserve">
+    <value>Drag to stretch the notes, keeping the first note where it is</value>
+    <comment>A lane with the Alignment tool, over the handle after the last note's end.</comment>
+  </data>
+  <data name="AlignReadoutFormat" xml:space="preserve">
+    <value>{0} s · {1}%</value>
+    <comment>A lane with the Alignment tool: the offset and speed, drawn over the notes. {0} is the offset in seconds with its sign, e.g. "+11.446"; {1} the speed, e.g. "99.32".</comment>
+  </data>
   <data name="MenuFile" xml:space="preserve">
     <value>_File</value>
     <comment>The editor title bar's File menu. The underscore marks its access key (Alt+F).</comment>
@@ -297,6 +357,14 @@
   <data name="MenuExportCopy" xml:space="preserve">
     <value>_Export copy…</value>
     <comment>File menu: writes a copy of the song to another folder.</comment>
+  </data>
+  <data name="MenuImportLyrics" xml:space="preserve">
+    <value>_Import Lyrics…</value>
+    <comment>File menu: picks a lyrics file and puts its words into a vocal part.</comment>
+  </data>
+  <data name="MenuExportLyrics" xml:space="preserve">
+    <value>Export _Lyrics…</value>
+    <comment>File menu: writes a vocal part's lyrics to an UltraStar .txt or an .lrc file.</comment>
   </data>
   <data name="MenuEdit" xml:space="preserve">
     <value>_Edit</value>
@@ -406,6 +474,158 @@
     <value>_Difficulty window</value>
     <comment>View menu: opens the difficulty analysis in a window of its own.</comment>
   </data>
+  <data name="MenuLoadLayout" xml:space="preserve">
+    <value>_Load Layout</value>
+    <comment>View menu: a submenu of the layout templates, each loading in place of the lanes open.</comment>
+  </data>
+  <data name="MenuSaveLayout" xml:space="preserve">
+    <value>Sa_ve Layout</value>
+    <comment>View menu: a submenu of the layout templates, each saving the lanes open over it, and New Layout.</comment>
+  </data>
+  <data name="MenuNewLayout" xml:space="preserve">
+    <value>New Layout…</value>
+    <comment>View menu, Save Layout submenu: saves the lanes open as a new layout template, asking its name.</comment>
+  </data>
+  <data name="MenuManageLayouts" xml:space="preserve">
+    <value>Manage La_youts…</value>
+    <comment>View menu: opens the window that adds, renames, reorders, overwrites and deletes the layout templates.</comment>
+  </data>
+  <data name="LayoutDefaultName" xml:space="preserve">
+    <value>Default</value>
+    <comment>The name of the layout template Chart Builder starts with: Guitar and Drums side by side.</comment>
+  </data>
+  <data name="LayoutNameBlank" xml:space="preserve">
+    <value>Enter a name for the layout.</value>
+    <comment>Layout name dialog: the name is blank.</comment>
+  </data>
+  <data name="LayoutNameTooLongFormat" xml:space="preserve">
+    <value>A layout's name can be at most {0} characters.</value>
+    <comment>Layout name dialog: the name is too long. {0} is the most characters.</comment>
+  </data>
+  <data name="LayoutNameTakenFormat" xml:space="preserve">
+    <value>There's already a layout named “{0}”.</value>
+    <comment>Layout name dialog: another layout has the name, ignoring case. {0} is the name.</comment>
+  </data>
+  <data name="LayoutLimitFormat" xml:space="preserve">
+    <value>There can be at most {0} layouts. Delete one to make room.</value>
+    <comment>Layout name dialog: no more layouts can be added. {0} is the most there can be.</comment>
+  </data>
+  <data name="LayoutNewTitle" xml:space="preserve">
+    <value>New Layout</value>
+    <comment>Title of the dialog that names a new layout template.</comment>
+  </data>
+  <data name="LayoutRenameTitle" xml:space="preserve">
+    <value>Rename Layout</value>
+    <comment>Title of the dialog that renames a layout template.</comment>
+  </data>
+  <data name="LayoutNameLabel" xml:space="preserve">
+    <value>Name</value>
+    <comment>Layout name dialog: the label above the name box.</comment>
+  </data>
+  <data name="LayoutNewIntro" xml:space="preserve">
+    <value>The lanes open now are saved as the new layout.</value>
+    <comment>Layout name dialog, naming a new layout: what's saved.</comment>
+  </data>
+  <data name="LayoutSaveButton" xml:space="preserve">
+    <value>Save</value>
+    <comment>Layout name dialog: saves the new layout.</comment>
+  </data>
+  <data name="LayoutRenameButton" xml:space="preserve">
+    <value>Rename</value>
+    <comment>Layout name dialog: renames the layout.</comment>
+  </data>
+  <data name="LayoutOverwriteTitle" xml:space="preserve">
+    <value>Overwrite Layout</value>
+    <comment>Title of the prompt before a layout template is overwritten.</comment>
+  </data>
+  <data name="LayoutOverwriteMessageFormat" xml:space="preserve">
+    <value>Replace the layout “{0}” with the lanes open now?</value>
+    <comment>Prompt before a layout template is overwritten. {0} is its name.</comment>
+  </data>
+  <data name="LayoutOverwriteButton" xml:space="preserve">
+    <value>Overwrite</value>
+    <comment>Overwrite prompt: replaces the layout with the lanes open.</comment>
+  </data>
+  <data name="LayoutLoadTitle" xml:space="preserve">
+    <value>Load Layout</value>
+    <comment>Title of the prompt before a layout template is loaded over lanes that aren't saved as one.</comment>
+  </data>
+  <data name="LayoutLoadMessageFormat" xml:space="preserve">
+    <value>Put the layout “{0}” in place of the lanes open now? They aren't saved as a layout, so their arrangement will be lost. Save them first with View ▸ Save Layout to keep it.</value>
+    <comment>Prompt before a layout template is loaded over lanes that aren't saved as one. {0} is its name.</comment>
+  </data>
+  <data name="LayoutLoadButton" xml:space="preserve">
+    <value>Load</value>
+    <comment>Load prompt: puts the layout in place of the lanes open.</comment>
+  </data>
+  <data name="LayoutDeleteTitle" xml:space="preserve">
+    <value>Delete Layout</value>
+    <comment>Title of the prompt before a layout template is deleted.</comment>
+  </data>
+  <data name="LayoutDeleteMessageFormat" xml:space="preserve">
+    <value>Delete the layout “{0}”? This can't be undone.</value>
+    <comment>Prompt before a layout template is deleted. {0} is its name.</comment>
+  </data>
+  <data name="LayoutDeleteButton" xml:space="preserve">
+    <value>Delete</value>
+    <comment>Delete prompt: deletes the layout.</comment>
+  </data>
+  <data name="LayoutUnreadableFormat" xml:space="preserve">
+    <value>The layout “{0}” couldn't be loaded.</value>
+    <comment>Message bar: a layout template couldn't be read, so the lanes stayed as they were. {0} is its name.</comment>
+  </data>
+  <data name="ManageLayoutsTitle" xml:space="preserve">
+    <value>Manage Layouts</value>
+    <comment>Title of the window that manages the layout templates.</comment>
+  </data>
+  <data name="ManageLayoutsIntro" xml:space="preserve">
+    <value>View ▸ Load Layout puts a layout's lanes in place of those open. Changing the lanes afterwards never changes the layout: overwrite it to update it.</value>
+    <comment>Manage Layouts: what the layouts are for.</comment>
+  </data>
+  <data name="ManageLayoutsEmpty" xml:space="preserve">
+    <value>No layouts yet. New Layout saves the lanes open as one.</value>
+    <comment>Manage Layouts: shown in place of the list when there are no layouts.</comment>
+  </data>
+  <data name="ManageLayoutsListName" xml:space="preserve">
+    <value>Layouts</value>
+    <comment>Manage Layouts: the accessible name of the list of layouts.</comment>
+  </data>
+  <data name="ManageLayoutsNewButton" xml:space="preserve">
+    <value>New Layout</value>
+    <comment>Manage Layouts: saves the lanes open as a new layout.</comment>
+  </data>
+  <data name="ManageLayoutsNewToolTip" xml:space="preserve">
+    <value>Save the lanes open now as a new layout, at the bottom of the list</value>
+    <comment>Manage Layouts: New Layout's tooltip.</comment>
+  </data>
+  <data name="ManageLayoutsRenameButton" xml:space="preserve">
+    <value>Rename</value>
+    <comment>Manage Layouts: renames the layout selected.</comment>
+  </data>
+  <data name="ManageLayoutsMoveUpButton" xml:space="preserve">
+    <value>Move Up</value>
+    <comment>Manage Layouts: moves the layout selected up the list.</comment>
+  </data>
+  <data name="ManageLayoutsMoveDownButton" xml:space="preserve">
+    <value>Move Down</value>
+    <comment>Manage Layouts: moves the layout selected down the list.</comment>
+  </data>
+  <data name="ManageLayoutsOverwriteButton" xml:space="preserve">
+    <value>Overwrite Layout</value>
+    <comment>Manage Layouts: replaces the layout selected with the lanes open.</comment>
+  </data>
+  <data name="ManageLayoutsOverwriteToolTip" xml:space="preserve">
+    <value>Replace the layout selected with the lanes open now</value>
+    <comment>Manage Layouts: Overwrite Layout's tooltip.</comment>
+  </data>
+  <data name="ManageLayoutsDeleteButton" xml:space="preserve">
+    <value>Delete</value>
+    <comment>Manage Layouts: deletes the layout selected.</comment>
+  </data>
+  <data name="ManageLayoutsCloseButton" xml:space="preserve">
+    <value>Close</value>
+    <comment>Manage Layouts: closes the window.</comment>
+  </data>
   <data name="MenuSettings" xml:space="preserve">
     <value>_Settings…</value>
     <comment>Edit menu: the program settings (Ctrl+,). The chart's settings are a tab in the left panel.</comment>
@@ -485,8 +705,16 @@
     <comment>A Properties field: a vocal note's MIDI pitch.</comment>
   </data>
   <data name="PropertiesPitchToolTip" xml:space="preserve">
-    <value>The MIDI pitch, 36 to 84, or a note name such as C4 or F#3.</value>
+    <value>The MIDI pitch, 36 to 84, or a note name such as C4 or F#3. Drag sideways to raise or lower every selected note by semitones, keeping their intervals: Shift is faster, Ctrl finer.</value>
     <comment>The tooltip of Properties' pitch field for vocal notes.</comment>
+  </data>
+  <data name="PropertiesTickToolTip" xml:space="preserve">
+    <value>Where the notes start, in ticks. Type a tick to move them there when they all start on one. Drag sideways to move every selected note later or earlier by the same grid steps, or ticks with snap off, so they keep their places around each other: Shift is faster, Ctrl finer.</value>
+    <comment>The tooltip of Properties' tick fields, for notes and vocal notes.</comment>
+  </data>
+  <data name="PropertiesLengthToolTip" xml:space="preserve">
+    <value>How long the notes are held, in ticks. Drag sideways to lengthen or shorten every selected note by the same grid steps, or ticks with snap off, so each keeps its own length: Shift is faster, Ctrl finer.</value>
+    <comment>The tooltip of Properties' length fields, for notes and vocal notes.</comment>
   </data>
   <data name="PropertiesSpokenPitch" xml:space="preserve">
     <value>spoken</value>
@@ -501,7 +729,7 @@
     <comment>A Properties field: a vocal note's lyric.</comment>
   </data>
   <data name="PropertiesLyricToolTip" xml:space="preserve">
-    <value>The syllable as written. A trailing hyphen joins it to the next; # marks it spoken; + is a slide from the previous note.</value>
+    <value>The syllable. A trailing hyphen joins it to the next. Whether the note is spoken or a slide is set below, and kept as it is when the lyric changes.</value>
     <comment>The tooltip of Properties' lyric field.</comment>
   </data>
   <data name="PropertiesSungLabel" xml:space="preserve">
@@ -547,6 +775,22 @@
   <data name="PropertiesTypedLyricsLeftFormat" xml:space="preserve">
     <value>{0} syllables had no note to go on.</value>
     <comment>Said after Type lyrics when the line had more syllables than the selected notes, with how many were left.</comment>
+  </data>
+  <data name="VocalNoteLyricTip" xml:space="preserve">
+    <value>Double-click to edit the lyric</value>
+    <comment>The tip over a vocal note's lyric bubble in its lane, as the pointer rests on it.</comment>
+  </data>
+  <data name="LyricEditWatermark" xml:space="preserve">
+    <value>Syllable, symbols included</value>
+    <comment>The watermark of the box that edits a vocal note's lyric in its lane.</comment>
+  </data>
+  <data name="VocalEditLyricNone" xml:space="preserve">
+    <value>Select a vocal note to edit its lyric.</value>
+    <comment>Said when the lyric box is opened with no vocal note selected.</comment>
+  </data>
+  <data name="VocalSlideNoLyric" xml:space="preserve">
+    <value>A slide has no lyric of its own. Turn off Slide in Properties to give the note one.</value>
+    <comment>Said when the lyric box is opened on a slide note, whose + is not a lyric.</comment>
   </data>
   <data name="LaneNoVocalsFormat" xml:space="preserve">
     <value>The chart has no {0} part.</value>
@@ -2426,10 +2670,22 @@ Saving also changes song.ini:
     <value>Spectrogram Memory Budget (MB)</value>
   </data>
   <data name="SpectrogramBudgetDescription" xml:space="preserve">
-    <value>How much memory all stems' spectrograms may take together.</value>
+    <value>How much memory all stems' spectrograms may take together, with the stems decoded once to draw and analyse them. The spectrograms come first; decoded stems that don't fit are decoded again when needed.</value>
   </data>
   <data name="SpectrogramBudgetKeywords" xml:space="preserve">
     <value>spectrogram memory budget ram megabytes</value>
+  </data>
+  <data name="SpectrogramSharpeningLabel" xml:space="preserve">
+    <value>Sharpen Spectrograms</value>
+    <comment>Settings: the switch for drawing spectrograms sharpened.</comment>
+  </data>
+  <data name="SpectrogramSharpeningDescription" xml:space="preserve">
+    <value>Draws each part of the sound at the pitch and the time it's really at, so notes are thin lines and hits are thin columns. Off, they're as blurred as the analysis is, which can read more smoothly on a dense mix. Changing it computes the spectrograms again.</value>
+    <comment>Settings: what the Sharpen spectrograms switch does.</comment>
+  </data>
+  <data name="SpectrogramSharpeningKeywords" xml:space="preserve">
+    <value>spectrogram sharpen sharp blurry blur detail resolution reassign crisp pitch vocals</value>
+    <comment>Settings: search words for the Sharpen spectrograms switch, separated by spaces.</comment>
   </data>
   <data name="LaneAudioToolTip" xml:space="preserve">
     <value>The lane's audio: waveform or spectrogram, and onsets</value>
@@ -2907,6 +3163,110 @@ Saving also changes song.ini:
   </data>
   <data name="LaneMappingPasteButton" xml:space="preserve">
     <value>Paste</value>
+  </data>
+  <data name="LyricsImportTitle" xml:space="preserve">
+    <value>Import Lyrics</value>
+    <comment>Title of the dialog, and of the file picker, that import lyrics from a file into a vocal part.</comment>
+  </data>
+  <data name="LyricsExportTitle" xml:space="preserve">
+    <value>Export Lyrics</value>
+    <comment>Title of the dialog, and of the save dialog, that write a vocal part's lyrics to an .lrc file.</comment>
+  </data>
+  <data name="LyricsImportButton" xml:space="preserve">
+    <value>Import</value>
+    <comment>The Import lyrics dialog's confirm button.</comment>
+  </data>
+  <data name="LyricsExportButton" xml:space="preserve">
+    <value>Export</value>
+    <comment>The Export lyrics dialog's confirm button.</comment>
+  </data>
+  <data name="LyricsImportSummaryFormat" xml:space="preserve">
+    <value>{0}: {1} lines, {2} words.</value>
+    <comment>The Import lyrics dialog's summary of the file read. {0} is the file's name, {1} its number of lines, {2} its number of words.</comment>
+  </data>
+  <data name="LyricsExportSummary" xml:space="preserve">
+    <value>Writes one line for each phrase of the part, timed to the audio.</value>
+    <comment>The Export lyrics dialog's description of what's written, when the format is LRC.</comment>
+  </data>
+  <data name="LyricsExportUltraStarSummary" xml:space="preserve">
+    <value>Writes an UltraStar song: every note with its pitch and lyric, one line for each phrase, timed to the audio. Save it in the song's folder, beside its audio.</value>
+    <comment>The Export lyrics dialog's description of what's written, when the format is UltraStar.</comment>
+  </data>
+  <data name="LyricsFormatLabel" xml:space="preserve">
+    <value>Format</value>
+    <comment>The Export lyrics dialog's drop-down of the file format: UltraStar or LRC.</comment>
+  </data>
+  <data name="LyricsFormatUltraStar" xml:space="preserve">
+    <value>UltraStar (.txt)</value>
+    <comment>Export lyrics format: an UltraStar song file, with pitches. The default.</comment>
+  </data>
+  <data name="LyricsFormatLrc" xml:space="preserve">
+    <value>LRC (.lrc)</value>
+    <comment>Export lyrics format: LRC lyrics, timed by line or, with A2, by word; no pitches.</comment>
+  </data>
+  <data name="LyricsDuetPart" xml:space="preserve">
+    <value>Harmony 1 + 2 (Duet)</value>
+    <comment>The Import and Export lyrics dialogs' vocal part choice for an UltraStar duet: its first singer is Harmony 1, its second Harmony 2.</comment>
+  </data>
+  <data name="LyricsUsePitches" xml:space="preserve">
+    <value>Use Pitches from the File</value>
+    <comment>Import lyrics option, shown when the file has pitches (UltraStar, or karaoke with a melody): when off, every word is spoken. Needs Use Word Timing from the File.</comment>
+  </data>
+  <data name="LyricsImportPitchedNote" xml:space="preserve">
+    <value>Every imported word is sung at its pitch from the file, moved by octaves into the vocal range; a word with no pitch is spoken. Each line becomes a phrase.</value>
+    <comment>Import lyrics dialog: a note under the replace and merge options, when the file's pitches are used.</comment>
+  </data>
+  <data name="LyricsImportDuetSummaryFormat" xml:space="preserve">
+    <value>{0}: a duet, {1} lines, {2} words.</value>
+    <comment>The Import lyrics dialog's summary of a duet file read. {0} is the file's name, {1} its number of lines, both singers', {2} its number of words.</comment>
+  </data>
+  <data name="LyricsPartLabel" xml:space="preserve">
+    <value>Vocal Part</value>
+    <comment>The Import and Export lyrics dialogs' drop-down of the vocal part: Vocals, or a harmony.</comment>
+  </data>
+  <data name="LyricsReplaceOption" xml:space="preserve">
+    <value>Replace Existing Lyrics</value>
+    <comment>Import lyrics option: the part's own notes, lyrics and phrases are removed first.</comment>
+  </data>
+  <data name="LyricsMergeOption" xml:space="preserve">
+    <value>Merge with Existing Lyrics</value>
+    <comment>Import lyrics option: the part keeps what it has, and the words are added where there's room.</comment>
+  </data>
+  <data name="LyricsImportNote" xml:space="preserve">
+    <value>Every imported word is spoken: a note with no pitch. Each line becomes a phrase.</value>
+    <comment>Import lyrics dialog: a note under the replace and merge options.</comment>
+  </data>
+  <data name="LyricsUseWordTimes" xml:space="preserve">
+    <value>Use Word Timing from the File</value>
+    <comment>Import lyrics option, shown when the file times its words (LRC with A2, TTML, UltraStar, karaoke): when off, the words of each line share its time.</comment>
+  </data>
+  <data name="LyricsIncludeWordTimes" xml:space="preserve">
+    <value>Include Word Timing (A2)</value>
+    <comment>Export lyrics option: when on, each syllable has its own time, in the A2 extension of LRC.</comment>
+  </data>
+  <data name="LyricsImportedFormat" xml:space="preserve">
+    <value>Imported {0} words into {1}.</value>
+    <comment>Message bar, after Import lyrics. {0} is how many words were added, {1} the vocal part's name.</comment>
+  </data>
+  <data name="LyricsImportedSkippedFormat" xml:space="preserve">
+    <value>Imported {0} words into {1}; {2} were left out.</value>
+    <comment>Message bar, after Import lyrics left some words out: before the start of the song, on another word, or on a note the part has. {0} is how many were added, {1} the vocal part's name, {2} how many were left out.</comment>
+  </data>
+  <data name="LyricsImportFailedFormat" xml:space="preserve">
+    <value>The lyrics weren't imported: {0}</value>
+    <comment>Message bar. {0} is why, e.g. that the file isn't a lyrics file, or has no times.</comment>
+  </data>
+  <data name="LyricsExportedFormat" xml:space="preserve">
+    <value>Exported the lyrics to {0}.</value>
+    <comment>Message bar, after Export lyrics. {0} is the file written.</comment>
+  </data>
+  <data name="LyricsExportFailedFormat" xml:space="preserve">
+    <value>The lyrics weren't exported: {0}</value>
+    <comment>Message bar. {0} is why, e.g. that the file can't be written.</comment>
+  </data>
+  <data name="LyricsExportNone" xml:space="preserve">
+    <value>No vocal part has lyrics to export.</value>
+    <comment>Message bar, when Export lyrics is chosen and no vocal part has any.</comment>
   </data>
   <data name="LaneSelectLane" xml:space="preserve">
     <value>Select lane</value>
@@ -3399,6 +3759,14 @@ Saving also changes song.ini:
     <value>{0} track</value>
     <comment>{0} is the stem, e.g. "guitar".</comment>
   </data>
+  <data name="NoteMenuEditLyric" xml:space="preserve">
+    <value>Edit Lyric…</value>
+    <comment>The note menu item that opens a vocal note's lyric box, as the Properties lyric field edits it.</comment>
+  </data>
+  <data name="NoteMenuDeleteLyric" xml:space="preserve">
+    <value>Delete Lyric</value>
+    <comment>The note menu item that takes the lyric off the selected vocal notes, leaving the notes.</comment>
+  </data>
   <data name="NoteMenuNatural" xml:space="preserve">
     <value>Natural</value>
     <comment>The note menu: the chords are neither forced nor tapped, so the games decide strum or HOPO.</comment>
@@ -3430,6 +3798,10 @@ Saving also changes song.ini:
   <data name="RailVocalPhraseToolTip" xml:space="preserve">
     <value>Vocal phrase</value>
     <comment>Shown over a vocal phrase's bar in the phrase strip.</comment>
+  </data>
+  <data name="RailVocalStarPowerToolTip" xml:space="preserve">
+    <value>Star power</value>
+    <comment>Shown over a vocal part's star power bar in its star power rail.</comment>
   </data>
   <data name="LaneDifficultyPickerToolTip" xml:space="preserve">
     <value>Difficulty shown</value>
@@ -4596,6 +4968,10 @@ Saving also changes song.ini:
     <value>Star Power</value>
     <comment>Name of the Star power shortcut, in the keyboard shortcuts list.</comment>
   </data>
+  <data name="KeyActionNoteEditLyric" xml:space="preserve">
+    <value>Edit Lyric</value>
+    <comment>Name of the Edit lyric shortcut, in the keyboard shortcuts list.</comment>
+  </data>
   <data name="KeyActionDifficultyEasy" xml:space="preserve">
     <value>Show Easy</value>
     <comment>Name of the Show Easy shortcut, in the keyboard shortcuts list.</comment>
@@ -4623,6 +4999,14 @@ Saving also changes song.ini:
   <data name="KeyActionMouseZoom" xml:space="preserve">
     <value>Change Look-Ahead</value>
     <comment>Name of the Change the look-ahead shortcut, in the keyboard shortcuts list.</comment>
+  </data>
+  <data name="KeyActionMousePitchScroll" xml:space="preserve">
+    <value>Scroll Vocal Pitches</value>
+    <comment>Name of the Scroll the pitches a vocal lane shows shortcut, in the keyboard shortcuts list: the wheel over its piano keyboard.</comment>
+  </data>
+  <data name="KeyActionMousePitchZoom" xml:space="preserve">
+    <value>Zoom Vocal Pitches</value>
+    <comment>Name of the Zoom the pitches a vocal lane shows shortcut, in the keyboard shortcuts list: Ctrl and the wheel over its piano keyboard.</comment>
   </data>
   <data name="KeyActionMouseSync" xml:space="preserve">
     <value>Use Sync Tool While Held</value>

@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Threading;
+using ChartShared.Audio.Decoding;
 using ChartShared.Audio.Playback;
 using ChartShared.Audio.Waveforms;
 using ChartShared.Core.Charting;
@@ -38,6 +39,7 @@ namespace ChartBuilder.ViewModels
 
         private readonly SongEntry? _entry;
         private readonly IReadOnlyList<SongTrack> _tracks;
+        private readonly StemDecoder? _decoder;
         private readonly CancellationTokenSource _cancel = new();
         private readonly DispatcherTimer _changed;
 
@@ -65,8 +67,13 @@ namespace ChartBuilder.ViewModels
         private bool _changePending;
         private bool _disposed;
 
-        public StemWaveforms(SongEntry? entry, IReadOnlyList<SongTrack> tracks, WaveformFidelity fidelity = WaveformFidelity.High)
+        /// <param name="decoder">
+        /// Where the stems are decoded once, up front: their peaks are read from there as they're decoded, rather than from
+        /// their files, but by channel. The owner disposes it, after this.
+        /// </param>
+        public StemWaveforms(SongEntry? entry, IReadOnlyList<SongTrack> tracks, WaveformFidelity fidelity = WaveformFidelity.High, StemDecoder? decoder = null)
         {
+            _decoder = decoder;
             _entry = entry;
             _tracks = tracks;
             Fidelity = Enum.IsDefined(fidelity) ? fidelity : WaveformFidelity.High;
@@ -78,7 +85,7 @@ namespace ChartBuilder.ViewModels
         /// <summary>Raised on the UI thread when some waveform may have changed: peaks read, or a mix made.</summary>
         public event EventHandler? Changed;
 
-        /// <summary>Starts reading every track's peaks, from the cache where it has them.</summary>
+        /// <summary>Starts reading every track's peaks: from the cache where it has them, else as the stems are decoded.</summary>
         public void Start()
         {
             if (_tracks.Count > 0)
@@ -288,11 +295,14 @@ namespace ChartBuilder.ViewModels
             }, token);
         }
 
-        /// <summary>Reads <paramref name="tracks"/>' peaks in the background, from the cache where it has them.</summary>
+        /// <summary>
+        /// Reads <paramref name="tracks"/>' peaks in the background: from the cache where it has them, else from the stems as
+        /// they're decoded up front, else, by channel or where a stem isn't decoded, from their files.
+        /// </summary>
         private void Read(IReadOnlyList<SongTrack> tracks, bool channels)
         {
             var token = _cancel.Token;
-            _ = Task.Run(() =>
+            _ = Task.Run(async () =>
             {
                 try
                 {
@@ -305,6 +315,18 @@ namespace ChartBuilder.ViewModels
                             Show(track, cached);
                         else
                             keys[track] = key;
+                    }
+
+                    // The stems decoded are their channels averaged, so peaks by channel are read from the files.
+                    if (!channels && _decoder is { } decoder && keys.Count > 0)
+                    {
+                        var pending = keys.Keys.ToList();
+                        bool[] read = await Task.WhenAll(pending.Select(track => ReadDecodedAsync(decoder, track, token))).ConfigureAwait(false);
+                        for (int i = 0; i < pending.Count; i++)
+                        {
+                            if (read[i])
+                                keys.Remove(pending[i]);
+                        }
                     }
 
                     if (keys.Count == 0)
@@ -339,6 +361,25 @@ namespace ChartBuilder.ViewModels
                     }
                 }
             }, token);
+        }
+
+        /// <summary>
+        /// Reads <paramref name="track"/>'s peaks from its stem as it's decoded up front, showing them as they fill in, and
+        /// keeps them under the file it was decoded from.
+        /// </summary>
+        /// <returns>Whether they were read: not when the stem isn't decoded, or its decode failed, so they're read from its file.</returns>
+        private async Task<bool> ReadDecodedAsync(StemDecoder decoder, SongTrack track, CancellationToken token)
+        {
+            if (await decoder.GetAsync(track, token).ConfigureAwait(false) is not { } stem)
+                return false;
+
+            var peaks = await ChunkedPeaksRead.ReadDecodedAsync(track.StoredName, stem, Resolution, partial => Show(track, partial), ProgressInterval, token).ConfigureAwait(false);
+            if (peaks is null)
+                return false;
+
+            Show(track, peaks);
+            StemPeaksCache.Shared.Add(stem.Key, peaks);
+            return true;
         }
 
         private void Show(SongTrack track, StemPeaks peaks)

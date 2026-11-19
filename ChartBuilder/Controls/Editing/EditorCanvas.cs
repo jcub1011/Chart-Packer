@@ -24,6 +24,7 @@ using ChartShared.Core.Charting.Layout;
 using ChartShared.Core.Charts;
 using ChartShared.UI.Controls;
 using ChartShared.UI.Controls.Highway;
+using ChartShared.UI.Controls.Skia;
 
 namespace ChartBuilder.Controls.Editing
 {
@@ -136,7 +137,7 @@ namespace ChartBuilder.Controls.Editing
         private static readonly IBrush UnsureLabelBrush = new ImmutableSolidColorBrush(Color.FromRgb(0xFF, 0x8A, 0x94));
         private static readonly IPen DownbeatPen = new ImmutablePen(HighwayPalette.WithAlpha(HighwayPalette.Yellow, 0xE0).ToUInt32(), 2, new ImmutableDashStyle([6, 3], 0));
         private static readonly IBrush DownbeatLabelBrush = new ImmutableSolidColorBrush(HighwayPalette.Yellow);
-        private static readonly Geometry Diamond = new PolylineGeometry([new Point(0, -5), new Point(5, 0), new Point(0, 5), new Point(-5, 0)], true);
+        private static readonly HighwayPath Diamond = HighwayPath.Polygon([new Point(0, -5), new Point(5, 0), new Point(0, 5), new Point(-5, 0)]);
 
         // How near a proposed beat's handle the pointer must be to grab it, in pixels.
         private const double HandlePixels = 6;
@@ -403,11 +404,17 @@ namespace ChartBuilder.Controls.Editing
         /// </summary>
         protected virtual LaneProjection? ProjectVocals(Size size, LaneSlots slots, EditorViewport viewport, HighwayLength length) => null;
 
-        /// <summary>Where a vocal part's lyrics are drawn, under its pitch rows.</summary>
-        protected virtual Rect LyricsArea(Size size, LaneProjection projection) => default;
+        /// <summary>How wide the piano keyboard is down a vocal part's left edge, in pixels; none for a view that has no keyboard.</summary>
+        protected virtual double VocalGutterWidth => 0;
+
+        /// <summary>Whether the canvas is showing a vocal part's lane.</summary>
+        protected bool IsVocalLane => _lane?.Vocal is not null;
 
         /// <summary>Where a vocal part's phrases are drawn as bars to select and drag, above its pitch rows.</summary>
         protected virtual Rect VocalPhraseArea(Size size, LaneProjection projection) => default;
+
+        /// <summary>Where a vocal part's star power is drawn as bars to select and drag, between its phrases and its pitch rows.</summary>
+        protected virtual Rect VocalStarPowerArea(Size size, LaneProjection projection) => default;
 
         /// <summary>How thick the phrase rail of <paramref name="phraseRows"/> rows is across the view, in pixels.</summary>
         protected static double PhraseRailSize(int phraseRows) =>
@@ -450,10 +457,6 @@ namespace ChartBuilder.Controls.Editing
         {
             base.OnDetachedFromVisualTree(e);
             Detach();
-
-            // The perspective labels' page goes with the canvas, rather than waiting on the collector; attached again, it's
-            // filled again as they're drawn.
-            _pictures.Dispose();
         }
 
         protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
@@ -495,7 +498,7 @@ namespace ChartBuilder.Controls.Editing
         public override void Render(DrawingContext context) => context.FillRectangle(RailBrush, new Rect(Bounds.Size));
 
         /// <summary>Draws <paramref name="layer"/>: a page of what moves with the song, or what stays put on the screen.</summary>
-        private void RenderLayer(DrawingContext context, Layer layer)
+        private void RenderLayer(IHighwayCanvas context, Layer layer)
         {
             layer.Page = null;
             if (Session is not { } session || _lane is not { } lane)
@@ -562,7 +565,7 @@ namespace ChartBuilder.Controls.Editing
         /// The strike line, then the notes' tails, over the song, in the song's drawing (see <see cref="DrawsWithSong"/>): in the order
         /// their layers are in, the strike line where it is on the screen, though the song's layer is on a page, and the tails on it.
         /// </summary>
-        private void RenderStrikeAndNotes(DrawingContext context, Layer song, EditorSession session, EditorLaneViewModel lane, ChartTrackKey key, EditableTrack track, EditablePart part, LaneSlots slots, LaneProjection screen, LaneProjection projection)
+        private void RenderStrikeAndNotes(IHighwayCanvas context, Layer song, EditorSession session, EditorLaneViewModel lane, ChartTrackKey key, EditableTrack track, EditablePart part, LaneSlots slots, LaneProjection screen, LaneProjection projection)
         {
             // The song's layer is moved by its page's shift from the screen (Layer.Show): the strike line is moved back by as much.
             var limit = _alongLimit;
@@ -592,7 +595,7 @@ namespace ChartBuilder.Controls.Editing
         /// The song under the notes, across a page: the lanes, the audio, the beats and their numbers, the tempo markers, the
         /// sections and the phrase rail.
         /// </summary>
-        private void RenderSong(DrawingContext context, EditorSession session, ChartTrackKey key, EditablePart part, IReadOnlyList<RailKind> rows, LaneSlots slots, LaneProjection projection, Size size)
+        private void RenderSong(IHighwayCanvas context, EditorSession session, ChartTrackKey key, EditablePart part, IReadOnlyList<RailKind> rows, LaneSlots slots, LaneProjection projection, Size size)
         {
             var (fromTick, toTick) = TicksOf(session, projection);
             FillPage(context, projection);
@@ -617,7 +620,7 @@ namespace ChartBuilder.Controls.Editing
             DrawPhraseRailBackground(context, rows, projection);
             DrawPhraseRanges(context, session, key, projection, fromTick, toTick);
             DrawSpans(context, session, projection);
-            DrawSyncBands(context, session, key, projection);
+            DrawSyncBands(context, session, projection);
             if (!FramePerf.IsOff(FramePerf.Part.BeatLines))
                 DrawBeats(context, session, session.TempoMap, projection, fromTick, toTick, size, RailOnPlane);
             DrawOnsets(context, size, projection, key);
@@ -634,7 +637,7 @@ namespace ChartBuilder.Controls.Editing
         /// The strike line's band, and while the song plays, the columns it's playing through, lit. While the lane is
         /// playtested, the frets and pads pressed are shown on it, as the games show theirs, and each hit bursts from it.
         /// </summary>
-        private void RenderStrike(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, LaneSlots slots, LaneProjection screen)
+        private void RenderStrike(IHighwayCanvas context, EditorSession session, ChartTrackKey key, EditableTrack track, LaneSlots slots, LaneProjection screen)
         {
             if (FramePerf.IsOff(FramePerf.Part.Strike))
                 return;
@@ -656,7 +659,7 @@ namespace ChartBuilder.Controls.Editing
         }
 
         /// <summary>The notes across a page, within the lanes: the ghost difficulty's, a draft over the notes it would replace, and the solos' counts.</summary>
-        private void RenderNotes(DrawingContext context, EditorSession session, EditorLaneViewModel lane, ChartTrackKey key, EditableTrack track, EditablePart part, LaneSlots slots, LaneProjection projection)
+        private void RenderNotes(IHighwayCanvas context, EditorSession session, EditorLaneViewModel lane, ChartTrackKey key, EditableTrack track, EditablePart part, LaneSlots slots, LaneProjection projection)
         {
             if (FramePerf.IsOff(FramePerf.Part.Tails))
                 return;
@@ -677,13 +680,21 @@ namespace ChartBuilder.Controls.Editing
         /// The notes <paramref name="painter"/> draws, in <paramref name="pass"/>: the ghost difficulty's, and the track's own,
         /// or a draft not yet added (Reduce, record mode) over the notes it would replace, which fade behind it.
         /// </summary>
-        private void DrawNoteSets(DrawingContext context, EditorSession session, EditorLaneViewModel lane, ChartTrackKey key, EditableTrack track, EditablePart part, LaneProjection projection, LaneSlots slots, double fromTick, double toTick, NotePainter painter, NotePass pass)
+        private void DrawNoteSets(IHighwayCanvas context, EditorSession session, EditorLaneViewModel lane, ChartTrackKey key, EditableTrack track, EditablePart part, LaneProjection projection, LaneSlots slots, double fromTick, double toTick, NotePainter painter, NotePass pass)
         {
             if (lane.Ghost is { } ghost)
             {
                 var ghostKey = new ChartTrackKey(key.Instrument, ghost);
                 using (context.PushOpacity(0.28))
                     DrawNotes(context, session, ghostKey, part[ghost], projection, slots, fromTick, toTick, LongestOf(ref _ghostLongest, ghostKey, part[ghost]), isGhost: true, painter, pass);
+            }
+
+            // The notes being dragged leave a faint ghost where they were, under the notes, until they're let go: outlined as
+            // the ghost difficulty's are, but ringed in the accent as the selection is, so they're not taken for its notes.
+            if (session.Tools.MoveGhost(key) is { } lifted)
+            {
+                using (context.PushOpacity(0.4))
+                    DrawNotes(context, session, key, lifted.Notes, projection, slots, fromTick, toTick, lifted.Longest, isGhost: true, painter, pass, ghostRing: AccentPens().Selected);
             }
 
             long longest = LongestOf(ref _longest, key, track);
@@ -706,10 +717,12 @@ namespace ChartBuilder.Controls.Editing
         /// of it the pointer would take hold of, the loop region's X and what of it the pointer would take hold of, the
         /// cursor, a box being drawn, and the focus's edge.
         /// </summary>
-        private void RenderOverlay(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, EditablePart part, IReadOnlyList<RailKind> rows, LaneSlots slots, LaneProjection screen)
+        private void RenderOverlay(IHighwayCanvas context, EditorSession session, ChartTrackKey key, EditableTrack track, EditablePart part, IReadOnlyList<RailKind> rows, LaneSlots slots, LaneProjection screen)
         {
             if (_camera is null)
                 _perf?.Draw(context, new Point(4, 4));
+
+            DrawTrackAlignment(context, session, key, screen, slots);
 
             var lanes = LanesOf(screen, slots);
             using (context.PushClip(lanes))
@@ -729,7 +742,7 @@ namespace ChartBuilder.Controls.Editing
             DrawRailHover(context, session, key, part, rows, screen);
             DrawLoopLine(context, session, screen, slots);
             DrawSyncLine(context, session, screen, slots);
-            DrawSyncHover(context, session, key, screen, slots);
+            DrawSyncHover(context, session, screen, slots);
             DrawLoopHover(context, session, screen, slots);
 
             DrawCursor(context, session, screen, lanes);
@@ -740,7 +753,7 @@ namespace ChartBuilder.Controls.Editing
         }
 
         /// <summary>The box being drawn out to select notes, if one is: its press anchor sticks to the song, so scrolling or zooming mid-drag moves the box with the content the selection covers.</summary>
-        private void DrawBox(DrawingContext context, LaneProjection screen)
+        private void DrawBox(IHighwayCanvas context, LaneProjection screen)
         {
             if (_boxFrom is not { } from)
                 return;
@@ -753,7 +766,7 @@ namespace ChartBuilder.Controls.Editing
         /// Nothing, across all of a page and a little beyond, so the page's picture is the same size whatever's on it, and
         /// isn't made again each time the page is.
         /// </summary>
-        private void FillPage(DrawingContext context, LaneProjection projection)
+        private void FillPage(IHighwayCanvas context, LaneProjection projection)
         {
             // Nothing to keep the size of, on a plane that's drawn again for every move: it is just a screen.
             if (_camera is not null)
@@ -850,14 +863,16 @@ namespace ChartBuilder.Controls.Editing
 
         /// <summary>
         /// Whether the place tool's ghost, the erase tool's red, the Phrase tool's line or the Tempo tool's marker preview
-        /// is shown under the pointer, which follow the song as it moves under it; or a Select tool's rail hover, whose
-        /// placement line does too; or, with a synchronized region or the loop region drawn, its X and hover, which do too.
+        /// is shown under the pointer, which follow the song as it moves under it; or the note or bar a press would grab,
+        /// with the Select tool or with Shift lending it, which is lit wherever the song brings one under the pointer and
+        /// let go of when it moves on; or, with a synchronized region or the loop region drawn, its X and hover, which do too.
         /// </summary>
         private bool IsHoverShown => _hover is { } hover && !_isPressed
-            && (Session?.Tool is EditorTool.Place or EditorTool.Erase or EditorTool.Phrase or EditorTool.Tempo
+            && (Session?.Tool is EditorTool.Place or EditorTool.Erase or EditorTool.Phrase or EditorTool.Tempo or EditorTool.Align
                 || Session?.Sync.IsActive == true
                 || Session?.Loop?.Span is not null
-                || (Session?.Tool == EditorTool.Select && PointAt(hover) is { Rail: not null }));
+                || ((Session?.Tool == EditorTool.Select || (_keys & KeyModifiers.Shift) != 0)
+                    && PointAt(hover) is { Lane: not null } or { Rail: not null }));
 
         /// <summary>
         /// Follows the cursor: the song and the notes are moved, as far as their page reaches, and drawn again around the
@@ -899,7 +914,9 @@ namespace ChartBuilder.Controls.Editing
                 _strike.Redraw();
             if (_editor?.Playtest.HasFeedback == true)
                 _playtest.Redraw();
-            if (IsHoverShown || vocal)
+            // The Alignment tool's span is on the overlay, which stays put on the screen: it's drawn again to follow the notes,
+            // wherever the pointer is, as when the song is scrubbed from the timeline.
+            if (IsHoverShown || vocal || IsAligningLane)
             {
                 _overlay.Redraw();
             }
@@ -949,9 +966,13 @@ namespace ChartBuilder.Controls.Editing
         /// moved, by its composition visual's translation: moving it by a render transform would have it drawn again.
         /// Kept as a picture of itself too, it's no more than that picture to draw each frame.
         /// </summary>
+        /// <remarks>
+        /// What it shows is drawn by a <see cref="SkiaHost"/> inside it, whose drawing SkiaSharp does on the render thread. Kept
+        /// as a picture, the layer has the host's drawing in the picture, which is drawn again when the host draws again.
+        /// </remarks>
         private sealed class Layer : Control
         {
-            private readonly Painter _painter;
+            private readonly SkiaHost _host;
 
             private readonly EditorCanvas _owner;
 
@@ -960,8 +981,8 @@ namespace ChartBuilder.Controls.Editing
                 _owner = owner;
                 Kind = kind;
                 IsHitTestVisible = false;
-                _painter = new Painter(owner, this);
-                VisualChildren.Add(_painter);
+                _host = new SkiaHost(new LayerContent(owner, this));
+                VisualChildren.Add(_host);
             }
 
             public LayerKind Kind { get; }
@@ -971,9 +992,16 @@ namespace ChartBuilder.Controls.Editing
 
             protected override Size ArrangeOverride(Size finalSize)
             {
-                _painter.Arrange(new Rect(finalSize));
+                _host.Arrange(new Rect(finalSize));
                 return finalSize;
             }
+
+            /// <summary>
+            /// Nothing to see, but something drawn of its own: a layer kept as a picture leaves out what a <see cref="SkiaHost"/> in it
+            /// draws unless the layer draws something itself. A pixel at its corner, inside any page, so the picture is the page's
+            /// size and no more.
+            /// </summary>
+            public override void Render(DrawingContext context) => context.FillRectangle(Brushes.Transparent, new Rect(0, 0, 1, 1));
 
             /// <summary>Has this drawn again; and the notes standing up on a perspective highway, with the layer that draws their tails.</summary>
             public void Redraw()
@@ -985,7 +1013,7 @@ namespace ChartBuilder.Controls.Editing
                     return;
                 }
 
-                _painter.InvalidateVisual();
+                RedrawItself();
                 if (Kind is LayerKind.Notes or LayerKind.Song)
                     _owner.RedrawGems();
                 else if (Kind is LayerKind.Overlay or LayerKind.Playtest)
@@ -993,7 +1021,7 @@ namespace ChartBuilder.Controls.Editing
             }
 
             /// <summary>Has this drawn again, itself, whatever draws it: as when it has just come to be drawn with the song, and is to be empty.</summary>
-            public void RedrawItself() => _painter.InvalidateVisual();
+            public void RedrawItself() => _host.Redraw();
 
             /// <summary>Drawn on <paramref name="page"/>, moved to show what <paramref name="screen"/> shows.</summary>
             public void Show(LanePage page, LaneProjection screen)
@@ -1018,29 +1046,15 @@ namespace ChartBuilder.Controls.Editing
             }
         }
 
-        /// <summary>
-        /// What a layer draws, drawn by a visual of its own inside the layer. A layer kept as a picture has its picture drawn
-        /// again only when what's inside it changes, not when its own drawing does, so a layer that drew its page itself
-        /// would go on showing its first page however many it was drawn on since.
-        /// </summary>
-        private sealed class Painter : Control
+        /// <summary>What a layer draws, recorded for SkiaSharp to draw on the render thread.</summary>
+        private sealed class LayerContent(EditorCanvas owner, Layer layer) : ISkiaContent
         {
-            private readonly EditorCanvas _owner;
-            private readonly Layer _layer;
-
-            public Painter(EditorCanvas owner, Layer layer)
+            public void Record(IHighwayCanvas canvas, SkiaHost host)
             {
-                _owner = owner;
-                _layer = layer;
-                IsHitTestVisible = false;
-            }
-
-            public override void Render(DrawingContext context)
-            {
-                var perf = _owner._perf;
+                var perf = owner._perf;
                 long start = FramePerf.Now(perf);
-                _owner.RenderLayer(context, _layer);
-                perf?.Add((FramePerf.Slot)(int)_layer.Kind, start);
+                owner.RenderLayer(canvas, layer);
+                perf?.Add((FramePerf.Slot)(int)layer.Kind, start);
             }
         }
 
@@ -1104,6 +1118,15 @@ namespace ChartBuilder.Controls.Editing
                 return;
             }
 
+            // A vocal part's keyboard takes no press, so a click on it never edits a note or moves the song.
+            if (IsOnVocalKeyboard(current.Position))
+            {
+                Focus();
+                ShowTip(null);
+                e.Handled = true;
+                return;
+            }
+
             _pressButton = button;
             _pressedAt = current.Position;
             _pressDragged = false;
@@ -1119,19 +1142,27 @@ namespace ChartBuilder.Controls.Editing
                 return;
             }
 
-            if (_lane is { Vocal: not null })
-            {
-                PressVocals(session, current.Position, e);
-                return;
-            }
-
-            // The small X at the synchronized region's top right clears it, whatever the tool.
+            // The small X at the synchronized region's top right clears it, whatever the tool, in a vocal part's lane too.
             if (button == MouseButton.Left && SyncCloseAt(current.Position))
             {
                 session.Sync.Clear();
                 Focus();
                 e.Handled = true;
                 _overlay.Redraw();
+                return;
+            }
+
+            // While the song plays the lanes aren't edited; only the loop region, which steers playback, still takes a press.
+            if (_editor?.Playback.IsPlaying == true && !session.Tools.LoopActive)
+            {
+                Focus();
+                e.Handled = true;
+                return;
+            }
+
+            if (_lane is { Vocal: not null })
+            {
+                PressVocals(session, current.Position, e);
                 return;
             }
 
@@ -1157,9 +1188,11 @@ namespace ChartBuilder.Controls.Editing
             _lastPoint = point;
 
             // A box is drawn from a press in the lanes that's on no note, with the select tool or Shift, which lends any tool
-            // the select tool's press. The Sync and Loop tools' presses draw no box.
+            // the select tool's press. The Sync, Loop and Alignment tools' presses draw no box: Shift makes an alignment
+            // drag fine instead.
             bool sync = session.Tools.IsSyncPress(ModifiersOf(e.KeyModifiers));
-            bool selecting = !sync && !session.Tools.LoopActive && (session.Tool == EditorTool.Select || (e.KeyModifiers & KeyModifiers.Shift) != 0);
+            bool selecting = !sync && !session.Tools.LoopActive && session.Tool != EditorTool.Align
+                && (session.Tool == EditorTool.Select || (e.KeyModifiers & KeyModifiers.Shift) != 0);
             _boxFrom = button == MouseButton.Left && selecting && point.Rail is null && session.TrackOf(point.Track) is not null && session.Tools.HitTest(point) is null
                 ? current.Position
                 : null;
@@ -1222,10 +1255,10 @@ namespace ChartBuilder.Controls.Editing
             {
                 if (_lane is { Vocal: not null })
                 {
-                    if (!ShowLoopCursor(position) && !ShowVocalTempoCursor(position))
+                    if (!ShowLoopCursor(position) && !ShowSyncCursor(position) && !ShowVocalTempoCursor(position))
                         ShowVocalCursor(position);
                 }
-                else if (!ShowLoopCursor(position) && !ShowSyncCursor(position) && !ShowTempoCursor(position))
+                else if (!ShowLoopCursor(position) && !ShowSyncCursor(position) && !ShowTempoCursor(position) && !ShowTrackAlignCursor(position))
                 {
                     ShowRailCursor(position);
                 }
@@ -1263,6 +1296,14 @@ namespace ChartBuilder.Controls.Editing
             else if (_lane is { Vocal: not null })
             {
                 session.Tools.Release(VocalPointAt(e.GetPosition(this), clamp: true) ?? _lastVocalPoint);
+
+                // A double click on a note, once its gesture's done, opens the box its lyric's edited in.
+                if (_lyricOnRelease is { } tick)
+                {
+                    _lyricOnRelease = null;
+                    if (!_pressDragged)
+                        OpenLyricEditor(tick);
+                }
             }
             else
             {
@@ -1273,10 +1314,10 @@ namespace ChartBuilder.Controls.Editing
             _overlay.Redraw();
         }
 
-        /// <summary>Opens the note menu at the pointer, for the selected notes, after a right click; nothing with none.</summary>
+        /// <summary>Opens the note menu at the pointer, for the selected notes, after a right click; nothing with none, or while the song plays.</summary>
         private void ShowNoteMenu()
         {
-            if (_lane?.BuildNoteMenu() is not { Count: > 0 } items)
+            if (_editor?.Playback.IsPlaying == true || _lane?.BuildNoteMenu() is not { Count: > 0 } items)
                 return;
             new MenuFlyout { ItemsSource = LaneMenu.MenuItems(items) }.ShowAt(this, showAtPointer: true);
         }
@@ -1291,6 +1332,7 @@ namespace ChartBuilder.Controls.Editing
             _isPressed = false;
             _boxFrom = null;
             _boxFromSeconds = null;
+            _lyricOnRelease = null;
             if (_lane is { Vocal: not null })
                 Session?.Tools.Release(_lastVocalPoint);
             else
@@ -1311,6 +1353,13 @@ namespace ChartBuilder.Controls.Editing
             base.OnPointerWheelChanged(e);
             if (Session is not { } session || _lane is not { HasCanvas: true } lane)
                 return;
+
+            // Over a vocal part's keyboard the wheel scrolls the notes shown and Ctrl zooms them, rather than moving the song.
+            if (IsOnVocalKeyboard(e.GetPosition(this)))
+            {
+                WheelVocalKeyboard(e, lane);
+                return;
+            }
 
             // The song moves past the strike line a grid step a notch, through the tempo map, so the strike line stays on the
             // grid across tempo and time-signature changes; Ctrl zooms, turned up the lane looking less far ahead. A turn of none
@@ -1334,13 +1383,10 @@ namespace ChartBuilder.Controls.Editing
 
             public double FineFactor => LaneScrub.DefaultFineFactor;
 
-            public void ScrubStarted()
-            {
-            }
+            // The song is held still while the lane is dragged, and plays on from where it's left if it was playing.
+            public void ScrubStarted() => canvas._editor?.Playback.BeginScrub();
 
-            public void ScrubEnded()
-            {
-            }
+            public void ScrubEnded() => canvas._editor?.Playback.EndScrub();
 
             // The cursor moves, and playback seeks there, as it does for every move of it by hand.
             public void ScrubTo(double seconds)
@@ -1534,7 +1580,7 @@ namespace ChartBuilder.Controls.Editing
         /// </summary>
         private bool ShowSyncCursor(Point position)
         {
-            if (Session is not { } session || _lane?.Track is not { } key || session.Sync is not { IsActive: true } sync || sync.Track != key)
+            if (Session is not { } session || session.Sync is not { IsActive: true } sync || !IsSyncLane(sync))
                 return false;
             if (CurrentProjection() is not { } projection || sync.Span is not var (from, to))
                 return false;
@@ -1548,7 +1594,7 @@ namespace ChartBuilder.Controls.Editing
 
             if (!session.Tools.IsSyncPress(ModifiersOf(_keys)))
                 return false;
-            if (PointAt(position) is not { Rail: null } point)
+            if (SyncTickAt(position) is not { } point)
                 return false;
 
             long length = to - from;
@@ -1694,10 +1740,12 @@ namespace ChartBuilder.Controls.Editing
             lane = wanted;
             _editor = lane.Editor;
             lane.PropertyChanged += OnLaneChanged;
+            lane.LyricEditRequested += OnLyricEditRequested;
             if (_editor is { } editor)
             {
                 editor.Session.ChartChanged += OnChartChanged;
                 editor.Session.StateChanged += OnRedraw;
+                editor.Session.Alignment.Changed += OnRedraw;
                 editor.Session.Selection.Changed += OnRedraw;
                 editor.Session.Viewport.Changed += OnViewportChanged;
                 editor.Playback.PropertyChanged += OnPlaybackChanged;
@@ -1720,11 +1768,18 @@ namespace ChartBuilder.Controls.Editing
         private void Detach()
         {
             if (_lane is { } lane)
+            {
                 lane.PropertyChanged -= OnLaneChanged;
+                lane.LyricEditRequested -= OnLyricEditRequested;
+            }
+
+            // A lane going away takes its lyric box with it, without keeping what it said.
+            CloseLyricEditor(apply: false);
             if (_editor is { } editor)
             {
                 editor.Session.ChartChanged -= OnChartChanged;
                 editor.Session.StateChanged -= OnRedraw;
+                editor.Session.Alignment.Changed -= OnRedraw;
                 editor.Session.Selection.Changed -= OnRedraw;
                 editor.Session.Viewport.Changed -= OnViewportChanged;
                 editor.Playback.PropertyChanged -= OnPlaybackChanged;
@@ -1748,6 +1803,8 @@ namespace ChartBuilder.Controls.Editing
         {
             if (e.PropertyName == nameof(EditorLaneViewModel.Track) && IsFocused && Session is { } session && _lane?.Track is { } key)
                 session.Focused = key;
+            if (e.PropertyName == nameof(EditorLaneViewModel.Vocal) && _lane is { } shown)
+                shown.SetExtent(TimeAxisLength(_arranged));
             _longest = null;
             _ghostLongest = null;
             InvalidateLayers();
@@ -1825,7 +1882,7 @@ namespace ChartBuilder.Controls.Editing
             RequestFrame();
         }
 
-        private void DrawLaneDividers(DrawingContext context, LaneProjection projection, LaneSlots slots)
+        private void DrawLaneDividers(IHighwayCanvas context, LaneProjection projection, LaneSlots slots)
         {
             // A shared column's halves, which a click picks between: GHL's black fret, then its white.
             HighwayChrome.DrawLaneDividers(context, projection, projection.TimeFrom, projection.TimeFrom + projection.TimeLength, View == LaneView.Timeline ? AlternateRowBrush : null, GridPen, asRect: _camera is not null);
@@ -1849,7 +1906,7 @@ namespace ChartBuilder.Controls.Editing
         /// strength beside them, and always in a timeline's strip. Pictures there was no time to draw this frame are drawn
         /// once it's out.
         /// </summary>
-        private void DrawBackdrop(DrawingContext context, Size size, LaneProjection projection, int phraseRows)
+        private void DrawBackdrop(IHighwayCanvas context, Size size, LaneProjection projection, int phraseRows)
         {
             if (_lane?.Audio is not { Source: { } source } audio || _editor is not { } editor)
                 return;
@@ -1886,17 +1943,17 @@ namespace ChartBuilder.Controls.Editing
         private Func<double, double> AlongOf(LaneProjection projection) => _alongOf.For(projection);
 
         /// <returns>Whether all of it was drawn as it is now.</returns>
-        private bool DrawSpectrogram(DrawingContext context, LaneAudioViewModel audio, Spectrogram spectrogram, Rect area, LaneProjection projection)
+        private bool DrawSpectrogram(IHighwayCanvas context, LaneAudioViewModel audio, Spectrogram spectrogram, Rect area, LaneProjection projection, SpectrogramPainter.PitchFrame? frame = null)
         {
             if (area.Width <= 1 || area.Height <= 1)
                 return true;
             double scaling = 1 / (TopLevel.GetTopLevel(this)?.RenderScaling ?? 1);
             return SpectrogramPainter.Draw(context, spectrogram, area, View == LaneView.Highway, projection.Start, projection.End, AlongOf(projection),
-                audio.Options.FloorDb, audio.Options.CeilingDb, audio.Options.Band, scaling);
+                audio.Options.FloorDb, audio.Options.CeilingDb, audio.Options.Band, scaling, frame);
         }
 
         /// <returns>Whether all of it was drawn.</returns>
-        private bool DrawWaveform(DrawingContext context, ChartEditorViewModel editor, LaneAudioViewModel audio, AudioSource source, Rect area, LaneProjection projection, bool full)
+        private bool DrawWaveform(IHighwayCanvas context, ChartEditorViewModel editor, LaneAudioViewModel audio, AudioSource source, Rect area, LaneProjection projection, bool full)
         {
             if (area.Width <= 1 || area.Height <= 1)
                 return true;
@@ -1938,7 +1995,7 @@ namespace ChartBuilder.Controls.Editing
         /// The onsets of the lane's audio, as ticks in a strip beside the lanes (charter-spec C14 item 1): one band for
         /// guitar and bass, three for drums, kick nearest the lanes on a highway and at the top on a timeline.
         /// </summary>
-        private void DrawOnsets(DrawingContext context, Size size, LaneProjection projection, ChartTrackKey key)
+        private void DrawOnsets(IHighwayCanvas context, Size size, LaneProjection projection, ChartTrackKey key)
         {
             if (Extras.OnsetBands == 0 || _lane?.Audio is not { Source: { } source } audio || _editor is not { } editor)
                 return;
@@ -1982,7 +2039,7 @@ namespace ChartBuilder.Controls.Editing
         /// The proposed tempo map being reviewed, as a ghost over the real one (charter-spec C14 item 4), and Find first
         /// downbeat's guess (C14 item 5).
         /// </summary>
-        private void DrawTempoProposal(DrawingContext context, EditorSession session, LaneProjection projection, Size size, RailPass pass)
+        private void DrawTempoProposal(IHighwayCanvas context, EditorSession session, LaneProjection projection, Size size, RailPass pass)
         {
             bool lines = (pass & RailPass.Lines) != 0, texts = (pass & RailPass.Text) != 0;
             var labels = LabelsArea(size, projection);
@@ -2008,7 +2065,7 @@ namespace ChartBuilder.Controls.Editing
                     if (!lines)
                         DrawStandingLabel(context, text, new Point(labels.X + 2, Math.Max(a, b)), rightAligned: false);
                     else
-                        text.Draw(context, highway ? new Point(labels.X + 2, Math.Max(a, b) - text.Height) : new Point(Math.Min(a, b) + 3, labels.Bottom - text.Height));
+                        context.DrawText(text, highway ? new Point(labels.X + 2, Math.Max(a, b) - text.Height) : new Point(Math.Min(a, b) + 3, labels.Bottom - text.Height));
                 }
 
                 int perMeasure = Math.Max(1, proposal.BeatsPerMeasure);
@@ -2038,7 +2095,7 @@ namespace ChartBuilder.Controls.Editing
                 if (!lines)
                     DrawStandingLabel(context, text, new Point(labels.X + 2, along), rightAligned: false, raise: 2);
                 else
-                    text.Draw(context, highway ? new Point(labels.X + 2, along - text.Height - 2) : new Point(along + 3, labels.Y));
+                    context.DrawText(text, highway ? new Point(labels.X + 2, along - text.Height - 2) : new Point(along + 3, labels.Y));
             }
         }
 
@@ -2078,7 +2135,7 @@ namespace ChartBuilder.Controls.Editing
             if (Session is not { } session || _lane is null)
                 return null;
             if (_lane.Vocal is { } vocal)
-                return session.VocalsOf(vocal) is { } vocals ? ProjectVocals(Bounds.Size, VocalSlotsOf(vocals), session.Viewport, _lane.Length) : null;
+                return session.VocalsOf(vocal) is not null ? ProjectVocals(Bounds.Size, VocalSlotsOf(_lane), session.Viewport, _lane.Length) : null;
             if (_lane.Track is not { } key || session.TrackOf(key) is null)
                 return null;
             var slots = session.SlotsOf(key.Instrument, View);
@@ -2117,7 +2174,7 @@ namespace ChartBuilder.Controls.Editing
         /// The loop region, boxed in light green across the lanes: drawn wherever a region is, whether or not the song is
         /// repeating it just now (charter-spec C10 item 2). And the selected span.
         /// </summary>
-        private void DrawSpans(DrawingContext context, EditorSession session, LaneProjection projection)
+        private void DrawSpans(IHighwayCanvas context, EditorSession session, LaneProjection projection)
         {
             if (Loop is { } loop)
                 context.DrawRectangle(LoopBrush, LoopPen, LoopBandOf(projection, loop));
@@ -2143,10 +2200,10 @@ namespace ChartBuilder.Controls.Editing
         /// the notes; a region nothing matched is hashed in yellow instead. And the region being dragged out with the Sync
         /// tool.
         /// </summary>
-        private void DrawSyncBands(DrawingContext context, EditorSession session, ChartTrackKey key, LaneProjection projection)
+        private void DrawSyncBands(IHighwayCanvas context, EditorSession session, LaneProjection projection)
         {
             var sync = session.Sync;
-            if (sync.Track == key && sync.Span is var (regionFrom, regionTo))
+            if (IsSyncLane(sync) && sync.Span is var (regionFrom, regionTo))
             {
                 long length = regionTo - regionFrom;
                 foreach (long start in sync.Matches)
@@ -2158,7 +2215,7 @@ namespace ChartBuilder.Controls.Editing
                     context.DrawRectangle(SyncRegionBrush, SyncRegionPen, band);
             }
 
-            if (sync.Draft is var (track, draftFrom, draftTo) && track == key)
+            if (sync.Draft is var (part, draftFrom, draftTo) && IsLane(part))
                 context.DrawRectangle(SyncRegionBrush, SyncRegionPen, SyncBandOf(session, projection, draftFrom, draftTo));
         }
 
@@ -2170,7 +2227,7 @@ namespace ChartBuilder.Controls.Editing
         }
 
         /// <summary>A synchronized region nothing matched: hashed in yellow over its wash, inside its outline.</summary>
-        private void DrawSyncHash(DrawingContext context, Rect band)
+        private void DrawSyncHash(IHighwayCanvas context, Rect band)
         {
             context.DrawRectangle(SyncUnmatchedBrush, SyncUnmatchedPen, band);
             using (context.PushClip(band))
@@ -2193,7 +2250,7 @@ namespace ChartBuilder.Controls.Editing
         /// <summary>Whether the pointer at <paramref name="position"/> is on the X that clears the synchronized region.</summary>
         private bool SyncCloseAt(Point position)
         {
-            if (Session is not { } session || _lane?.Track is not { } key || session.Sync is not { IsActive: true } sync || sync.Track != key)
+            if (Session is not { } session || session.Sync is not { IsActive: true } sync || !IsSyncLane(sync))
                 return false;
             if (CurrentProjection() is not { } projection || sync.Span is not var (from, to))
                 return false;
@@ -2206,7 +2263,7 @@ namespace ChartBuilder.Controls.Editing
         /// (charter-spec C8), each in its kind's colour, with its start, and its end where it has one, marked by a
         /// stronger line of that colour. Overlapping tints show through each other.
         /// </summary>
-        private void DrawPhraseRanges(DrawingContext context, EditorSession session, ChartTrackKey key, LaneProjection projection, double fromTick, double toTick)
+        private void DrawPhraseRanges(IHighwayCanvas context, EditorSession session, ChartTrackKey key, LaneProjection projection, double fromTick, double toTick)
         {
             var ranges = _bands;
             ranges.Clear();
@@ -2249,7 +2306,7 @@ namespace ChartBuilder.Controls.Editing
         /// The phrase rail's rows, each a dark shade of its kind's colour (charter-spec C8). Drawn under the rest of the
         /// song so the marks across the rail, as a timeline's section lines, still show in it.
         /// </summary>
-        private void DrawPhraseRailBackground(DrawingContext context, IReadOnlyList<RailKind> rows, LaneProjection projection)
+        private void DrawPhraseRailBackground(IHighwayCanvas context, IReadOnlyList<RailKind> rows, LaneProjection projection)
         {
             double along1 = projection.TimeFrom, along2 = projection.TimeFrom + projection.TimeLength;
             for (int i = 0; i < rows.Count; i++)
@@ -2263,7 +2320,7 @@ namespace ChartBuilder.Controls.Editing
         /// The phrase rail (charter-spec C8): a row for each kind the part can have, with each phrase a bar in its kind's
         /// row, so phrases that overlap don't hide each other. The selected ones are lit and outlined.
         /// </summary>
-        private void DrawPhraseRail(DrawingContext context, EditorSession session, EditablePart part, IReadOnlyList<RailKind> rows, LaneProjection projection)
+        private void DrawPhraseRail(IHighwayCanvas context, EditorSession session, EditablePart part, IReadOnlyList<RailKind> rows, LaneProjection projection)
         {
             var selection = session.Selection;
             var accent = ((AccentBrush ?? DefaultAccentBrush) as ISolidColorBrush)?.Color ?? Color.FromRgb(0x7C, 0xB4, 0xFF);
@@ -2286,7 +2343,7 @@ namespace ChartBuilder.Controls.Editing
         /// The disco flip sections of the lane's difficulty (charter-spec C6 item 7) as bars in the rail's last row, as
         /// phrases are drawn. A section a loaded file never ends runs on to the far end of the view.
         /// </summary>
-        private void DrawDiscoFlips(DrawingContext context, EditorSession session, ChartTrackKey key, IReadOnlyList<RailKind> rows, LaneProjection projection, double fromTick, double toTick)
+        private void DrawDiscoFlips(IHighwayCanvas context, EditorSession session, ChartTrackKey key, IReadOnlyList<RailKind> rows, LaneProjection projection, double fromTick, double toTick)
         {
             int row = IndexOf(rows, RailKind.DiscoFlip);
             if (row < 0)
@@ -2317,7 +2374,7 @@ namespace ChartBuilder.Controls.Editing
         /// on screen, as the others' counts aren't seen.
         /// </summary>
         /// <param name="upright">Whether the counts stand up beside a perspective highway's plane, to be read, rather than lie on it.</param>
-        private void DrawSoloCounts(DrawingContext context, EditorSession session, EditableTrack track, LaneProjection projection, double fromTick, double toTick, bool upright)
+        private void DrawSoloCounts(IHighwayCanvas context, EditorSession session, EditableTrack track, LaneProjection projection, double fromTick, double toTick, bool upright)
         {
             long from = (long)Math.Floor(fromTick) - 1, to = (long)Math.Ceiling(toTick);
             foreach (var phrase in _phrasesShown)
@@ -2336,7 +2393,7 @@ namespace ChartBuilder.Controls.Editing
                     ? new Point(projection.LaneFrom + 3, along - text.Height - 2)
                     : new Point(along + 3, projection.LaneFrom + 2);
                 context.FillRectangle(BadgeBrush, new Rect(at, new Size(text.Width, text.Height)).Inflate(1));
-                text.Draw(context, at);
+                context.DrawText(text, at);
             }
         }
 
@@ -2393,7 +2450,7 @@ namespace ChartBuilder.Controls.Editing
         private RailPass RailOnPlane => _camera is null ? RailPass.Both : RailPass.Lines;
 
         /// <summary>The grid's steps faintly, then the beat and measure lines, with the measures' numbers in the labels' margin.</summary>
-        private void DrawBeats(DrawingContext context, EditorSession session, TempoMap map, LaneProjection projection, double fromTick, double toTick, Size size, RailPass pass)
+        private void DrawBeats(IHighwayCanvas context, EditorSession session, TempoMap map, LaneProjection projection, double fromTick, double toTick, Size size, RailPass pass)
         {
             bool lines = (pass & RailPass.Lines) != 0, text = (pass & RailPass.Text) != 0;
             double across1 = projection.LaneFrom, across2 = projection.LaneFrom + (projection.LaneSize * projection.Slots.Slots.Count);
@@ -2439,12 +2496,12 @@ namespace ChartBuilder.Controls.Editing
                 var at = View == LaneView.Highway
                     ? new Point(labels.Right - numberText.Width - 4, along - numberText.Height)
                     : new Point(along + 3, labels.Bottom - numberText.Height - 1);
-                numberText.Draw(context, at);
+                context.DrawText(numberText, at);
             }
         }
 
         /// <summary>The tempo markers: a line across the lanes, the tempo and any time signature in the labels' margin, and whether each is anchored.</summary>
-        private void DrawTempoMarkers(DrawingContext context, EditorSession session, LaneProjection projection, double fromTick, double toTick, Size size, RailPass pass)
+        private void DrawTempoMarkers(IHighwayCanvas context, EditorSession session, LaneProjection projection, double fromTick, double toTick, Size size, RailPass pass)
         {
             bool lines = (pass & RailPass.Lines) != 0, texts = (pass & RailPass.Text) != 0;
             var tempoMap = session.Chart.TempoMap;
@@ -2472,7 +2529,7 @@ namespace ChartBuilder.Controls.Editing
                     : new Point(along + 3, labels.Y + 1);
                 if (selected)
                     context.FillRectangle(BadgeBrush, new Rect(at, new Size(text.Width, text.Height)).Inflate(1));
-                text.Draw(context, at);
+                context.DrawText(text, at);
             }
 
             // Time signatures with no tempo marker at their tick.
@@ -2490,7 +2547,7 @@ namespace ChartBuilder.Controls.Editing
                 if (!lines)
                     DrawStandingLabel(context, text, new Point(labels.X + 2, along), rightAligned: false);
                 else
-                    text.Draw(context, View == LaneView.Highway ? new Point(labels.X + 2, along + 1) : new Point(along + 3, labels.Y + 1));
+                    context.DrawText(text, View == LaneView.Highway ? new Point(labels.X + 2, along + 1) : new Point(along + 3, labels.Y + 1));
             }
         }
 
@@ -2537,7 +2594,7 @@ namespace ChartBuilder.Controls.Editing
         /// and its name in the margin. A highway's name is above the measure number, cut short to the rail's width; a
         /// timeline's is in the ruler, after the measure number and any tempo there.
         /// </summary>
-        private void DrawSections(DrawingContext context, EditorSession session, LaneProjection projection, double fromTick, double toTick, Size size, RailPass pass)
+        private void DrawSections(IHighwayCanvas context, EditorSession session, LaneProjection projection, double fromTick, double toTick, Size size, RailPass pass)
         {
             bool lines = (pass & RailPass.Lines) != 0, texts = (pass & RailPass.Text) != 0;
             var labels = LabelsArea(size, projection);
@@ -2564,7 +2621,7 @@ namespace ChartBuilder.Controls.Editing
                     if (!lines)
                         DrawStandingLabel(context, text, new Point(labels.X + 2, along), rightAligned: false, raise: number?.Height ?? 0);
                     else
-                        text.Draw(context, new Point(labels.X + 2, along - (number?.Height ?? 0) - text.Height));
+                        context.DrawText(text, new Point(labels.X + 2, along - (number?.Height ?? 0) - text.Height));
                     continue;
                 }
 
@@ -2578,12 +2635,13 @@ namespace ChartBuilder.Controls.Editing
                 var label = Label(name, 10, SectionBrush);
                 var at = new Point(along + 3 + (before > 0 ? before + 6 : 0), labels.Y + Math.Max(0, (labels.Height - label.Height) / 2));
                 context.FillRectangle(BadgeBrush, new Rect(at, new Size(label.Width, label.Height)).Inflate(1));
-                label.Draw(context, at);
+                context.DrawText(label, at);
             }
         }
 
         /// <param name="longest">The longest note's length in <paramref name="track"/>, so a sustain begun before the view is drawn.</param>
-        private void DrawNotes(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, LaneProjection projection, LaneSlots slots, double fromTick, double toTick, long longest, bool isGhost, NotePainter painter, NotePass pass)
+        /// <param name="ghostRing">With <paramref name="isGhost"/>, the pen of a ring round each note, as the selection's: what a move leaves where the notes were.</param>
+        private void DrawNotes(IHighwayCanvas context, EditorSession session, ChartTrackKey key, EditableTrack track, LaneProjection projection, LaneSlots slots, double fromTick, double toTick, long longest, bool isGhost, NotePainter painter, NotePass pass, IPen? ghostRing = null)
         {
             var kind = track.Kind;
             bool drums = kind == ChartInstrumentKind.Drums;
@@ -2675,7 +2733,7 @@ namespace ChartBuilder.Controls.Editing
             }
 
             _flagged.Clear();
-            _decorations.Begin(session, key, track, projection, slots, AccentPens().Selected, isGhost, upright: ReferenceEquals(painter, _uprightNotes));
+            _decorations.Begin(session, key, track, projection, slots, AccentPens().Selected, isGhost, isGhost ? ghostRing : null, upright: ReferenceEquals(painter, _uprightNotes), aligning: !isGhost && IsAligning(session, key));
             painter.Draw(context, projection, kind, CollectionsMarshal.AsSpan(glyphs), size, _decorations, _alongLimit.From, _alongLimit.To, pass);
         }
 
@@ -2690,15 +2748,19 @@ namespace ChartBuilder.Controls.Editing
             private LaneSlots? _slots;
             private IPen? _selectedPen;
             private bool _isGhost;
+            private IPen? _ghostRing;
             private bool _isUpright;
+            private bool _isAligning;
 
             public NoteDecorations(EditorCanvas canvas)
             {
                 _canvas = canvas;
             }
 
-            public void Begin(EditorSession session, ChartTrackKey key, EditableTrack track, LaneProjection projection, LaneSlots slots, IPen selectedPen, bool isGhost, bool upright)
+            /// <param name="aligning">Whether the Alignment tool aligns the track, so every note is ringed as they all move together.</param>
+            public void Begin(EditorSession session, ChartTrackKey key, EditableTrack track, LaneProjection projection, LaneSlots slots, IPen selectedPen, bool isGhost, IPen? ghostRing, bool upright, bool aligning)
             {
+                _isAligning = aligning;
                 _session = session;
                 _key = key;
                 _track = track;
@@ -2706,10 +2768,11 @@ namespace ChartBuilder.Controls.Editing
                 _slots = slots;
                 _selectedPen = selectedPen;
                 _isGhost = isGhost;
+                _ghostRing = ghostRing;
                 _isUpright = upright;
             }
 
-            public void DrawDashedTail(DrawingContext context, in NoteGlyph glyph, Rect tail)
+            public void DrawDashedTail(IHighwayCanvas context, in NoteGlyph glyph, Rect tail)
             {
                 // Tilted, a dashed outline is a path of many dashes for the graphics card to work out each frame, for each short note: a
                 // plain faint fill stands for it, as it still shows the tail is there and is too short to be one.
@@ -2719,20 +2782,19 @@ namespace ChartBuilder.Controls.Editing
                     DashedOutline.DrawRectangle(context, _canvas.ShortTailPen(glyph.Color), tail.Deflate(0.5), 0, ShortTailDash, ShortTailDash);
             }
 
-            public void AfterNote(DrawingContext context, in NoteGlyph glyph, Rect rect)
+            public void AfterNote(IHighwayCanvas context, in NoteGlyph glyph, Rect rect)
             {
                 if (_isGhost)
+                {
+                    if (_ghostRing is { } ring)
+                        DrawRing(context, rect, ring);
                     return;
+                }
 
                 var note = _canvas._glyphNotes[glyph.Index];
                 bool across = glyph.Has(NoteGlyphParts.Across);
-                if (_session!.Selection.IsMarked(_key, note))
-                {
-                    if (_isUpright)
-                        _canvas._upright.DrawSelection(context, rect, _selectedPen!);
-                    else
-                        context.DrawRectangle(null, _selectedPen, rect.Inflate(2), 3, 3);
-                }
+                if (_isAligning || _session!.Selection.IsMarked(_key, note))
+                    DrawRing(context, rect, _selectedPen!);
 
                 if (!across && _track!.Kind != ChartInstrumentKind.Drums && _canvas._flagged.Add(note.Tick) && _track.FlagsAt(note.Tick) is var flags and not ChordFlags.None)
                 {
@@ -2742,10 +2804,19 @@ namespace ChartBuilder.Controls.Editing
                         _canvas.DrawForcing(context, _projection!, _slots!, glyph.Along, flags);
                 }
             }
+
+            // A ring in pen round the note drawn at rect, as the selection's is, standing up on a perspective highway.
+            private void DrawRing(IHighwayCanvas context, Rect rect, IPen pen)
+            {
+                if (_isUpright)
+                    _canvas._upright.DrawSelection(context, rect, pen);
+                else
+                    context.DrawRectangle(null, pen, rect.Inflate(2), 3, 3);
+            }
         }
 
         /// <summary>The marks of a forced or tapped chord, beside it: H, S and T.</summary>
-        private void DrawForcing(DrawingContext context, LaneProjection projection, LaneSlots slots, double along, ChordFlags flags)
+        private void DrawForcing(IHighwayCanvas context, LaneProjection projection, LaneSlots slots, double along, ChordFlags flags)
         {
             string marks = (flags.HasFlag(ChordFlags.ForceHopo) ? "H" : "") + (flags.HasFlag(ChordFlags.ForceStrum) ? "S" : "") + (flags.HasFlag(ChordFlags.Tap) ? "T" : "");
             var text = Label(marks, 9, AccentBrush ?? DefaultAccentBrush);
@@ -2754,7 +2825,7 @@ namespace ChartBuilder.Controls.Editing
                 ? new Point(edge + 2, along - (text.Height / 2))
                 : new Point(along - (text.Width / 2), projection.LaneFrom - text.Height);
             context.FillRectangle(BadgeBrush, new Rect(at, new Size(text.Width, text.Height)).Inflate(1));
-            text.Draw(context, at);
+            context.DrawText(text, at);
         }
 
         /// <summary>
@@ -2762,7 +2833,7 @@ namespace ChartBuilder.Controls.Editing
         /// Alt held, or a fret while it places open notes, and made as the toolbar's place options have it. None with
         /// Shift held, which lends the place tool the select tool's press.
         /// </summary>
-        private void DrawHover(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, LaneProjection projection, LaneSlots slots, IGemPainter gems)
+        private void DrawHover(IHighwayCanvas context, EditorSession session, ChartTrackKey key, EditableTrack track, LaneProjection projection, LaneSlots slots, IGemPainter gems)
         {
             if (_hover is not { } hover || _isPressed || session.Tool != EditorTool.Place || (_keys & KeyModifiers.Shift) != 0 || PointAt(hover) is not { Rail: null } point)
                 return;
@@ -2829,7 +2900,7 @@ namespace ChartBuilder.Controls.Editing
         /// select tool's press.
         /// </summary>
         /// <param name="upright">Whether to draw what stands up from a perspective highway's plane, which is a note's gem, and nothing else.</param>
-        private void DrawEraseHover(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, EditablePart part, IReadOnlyList<RailKind> rows, LaneProjection projection, LaneSlots slots, bool upright)
+        private void DrawEraseHover(IHighwayCanvas context, EditorSession session, ChartTrackKey key, EditableTrack track, EditablePart part, IReadOnlyList<RailKind> rows, LaneProjection projection, LaneSlots slots, bool upright)
         {
             if (_hover is not { } hover || _isPressed || session.Tool != EditorTool.Erase || (_keys & KeyModifiers.Shift) != 0 || PointAt(hover) is not { } point)
                 return;
@@ -2884,7 +2955,7 @@ namespace ChartBuilder.Controls.Editing
         /// </summary>
         /// <param name="parts">Which of its parts to mark here: on a perspective highway the tail is marked on the plane and the gem above it.</param>
         /// <param name="upright">Whether the gem's mark is drawn standing up, in the host's layer, rather than flat.</param>
-        private void DrawNoteMark(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, EditableNote note, LaneProjection projection, LaneSlots slots, IBrush? brush, IPen pen, NoteMarkPart parts, bool upright)
+        private void DrawNoteMark(IHighwayCanvas context, EditorSession session, ChartTrackKey key, EditableTrack track, EditableNote note, LaneProjection projection, LaneSlots slots, IBrush? brush, IPen pen, NoteMarkPart parts, bool upright)
         {
             bool across = slots.Across == note.Lane;
             int column = slots.IndexOf(session.ShownLane(key, note));
@@ -2921,7 +2992,7 @@ namespace ChartBuilder.Controls.Editing
         /// up, in the layer above (PaintGemMarks), and only its tail lies here, on the plane.
         /// </summary>
         /// <param name="upright">Whether to draw the gem's mark standing up from the plane, rather than flat.</param>
-        private void DrawNoteHover(DrawingContext context, EditorSession session, ChartTrackKey key, LaneProjection projection, LaneSlots slots, bool upright)
+        private void DrawNoteHover(IHighwayCanvas context, EditorSession session, ChartTrackKey key, LaneProjection projection, LaneSlots slots, bool upright)
         {
             if (_hover is not { } hover || _isPressed || PointAt(hover) is not { Lane: not null } point || point.Rail is not null)
                 return;
@@ -2950,7 +3021,7 @@ namespace ChartBuilder.Controls.Editing
         /// where the change can't move, with Shift held, in the phrase rail, with the Sync tool's press, or where a press
         /// would add a marker instead.
         /// </summary>
-        private void DrawTempoHoverMark(DrawingContext context, EditorSession session, Size size, LaneProjection projection)
+        private void DrawTempoHoverMark(IHighwayCanvas context, EditorSession session, Size size, LaneProjection projection)
         {
             if (_hover is not { } hover || _isPressed || session.Tool != EditorTool.Tempo || (_keys & KeyModifiers.Shift) != 0
                 || session.Tools.IsSyncPress(ModifiersOf(_keys)))
@@ -2986,7 +3057,7 @@ namespace ChartBuilder.Controls.Editing
         /// with the Loop tool's press, or takes a selected bar out of the selection with Shift; nor with a press outside
         /// the rail.
         /// </summary>
-        private void DrawRailHover(DrawingContext context, EditorSession session, ChartTrackKey key, EditablePart part, IReadOnlyList<RailKind> rows, LaneProjection projection)
+        private void DrawRailHover(IHighwayCanvas context, EditorSession session, ChartTrackKey key, EditablePart part, IReadOnlyList<RailKind> rows, LaneProjection projection)
         {
             if (_hover is not { } hover || _isPressed || PointAt(hover) is not { Rail: not null, Lane: null } point)
                 return;
@@ -3020,7 +3091,7 @@ namespace ChartBuilder.Controls.Editing
         /// something else, such as on a phrase's bar or a proposed phrase's ghost, with Shift held, which lends the select
         /// tool's press; nor where a press is refused, as a disco flip section is off Pro drums.
         /// </summary>
-        private void DrawPhraseHover(DrawingContext context, EditorSession session, ChartTrackKey key, EditablePart part, IReadOnlyList<RailKind> rows, LaneProjection projection, LaneSlots slots)
+        private void DrawPhraseHover(IHighwayCanvas context, EditorSession session, ChartTrackKey key, EditablePart part, IReadOnlyList<RailKind> rows, LaneProjection projection, LaneSlots slots)
         {
             if (_hover is not { } hover || _isPressed || (_keys & KeyModifiers.Shift) != 0 || PointAt(hover) is not { } point)
                 return;
@@ -3044,7 +3115,7 @@ namespace ChartBuilder.Controls.Editing
         /// on the grid step the press would snap to, as the Phrase tool's hover line is drawn. None over a change the press
         /// would drag instead, in the phrase rail, or with Shift held or the Sync tool's press.
         /// </summary>
-        private void DrawTempoHover(DrawingContext context, EditorSession session, LaneProjection projection, LaneSlots slots)
+        private void DrawTempoHover(IHighwayCanvas context, EditorSession session, LaneProjection projection, LaneSlots slots)
         {
             if (_hover is not { } hover || _isPressed || session.Tool != EditorTool.Tempo || (_keys & KeyModifiers.Shift) != 0
                 || session.Tools.IsSyncPress(ModifiersOf(_keys)))
@@ -3065,11 +3136,11 @@ namespace ChartBuilder.Controls.Editing
         /// where a press does something else: on the region or a passage synced with it, on its X, or one that isn't the
         /// Sync tool's press.
         /// </summary>
-        private void DrawSyncLine(DrawingContext context, EditorSession session, LaneProjection projection, LaneSlots slots)
+        private void DrawSyncLine(IHighwayCanvas context, EditorSession session, LaneProjection projection, LaneSlots slots)
         {
             if (_hover is not { } hover || _isPressed || !session.Tools.IsSyncPress(ModifiersOf(_keys)) || SyncCloseAt(hover))
                 return;
-            if (PointAt(hover) is not { Rail: null } point || session.Tools.SyncDrawStart(point, ModifiersOf(_keys)) is not { } tick)
+            if (SyncDrawStartAt(session, hover) is not { } tick)
                 return;
             double along = projection.AlongOf(session.AudioAt(tick));
             context.FillRectangle(SyncLineBrush, Box(along - 1, along + 1, projection.LaneFrom, projection.LaneFrom + (projection.LaneSize * slots.Slots.Count)));
@@ -3079,9 +3150,9 @@ namespace ChartBuilder.Controls.Editing
         /// The notes the synchronized region holds, and each passage synced with it holds, marked over in orange while the
         /// Sync tool is active: just which notes are synced.
         /// </summary>
-        private void DrawSyncNotes(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, LaneProjection projection, LaneSlots slots, bool upright)
+        private void DrawSyncNotes(IHighwayCanvas context, EditorSession session, ChartTrackKey key, EditableTrack track, LaneProjection projection, LaneSlots slots, bool upright)
         {
-            if (session.Sync is not { IsActive: true } sync || sync.Track != key || sync.Span is not var (from, to))
+            if (session.Sync is not { IsActive: true } sync || !sync.IsOn(key) || sync.Span is not var (from, to))
                 return;
             if (!session.Tools.IsSyncPress(ModifiersOf(_keys)))
                 return;
@@ -3098,9 +3169,9 @@ namespace ChartBuilder.Controls.Editing
         /// the pointer is over the region; and with the Sync tool picked, or Ctrl + Shift held, what the pointer would take
         /// hold of: an end to resize, the region's body to move it, or a passage synced with it to make the source.
         /// </summary>
-        private void DrawSyncHover(DrawingContext context, EditorSession session, ChartTrackKey key, LaneProjection projection, LaneSlots slots)
+        private void DrawSyncHover(IHighwayCanvas context, EditorSession session, LaneProjection projection, LaneSlots slots)
         {
-            if (_hover is not { } hover || _isPressed || session.Sync is not { IsActive: true } sync || sync.Track != key)
+            if (_hover is not { } hover || _isPressed || session.Sync is not { IsActive: true } sync || !IsSyncLane(sync))
                 return;
             if (sync.Span is not var (from, to))
                 return;
@@ -3112,7 +3183,7 @@ namespace ChartBuilder.Controls.Editing
             DrawSyncClose(context, close);
             if (!session.Tools.IsSyncPress(ModifiersOf(_keys)))
                 return;
-            if (PointAt(hover) is not { Rail: null } point)
+            if (SyncTickAt(hover) is not { } point)
                 return;
 
             long length = to - from;
@@ -3137,8 +3208,38 @@ namespace ChartBuilder.Controls.Editing
             }
         }
 
+        /// <summary>Whether the synchronized region is drawn on this lane: on its highway's track, or on its vocal part.</summary>
+        private bool IsSyncLane(SyncRegion sync) => _lane is { } lane && (lane.Vocal is { } vocal ? sync.IsOn(vocal) : lane.Track is { } key && sync.IsOn(key));
+
+        /// <summary>Whether <paramref name="part"/> is what this lane shows: its highway's track, or its vocal part.</summary>
+        private bool IsLane(LanePart part) => _lane is { } lane && (lane.Vocal is { } vocal ? part.Vocal == vocal : lane.Track is { } key && part.Track == key);
+
+        /// <summary>
+        /// The tick under <paramref name="position"/>, and how many ticks either way it reaches, where the Sync tool's press
+        /// takes hold of the synchronized region: in a highway's lanes, not its phrase rail, or in a vocal part's rows, not
+        /// its phrase strip or star power rail. Null elsewhere.
+        /// </summary>
+        private (double Tick, double Tolerance)? SyncTickAt(Point position)
+        {
+            if (_lane is { Vocal: not null })
+                return VocalPointAt(position, clamp: false) is { Pitch: not null } vocal ? (vocal.Tick, vocal.Tolerance) : null;
+            return PointAt(position) is { Rail: null } point ? (point.Tick, point.Tolerance) : null;
+        }
+
+        /// <summary>
+        /// Where a press at <paramref name="position"/> would start drawing a synchronized region, in a highway's lane or a
+        /// vocal part's (<see cref="EditorTools.SyncDrawStart(ChartPoint, EditorModifiers)"/>).
+        /// </summary>
+        private long? SyncDrawStartAt(EditorSession session, Point position)
+        {
+            var modifiers = ModifiersOf(_keys);
+            if (_lane is { Vocal: not null })
+                return VocalPointAt(position, clamp: false) is { } vocal ? session.Tools.SyncDrawStart(vocal, modifiers) : null;
+            return PointAt(position) is { Rail: null } point ? session.Tools.SyncDrawStart(point, modifiers) : null;
+        }
+
         /// <summary>Draws the small X at <paramref name="close"/> that clears the synchronized region, or the loop region.</summary>
-        private void DrawSyncClose(DrawingContext context, Rect close)
+        private void DrawSyncClose(IHighwayCanvas context, Rect close)
         {
             context.DrawRectangle(SyncCloseBrush, null, close, 3, 3);
             var inner = close.Deflate(close.Width * 0.28);
@@ -3151,7 +3252,7 @@ namespace ChartBuilder.Controls.Editing
         /// green, on the grid step the press would snap to, as the Phrase tool's hover line is drawn. None where a press
         /// does something else: on the region, on its X, or one that isn't the Loop tool's press.
         /// </summary>
-        private void DrawLoopLine(DrawingContext context, EditorSession session, LaneProjection projection, LaneSlots slots)
+        private void DrawLoopLine(IHighwayCanvas context, EditorSession session, LaneProjection projection, LaneSlots slots)
         {
             if (_hover is not { } hover || _isPressed || !session.Tools.LoopActive || LoopCloseAt(hover))
                 return;
@@ -3168,7 +3269,7 @@ namespace ChartBuilder.Controls.Editing
         /// pointer is over the region in this lane; and with the Loop tool picked, or L held, what the pointer would take
         /// hold of: an end to resize, or the region's body to move it.
         /// </summary>
-        private void DrawLoopHover(DrawingContext context, EditorSession session, LaneProjection projection, LaneSlots slots)
+        private void DrawLoopHover(IHighwayCanvas context, EditorSession session, LaneProjection projection, LaneSlots slots)
         {
             if (_hover is not { } hover || _isPressed || Loop is not { } loop)
                 return;
@@ -3219,7 +3320,7 @@ namespace ChartBuilder.Controls.Editing
         }
 
         /// <summary>The strike line's band, on the cursor, behind the notes: dark across the lanes, as in the games.</summary>
-        private void DrawStrikeBand(DrawingContext context, EditorSession session, LaneProjection projection)
+        private void DrawStrikeBand(IHighwayCanvas context, EditorSession session, LaneProjection projection)
         {
             double along = projection.AlongOf(session.Viewport.Cursor);
             double across1 = projection.LaneFrom, across2 = projection.LaneFrom + (projection.LaneSize * projection.Slots.Slots.Count);
@@ -3231,7 +3332,7 @@ namespace ChartBuilder.Controls.Editing
         /// The columns the song is playing through, lit as the inspector's highway lights them: a beam rising from the
         /// strike line and the column's target filled in, as each note reaches it, fading, and slowly over a sustain.
         /// </summary>
-        private void DrawGlow(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, LaneProjection projection, LaneSlots slots)
+        private void DrawGlow(IHighwayCanvas context, EditorSession session, ChartTrackKey key, EditableTrack track, LaneProjection projection, LaneSlots slots)
         {
             var kind = track.Kind;
             bool drums = kind == ChartInstrumentKind.Drums;
@@ -3296,7 +3397,7 @@ namespace ChartBuilder.Controls.Editing
         }
 
         /// <summary>The cursor's line through the strike band, over the notes and into the labels' margin.</summary>
-        private void DrawCursor(DrawingContext context, EditorSession session, LaneProjection projection, Rect lanes)
+        private void DrawCursor(IHighwayCanvas context, EditorSession session, LaneProjection projection, Rect lanes)
         {
             double along = projection.AlongOf(session.Viewport.Cursor);
             var pen = AccentPens().Cursor;
@@ -3440,7 +3541,7 @@ namespace ChartBuilder.Controls.Editing
         private TextLayout Label(string text, double size, IBrush brush, double? maxWidth = null) => _labels.Get(text, size, brush, maxWidth);
 
         /// <summary>A straight line on the canvas: filled as a rectangle while it's tilted back, which costs far less to draw through the tilt (see <see cref="HighwayChrome.DrawStraight"/>).</summary>
-        private void Line(DrawingContext context, IPen pen, Point from, Point to) => HighwayChrome.DrawStraight(context, pen, from, to, _camera is not null);
+        private void Line(IHighwayCanvas context, IPen pen, Point from, Point to) => HighwayChrome.DrawStraight(context, pen, from, to, _camera is not null);
 
         /// <summary>Measure <paramref name="index"/>'s number, counting from one, made once.</summary>
         private string MeasureNumber(int index)

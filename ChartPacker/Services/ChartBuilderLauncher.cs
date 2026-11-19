@@ -27,14 +27,15 @@ namespace ChartPacker.Services
             if (!File.Exists(ExecutablePath))
                 return string.Format(CultureInfo.CurrentCulture, Strings.ChartBuilderMissingFormat, ExecutablePath);
 
-            var start = new ProcessStartInfo(ExecutablePath) { UseShellExecute = false };
+            // Chart Builder runs on its own: detached, so it outlives Chart Packer and whatever started that, with nothing
+            // waiting for it or reading its output.
+            var start = new ProcessStartInfo(ExecutablePath) { UseShellExecute = false, StartDetached = true };
             foreach (string argument in arguments)
                 start.ArgumentList.Add(argument);
 
             try
             {
-                // Chart Builder runs on its own; nothing waits for it or reads its output.
-                Process.Start(start)?.Dispose();
+                Process.StartAndForget(start);
                 return null;
             }
             catch (Exception ex) when (ex is Win32Exception or IOException or UnauthorizedAccessException)

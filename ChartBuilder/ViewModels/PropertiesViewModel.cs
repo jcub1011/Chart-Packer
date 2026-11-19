@@ -7,6 +7,7 @@ using ChartShared.Core.Charting;
 using ChartShared.Core.Charting.Commands;
 using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charts;
+using ChartShared.UI.Controls;
 using ChartShared.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -28,12 +29,29 @@ namespace ChartBuilder.ViewModels
         // While the fields are filled from the selection, so filling them isn't taken as an edit.
         private bool _loading;
 
+        // How far a Properties field is dragged for each step it scrubs: a semitone, or a step of the grid.
+        private const double PixelsPerScrubStep = 8;
+
+        // With snap off, a tick or a length is scrubbed a tick at a time, a tick for each pixel.
+        private const double PixelsPerScrubTick = 1;
+
         internal PropertiesViewModel(ChartEditorViewModel editor)
         {
             _editor = editor;
+            TickScrub = ScrubOf(() => Session.Tools.StartNoteTickScrub(), GridScrubPixels);
+            LengthScrub = ScrubOf(() => Session.Tools.StartNoteLengthScrub(), GridScrubPixels);
+            VocalTickScrub = ScrubOf(() => Session.Tools.StartVocalTickScrub(), GridScrubPixels);
+            PitchScrub = ScrubOf(() => Session.Tools.StartVocalPitchScrub(), () => PixelsPerScrubStep);
+            VocalLengthScrub = ScrubOf(() => Session.Tools.StartVocalLengthScrub(), GridScrubPixels);
         }
 
         private EditorSession Session => _editor.Session;
+
+        /// <summary>The notes' Tick field dragged: each note moved later or earlier by the same grid steps.</summary>
+        public IDeltaScrubTarget TickScrub { get; }
+
+        /// <summary>The notes' Length field dragged: each sustain lengthened or shortened by the same grid steps.</summary>
+        public IDeltaScrubTarget LengthScrub { get; }
 
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(IsEmpty))]
@@ -535,6 +553,28 @@ namespace ChartBuilder.ViewModels
                     SongTime.Format(TimeSpan.FromSeconds(Math.Max(0, Session.AudioAt(span.To))), decimals: 3));
             }
         }
+
+        /// <summary>
+        /// A field dragged sideways, which <paramref name="start"/> starts scrubbing: the chart shows each step as it's
+        /// dragged, with the fields following it, and it goes on the undo stack as one step when the drag ends.
+        /// </summary>
+        private FieldScrubTarget ScrubOf(Func<bool> start, Func<double> pixelsPerStep) => new(
+            pixelsPerStep,
+            start,
+            steps =>
+            {
+                int at = Session.Tools.Scrub(steps);
+                Refresh();
+                return at;
+            },
+            () =>
+            {
+                Session.Tools.EndScrub();
+                Refresh();
+            });
+
+        // A tick or a length is scrubbed a grid step at a time while snap is on, and a tick at a time while it's off.
+        private double GridScrubPixels() => Session.Snap.IsOn ? PixelsPerScrubStep : PixelsPerScrubTick;
 
         /// <summary>The value every item has, or <see cref="Multiple"/>.</summary>
         private static string Same<T>(IEnumerable<T> items, Func<T, string> value)

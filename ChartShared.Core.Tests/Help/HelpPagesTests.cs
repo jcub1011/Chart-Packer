@@ -116,7 +116,7 @@ public sealed class HelpPagesTests
         var pages = Pages();
 
         Assert.IsGreaterThan(20, pages.Length);
-        Assert.AreEqual(pages.Length, pages.Distinct(StringComparer.OrdinalIgnoreCase).Count());
+        Assert.HasCount(pages.Length, pages.Distinct(StringComparer.OrdinalIgnoreCase));
         foreach (string page in pages)
             Assert.AreEqual(page, Uri.EscapeDataString(page), $"{page} would be escaped in its address.");
     }

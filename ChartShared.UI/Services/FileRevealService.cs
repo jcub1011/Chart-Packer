@@ -42,11 +42,7 @@ namespace ChartShared.UI.Services
                 }
                 else if (OperatingSystem.IsMacOS())
                 {
-                    var start = new ProcessStartInfo("open") { UseShellExecute = false };
-                    start.ArgumentList.Add("-R");
-                    foreach (string path in existing)
-                        start.ArgumentList.Add(path);
-                    Process.Start(start)?.Dispose();
+                    Process.StartAndForget("open", ["-R", .. existing]);
                 }
                 else if (topLevel()?.Launcher is { } launcher)
                 {

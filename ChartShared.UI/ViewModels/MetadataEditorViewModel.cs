@@ -33,8 +33,8 @@ namespace ChartShared.UI.ViewModels
         private readonly IMetadataEditorHost _host;
 
         // The Quick Fix commands of keys without a row, and the keys some song shown has a quick fix for.
-        private readonly Dictionary<string, IRelayCommand> _quickFixKeyCommands = new(StringComparer.OrdinalIgnoreCase);
-        private HashSet<string> _keysWithQuickFix = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, IRelayCommand> _quickFixKeyCommands = [with(StringComparer.OrdinalIgnoreCase)];
+        private HashSet<string> _keysWithQuickFix = [with(StringComparer.OrdinalIgnoreCase)];
 
         // A key was just added from the new row, which goes back to its key once the rows have it; the host refreshes
         // them during the add or later.
@@ -416,7 +416,7 @@ namespace ChartShared.UI.ViewModels
                     if (QuickFixRegistry.Propose(finding, pairs) is { } fix)
                     {
                         if (!fixes.TryGetValue(key, out var descriptions))
-                            fixes[key] = descriptions = new HashSet<string>(StringComparer.Ordinal);
+                            fixes[key] = descriptions = [with(StringComparer.Ordinal)];
                         descriptions.Add(fix.Description);
                     }
 

@@ -1,3 +1,4 @@
+using System.Numerics;
 using System.Text;
 using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charts;
@@ -128,12 +129,6 @@ public static class Reducer
         var inRange = Inside(source.Notes, range);
         var chords = ChordsOf(inRange);
         var phrases = Phrases(chords, SectionTicks(chart), chart.Resolution);
-        var anchors = chords.Select(c => Anchor(c.Notes, Column)).ToArray();
-        var scores = Scores(chords, phrases, anchors, map, chart.Resolution, (c, i) => c.Notes.Where(static n => n.Lane != ChartNote.OpenLane).Select(Column).Distinct().Count() > 1);
-        var riffs = ShareRiffScores(chords, scores, map, chart.Resolution);
-
-        var spacing = SpacingOf(rules.ThinningDivision, rules.BurstDivision, rules.MaxBurst, chart.Resolution);
-        var kept = Thin(chords, scores, spacing, whole.Phrases, Outside(target.Notes, range), riffs);
 
         // Each chord's fret columns, one bit each (none for opens alone), and whether it has an open.
         var shape = new int[chords.Count];
@@ -151,6 +146,16 @@ public static class Reducer
 
         bool OpenOnly(int i) => shape[i] == 0;
 
+        // A chord's lowest column is its anchor, and one of two columns or more is a chord.
+        var anchors = new int?[chords.Count];
+        for (int i = 0; i < chords.Count; i++)
+            anchors[i] = shape[i] == 0 ? null : BitOperations.TrailingZeroCount(shape[i]);
+        var scores = Scores(chords, phrases, anchors, map, chart.Resolution, (_, i) => BitOperations.PopCount((uint)shape[i]) > 1);
+        var riffs = ShareRiffScores(chords, scores, map, chart.Resolution);
+
+        var spacing = SpacingOf(rules.ThinningDivision, rules.BurstDivision, rules.MaxBurst, chart.Resolution);
+        var kept = Thin(chords, scores, spacing, whole.Phrases, Outside(target.Notes, range), riffs);
+
         // Where the rules fret opens, each phrase of the source with opens alone and pressed notes both: there each open is
         // green, and each fret next to an open alone, with the same chord repeated beside it, is lifted a column, so going
         // between them is still a move. Frets further from an open keep their place, so a fill keeps its top; a chord with
@@ -162,8 +167,14 @@ public static class Reducer
         {
             foreach (var (start, end) in phrases)
             {
-                var all = Enumerable.Range(start, end - start + 1);
-                if (!all.Any(OpenOnly) || !all.Any(i => shape[i] != 0))
+                bool anyOpenOnly = false, anyFretted = false;
+                for (int i = start; i <= end; i++)
+                {
+                    anyOpenOnly |= shape[i] == 0;
+                    anyFretted |= shape[i] != 0;
+                }
+
+                if (!anyOpenOnly || !anyFretted)
                     continue;
                 Array.Fill(mixed, true, start, end - start + 1);
                 for (int i = start; i <= end; i++)
@@ -181,57 +192,88 @@ public static class Reducer
             ? [.. chords[i].Notes.Select(static n => n.Lane == ChartNote.OpenLane ? n with { Lane = 0 } : n)]
             : chords[i].Notes;
 
+        // A chord's columns as pressed, one bit each: its frets', and green's for an open pressed with them.
+        int PressedColumns(int i) => mixed[i] && hasOpen[i] && !OpenOnly(i) ? shape[i] | 1 : shape[i];
+
         // Each kept chord's columns, then each phrase fitted to the range as a whole.
-        var columns = new Dictionary<int, List<int>>();
+        var columns = new Dictionary<int, List<int>>(kept.Count);
         foreach (int i in kept)
         {
-            if (SelectColumns(Pressed(i), rules.MaxChordSize, Column) is { } chosen)
+            if (SelectColumns(PressedColumns(i), rules.MaxChordSize) is { } chosen)
                 columns[i] = chosen;
         }
 
         // The phrases cover the chords in order, so one walk through the kept chords, which are in order too, splits them.
-        var placedAt = new Dictionary<int, (int Anchor, int Width)>();
+        var placedAt = new Dictionary<int, (int Anchor, int Width)>(kept.Count);
         int next = 0;
+        var inPhrase = new List<int>();
+        var frets = new List<int>();
+        var floors = new List<int>();
+        var anchorsOf = new List<int>();
+        var widths = new List<int>();
+        var tops = new List<int>();
+        var places = new List<int>();
         foreach (var (start, end) in phrases)
         {
-            var inPhrase = new List<int>();
+            inPhrase.Clear();
             for (; next < kept.Count && kept[next] <= end; next++)
                 inPhrase.Add(kept[next]);
 
             // A fret is lifted by the source's opens, so each difficulty has it alike, and by an open the draft keeps beside
             // it, which is green, where it's kept off green too: thinned out, green is free again.
             bool BesideOpen(int k) => mixed[start] && !hasOpen[inPhrase[k]] && ((k > 0 && OpenOnly(inPhrase[k - 1])) || (k + 1 < inPhrase.Count && OpenOnly(inPhrase[k + 1])));
-            var frets = new List<int>();
-            var floors = new List<int>();
+            frets.Clear();
+            floors.Clear();
+            anchorsOf.Clear();
+            widths.Clear();
+            tops.Clear();
+            places.Clear();
             for (int k = 0; k < inPhrase.Count; k++)
             {
-                if (!columns.ContainsKey(inPhrase[k]))
+                int fret = inPhrase[k];
+                if (!columns.TryGetValue(fret, out var picked))
                     continue;
-                frets.Add(inPhrase[k]);
-                floors.Add(BesideOpen(k) ? 1 : 0);
+                int floor = BesideOpen(k) ? 1 : 0;
+                frets.Add(fret);
+                floors.Add(floor);
+                anchorsOf.Add(picked[0]);
+                widths.Add(picked[^1] - picked[0]);
+
+                // The highest column pressed.
+                tops.Add(BitOperations.Log2((uint)PressedColumns(fret)));
+                places.Add(picked[0] + (lifted[fret] || floor > 0 ? 1 : 0));
             }
 
-            int[] anchorsOf = [.. frets.Select(i => columns[i][0])];
-            var tops = frets.Select(i => Pressed(i).Where(static n => n.Lane != ChartNote.OpenLane).Max(Column)).ToArray();
-            int[] places = [.. frets.Select((i, k) => anchorsOf[k] + (lifted[i] || floors[k] > 0 ? 1 : 0))];
-            var fitted = FitPhrase(anchorsOf, [.. frets.Select(i => columns[i][^1] - columns[i][0])], highest, tops, places, floors);
+            var fitted = FitPhrase(anchorsOf, widths, highest, tops, places, floors);
             for (int k = 0; k < frets.Count; k++)
                 placedAt[frets[k]] = fitted[k];
         }
 
-        var notes = new List<EditableNote>();
+        var notes = new List<EditableNote>(inRange.Length);
         var flags = new List<FlaggedChord>();
+        var placed = new List<EditableNote>();
         foreach (int i in kept)
         {
             var (tick, chord) = chords[i];
 
             // In a phrase whose opens are fretted, opens alone are the chord's longest on green (on GHL, the first white); one
             // with frets is pressed with them.
-            List<EditableNote> placed = !mixed[i] ? [.. chord.Where(static n => n.Lane == ChartNote.OpenLane)]
-                : OpenOnly(i) ? [chord.MaxBy(static n => n.Length)! with { Lane = 0 }]
-                : [];
+            placed.Clear();
+            if (!mixed[i])
+            {
+                foreach (var n in chord)
+                {
+                    if (n.Lane == ChartNote.OpenLane)
+                        placed.Add(n);
+                }
+            }
+            else if (OpenOnly(i))
+            {
+                placed.Add(chord.MaxBy(static n => n.Length)! with { Lane = 0 });
+            }
+
             if (columns.TryGetValue(i, out var chosen))
-                placed.AddRange(Place(Pressed(i), chosen, placedAt[i].Anchor, placedAt[i].Width, highest, ghl, Column));
+                Place(Pressed(i), chosen, placedAt[i].Anchor, placedAt[i].Width, highest, ghl, placed);
 
             foreach (var note in placed)
             {
@@ -288,8 +330,26 @@ public static class Reducer
         var marked = flags.ToDictionary(static f => f.Tick, static f => f.Flags);
 
         // Each chord's frets, and whether it's on the same ones as the chord before it.
-        var chords = notes.GroupBy(static n => n.Tick).Select(static g => (g.Key, Frets: string.Join(",", g.Select(static n => n.Lane).Distinct().Order()))).ToList();
-        var repeated = Enumerable.Range(1, Math.Max(0, chords.Count - 1)).Where(i => chords[i].Frets == chords[i - 1].Frets).Select(i => chords[i].Key).ToHashSet();
+        var chords = new List<(long Key, int Frets)>();
+        var indexOf = new Dictionary<long, int>();
+        foreach (var note in notes)
+        {
+            if (!indexOf.TryGetValue(note.Tick, out int at))
+            {
+                indexOf[note.Tick] = at = chords.Count;
+                chords.Add((note.Tick, 0));
+            }
+
+            // One bit for each lane, open's first.
+            chords[at] = (note.Tick, chords[at].Frets | (1 << (note.Lane - ChartNote.OpenLane)));
+        }
+
+        var repeated = new HashSet<long>();
+        for (int i = 1; i < chords.Count; i++)
+        {
+            if (chords[i].Frets == chords[i - 1].Frets)
+                repeated.Add(chords[i].Key);
+        }
         foreach (var (tick, wants) in wanted)
         {
             var want = wants;
@@ -356,13 +416,37 @@ public static class Reducer
             notes.RemoveAll(n => n.Lane == 0 && !keptKicks.Contains(n.Tick));
         }
 
+        // The notes are in tick order, so each hit's are together: its kicks, then its pads by rank, the earlier first on
+        // a tie, as many as the rules keep.
         var result = new List<EditableNote>(notes.Count);
-        foreach (var hit in notes.GroupBy(static n => n.Tick))
+        var pads = new List<(int Rank, EditableNote Note)>();
+        for (int at = 0; at < notes.Count;)
         {
-            result.AddRange(hit.Where(static n => n.Lane == 0));
-            result.AddRange(hit.Where(static n => n.Lane > 0)
-                .OrderBy(n => PadRank(drums, source, variant, n))
-                .Take(rules.PadsPerHit));
+            int end = at;
+            while (end < notes.Count && notes[end].Tick == notes[at].Tick)
+                end++;
+
+            pads.Clear();
+            for (int i = at; i < end; i++)
+            {
+                if (notes[i].Lane == 0)
+                    result.Add(notes[i]);
+            }
+
+            for (int i = at; i < end; i++)
+            {
+                if (notes[i].Lane <= 0)
+                    continue;
+                int rank = PadRank(drums, source, variant, notes[i]);
+                int slot = pads.Count;
+                while (slot > 0 && pads[slot - 1].Rank > rank)
+                    slot--;
+                pads.Insert(slot, (rank, notes[i]));
+            }
+
+            for (int i = 0; i < pads.Count && i < rules.PadsPerHit; i++)
+                result.Add(pads[i].Note);
+            at = end;
         }
 
         int made = result.Count;
@@ -384,7 +468,12 @@ public static class Reducer
     internal static int BeatStrength(long tick, TempoMap map)
     {
         var (signature, _) = SignatureAt(tick, map);
-        long beat = BeatOf(signature, map);
+        return BeatStrength(tick, signature, BeatOf(signature, map));
+    }
+
+    // As BeatStrength, for a tick whose time signature, and its beat in ticks, are known already.
+    private static int BeatStrength(long tick, TimeSignature signature, long beat)
+    {
         long offset = Math.Max(0, tick - signature.Tick);
         long within = offset % beat;
         if (within == 0)
@@ -424,29 +513,28 @@ public static class Reducer
         long beat = BeatOf(signature, map);
         long offset = Math.Max(0, tick - signature.Tick);
 
-        // Every position stronger than the tick is on a grid whose every step is as strong, so the nearest is the first
-        // step after it of one of the grids: the measure, the beat, each halving, each triplet.
-        var grids = new List<long> { beat * Math.Max(1, signature.Numerator), beat };
-        for (int level = 1; level <= 6; level++)
+        // Every position as strong as that is on a grid whose every step is: the measure (0), the beat (1), each halving
+        // of it (2, 3, …), each triplet (3, 4, …). So the nearest is the first step after the tick of one of the grids
+        // that strong, and no weaker grid has one nearer that counts.
+        long nearest = next ?? long.MaxValue;
+        if (strength >= 0)
+            nearest = Math.Min(nearest, StepAfter(beat * Math.Max(1, signature.Numerator)));
+        if (strength >= 1)
+            nearest = Math.Min(nearest, StepAfter(beat));
+        for (int level = 1; level <= 6 && 1 + level <= strength; level++)
         {
             if (beat >> level > 0 && beat % (1L << level) == 0)
-                grids.Add(beat >> level);
-            if (beat / (3L << (level - 1)) > 0 && beat % (3L << (level - 1)) == 0)
-                grids.Add(beat / (3L << (level - 1)));
+                nearest = Math.Min(nearest, StepAfter(beat >> level));
+            if (2 + level <= strength && beat / (3L << (level - 1)) > 0 && beat % (3L << (level - 1)) == 0)
+                nearest = Math.Min(nearest, StepAfter(beat / (3L << (level - 1))));
         }
 
-        (long Tick, int Strength)? best = next is { } change ? (change, 0) : null;
-        foreach (long grid in grids)
-        {
-            long at = signature.Tick + (((offset / grid) + 1) * grid);
-            if (best is { } b && at >= b.Tick)
-                continue;
-            int found = BeatStrength(at, map);
-            if (found <= strength)
-                best = (at, found);
-        }
+        // A step found is past the tick and before the next time signature, so it's in this one.
+        if (nearest == long.MaxValue)
+            return null;
+        return nearest == next ? (nearest, 0) : (nearest, BeatStrength(nearest, signature, beat));
 
-        return best;
+        long StepAfter(long grid) => signature.Tick + (((offset / grid) + 1) * grid);
     }
 
     /// <summary>
@@ -475,8 +563,8 @@ public static class Reducer
             return [.. Enumerable.Range(0, ticks.Count)];
 
         var groups = first.ToList();
-        var fixedSet = new SortedSet<long>(fixedTicks);
-        var taken = new SortedSet<long>(fixedSet);
+        var fixedSet = new TickSet(fixedTicks);
+        var taken = new TickSet(fixedSet);
         var kept = new HashSet<int>();
         var tried = new HashSet<int>();
         var bursts = spacing.IsEven ? null : SourceBursts(ticks, spacing);
@@ -501,7 +589,10 @@ public static class Reducer
 
         foreach (var group in groups)
         {
-            if (group.Any(kept.Contains))
+            bool has = false;
+            foreach (int i in group)
+                has |= kept.Contains(i);
+            if (has)
                 continue;
             foreach (int i in group)
             {
@@ -510,7 +601,17 @@ public static class Reducer
             }
         }
 
-        var order = Enumerable.Range(0, ticks.Count).OrderByDescending(i => scores[i]).ThenBy(i => ticks[i]).ToList();
+        // Best first, then the earlier, then the one first in the list.
+        int[] order = new int[ticks.Count];
+        for (int i = 0; i < order.Length; i++)
+            order[i] = i;
+        Array.Sort(order, (a, b) =>
+        {
+            int c = scores[b].CompareTo(scores[a]);
+            if (c == 0)
+                c = ticks[a].CompareTo(ticks[b]);
+            return c != 0 ? c : a.CompareTo(b);
+        });
         foreach (int i in order)
             Try(i);
         if (riffs is { Count: > 0 })
@@ -720,8 +821,9 @@ public static class Reducer
     {
         var signatures = map.TimeSignatures;
         var signature = signatures[0];
-        foreach (var s in signatures)
+        for (int i = 0; i < signatures.Count; i++)
         {
+            var s = signatures[i];
             if (s.Tick > tick)
                 return (signature, s.Tick);
             signature = s;
@@ -749,14 +851,51 @@ public static class Reducer
             ? [.. notes.AsSpan().ToArray().Where(n => (n.Tick < r.From || n.Tick > r.To) && (which is null || which(n))).Select(static n => n.Tick).Distinct()]
             : [];
 
-    internal static List<(long Tick, EditableNote[] Notes)> ChordsOf(EditableNote[] notes) =>
-        [.. notes.GroupBy(static n => n.Tick).OrderBy(static g => g.Key).Select(static g => (g.Key, g.ToArray()))];
+    internal static List<(long Tick, EditableNote[] Notes)> ChordsOf(EditableNote[] notes)
+    {
+        // In tick order, as a track's notes are, each chord's are together.
+        for (int i = 1; i < notes.Length; i++)
+        {
+            if (notes[i].Tick < notes[i - 1].Tick)
+                return [.. notes.GroupBy(static n => n.Tick).OrderBy(static g => g.Key).Select(static g => (g.Key, g.ToArray()))];
+        }
+
+        var chords = new List<(long Tick, EditableNote[] Notes)>(notes.Length);
+        for (int at = 0; at < notes.Length;)
+        {
+            int end = at + 1;
+            while (end < notes.Length && notes[end].Tick == notes[at].Tick)
+                end++;
+            chords.Add((notes[at].Tick, notes[at..end]));
+            at = end;
+        }
+
+        return chords;
+    }
 
     internal static long[] SectionTicks(EditableChart chart) => [.. SectionEvents.All(chart).Select(static e => e.Tick)];
 
     // Whether chord i starts a beat (resolution) or more after the one before it ends.
-    private static bool RestsBefore(IReadOnlyList<(long Tick, EditableNote[] Notes)> chords, int i, int resolution) =>
-        chords[i].Tick - (chords[i - 1].Tick + chords[i - 1].Notes.Max(static n => Math.Max(1, n.Length))) >= resolution;
+    private static bool RestsBefore(IReadOnlyList<(long Tick, EditableNote[] Notes)> chords, int i, int resolution)
+    {
+        var before = chords[i - 1].Notes;
+        long longest = Math.Max(1, before[0].Length);
+        for (int n = 1; n < before.Length; n++)
+            longest = Math.Max(longest, Math.Max(1, before[n].Length));
+        return chords[i].Tick - (chords[i - 1].Tick + longest) >= resolution;
+    }
+
+    // Whether a chord holds a sustain of a beat (resolution) or longer.
+    private static bool HoldsSustain(EditableNote[] chord, int resolution)
+    {
+        foreach (var note in chord)
+        {
+            if (note.Length >= resolution)
+                return true;
+        }
+
+        return false;
+    }
 
     // A range's mixes: the target's outside it and the source's inside, with a mix at the range's start where what the
     // source has in effect there isn't what the target has, and one after its end back to the target's, so disco flip and
@@ -789,13 +928,6 @@ public static class Reducer
             (a?.Configuration ?? 0) == (b?.Configuration ?? 0) && (a?.Setting ?? string.Empty) == (b?.Setting ?? string.Empty);
     }
 
-    // A chord's lowest column, or null for one of opens alone.
-    private static int? Anchor(EditableNote[] chord, Func<EditableNote, int> column)
-    {
-        var frets = chord.Where(static n => n.Lane != ChartNote.OpenLane).ToList();
-        return frets.Count == 0 ? null : frets.Min(column);
-    }
-
     // How readily each chord is kept (ThinningWeights); anchors give the melody's turns, and are null for drums.
     internal static double[] Scores(List<(long Tick, EditableNote[] Notes)> chords, List<(int Start, int End)> phrases, int?[]? anchors, TempoMap map, int resolution, Func<(long Tick, EditableNote[] Notes), int, bool> isChord)
     {
@@ -808,7 +940,7 @@ public static class Reducer
                 && chords[i + 1].Tick < (NextAtLeast(stronger.Tick, stronger.Strength, map)?.Tick ?? long.MaxValue)
                 ? -(stronger.Strength + ThinningWeights.Anticipation)
                 : -BeatStrength(chords[i].Tick, map);
-            if (chords[i].Notes.Any(n => n.Length >= resolution))
+            if (HoldsSustain(chords[i].Notes, resolution))
                 scores[i] += ThinningWeights.Sustain;
             if (isChord(chords[i], i))
                 scores[i] += ThinningWeights.Chord;
@@ -826,13 +958,21 @@ public static class Reducer
                 continue;
 
             // A turn: the fretted chords either side are both higher, or both lower.
-            var frets = Enumerable.Range(start, end - start + 1).Where(i => anchors[i] is not null).ToList();
-            for (int k = 1; k < frets.Count - 1; k++)
+            int first = -1, middle = -1;
+            for (int i = start; i <= end; i++)
             {
-                int before = Math.Sign(anchors[frets[k]]!.Value - anchors[frets[k - 1]]!.Value);
-                int after = Math.Sign(anchors[frets[k + 1]]!.Value - anchors[frets[k]]!.Value);
-                if (before != 0 && after != 0 && before != after)
-                    scores[frets[k]] += ThinningWeights.DirectionChange;
+                if (anchors[i] is not { } last)
+                    continue;
+                if (first >= 0)
+                {
+                    int before = Math.Sign(anchors[middle]!.Value - anchors[first]!.Value);
+                    int after = Math.Sign(last - anchors[middle]!.Value);
+                    if (before != 0 && after != 0 && before != after)
+                        scores[middle] += ThinningWeights.DirectionChange;
+                }
+
+                first = middle;
+                middle = i;
             }
         }
 
@@ -863,8 +1003,8 @@ public static class Reducer
             key.Clear().Append(to - from);
             for (int i = start; i < end; i++)
             {
-                key.Append(';').Append(chords[i].Tick - from).Append(chords[i].Notes.Any(n => n.Length >= resolution) ? 'S' : ':');
-                foreach (var note in chords[i].Notes.OrderBy(static n => n.Lane))
+                key.Append(';').Append(chords[i].Tick - from).Append(HoldsSustain(chords[i].Notes, resolution) ? 'S' : ':');
+                foreach (var note in ByLane(chords[i].Notes))
                     key.Append(note.Lane).Append(',').Append((int)note.Dynamics).Append(note.DoubleKick ? '+' : ',');
             }
 
@@ -884,7 +1024,10 @@ public static class Reducer
         {
             for (int k = 0; k < length; k++)
             {
-                double mean = starts.Average(s => scores[s + k]);
+                double sum = 0;
+                foreach (int s in starts)
+                    sum += scores[s + k];
+                double mean = sum / starts.Count;
                 foreach (int s in starts)
                     scores[s + k] = mean;
             }
@@ -893,6 +1036,18 @@ public static class Reducer
         }
 
         return repeated;
+    }
+
+    // A chord's notes by lane, the earlier first on a tie: as they are, when a track's notes, which are in that order.
+    private static EditableNote[] ByLane(EditableNote[] chord)
+    {
+        for (int i = 1; i < chord.Length; i++)
+        {
+            if (chord[i].Lane < chord[i - 1].Lane)
+                return [.. chord.OrderBy(static n => n.Lane)];
+        }
+
+        return chord;
     }
 
     // The chords kept: the best of each star power phrase and solo the spacing allows first, then the rest by score, then
@@ -949,18 +1104,27 @@ public static class Reducer
 
     // Whether every Burst + 1 ticks in a row with tick among them, of those taken and it, span Burst of the pace's gaps.
     // Only ticks within that span of it can make a run too short, so only those are looked at.
-    private static bool KeepsPace(SortedSet<long> taken, long tick, ThinningSpacing spacing)
+    private static bool KeepsPace(TickSet taken, long tick, ThinningSpacing spacing)
     {
         int burst = spacing.Burst;
         long span = spacing.Pace * burst;
-        var near = taken.GetViewBetween(tick - span, tick + span);
-        var row = new List<long>(near.Where(t => t < tick).TakeLast(burst));
-        int here = row.Count;
-        row.Add(tick);
-        row.AddRange(near.Where(t => t > tick).Take(burst));
-        for (int start = Math.Max(0, here - burst); start <= here && start + burst < row.Count; start++)
+
+        // The row: up to Burst of the ticks taken before it, the nearest, then it, then up to Burst of those after.
+        int at = taken.FirstAtOrAfter(tick);
+        int before = at;
+        while (before > 0 && at - before < burst && taken[before - 1] >= tick - span)
+            before--;
+        int after = at < taken.Count && taken[at] == tick ? at + 1 : at;
+        int afterEnd = after;
+        while (afterEnd < taken.Count && afterEnd - after < burst && taken[afterEnd] <= tick + span)
+            afterEnd++;
+
+        int here = at - before;
+        int count = here + 1 + (afterEnd - after);
+        long Row(int i) => i < here ? taken[before + i] : i == here ? tick : taken[after + (i - here - 1)];
+        for (int start = Math.Max(0, here - burst); start <= here && start + burst < count; start++)
         {
-            if (row[start + burst] - row[start] < span)
+            if (Row(start + burst) - Row(start) < span)
                 return false;
         }
 
@@ -968,51 +1132,118 @@ public static class Reducer
     }
 
     // Whether no tick taken is closer to tick than gap.
-    private static bool IsClear(SortedSet<long> taken, long tick, long gap) =>
-        gap <= 1 || taken.GetViewBetween(tick - gap + 1, tick + gap - 1).Count == 0;
+    private static bool IsClear(TickSet taken, long tick, long gap) =>
+        gap <= 1 || !taken.AnyBetween(tick - gap + 1, tick + gap - 1);
 
-    // The columns a chord keeps, lowest first: its outermost, then inner ones up to the limit; null for opens alone.
-    private static List<int>? SelectColumns(EditableNote[] chord, int maxChordSize, Func<EditableNote, int> column)
+    /// <summary>A set of ticks kept in order, to ask what's near a tick without making anything to answer.</summary>
+    private sealed class TickSet
     {
-        var columns = chord.Where(static n => n.Lane != ChartNote.OpenLane).Select(column).Distinct().Order().ToList();
-        if (columns.Count == 0)
-            return null;
-        if (maxChordSize <= 1 || columns.Count == 1)
-            return [columns[0]];
+        private readonly List<long> _ticks;
 
-        var keep = new List<int> { columns[0], columns[^1] };
-        foreach (int c in columns.Skip(1).SkipLast(1))
+        public TickSet(IEnumerable<long> ticks)
         {
-            if (keep.Count >= maxChordSize)
-                break;
-            keep.Add(c);
+            _ticks = [.. ticks];
+            _ticks.Sort();
+            int kept = 0;
+            for (int i = 0; i < _ticks.Count; i++)
+            {
+                if (kept == 0 || _ticks[i] != _ticks[kept - 1])
+                    _ticks[kept++] = _ticks[i];
+            }
+
+            _ticks.RemoveRange(kept, _ticks.Count - kept);
         }
 
-        keep.Sort();
+        public TickSet(TickSet copied) => _ticks = [.. copied._ticks];
+
+        public int Count => _ticks.Count;
+
+        public long this[int index] => _ticks[index];
+
+        /// <summary>The index of the first tick at or after <paramref name="tick"/>; the count when there's none.</summary>
+        public int FirstAtOrAfter(long tick)
+        {
+            int at = _ticks.BinarySearch(tick);
+            return at < 0 ? ~at : at;
+        }
+
+        public bool Contains(long tick) => _ticks.BinarySearch(tick) >= 0;
+
+        /// <summary>Whether a tick from <paramref name="from"/> to <paramref name="to"/>, both in, is in the set.</summary>
+        public bool AnyBetween(long from, long to)
+        {
+            int at = FirstAtOrAfter(from);
+            return at < _ticks.Count && _ticks[at] <= to;
+        }
+
+        public void Add(long tick)
+        {
+            int at = _ticks.BinarySearch(tick);
+            if (at < 0)
+                _ticks.Insert(~at, tick);
+        }
+
+        public void Remove(long tick)
+        {
+            int at = _ticks.BinarySearch(tick);
+            if (at >= 0)
+                _ticks.RemoveAt(at);
+        }
+    }
+
+    // The columns a chord keeps, of those it has (one bit each), lowest first: its outermost, then inner ones up to the
+    // limit; null for opens alone.
+    private static List<int>? SelectColumns(int columns, int maxChordSize)
+    {
+        if (columns == 0)
+            return null;
+        int lowest = BitOperations.TrailingZeroCount(columns);
+        int highest = BitOperations.Log2((uint)columns);
+        if (maxChordSize <= 1 || lowest == highest)
+            return [lowest];
+
+        // The inner columns, lowest first, come between the two already kept, so the list stays in order.
+        var keep = new List<int>(Math.Min(maxChordSize, highest - lowest + 1)) { lowest };
+        for (int c = lowest + 1; c < highest && keep.Count + 1 < maxChordSize; c++)
+        {
+            if ((columns & (1 << c)) != 0)
+                keep.Add(c);
+        }
+
+        keep.Add(highest);
         return keep;
     }
 
     // A chord's kept frets with its lowest column at anchor, its shape kept; only notes past the highest column move down,
     // as a whole, and those that would go below green are pressed together, the longer sustain kept. Made narrower than
     // that (width), its notes are spread over the width instead, the lowest at anchor and the highest at its top.
-    private static IEnumerable<EditableNote> Place(EditableNote[] chord, List<int> columns, int anchor, int width, int highest, bool ghl, Func<EditableNote, int> column)
+    // They're added to the end of into, lowest lane first.
+    private static void Place(EditableNote[] chord, List<int> columns, int anchor, int width, int highest, bool ghl, List<EditableNote> into)
     {
         int span = columns[^1] - columns[0];
         bool narrowed = width < Math.Min(span, highest);
         int offset = anchor - columns[0];
         int shift = Math.Max(0, columns[^1] + offset - highest);
-        var placed = new Dictionary<int, EditableNote>();
-        foreach (var note in chord.Where(n => n.Lane != ChartNote.OpenLane && columns.Contains(column(n))).OrderBy(static n => n.Lane))
+        int from = into.Count;
+        foreach (var note in ByLane(chord))
         {
+            int column = ghl ? note.Lane % 3 : note.Lane;
+            if (note.Lane == ChartNote.OpenLane || !columns.Contains(column))
+                continue;
             int moved = narrowed
-                ? anchor + (int)Math.Round((column(note) - columns[0]) * (double)width / span, MidpointRounding.AwayFromZero)
-                : Math.Max(0, column(note) + offset - shift);
+                ? anchor + (int)Math.Round((column - columns[0]) * (double)width / span, MidpointRounding.AwayFromZero)
+                : Math.Max(0, column + offset - shift);
             int lane = ghl ? (note.Lane / 3 * 3) + moved : moved;
-            if (!placed.TryGetValue(lane, out var there) || note.Length > there.Length)
-                placed[lane] = note with { Lane = lane };
-        }
 
-        return placed.Values.OrderBy(static n => n.Lane);
+            // Where the lane goes among those placed, which are kept in order; a note already on it gives way to a longer.
+            int at = from;
+            while (at < into.Count && into[at].Lane < lane)
+                at++;
+            if (at == into.Count || into[at].Lane != lane)
+                into.Insert(at, note with { Lane = lane });
+            else if (note.Length > into[at].Length)
+                into[at] = note with { Lane = lane };
+        }
     }
 
     // A sustain held into the next note on its lane ends there, or, one the draft makes (in range, when there's one), is a

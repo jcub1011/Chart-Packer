@@ -25,6 +25,24 @@ public sealed class SongFileGateTests
     }
 
     [TestMethod]
+    public async Task AWaitingWriteCanBeCancelledAndDoesNotHoldUpWhoComesAfter()
+    {
+        var gate = new SongFileGate();
+        var read = await gate.ReadAsync([Song]);
+        using var cts = new CancellationTokenSource();
+
+        var cancelled = gate.WriteAsync([Song], cts.Token);
+        await AssertWaitingAsync(cancelled);
+        var later = gate.ReadAsync([Song]);
+        cts.Cancel();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() => cancelled);
+        // The read that came after the cancelled write was queued behind it; it runs once the first read lets go.
+        read.Dispose();
+        (await later.WaitAsync(TimeSpan.FromSeconds(5))).Dispose();
+    }
+
+    [TestMethod]
     public async Task AReadWaitsForAWriteRunning()
     {
         var gate = new SongFileGate();

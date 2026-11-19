@@ -82,7 +82,7 @@ public static class SongLengthEstimator
 
         try
         {
-            byte[]? bytes = picked.ReadAsync(entry, cancellationToken).GetAwaiter().GetResult();
+            byte[]? bytes = picked.Read(entry, cancellationToken);
             if (bytes is null)
                 return null;
 

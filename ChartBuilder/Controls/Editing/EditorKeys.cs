@@ -11,7 +11,8 @@ namespace ChartBuilder.Controls.Editing
     /// What the editor's keys do (charter-spec §9), for the focused canvas. Which key does what is the key map's: the window's
     /// <see cref="ChartShared.UI.Keybinds.KeyDispatcher"/> turns a press into one of <see cref="BuilderKeys"/>' actions, and
     /// <see cref="Run"/> does it. Tab is never taken, so focus can always leave the canvas. Ctrl+Z, Ctrl+Y and Ctrl+S are
-    /// the window's, and so are the tool keys (<see cref="ToolKeys"/>).
+    /// the window's, and so are the tool keys (<see cref="ToolKeys"/>). While the song plays, the keys that would change the
+    /// notes or the selection do nothing (<see cref="IsLaneEdit"/>).
     /// </summary>
     internal static class EditorKeys
     {
@@ -31,6 +32,10 @@ namespace ChartBuilder.Controls.Editing
             var session = editor.Session;
             var tools = session.Tools;
             bool highway = canvas.CanvasView == LaneView.Highway;
+
+            // While the song plays the lanes aren't edited: a key that would change the notes or the selection does nothing.
+            if (editor.Playback.IsPlaying && IsLaneEdit(id))
+                return true;
 
             switch (id)
             {
@@ -148,7 +153,7 @@ namespace ChartBuilder.Controls.Editing
                     return true;
 
                 // The lane's audio as a waveform or a spectrogram (charter-spec C13 item 5).
-                case BuilderKeys.AudioBackdrop when !lane.IsVocal:
+                case BuilderKeys.AudioBackdrop:
                     lane.Audio.ToggleBackdrop();
                     return true;
 
@@ -182,9 +187,16 @@ namespace ChartBuilder.Controls.Editing
                 case BuilderKeys.NoteGhost when !lane.IsVocal:
                     tools.ToggleDynamics(NoteDynamics.Ghost);
                     return true;
-                case BuilderKeys.NoteStarPower when !lane.IsVocal:
-                    tools.ToggleStarPowerOverSelection();
+                case BuilderKeys.NoteStarPower:
+                    if (lane.IsVocal)
+                        tools.ToggleVocalStarPowerOverSelection();
+                    else
+                        tools.ToggleStarPowerOverSelection();
                     return true;
+
+                // A vocal note's lyric, in the box over it (charter-spec C3 item 7).
+                case BuilderKeys.NoteEditLyric:
+                    return lane.IsVocal && canvas.OpenLyricEditor();
                 case BuilderKeys.TapTempo:
                     editor.Tap();
                     return true;
@@ -234,7 +246,7 @@ namespace ChartBuilder.Controls.Editing
                         tools.Cancel();
                     else if (editor.Navigation.IsOpen)
                         editor.Navigation.CloseCommand.Execute(null);
-                    else
+                    else if (!editor.Playback.IsPlaying)
                         session.Selection.Clear();
                     return true;
 
@@ -310,6 +322,16 @@ namespace ChartBuilder.Controls.Editing
                 editor.RecordRelease(shown);
         }
 
+        /// <summary>Whether the action <paramref name="id"/> changes the notes or the selection, which isn't done while the song plays.</summary>
+        private static bool IsLaneEdit(string id) => id is
+            BuilderKeys.SelectionMoveUp or BuilderKeys.SelectionMoveDown or BuilderKeys.SelectionMoveLeft or BuilderKeys.SelectionMoveRight
+            or BuilderKeys.SelectionShiftUp or BuilderKeys.SelectionShiftDown or BuilderKeys.SelectionShiftLeft or BuilderKeys.SelectionShiftRight
+            or BuilderKeys.NudgeToOnsets
+            or BuilderKeys.NoteForceHopo or BuilderKeys.NoteForceStrum or BuilderKeys.NoteTap or BuilderKeys.NoteCymbal
+            or BuilderKeys.NoteAccent or BuilderKeys.NoteGhost or BuilderKeys.NoteStarPower or BuilderKeys.NoteEditLyric
+            or BuilderKeys.SelectAll or BuilderKeys.SelectSection or BuilderKeys.Quantize
+            or BuilderKeys.Cut or BuilderKeys.Paste or BuilderKeys.PasteMerge or BuilderKeys.Delete;
+
         /// <summary>The digit a lane action stands for (1 to 6, 0 the open note or the kick); null for another action.</summary>
         public static int? LaneNumberOf(string id)
         {
@@ -374,7 +396,7 @@ namespace ChartBuilder.Controls.Editing
         /// (Alt and <c>n + 1</c> by default). The table <see cref="ToolOf"/> reads.
         /// </summary>
         public static IReadOnlyList<EditorTool> ToolKeys { get; } =
-            [EditorTool.Select, EditorTool.Place, EditorTool.Erase, EditorTool.Phrase, EditorTool.Tempo, EditorTool.Sync];
+            [EditorTool.Select, EditorTool.Place, EditorTool.Erase, EditorTool.Phrase, EditorTool.Tempo, EditorTool.Sync, EditorTool.Align];
 
         /// <summary>The tool the action <paramref name="id"/> picks, or <see langword="null"/> when it isn't a tool action.</summary>
         public static EditorTool? ToolOf(string id)

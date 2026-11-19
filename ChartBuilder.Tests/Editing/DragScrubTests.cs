@@ -21,4 +21,14 @@ public sealed class DragScrubTests
         Assert.AreEqual(123m, ScrubMath.DraggedValue(120m, 3, 1), "A step of one still moves whole numbers.");
         Assert.AreEqual(120.5m, ScrubMath.DraggedValue(120m, 0.5, 0.5));
     }
+
+    [TestMethod]
+    public void AFieldScrubbedByStepsCountsHalfAStepOrMoreAsOne()
+    {
+        Assert.AreEqual(0, ScrubMath.Steps(3.9, 8));
+        Assert.AreEqual(1, ScrubMath.Steps(4, 8));
+        Assert.AreEqual(-1, ScrubMath.Steps(-4, 8));
+        Assert.AreEqual(3, ScrubMath.Steps(25, 8));
+        Assert.AreEqual(int.MaxValue, ScrubMath.Steps(1e300, 1), "A drag beyond the steps an int holds stops at the last.");
+    }
 }

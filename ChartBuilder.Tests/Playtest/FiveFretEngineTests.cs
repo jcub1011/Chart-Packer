@@ -52,7 +52,7 @@ public sealed class FiveFretEngineTests
         var extra = Play(Engine(Note(1.0, 0), Note(1.0, 1)), 2, Down(Green, 0.5), Down(Red, 0.5), Down(Yellow, 0.5), Down(StrumDown, 1.0));
         var exact = Play(Engine(Note(1.0, 0), Note(1.0, 1)), 2, Down(Green, 0.5), Down(Red, 0.5), Down(StrumDown, 1.0));
 
-        Assert.IsFalse(extra.Any(j => j.Kind == JudgeKind.Hit));
+        Assert.DoesNotContain(j => j.Kind == JudgeKind.Hit, extra);
         Assert.AreSequenceEqual([(JudgeKind.Hit, 0)], Kinds(exact));
     }
 
@@ -62,7 +62,7 @@ public sealed class FiveFretEngineTests
         var held = Play(Engine(Note(1.0, ChartNote.OpenLane)), 2, Down(Green, 0.5), Down(StrumDown, 1.0));
         var open = Play(Engine(Note(1.0, ChartNote.OpenLane)), 2, Down(StrumDown, 1.0));
 
-        Assert.IsFalse(held.Any(j => j.Kind == JudgeKind.Hit));
+        Assert.DoesNotContain(j => j.Kind == JudgeKind.Hit, held);
         Assert.AreSequenceEqual([(JudgeKind.Hit, 0)], Kinds(open));
     }
 
@@ -137,7 +137,7 @@ public sealed class FiveFretEngineTests
         var ghosted = Play(engine, 2, Down(Green, 0.5), Down(StrumDown, 1.0), Down(Yellow, 1.18), Up(Yellow, 1.19), Down(Red, 1.2));
         var strummed = Play(engine, 2, Down(Green, 0.5), Down(StrumDown, 1.0), Down(Yellow, 1.18), Up(Yellow, 1.19), Down(Red, 1.2), Down(StrumDown, 1.21));
 
-        Assert.IsTrue(ghosted.Any(j => j.Kind == JudgeKind.Ghost));
+        Assert.Contains(j => j.Kind == JudgeKind.Ghost, ghosted);
         Assert.AreSequenceEqual([(JudgeKind.Hit, 0), (JudgeKind.Miss, 1)], Kinds(ghosted));
         Assert.AreSequenceEqual([(JudgeKind.Hit, 0), (JudgeKind.Hit, 1)], Kinds(strummed));
     }
@@ -168,8 +168,8 @@ public sealed class FiveFretEngineTests
         var held = Play(Engine(Note(1.0, 0, holdSeconds: 1)), 3, Down(Green, 0.5), Down(StrumDown, 1.0), Up(Green, 1.97));
         var dropped = Play(Engine(Note(1.0, 0, holdSeconds: 1)), 3, Down(Green, 0.5), Down(StrumDown, 1.0), Up(Green, 1.5));
 
-        Assert.IsTrue(held.Any(j => j.Kind == JudgeKind.SustainDone));
-        Assert.IsFalse(held.Any(j => j.Kind == JudgeKind.SustainDrop));
+        Assert.Contains(j => j.Kind == JudgeKind.SustainDone, held);
+        Assert.DoesNotContain(j => j.Kind == JudgeKind.SustainDrop, held);
         var drop = dropped.Single(j => j.Kind == JudgeKind.SustainDrop);
         Assert.AreEqual(-500, drop.OffsetMs, 1e-6);
         Assert.AreEqual(1, drop.Combo);
@@ -182,7 +182,7 @@ public sealed class FiveFretEngineTests
         var missed = Play(Engine(Note(1.0, 0)), 2, Down(Green, 0.5, 0.5), Down(StrumDown, 1.04, 0.5));
 
         Assert.AreEqual(60, hit.Single(j => j.Kind == JudgeKind.Hit).OffsetMs, 1e-6);
-        Assert.IsTrue(missed.Any(j => j.Kind == JudgeKind.Miss));
+        Assert.Contains(j => j.Kind == JudgeKind.Miss, missed);
     }
 
     [TestMethod]

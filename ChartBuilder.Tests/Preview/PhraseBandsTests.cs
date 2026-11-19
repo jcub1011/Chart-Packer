@@ -27,18 +27,15 @@ public sealed class PhraseBandsTests
         var chart = DrumChart();
 
         var expert = PhraseSpans.Of(chart, new ChartTrackKey(ChartInstrument.Drums, ChartDifficulty.Expert));
-        CollectionAssert.AreEqual(
-            new PhraseKind?[] { PhraseKind.StarPower, PhraseKind.Solo, PhraseKind.Roll },
-            expert.Select(s => s.Kind).ToArray());
+        Assert.AreSequenceEqual(
+            [PhraseKind.StarPower, PhraseKind.Solo, PhraseKind.Roll], expert.Select(s => s.Kind).ToArray());
 
         var hard = PhraseSpans.Of(chart, new ChartTrackKey(ChartInstrument.Drums, ChartDifficulty.Hard));
         Assert.HasCount(3, hard, "A roll reaches Hard, where it's lowest.");
 
         var medium = PhraseSpans.Of(chart, new ChartTrackKey(ChartInstrument.Drums, ChartDifficulty.Medium));
-        CollectionAssert.AreEqual(
-            new PhraseKind?[] { PhraseKind.StarPower, PhraseKind.Solo },
-            medium.Select(s => s.Kind).ToArray(),
-            "A roll doesn't reach below its lowest difficulty.");
+        Assert.AreSequenceEqual(
+            [PhraseKind.StarPower, PhraseKind.Solo], medium.Select(s => s.Kind).ToArray(), "A roll doesn't reach below its lowest difficulty.");
     }
 
     [TestMethod]
@@ -91,7 +88,7 @@ public sealed class PhraseBandsTests
             bands: [new HighwayBand(1, 2, HighwayBandKind.Proposal)],
             phrases: [new PhraseSpan(PhraseKind.StarPower, 480, 960)]);
 
-        Assert.AreEqual(2, lane.Bands.Length);
+        Assert.HasCount(2, lane.Bands);
         Assert.AreEqual(HighwayBandKind.Proposal, lane.Bands[0].Kind, "A generator window's selected band keeps its place.");
         Assert.AreEqual(HighwayBandKind.StarPower, lane.Bands[1].Kind);
     }
@@ -105,15 +102,13 @@ public sealed class PhraseBandsTests
 
         var tracks = PhraseSpans.Read("notes.mid", MidiChartWriter.Write(chart), []);
 
-        CollectionAssert.AreEquivalent(
-            new[] { new ChartTrackKey(ChartInstrument.Drums, ChartDifficulty.Expert), new ChartTrackKey(ChartInstrument.Drums, ChartDifficulty.Hard) },
-            tracks.Keys.ToArray(),
-            "A track with no notes isn't shown.");
+        Assert.AreSequenceEqual(
+            [new ChartTrackKey(ChartInstrument.Drums, ChartDifficulty.Expert), new ChartTrackKey(ChartInstrument.Drums, ChartDifficulty.Hard)], [.. tracks.Keys], Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder, "A track with no notes isn't shown.");
         var expert = tracks[new ChartTrackKey(ChartInstrument.Drums, ChartDifficulty.Expert)];
-        Assert.IsTrue(expert.Any(s => s.Kind == PhraseKind.StarPower && s.Tick == 0), "Read back from the MIDI as the games read it.");
-        Assert.IsTrue(expert.Any(s => s.Kind == PhraseKind.Solo));
-        Assert.IsTrue(expert.Any(s => s.Kind == PhraseKind.Roll));
-        Assert.IsFalse(tracks[new ChartTrackKey(ChartInstrument.Drums, ChartDifficulty.Hard)].Any(s => s.Kind == PhraseKind.Roll && s.Tick != 4800), "Only the roll that was written.");
+        Assert.Contains(s => s.Kind == PhraseKind.StarPower && s.Tick == 0, expert, "Read back from the MIDI as the games read it.");
+        Assert.Contains(s => s.Kind == PhraseKind.Solo, expert);
+        Assert.Contains(s => s.Kind == PhraseKind.Roll, expert);
+        Assert.DoesNotContain(s => s.Kind == PhraseKind.Roll && s.Tick != 4800, tracks[new ChartTrackKey(ChartInstrument.Drums, ChartDifficulty.Hard)], "Only the roll that was written.");
     }
 
     [TestMethod]

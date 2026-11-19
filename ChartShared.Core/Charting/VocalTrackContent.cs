@@ -47,8 +47,18 @@ public readonly record struct VocalPhraseEvent(long Tick, long Length, VocalPhra
 }
 
 /// <summary>
-/// One vocal track (<c>PART VOCALS</c>, <c>HARM1</c> to <c>HARM3</c>) as the editor edits it: its sung notes, lyrics and
-/// phrases, and every other event it has kept as it is, in order (charter-spec §4.2, C3 item 7). Immutable: an edit is a
+/// A star power phrase of a vocal track (note 116, which the games call overdrive): from <see cref="Tick"/> up to but not
+/// including <see cref="EndTick"/>. It's marked over the part's phrases and notes, and not one with them.
+/// </summary>
+public readonly record struct VocalStarPowerEvent(long Tick, long Length)
+{
+    /// <summary>The tick after the last the star power covers.</summary>
+    public long EndTick => Tick + Length;
+}
+
+/// <summary>
+/// One vocal track (<c>PART VOCALS</c>, <c>HARM1</c> to <c>HARM3</c>) as the editor edits it: its sung notes, lyrics,
+/// phrases and star power, and every other event it has kept as it is, in order (charter-spec §4.2, C3 item 7). Immutable: an edit is a
 /// new content, written as a new track (<see cref="Write"/>) that replaces the old one.
 /// </summary>
 /// <remarks>
@@ -73,6 +83,9 @@ public sealed class VocalTrackContent
     /// <summary>The note older charts mark a second singer's phrases with.</summary>
     public const int OtherPhrasePitch = 106;
 
+    /// <summary>The note star power is written as.</summary>
+    public const int StarPowerPitch = MidiLayout.StarPowerPitch;
+
     /// <summary>A lyric meta event's type.</summary>
     public const byte LyricType = 0x05;
 
@@ -95,6 +108,7 @@ public sealed class VocalTrackContent
         IReadOnlyList<VocalNoteEvent> notes,
         IReadOnlyList<VocalLyricEvent> lyrics,
         IReadOnlyList<VocalPhraseEvent> phrases,
+        IReadOnlyList<VocalStarPowerEvent> starPower,
         IReadOnlyList<MidiMessage> kept,
         long endTick)
     {
@@ -104,6 +118,7 @@ public sealed class VocalTrackContent
         Notes = notes;
         Lyrics = lyrics;
         Phrases = phrases;
+        StarPower = starPower;
         Kept = kept;
         EndTick = endTick;
     }
@@ -126,7 +141,10 @@ public sealed class VocalTrackContent
     /// <summary>The phrases, by tick.</summary>
     public IReadOnlyList<VocalPhraseEvent> Phrases { get; }
 
-    /// <summary>Every other event, as the track has it, in its order: its name, percussion, overdrive, animations and the rest.</summary>
+    /// <summary>The star power phrases, by tick, none overlapping.</summary>
+    public IReadOnlyList<VocalStarPowerEvent> StarPower { get; }
+
+    /// <summary>Every other event, as the track has it, in its order: its name, percussion, animations and the rest.</summary>
     internal IReadOnlyList<MidiMessage> Kept { get; }
 
     /// <summary>The tick the track ends on, which a track written again ends no earlier than.</summary>
@@ -147,27 +165,29 @@ public sealed class VocalTrackContent
     public static VocalTrackContent Empty(string name)
     {
         ArgumentNullException.ThrowIfNull(name);
-        return new(name, null, true, [], [], [], [MidiMessage.Text(0, NameType, name)], 0);
+        return new(name, null, true, [], [], [], [], [MidiMessage.Text(0, NameType, name)], 0);
     }
 
     /// <summary>
-    /// The content with <paramref name="notes"/>, <paramref name="lyrics"/> or <paramref name="phrases"/> in place of its
-    /// own, each put in order and kept to the rules in the remarks: of two notes at a tick and pitch the longer is kept,
-    /// and a note held into the next on its pitch is cut where that starts; phrases likewise for each marker. This one,
-    /// when they're all the same as its own.
+    /// The content with <paramref name="notes"/>, <paramref name="lyrics"/>, <paramref name="phrases"/> or
+    /// <paramref name="starPower"/> in place of its own, each put in order and kept to the rules in the remarks: of two notes
+    /// at a tick and pitch the longer is kept, and a note held into the next on its pitch is cut where that starts; phrases
+    /// likewise for each marker, and star power likewise. This one, when they're all the same as its own.
     /// </summary>
     /// <exception cref="ArgumentOutOfRangeException">A tick or length is negative, a pitch isn't sung, or a phrase has no marker.</exception>
     public VocalTrackContent With(
         IEnumerable<VocalNoteEvent>? notes = null,
         IEnumerable<VocalLyricEvent>? lyrics = null,
-        IEnumerable<VocalPhraseEvent>? phrases = null)
+        IEnumerable<VocalPhraseEvent>? phrases = null,
+        IEnumerable<VocalStarPowerEvent>? starPower = null)
     {
         var newNotes = notes is null ? Notes : NotesInOrder(Checked(notes));
         var newLyrics = lyrics is null ? Lyrics : LyricsInOrder(Checked(lyrics));
         var newPhrases = phrases is null ? Phrases : PhrasesInOrder(Checked(phrases));
-        if (newNotes.SequenceEqual(Notes) && newLyrics.SequenceEqual(Lyrics) && newPhrases.SequenceEqual(Phrases))
+        var newStarPower = starPower is null ? StarPower : StarPowerInOrder(Checked(starPower));
+        if (newNotes.SequenceEqual(Notes) && newLyrics.SequenceEqual(Lyrics) && newPhrases.SequenceEqual(Phrases) && newStarPower.SequenceEqual(StarPower))
             return this;
-        return new(Name, Source, true, newNotes, newLyrics, newPhrases, Kept, EndTick);
+        return new(Name, Source, true, newNotes, newLyrics, newPhrases, newStarPower, Kept, EndTick);
     }
 
     /// <summary>The part as <see cref="VocalReader.ReadPart"/> reads it from the track <see cref="Write"/> gives.</summary>
@@ -215,6 +235,9 @@ public sealed class VocalTrackContent
                 track.Note(phrase.Tick, phrase.Length, OtherPhrasePitch);
         }
 
+        foreach (var starPower in StarPower)
+            track.Note(starPower.Tick, starPower.Length, StarPowerPitch);
+
         return PassthroughTrack.Rewritten(track.Chunk(EndTick), Name);
     }
 
@@ -228,6 +251,7 @@ public sealed class VocalTrackContent
         var notes = new List<VocalNoteEvent>();
         var lyrics = new List<VocalLyricEvent>();
         var phrases = new List<(long Tick, long Length, VocalPhraseMarkers Marker)>();
+        var starPower = new List<VocalStarPowerEvent>();
         var kept = new List<MidiMessage>();
         var open = new Dictionary<int, (long Tick, int Velocity)>();
         long end = 0;
@@ -272,6 +296,8 @@ public sealed class VocalTrackContent
                 phrases.Add((tick, Math.Max(1, endTick - tick), VocalPhraseMarkers.Primary));
             else if (pitch == OtherPhrasePitch)
                 phrases.Add((tick, Math.Max(1, endTick - tick), VocalPhraseMarkers.Secondary));
+            else if (pitch == StarPowerPitch)
+                starPower.Add(new VocalStarPowerEvent(tick, Math.Max(1, endTick - tick)));
             else
                 notes.Add(new VocalNoteEvent(tick, Math.Max(0, endTick - tick), pitch, velocity));
         }
@@ -281,7 +307,7 @@ public sealed class VocalTrackContent
             .GroupBy(static p => (p.Tick, p.Length))
             .Select(static g => new VocalPhraseEvent(g.Key.Tick, g.Key.Length, g.Aggregate(VocalPhraseMarkers.None, static (m, p) => m | p.Marker)));
 
-        return new(source.Name, source, false, NotesInOrder(notes), LyricsInOrder(lyrics), PhrasesInOrder(joined), kept, end);
+        return new(source.Name, source, false, NotesInOrder(notes), LyricsInOrder(lyrics), PhrasesInOrder(joined), StarPowerInOrder(starPower), kept, end);
     }
 
     // A lyric event, or a text event older charts have as one, with text; null for any other.
@@ -296,7 +322,7 @@ public sealed class VocalTrackContent
         return null;
     }
 
-    private static bool IsModelled(int pitch) => IsSung(pitch) || pitch is PhrasePitch or OtherPhrasePitch;
+    private static bool IsModelled(int pitch) => IsSung(pitch) || pitch is PhrasePitch or OtherPhrasePitch or StarPowerPitch;
 
     private static List<T> Checked<T>(IEnumerable<T> items)
     {
@@ -316,6 +342,10 @@ public sealed class VocalTrackContent
                 case VocalLyricEvent lyric:
                     ArgumentOutOfRangeException.ThrowIfNegative(lyric.Tick, nameof(lyric.Tick));
                     ArgumentNullException.ThrowIfNull(lyric.Text, nameof(lyric.Text));
+                    break;
+                case VocalStarPowerEvent starPower:
+                    ArgumentOutOfRangeException.ThrowIfNegative(starPower.Tick, nameof(starPower.Tick));
+                    ArgumentOutOfRangeException.ThrowIfLessThan(starPower.Length, 1, nameof(starPower.Length));
                     break;
                 case VocalPhraseEvent phrase:
                     ArgumentOutOfRangeException.ThrowIfNegative(phrase.Tick, nameof(phrase.Tick));
@@ -351,6 +381,27 @@ public sealed class VocalTrackContent
     }
 
     private static VocalLyricEvent[] LyricsInOrder(IEnumerable<VocalLyricEvent> lyrics) => [.. lyrics.OrderBy(static l => l.Tick)];
+
+    // By tick; one starting on the same tick as a longer one gives it up, and each is cut where the next starts.
+    private static VocalStarPowerEvent[] StarPowerInOrder(IEnumerable<VocalStarPowerEvent> starPower)
+    {
+        var result = new List<VocalStarPowerEvent>();
+        foreach (var phrase in starPower.OrderBy(static p => p.Tick).ThenByDescending(static p => p.Length))
+        {
+            if (result.Count > 0)
+            {
+                var before = result[^1];
+                if (before.Tick == phrase.Tick)
+                    continue;
+                if (before.EndTick > phrase.Tick)
+                    result[^1] = before with { Length = phrase.Tick - before.Tick };
+            }
+
+            result.Add(phrase);
+        }
+
+        return [.. result];
+    }
 
     // By tick, then end; for each marker, a phrase is cut where the next with it starts, and one starting on the same tick
     // as a longer one with it gives it up.

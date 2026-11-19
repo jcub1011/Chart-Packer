@@ -189,6 +189,22 @@
     <value>Charts and songs ({0})</value>
     <comment>File-picker filter. {0} is the extensions, e.g. "chart, mid, midi, sng".</comment>
   </data>
+  <data name="LyricsFileTypeFormat" xml:space="preserve">
+    <value>Lyrics files ({0})</value>
+    <comment>File-picker filter for importing lyrics. {0} is the extensions, e.g. "lrc, srt, vtt".</comment>
+  </data>
+  <data name="LyricsTagsFileTypeFormat" xml:space="preserve">
+    <value>Audio with lyrics in its tags ({0})</value>
+    <comment>File-picker filter for importing lyrics. {0} is the extensions, e.g. "mp3, ogg, flac".</comment>
+  </data>
+  <data name="LrcFileTypeFormat" xml:space="preserve">
+    <value>LRC lyrics ({0})</value>
+    <comment>Save-dialog file type for exporting lyrics. {0} is the extension, "lrc".</comment>
+  </data>
+  <data name="UltraStarFileTypeFormat" xml:space="preserve">
+    <value>UltraStar song ({0})</value>
+    <comment>Save-dialog file type for exporting lyrics as an UltraStar song. {0} is the extension, "txt".</comment>
+  </data>
   <data name="SettingsWindowTitle" xml:space="preserve">
     <value>Settings</value>
   </data>
@@ -224,6 +240,33 @@
   <data name="SettingsCategoryGeneral" xml:space="preserve">
     <value>General</value>
     <comment>Top-level Settings category for app-wide settings.</comment>
+  </data>
+  <data name="OutputDeviceDefaultLabel" xml:space="preserve">
+    <value>Default Output Device</value>
+    <comment>The choice in the output device list that plays on the system's default output device.</comment>
+  </data>
+  <data name="OutputDeviceNotConnectedLabel" xml:space="preserve">
+    <value>Previously Selected Device (Not Connected)</value>
+    <comment>The output device choice shown when the device saved in the settings isn't currently connected.</comment>
+  </data>
+  <data name="LowLatencyAudioLabel" xml:space="preserve">
+    <value>Low Latency Audio</value>
+    <comment>Switch: plays audio on Windows' low-latency audio path instead of the default one.</comment>
+  </data>
+  <data name="LowLatencyAudioDescription" xml:space="preserve">
+    <value>Play audio on Windows' low-latency audio path, with a small device buffer, so audio is heard sooner after it is mixed. Windows only; applies when the app starts.</value>
+  </data>
+  <data name="LowLatencyAudioKeywords" xml:space="preserve">
+    <value>low latency audio wasapi driver buffer windows delay lag fast</value>
+  </data>
+  <data name="OutputDeviceLabel" xml:space="preserve">
+    <value>Output Device</value>
+  </data>
+  <data name="OutputDeviceDescription" xml:space="preserve">
+    <value>The device audio plays on. When the chosen device isn't connected, the default output device is used until it is. Applies the next time audio is opened.</value>
+  </data>
+  <data name="OutputDeviceKeywords" xml:space="preserve">
+    <value>output device audio playback headphones speakers wasapi default sound</value>
   </data>
   <data name="SettingsCategoryLogging" xml:space="preserve">
     <value>Logging</value>

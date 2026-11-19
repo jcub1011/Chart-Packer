@@ -13,11 +13,14 @@ using DecodeBench;
 // Times the app's audio decoders with BenchmarkDotNet, on the managed and FFmpeg backends (see RESULTS.md):
 //
 //   dotnet run -c Release --project tools/DecodeBench -- [paths…] [--per-format K] [--iterations N] [--aot] [--list] [--waveforms]
+//                                                        [--opus-decoder opus|libopus] [--decode-only]
 //
 // A path is an audio file, a .sng (its audio is read in place) or a directory searched for both, which
 // keeps its K longest stems of each format. With no paths it reads the test fixtures. --aot adds a
 // Native AOT job beside the JIT one, as the app ships; --list only shows the stems found; --waveforms times what the
-// waveform costs at each fidelity (WaveformBenchmarks) instead of the decoders. Files are only read.
+// waveform costs at each fidelity (WaveformBenchmarks) instead of the decoders. --opus-decoder makes the FFmpeg backend
+// decode Opus with that FFmpeg decoder rather than the app's default (opus); --decode-only times just Decode, on
+// FFmpeg, for comparing decoders. Files are only read.
 
 var paths = new List<string>();
 int perFormat = 2;
@@ -25,6 +28,12 @@ int iterations = 10;
 bool aot = false;
 bool list = false;
 bool waveforms = false;
+bool decodeOnly = false;
+
+// Read by ChartShared.Audio once, before the first stream opens, so it's set while the arguments are read. It's also
+// given to BenchmarkDotNet's processes below, as the stems are.
+const string OpusDecoderVariable = "CHART_PACKER_OPUS_DECODER";
+string? opusDecoder = null;
 
 for (int i = 0; i < args.Length; i++)
 {
@@ -44,6 +53,19 @@ for (int i = 0; i < args.Length; i++)
             break;
         case "--waveforms":
             waveforms = true;
+            break;
+        case "--decode-only":
+            decodeOnly = true;
+            break;
+        case "--opus-decoder":
+            opusDecoder = i + 1 < args.Length ? args[++i] : null;
+            if (opusDecoder is not ("opus" or "libopus"))
+            {
+                Console.Error.WriteLine("--opus-decoder takes opus or libopus.");
+                return 1;
+            }
+
+            Environment.SetEnvironmentVariable(OpusDecoderVariable, opusDecoder);
             break;
         default:
             paths.Add(args[i]);
@@ -74,6 +96,10 @@ Environment.SetEnvironmentVariable(StemLocation.Variable, serialized);
 var variable = new EnvironmentVariable(StemLocation.Variable, serialized);
 
 var job = Job.Default.WithWarmupCount(2).WithIterationCount(iterations).WithLaunchCount(1).WithEnvironmentVariable(variable);
+if (opusDecoder is not null)
+    job = job.WithEnvironmentVariable(new EnvironmentVariable(OpusDecoderVariable, opusDecoder));
+Console.WriteLine($"Opus decoder on FFmpeg: {opusDecoder ?? "the app's choice"}");
+Console.WriteLine();
 if (waveforms)
 {
     var waveformConfig = ManualConfig.Create(DefaultConfig.Instance)
@@ -85,7 +111,7 @@ if (waveforms)
         .AddLogicalGroupRules(BenchmarkLogicalGroupRule.ByMethod)
         .WithArtifactsPath(Path.Combine(AppContext.BaseDirectory, "BenchmarkDotNet.Artifacts"));
     if (aot)
-        waveformConfig = waveformConfig.AddJob(job.WithRuntime(NativeAotRuntime.Net10_0).WithId("NativeAOT"));
+        waveformConfig = waveformConfig.AddJob(job.WithRuntime(NativeAotRuntime.Net11_0).WithId("NativeAOT"));
 
     BenchmarkRunner.Run<WaveformBenchmarks>(waveformConfig);
     return 0;
@@ -101,12 +127,19 @@ var config = ManualConfig.Create(DefaultConfig.Instance)
     .WithArtifactsPath(Path.Combine(AppContext.BaseDirectory, "BenchmarkDotNet.Artifacts"));
 
 if (aot)
-    config = config.AddJob(job.WithRuntime(NativeAotRuntime.Net10_0).WithId("NativeAOT"));
+    config = config.AddJob(job.WithRuntime(NativeAotRuntime.Net11_0).WithId("NativeAOT"));
 
 // A stem FFmpeg can't decode is timed on the managed decoders alone.
 config = config.AddFilter(new SimpleFilter(c =>
     (AudioBackend)c.Parameters[nameof(DecodeBenchmarks.Backend)]! != AudioBackend.Ffmpeg
     || onFfmpeg.Contains((string)c.Parameters[nameof(DecodeBenchmarks.Audio)]!)));
+
+if (decodeOnly)
+{
+    config = config.AddFilter(new SimpleFilter(c =>
+        c.Descriptor.WorkloadMethod.Name == nameof(DecodeBenchmarks.Decode)
+        && (AudioBackend)c.Parameters[nameof(DecodeBenchmarks.Backend)]! == AudioBackend.Ffmpeg));
+}
 
 BenchmarkRunner.Run<DecodeBenchmarks>(config);
 return 0;

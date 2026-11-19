@@ -12,6 +12,12 @@ public readonly record struct VocalLaneNote(long Tick, long EndTick, int Pitch, 
 /// <param name="JoinsNext">The next syllable follows on without a space.</param>
 public readonly record struct VocalLaneLyric(long Tick, string Text, bool JoinsNext);
 
+/// <summary>A slide being sung: the gap between a note and the slide note it carries on to.</summary>
+/// <param name="From">The index of the note slid from.</param>
+/// <param name="To">The index of the slide note.</param>
+/// <param name="Progress">How far through the gap, from 0 at the first note's end to 1 at the slide's start, in ticks.</param>
+public readonly record struct VocalLaneSlide(int From, int To, double Progress);
+
 /// <summary>
 /// One vocal part as an editor lane shows it: its notes with their syllables worked out, the syllables it shows, its
 /// phrases, and the pitches its rows are. Everything is in ticks, as the chart has it, so the lane's projection places
@@ -108,6 +114,41 @@ public sealed class VocalLane
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// The slide being sung at <paramref name="tick"/>: when it's in the gap between a sung note and the sung slide
+    /// (<c>+</c>) note it carries on to, the two notes and how far through the gap it is; otherwise null. Spoken notes
+    /// don't slide, as the lane draws no line to or from them.
+    /// </summary>
+    public VocalLaneSlide? SlideAt(double tick)
+    {
+        if (NoteAt(tick) is not null)
+            return null;
+        int next = FirstNoteFrom(Math.Floor(tick) + 1);
+        if (next <= 0 || next >= Notes.Count || Notes[next] is not { IsSlide: true, IsUnpitched: false } slide
+            || Notes[next - 1] is not { IsUnpitched: false } before)
+        {
+            return null;
+        }
+
+        double gap = slide.Tick - before.EndTick;
+        double progress = gap > 0 ? Math.Clamp((tick - before.EndTick) / gap, 0, 1) : 1;
+        return new VocalLaneSlide(next - 1, next, progress);
+    }
+
+    /// <summary>
+    /// The pitch being sung at <paramref name="tick"/>: a sung note's, or in a slide's gap the pitch it has slid to so far,
+    /// each between the two in turn; null on a spoken note or between notes.
+    /// </summary>
+    public int? SungPitchAt(double tick)
+    {
+        if (NoteAt(tick) is { } index)
+            return Notes[index].IsUnpitched ? null : Notes[index].Pitch;
+        if (SlideAt(tick) is not { } slide)
+            return null;
+        int from = Notes[slide.From].Pitch, to = Notes[slide.To].Pitch;
+        return (int)Math.Round(from + ((to - from) * slide.Progress), MidpointRounding.AwayFromZero);
     }
 
     private int FirstNoteFrom(double tick)

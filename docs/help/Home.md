@@ -15,6 +15,7 @@ This wiki gives a high-level overview of what each window does and its idiosyncr
 - [Validate Metadata](Validator.md) and its [progress dialog](Validator-Progress.md)
 - [Generate Lower Difficulties](Lower-Difficulties.md)
 - [Deduplicate Library](Dedup.md)
+- [Optimize Library](Optimize.md)
 - [Job Progress](Job-Progress.md)
 - [Message dialog](Message-Dialog.md)
 
@@ -23,7 +24,9 @@ This wiki gives a high-level overview of what each window does and its idiosyncr
 - [Chart Builder](Chart-Builder.md): the editor
 - [First Save](First-Save.md), [Export Song](Export-SNG.md) and [Export Progress](Export-Progress.md)
 - [Reduce](Reduce.md), [Generate Phrases](Generate-Phrases.md) and [Lane Mapping](Lane-Mapping.md)
+- [Lyric Import and Export](Lyric-Import-and-Export.md)
 - [Preview](Preview.md) and [Difficulty](Difficulty.md) windows
+- [Manage Layouts](Manage-Layouts.md)
 - [Input Devices](Input-Devices.md)
 - [Messages](Messages.md)
 

@@ -7,6 +7,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Avalonia.Media;
 using Avalonia.Threading;
+using ChartBuilder.Controls.Editing;
 using ChartBuilder.Resources;
 using ChartBuilder.Services;
 using ChartShared.Audio.Synthesis;
@@ -69,6 +70,10 @@ namespace ChartBuilder.ViewModels
         // What the place tool's options last showed for (RefreshPlacing): the tool, the lane in focus, the drums' variant and the options.
         private (EditorTool, ChartTrackKey?, DrumsVariant?, PlaceOptions)? _placingShown;
 
+        // The song's lyrics for the lyric lens, and the vocal part they were preferred from (SongLyrics): kept until the
+        // chart or the song's settings change, so the lens keeps its layout and a state change doesn't read them again.
+        private (VocalTrack? Preferred, IReadOnlyList<OverviewLyric>? Lyrics)? _songLyrics;
+
         // The frame the playhead was last followed in.
         private TimeSpan? _followed;
 
@@ -119,6 +124,7 @@ namespace ChartBuilder.ViewModels
             _tapEnd.Tick += (_, _) => _ = ApplyTapsAsync();
 
             Session.StateChanged += OnSessionState;
+            Session.Alignment.Changed += OnAlignmentChanged;
             Session.StatusPosted += OnStatusPosted;
             Session.ChartChanged += OnChartChanged;
             Session.SongSettingsChanged += OnSongSettingsChanged;
@@ -672,6 +678,8 @@ namespace ChartBuilder.ViewModels
         {
             _refresh.Stop();
             _tapEnd.Stop();
+            _alignApply?.Stop();
+            Session.Alignment.Changed -= OnAlignmentChanged;
             StopCountdown();
             Playback.DeferPlayStart = null;
             Session.StateChanged -= OnSessionState;
@@ -727,6 +735,7 @@ namespace ChartBuilder.ViewModels
             OnPropertyChanged(nameof(IsTempoTool));
             OnPropertyChanged(nameof(IsSyncTool));
             OnPropertyChanged(nameof(IsLoopTool));
+            RefreshAlign();
             OnPropertyChanged(nameof(IsRecording));
             OnPropertyChanged(nameof(RecordToolTip));
 
@@ -817,6 +826,7 @@ namespace ChartBuilder.ViewModels
         private void OnChartChanged(object? sender, EditorChartChangedEventArgs e)
         {
             OnPropertyChanged(nameof(PlayheadTickText)); // A tempo change moves the ticks against the audio.
+            _songLyrics = null;
             if (e.IsPreview)
                 return;
             ScheduleRefresh();
@@ -835,12 +845,20 @@ namespace ChartBuilder.ViewModels
         // The delay or the song's settings moved every note against the audio, or changed how they're read.
         private void OnSongSettingsChanged(object? sender, EventArgs e)
         {
+            _songLyrics = null;
             ScheduleRefresh();
             Properties.Refresh();
             OnPropertyChanged(nameof(PlayheadTickText));
         }
 
-        private void OnLayoutChanged(object? sender, EventArgs e) => ScheduleRefresh();
+        private void OnLayoutChanged(object? sender, EventArgs e)
+        {
+            // A vocal part's lane closed, or changed part, takes its focus with it, so the timeline and the findings' marks
+            // go back to the highway's.
+            if (Session.FocusedVocal is { } vocal && !Lanes.Layout.Lanes.Any(l => l.Part.Vocal == vocal))
+                Session.FocusedVocal = null;
+            ScheduleRefresh();
+        }
 
         private void OnViewportChanged(object? sender, EventArgs e) => RefreshVisibleSpan();
 
@@ -883,7 +901,13 @@ namespace ChartBuilder.ViewModels
                 case nameof(PlaybackViewModel.IsPlaying):
                     _devices?.Sample();
                     if (Playback.IsPlaying)
+                    {
+                        // The lanes aren't edited while the song plays, so a gesture under way is taken back; the loop
+                        // region's isn't, as it steers playback.
+                        if (Session.Tools.IsActive && !Session.Tools.LoopActive)
+                            Session.Tools.Cancel();
                         StartPlaying();
+                    }
                     else
                         StopPlaying();
                     break;
@@ -927,14 +951,44 @@ namespace ChartBuilder.ViewModels
             _refresh.Start();
         }
 
-        /// <summary>Works out what follows the chart: the hit sounds of the lanes shown, and the overview of the lane in focus.</summary>
+        /// <summary>
+        /// Works out what follows the chart: the hit sounds of the lanes shown, and the overview of the lane in focus: a vocal
+        /// part's when one was focused last, otherwise the highway's in focus, or the first shown of either; with the song's
+        /// lyrics for the lyric lens whichever it is.
+        /// </summary>
         private void RefreshDerived()
         {
             _refresh.Stop();
             var shown = Lanes.Layout.Lanes.Select(l => l.Part.Track).OfType<ChartTrackKey>().Where(k => Session.Chart.PartOf(k.Instrument) is not null).ToList();
             // Lent to a dialog, the hit sounds stay quiet until it's given back.
             Playback.SetHits(_playbackBorrows > 0 ? [] : [.. shown.SelectMany(HitsOf)]);
-            Overview = OverviewOf(Session.Focused is { } focused && Session.Chart.PartOf(focused.Instrument) is not null ? focused : shown.Cast<ChartTrackKey?>().FirstOrDefault());
+            OverviewData? overview;
+            VocalTrack? shownVocal = null;
+            if (Session.FocusedVocal is { } vocal && Session.VocalsOf(vocal) is not null)
+                (overview, shownVocal) = (OverviewOf(vocal), vocal);
+            else if (Session.Focused is { } focused && Session.Chart.PartOf(focused.Instrument) is not null)
+                overview = OverviewOf(focused);
+            else if (shown.Count > 0)
+                overview = OverviewOf(shown[0]);
+            else if (Lanes.Layout.Lanes.Select(l => l.Part.Vocal).FirstOrDefault(v => v is { } t && Session.VocalsOf(t) is not null) is { } first)
+                (overview, shownVocal) = (OverviewOf(first), first);
+            else
+                overview = OverviewOf((ChartTrackKey?)null);
+
+            // The lens reads the song's lyrics, the vocal part's shown when it has any.
+            Overview = overview is null ? null : overview with { Lyrics = SongLyrics(shownVocal) };
+        }
+
+        /// <summary>
+        /// The song's lyrics (<see cref="OverviewData.SongLyricsOf"/>), <paramref name="vocal"/>'s when it has any; the same
+        /// list until the chart or the song's settings change, or the part they're read from does.
+        /// </summary>
+        private IReadOnlyList<OverviewLyric>? SongLyrics(VocalTrack? vocal)
+        {
+            var preferred = vocal is { } track && Session.VocalsOf(track) is { Lyrics.Count: > 0 } ? vocal : null;
+            if (_songLyrics is not { } known || known.Preferred != preferred)
+                _songLyrics = known = (preferred, OverviewData.SongLyricsOf(Session, preferred));
+            return known.Lyrics;
         }
 
         private IEnumerable<NoteHit> HitsOf(ChartTrackKey key)
@@ -952,6 +1006,8 @@ namespace ChartBuilder.ViewModels
         }
 
         private OverviewData? OverviewOf(ChartTrackKey? key) => OverviewData.Of(Session, key, Playback.LengthSeconds, showFound: Navigation is { IsOpen: true, IsFinding: true });
+
+        private OverviewData? OverviewOf(VocalTrack vocal) => OverviewData.Of(Session, vocal, Playback.LengthSeconds);
     }
 
     /// <summary>A section, at its time in the audio, for the overview.</summary>
@@ -960,6 +1016,14 @@ namespace ChartBuilder.ViewModels
     /// <summary>A phrase of the lane in focus, in the audio, and the phrase rail's row it's drawn in, for the overview.</summary>
     /// <param name="Replaced">Whether it's star power the star power window is replacing, drawn muted.</param>
     public readonly record struct OverviewPhrase(double Start, double End, RailKind Row, bool Replaced = false);
+
+    /// <summary>
+    /// A syllable of a vocal part, for the timeline's lyric lens: when it's sung in the audio, from its note's start to the
+    /// end of its last note before the next syllable, slides included (its start, with none); its text with the chart's
+    /// symbols taken off; whether the next syllable follows on without a space; and whether it's the last of its line, the
+    /// next being in another phrase, or there being none.
+    /// </summary>
+    public readonly record struct OverviewLyric(double Start, double End, string Text, bool JoinsNext, bool EndsLine);
 
     /// <summary>A proposal of the generation window, in the audio, for the overview.</summary>
     public readonly record struct OverviewProposal(double Start, double End, bool Kept);
@@ -995,6 +1059,14 @@ namespace ChartBuilder.ViewModels
     /// The passages Find found in the lane in focus, while the flyout that finds them is open: each one's start and end in
     /// audio seconds, and whether the cursor was taken to it.
     /// </param>
+    /// <param name="LyricPhrases">
+    /// A vocal part's phrases, its lines of lyrics, each one's start and end in audio seconds, drawn in a row of their own
+    /// above <paramref name="Rows"/>; null for a highway's lane, which has no such row.
+    /// </param>
+    /// <param name="Lyrics">
+    /// The song's syllables, in time order, for the lyric lens, whichever lane is in focus (<see cref="SongLyricsOf"/>),
+    /// set by the editor; null for no lens, as when the song has no lyrics, or the timeline is a generation window's.
+    /// </param>
     public sealed record OverviewData(
         IReadOnlyList<OverviewSection> Sections,
         IReadOnlyList<double> TempoChanges,
@@ -1004,8 +1076,132 @@ namespace ChartBuilder.ViewModels
         IReadOnlyList<OverviewPhrase> Phrases,
         IReadOnlyList<OverviewProposal> Proposals,
         IReadOnlyList<(double Start, double End, bool IsRegion, bool Unmatched)> Synced,
-        IReadOnlyList<(double Start, double End, bool Current)> Found)
+        IReadOnlyList<(double Start, double End, bool Current)> Found,
+        IReadOnlyList<(double Start, double End)>? LyricPhrases = null,
+        IReadOnlyList<OverviewLyric>? Lyrics = null)
     {
+        /// <summary>
+        /// The overview of <paramref name="session"/>'s song, <paramref name="length"/> seconds long, for the vocal part
+        /// <paramref name="vocal"/> (charter-spec C3 item 7): its notes in its colour on a row for each pitch it sings,
+        /// the highest at the top and those spoken along the middle; its lines of lyrics; and its star power. The lyrics for
+        /// the lyric lens are left to the editor, which keeps them (<see cref="SongLyricsOf"/>). Null while the length isn't
+        /// known.
+        /// </summary>
+        internal static OverviewData? Of(EditorSession session, VocalTrack vocal, double length)
+        {
+            if (!(length > 0))
+                return null;
+
+            var (sections, tempoChanges, synced) = SongWide(session);
+            var starPower = new RailKind(PhraseKind.StarPower);
+            int noteRows = 0;
+            var notes = new List<OverviewNote>();
+            var phrases = new List<OverviewPhrase>();
+            var lyricPhrases = new List<(double, double)>();
+            if (session.VocalsOf(vocal) is { } lane)
+            {
+                int highest = lane.HighestPitch;
+                noteRows = highest - lane.LowestPitch + 1;
+                int spoken = (noteRows - 1) / 2;
+                var color = VocalPalette.Of(vocal);
+                foreach (var note in lane.Notes)
+                {
+                    int row = note.IsUnpitched ? spoken : Math.Clamp(highest - note.Pitch, 0, noteRows - 1);
+                    notes.Add(new OverviewNote(session.AudioAt(note.Tick), session.AudioAt(note.EndTick), row, color));
+                }
+
+                foreach (var (tick, endTick) in LinesOf(session, vocal, lane))
+                    lyricPhrases.Add((session.AudioAt(tick), session.AudioAt(endTick)));
+                foreach (var phrase in session.VocalContentOf(vocal)?.StarPower ?? [])
+                    phrases.Add(new OverviewPhrase(session.AudioAt(phrase.Tick), session.AudioAt(phrase.EndTick), starPower));
+            }
+
+            return new OverviewData(sections, tempoChanges, noteRows, notes, [starPower], phrases, [], synced, [], lyricPhrases);
+        }
+
+        /// <summary>
+        /// The song's lyrics for the lyric lens, whichever lane is in focus: <paramref name="preferred"/>'s syllables when it
+        /// has any, otherwise those of the first of <c>PART VOCALS</c> and the harmonies, in that order, that has any; null
+        /// when none has, so there's no lens.
+        /// </summary>
+        internal static IReadOnlyList<OverviewLyric>? SongLyricsOf(EditorSession session, VocalTrack? preferred = null)
+        {
+            IEnumerable<VocalTrack> tracks = Enum.GetValues<VocalTrack>();
+            if (preferred is { } first)
+                tracks = tracks.Where(t => t != first).Prepend(first);
+            foreach (var track in tracks)
+            {
+                if (session.VocalsOf(track) is { Lyrics.Count: > 0 } lane)
+                    return [.. LyricsOf(session, lane, LinesOf(session, track, lane))];
+            }
+
+            return null;
+        }
+
+        // The part's phrases, its lines of lyrics, as edited, or as its lane read them when it can't be edited.
+        private static List<(long Tick, long EndTick)> LinesOf(EditorSession session, VocalTrack track, VocalLane lane) =>
+            session.VocalContentOf(track) is { } content
+                ? [.. content.Phrases.Select(p => (p.Tick, p.EndTick))]
+                : [.. lane.Phrases.Select(p => (p.Tick, p.Tick + p.Length))];
+
+        // The lane's syllables, each sung until its last note before the next ends, and the last of its line where the next
+        // is in another of the lines (or in none, where the one before it was in one): runs of syllables outside every
+        // phrase are a line of their own, as LrcWriter writes them.
+        private static IEnumerable<OverviewLyric> LyricsOf(EditorSession session, VocalLane lane, List<(long Tick, long EndTick)> lines)
+        {
+            var ordered = lines.OrderBy(l => l.Tick).ToList();
+            int line = 0;
+            int LineOf(long tick)
+            {
+                while (line < ordered.Count && ordered[line].EndTick <= tick)
+                    line++;
+                return line < ordered.Count && ordered[line].Tick <= tick ? line : -1 - line;
+            }
+
+            var lyrics = lane.Lyrics;
+            int note = 0;
+            int current = lyrics.Count > 0 ? LineOf(lyrics[0].Tick) : 0;
+            for (int i = 0; i < lyrics.Count; i++)
+            {
+                var lyric = lyrics[i];
+                long nextTick = i + 1 < lyrics.Count ? lyrics[i + 1].Tick : long.MaxValue;
+                while (note < lane.Notes.Count && lane.Notes[note].Tick < lyric.Tick)
+                    note++;
+                long end = lyric.Tick;
+                for (; note < lane.Notes.Count && lane.Notes[note].Tick < nextTick; note++)
+                    end = Math.Max(end, lane.Notes[note].EndTick);
+
+                int next = i + 1 < lyrics.Count ? LineOf(nextTick) : int.MinValue;
+                yield return new OverviewLyric(session.AudioAt(lyric.Tick), session.AudioAt(end), lyric.Text, lyric.JoinsNext, next != current);
+                current = next;
+            }
+        }
+
+        // What's drawn whichever lane is in focus: the sections, the tempo and time signature changes, and the synchronized
+        // region and the passages synced with it.
+        private static (List<OverviewSection> Sections, List<double> TempoChanges, List<(double, double, bool, bool)> Synced) SongWide(EditorSession session)
+        {
+            var chart = session.Chart;
+            var sections = new List<OverviewSection>();
+            foreach (var e in chart.Events)
+            {
+                if (SectionEvents.NameOf(e.Text) is { } name)
+                    sections.Add(new OverviewSection(session.AudioAt(e.Tick), name));
+            }
+
+            var tempoChanges = TempoMapRows.Of(chart.TempoMap).Select(row => session.AudioAt(row.Tick)).ToList();
+
+            var synced = new List<(double, double, bool, bool)>();
+            if (session.Sync is { Span: var (from, to) } sync)
+            {
+                synced.Add((session.AudioAt(from), session.AudioAt(to), true, sync.IsUnmatched));
+                foreach (long start in sync.Matches)
+                    synced.Add((session.AudioAt(start), session.AudioAt(start + to - from), false, false));
+            }
+
+            return (sections, tempoChanges, synced);
+        }
+
         /// <summary>
         /// The overview of <paramref name="session"/>'s song, <paramref name="length"/> seconds long, for the lane
         /// <paramref name="key"/>; null while the length isn't known. <paramref name="proposals"/> are the ghosts to draw,
@@ -1025,14 +1221,7 @@ namespace ChartBuilder.ViewModels
                 return null;
 
             var chart = session.Chart;
-            var sections = new List<OverviewSection>();
-            foreach (var e in chart.Events)
-            {
-                if (SectionEvents.NameOf(e.Text) is { } name)
-                    sections.Add(new OverviewSection(session.AudioAt(e.Tick), name));
-            }
-
-            var tempoChanges = TempoMapRows.Of(chart.TempoMap).Select(row => session.AudioAt(row.Tick)).ToList();
+            var (sections, tempoChanges, synced) = SongWide(session);
 
             int noteRows = 0;
             var notes = new List<OverviewNote>();
@@ -1091,14 +1280,6 @@ namespace ChartBuilder.ViewModels
             }
 
             var ghosts = proposals ?? [];
-
-            var synced = new List<(double, double, bool, bool)>();
-            if (session.Sync is { Span: var (from, to) } sync)
-            {
-                synced.Add((session.AudioAt(from), session.AudioAt(to), true, sync.IsUnmatched));
-                foreach (long start in sync.Matches)
-                    synced.Add((session.AudioAt(start), session.AudioAt(start + to - from), false, false));
-            }
 
             var found = new List<(double, double, bool)>();
             if (showFound && session.Find is { Track: { } findTrack, Span: var (findFrom, findTo) } find && findTrack == key)

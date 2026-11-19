@@ -172,6 +172,72 @@ All values are medians.
    0.1 ms, once per waveform change rather than once per frame.
 
 
+## Opus Decoder And Interleaving
+
+Two ideas for making FFmpeg's Opus decode faster, tried on FFmpeg's own decoders: its `libopus` wrapper in
+place of the native `opus` decoder, and interleaving the native decoder's planar output faster. **Neither
+helps, so neither is shipped.** `opus` stays the Opus decoder.
+
+- **Machine:** Intel Core i9-9900K (8 cores, 16 threads), Windows 10 22H2, .NET SDK 11.0.100, JIT only.
+  Native AOT wasn't run: what differs is native code, and the gaps are far outside noise.
+- **FFmpeg:** the local BtbN 9.0 build, which has both decoders.
+- **Songs:** three real stereo 48 kHz Opus stems, loose files (4:18, 7:39 and 25:35).
+- **Run with** (`--decode-only` times `Decode` on FFmpeg alone; `--opus-decoder` sets
+  `CHART_PACKER_OPUS_DECODER` for the process and for BenchmarkDotNet's):
+
+  ```
+  dotnet run -c Release --project tools/DecodeBench -- --decode-only --opus-decoder opus|libopus --per-format 1 "<song folder>" …
+  dotnet run -c Release --project tools/DecodeBench -- --decode-only --opus-decoder opus|libopus
+  ```
+
+All values are `Decode` medians. Frame counts matched the managed decoder exactly for both FFmpeg decoders,
+on every song (22,049,088, 12,425,106 and 73,688,777 frames) and every fixture.
+
+### `libopus` Against `opus`
+
+`libopus` gives interleaved floats (with `request_sample_fmt=flt`; it gives 16-bit integers otherwise), but
+decodes **33–57% slower**. The gate was at least 5% faster on real songs, so it fails.
+
+| Audio | `opus` | `libopus` | `libopus` vs `opus` |
+|---|--:|--:|--:|
+| Song, 4:18 | 1.212 s (214×) | 1.629 s (159×) | 34% slower |
+| Song, 7:39 | 2.177 s (211×) | 3.040 s (151×) | 40% slower |
+| Song, 25:35 | 3.638 s (422×) | 5.721 s (268×) | 57% slower |
+| Fixture, mono 1 s | 1,786 us | 2,382 us | 33% slower |
+| Fixture, stereo 1 s | 3,451 us | 4,671 us | 35% slower |
+
+The decoder stays selectable for benchmarks (`--opus-decoder libopus`), but the app never picks it, so the
+FFmpeg build doesn't enable it.
+
+### Interleaving
+
+Which sample format each decoder gives when asked for interleaved floats (`request_sample_fmt=flt`), read
+from the decoded frame:
+
+| Decoder | Format given | Copy |
+|---|---|---|
+| `opus` | planar | one plane at a time |
+| `vorbis` | planar | one plane at a time |
+| `mp3float` | **interleaved** | one block copy |
+| `libopus` | interleaved | one block copy |
+
+Only `mp3float` changes, and the MP3 fixture's time didn't move (612 us, against 617 us before).
+
+For the planar decoders (all the library's Opus), a stereo interleave written with SSE (`UnpackLow` and
+`UnpackHigh`, four frames at a time) was timed against the scalar loop:
+
+| Song | Scalar | SIMD | Change |
+|---|--:|--:|--:|
+| 4:18 | 1.201 s | 1.218 s | +1.4% |
+| 7:39 | 2.177 s | 2.219 s | +1.9% |
+| 25:35 | 3.532 s | 3.457 s | −2.1% |
+
+No difference beyond noise. A decode takes about 100 ns a frame, and interleaving a frame is about 1% of that.
+The SIMD version was deleted.
+
+**Where the time is.** It's in FFmpeg's decoder, not around it. `opus` already decodes at 210–420× real time
+on one core, and a chunked waveform read of a song takes well under a second.
+
 ## Full results
 
 ### Fixtures (`ChartShared.Core.Tests/Audio/Fixtures`, 1 s each)

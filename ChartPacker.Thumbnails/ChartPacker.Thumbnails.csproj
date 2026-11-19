@@ -3,7 +3,6 @@
        (build/publish.ps1) as a native DLL, ChartPacker.Thumbnails.dll, which the installer registers as an
        in-process COM server. Windows only. -->
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <!-- The COM objects are built by hand from function pointers, as WindowsAudioEndpoint calls them. -->

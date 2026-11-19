@@ -63,10 +63,10 @@ public sealed class PanelLayoutSettingsTests
 
         var settings = BuilderSettingsService.Load(_path).Settings;
 
-        CollectionAssert.AreEqual(new[] { "art", "sections" }, settings.EditorLeftTabs);
-        Assert.AreEqual(1, settings.EditorSectionOrder!.Count);
-        CollectionAssert.AreEqual(new[] { "changes", "timing" }, settings.EditorSectionOrder["tempo-map"]);
-        CollectionAssert.AreEqual(new[] { "art/album-art" }, settings.EditorCollapsedSections);
+        Assert.AreSequenceEqual(["art", "sections"], settings.EditorLeftTabs);
+        Assert.HasCount(1, settings.EditorSectionOrder);
+        Assert.AreSequenceEqual(["changes", "timing"], settings.EditorSectionOrder["tempo-map"]);
+        Assert.AreSequenceEqual(["art/album-art"], settings.EditorCollapsedSections);
     }
 
     [TestMethod]
@@ -82,8 +82,8 @@ public sealed class PanelLayoutSettingsTests
         var settings = BuilderSettingsService.Load(_path).Settings;
 
         Assert.IsTrue(settings.EditorRightPanelAutoHide);
-        CollectionAssert.AreEqual(new[] { "difficulty", "properties" }, settings.EditorRightTabs);
-        CollectionAssert.AreEqual(new[] { "graph", "rating" }, settings.EditorSectionOrder!["difficulty"]);
-        CollectionAssert.AreEqual(new[] { "difficulty/lines" }, settings.EditorCollapsedSections);
+        Assert.AreSequenceEqual(["difficulty", "properties"], settings.EditorRightTabs);
+        Assert.AreSequenceEqual(["graph", "rating"], settings.EditorSectionOrder!["difficulty"]);
+        Assert.AreSequenceEqual(["difficulty/lines"], settings.EditorCollapsedSections);
     }
 }

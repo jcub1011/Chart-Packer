@@ -1,5 +1,6 @@
 using System;
 using Avalonia.Media;
+using ChartShared.UI.Controls.Skia;
 
 namespace ChartShared.UI.Controls.Highway
 {
@@ -27,9 +28,9 @@ namespace ChartShared.UI.Controls.Highway
         event Action? GemMarksInvalidated;
 
         /// <summary>Draws the notes standing up on the plane, and the text beside it.</summary>
-        void PaintGems(DrawingContext context);
+        void PaintGems(IHighwayCanvas context);
 
         /// <summary>Draws what follows the pointer, as much of it as stands up.</summary>
-        void PaintGemMarks(DrawingContext context);
+        void PaintGemMarks(IHighwayCanvas context);
     }
 }

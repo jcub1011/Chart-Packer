@@ -3,8 +3,6 @@ using ChartShared.Core.Jobs;
 using ChartShared.Core.Packing;
 using ChartShared.Core.Scanning;
 using ChartShared.Core.Sng;
-using Concentus;
-using Concentus.Enums;
 
 namespace ChartShared.Audio.Encoding;
 
@@ -13,7 +11,7 @@ namespace ChartShared.Audio.Encoding;
 /// <param name="Fraction">How far its transcode has got.</param>
 public sealed record TranscodeFileProgress(string Stem, double Fraction);
 
-/// <summary>Transcodes song audio to Ogg Opus at 48 kHz with Concentus (managed, AOT-safe).</summary>
+/// <summary>Transcodes song audio to Ogg Opus at 48 kHz, with libopus through FFmpeg when it's bundled and Concentus (managed, AOT-safe) otherwise.</summary>
 /// <remarks>
 /// Sources decode through <see cref="AudioDecoder"/> (whatever the extension says: wav, ogg,
 /// mp3 or opus); more than two channels fold to stereo as the playback mixer folds them;
@@ -24,7 +22,7 @@ public static class OpusTranscoder
     /// <summary>Opus always encodes at 48 kHz.</summary>
     public const int OutputRate = 48000;
 
-    /// <summary>Whether transcoding can run: the managed encoder is always bundled.</summary>
+    /// <summary>Whether transcoding can run: the managed encoder is always bundled, and stands in when FFmpeg has no libopus.</summary>
     public static bool IsAvailable => true;
 
     private const int FrameSize = 960;
@@ -48,27 +46,66 @@ public static class OpusTranscoder
         ArgumentException.ThrowIfNullOrWhiteSpace(sourcePath);
         ArgumentException.ThrowIfNullOrWhiteSpace(targetPath);
 
-        string stem = Path.GetFileNameWithoutExtension(targetPath);
-        int stereoBps = Math.Clamp(bitrateKbps * 1000, 8000, 512000);
-
         using var source = AudioDecoder.Open(
             new FileStream(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read), sourcePath);
-        if (source.Channels < 1)
-            throw new InvalidDataException($"'{sourcePath}' has no audio channels.");
 
-        int channels = Math.Min(source.Channels, 2);
-        int bitrate = channels == 1 ? Math.Max(stereoBps / 2, 8000) : stereoBps;
-
-        IOpusEncoder encoder;
         try
         {
-            encoder = OpusCodecFactory.CreateEncoder(OutputRate, channels, OpusApplication.OPUS_APPLICATION_AUDIO);
-            encoder.Bitrate = bitrate;
+            using var output = new FileStream(targetPath, FileMode.Create, FileAccess.Write, FileShare.None);
+            Transcode(source, output, bitrateKbps, sourcePath, progress, cancellationToken, Path.GetFileNameWithoutExtension(targetPath));
         }
-        catch (Exception ex) when (AudioDecoder.IsDecoderFault(ex))
+        catch
         {
-            throw AudioDecoder.Damaged(ex);
+            TryDelete(targetPath);
+            throw;
         }
+    }
+
+    /// <summary>Transcodes everything <paramref name="source"/> has from where it is to Ogg Opus written to <paramref name="output"/>.</summary>
+    /// <param name="source">The audio to transcode. Read, not disposed.</param>
+    /// <param name="output">Where the Ogg Opus stream is written, in order: it only has to be writable. Not disposed, and not deleted on failure.</param>
+    /// <param name="bitrateKbps">The bitrate in kbps per stereo stem (mono uses half).</param>
+    /// <param name="name">What the audio is called, for error messages.</param>
+    /// <param name="progress">Receives the transcode's fraction; may be <see langword="null"/>.</param>
+    /// <param name="stem">What progress reports call the audio; <paramref name="name"/>'s file name without its extension by default.</param>
+    /// <exception cref="InvalidDataException">The audio has no audio, is damaged, or can't be encoded.</exception>
+    /// <exception cref="IOException"><paramref name="output"/> can't be written.</exception>
+    /// <exception cref="OperationCanceledException">Transcoding was cancelled.</exception>
+    public static void Transcode(
+        IPcmSource source,
+        Stream output,
+        int bitrateKbps,
+        string name,
+        IProgress<TranscodeFileProgress>? progress = null,
+        CancellationToken cancellationToken = default,
+        string? stem = null) =>
+        Transcode(source, output, bitrateKbps, name, progress, cancellationToken, stem, OpusEncoderBackend.Auto);
+
+    /// <inheritdoc cref="Transcode(IPcmSource, Stream, int, string, IProgress{TranscodeFileProgress}?, CancellationToken, string?)"/>
+    /// <param name="backend">Which encoder to use, for tests that compare them.</param>
+    internal static void Transcode(
+        IPcmSource source,
+        Stream output,
+        int bitrateKbps,
+        string name,
+        IProgress<TranscodeFileProgress>? progress,
+        CancellationToken cancellationToken,
+        string? stem,
+        OpusEncoderBackend backend)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(output);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+
+        stem ??= Path.GetFileNameWithoutExtension(name);
+        if (source.Channels < 1)
+            throw new InvalidDataException($"'{name}' has no audio channels.");
+
+        int channels = Math.Min(source.Channels, 2);
+        // Widened before the multiply, so a huge request is clamped to the encoder's maximum rather than wrapping negative.
+        int bitrate = OpusBitrates.ForStereoBps((int)Math.Clamp((long)bitrateKbps * 1000, int.MinValue, int.MaxValue), channels);
+
+        using IOpusPacketEncoder encoder = OpusPacketEncoders.Create(channels, bitrate, backend);
 
         int lookahead = encoder.Lookahead;
 
@@ -88,11 +125,8 @@ public static class OpusTranscoder
         long decodedFrames = 0;
         bool sourceEnded = false;
 
-        try
+        using (var writer = new OggOpusWriter(output, channels, lookahead, source.SampleRate))
         {
-            using var output = new FileStream(targetPath, FileMode.Create, FileAccess.ReadWrite, FileShare.None);
-            using var writer = new OggOpusWriter(output, channels, lookahead, source.SampleRate);
-
             Report(0);
             while (!sourceEnded)
             {
@@ -139,7 +173,7 @@ public static class OpusTranscoder
             }
 
             if (validFrames == 0)
-                throw new InvalidDataException($"'{sourcePath}' has no audio.");
+                throw new InvalidDataException($"'{name}' has no audio.");
 
             // The encoder holds back its lookahead: flush it with silence so every valid
             // frame comes out, then trim the flush (and the padding) with the final granule.
@@ -156,31 +190,12 @@ public static class OpusTranscoder
             writer.Finish(lookahead + validFrames);
             Report(1);
         }
-        catch
-        {
-            TryDelete(targetPath);
-            throw;
-        }
 
         void Report(double fraction) => progress?.Report(new TranscodeFileProgress(stem, Math.Clamp(fraction, 0, 1)));
     }
 
-    private static int EncodeSilence(float[] silence, byte[] packet, IOpusEncoder encoder)
-    {
-        int length;
-        try
-        {
-            length = encoder.Encode(silence.AsSpan(), FrameSize, packet.AsSpan(), packet.Length);
-        }
-        catch (Exception ex) when (AudioDecoder.IsDecoderFault(ex))
-        {
-            throw AudioDecoder.Damaged(ex);
-        }
-
-        if (length <= 0)
-            throw new InvalidDataException("An audio frame couldn't be encoded to Opus.");
-        return length;
-    }
+    private static int EncodeSilence(float[] silence, byte[] packet, IOpusPacketEncoder encoder) =>
+        encoder.EncodeFrame(silence, packet);
 
     private static void TryDelete(string path)
     {
@@ -192,22 +207,10 @@ public static class OpusTranscoder
         {
         }
     }
-    private static int EncodeFrame(List<float> pending, byte[] packet, IOpusEncoder encoder, int channels)
+    private static int EncodeFrame(List<float> pending, byte[] packet, IOpusPacketEncoder encoder, int channels)
     {
         float[] frame = [.. pending.GetRange(0, FrameSize * channels)];
-        int length;
-        try
-        {
-            length = encoder.Encode(frame.AsSpan(), FrameSize, packet.AsSpan(), packet.Length);
-        }
-        catch (Exception ex) when (AudioDecoder.IsDecoderFault(ex))
-        {
-            throw AudioDecoder.Damaged(ex);
-        }
-
-        if (length <= 0)
-            throw new InvalidDataException("An audio frame couldn't be encoded to Opus.");
-        return length;
+        return encoder.EncodeFrame(frame, packet);
     }
 
     /// <summary>Mono passes through, stereo passes through, more channels fold even/odd as playback folds them.</summary>

@@ -75,7 +75,7 @@ public sealed class SongAudio : IDisposable
                 if (read.Header is { } header)
                 {
                     mask = header.Mask;
-                    stored = new Dictionary<string, SngFileEntry>(StringComparer.OrdinalIgnoreCase);
+                    stored = [with(StringComparer.OrdinalIgnoreCase)];
                     foreach (var file in read.Files)
                         stored.TryAdd(file.Name, file);
                 }

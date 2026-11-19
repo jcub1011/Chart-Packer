@@ -414,7 +414,7 @@ namespace ChartPacker.ViewModels
         private CancellationTokenSource? _cts;
 
         // The preview: a song folder the merge is staged into, what's in it, and what it was staged for.
-        private readonly Dictionary<string, string> _staged = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, string> _staged = [with(StringComparer.OrdinalIgnoreCase)];
         private string? _previewFolder;
         private string? _previewedPlan;
         private bool _previewRunning;
